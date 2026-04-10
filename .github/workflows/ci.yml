@@ -1,0 +1,51 @@
+name: SynapseCore CI
+
+on:
+  push:
+    branches:
+      - main
+      - master
+      - "codex/**"
+  pull_request:
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Java 21
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "21"
+          cache: maven
+
+      - name: Run backend tests
+        working-directory: backend
+        run: ./mvnw test
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Install frontend dependencies
+        working-directory: frontend
+        run: npm ci
+
+      - name: Build frontend
+        working-directory: frontend
+        run: npm run build
+
+      - name: Validate development Compose config
+        working-directory: infrastructure
+        run: docker compose config >/dev/null
+
+      - name: Validate production Compose config
+        working-directory: infrastructure
+        run: docker compose -f docker-compose.prod.yml config >/dev/null

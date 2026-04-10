@@ -1,0 +1,1 @@
+window.__SYNAPSE_RUNTIME_CONFIG__ = window.__SYNAPSE_RUNTIME_CONFIG__ || {};

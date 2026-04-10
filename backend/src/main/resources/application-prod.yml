@@ -1,0 +1,26 @@
+spring:
+  datasource:
+    url: ${SPRING_DATASOURCE_URL:${DATABASE_URL:jdbc:postgresql://${DB_HOST}:${DB_PORT:5432}/${DB_NAME}}}
+    username: ${SPRING_DATASOURCE_USERNAME:${DB_USER:}}
+    password: ${SPRING_DATASOURCE_PASSWORD:${DB_PASSWORD:}}
+  jpa:
+    hibernate:
+      ddl-auto: ${JPA_DDL_AUTO:validate}
+  data:
+    redis:
+      url: ${REDIS_URL:}
+      host: ${REDIS_HOST:localhost}
+      port: ${REDIS_PORT:6379}
+      repositories:
+        enabled: false
+
+server:
+  servlet:
+    session:
+      cookie:
+        secure: ${SESSION_COOKIE_SECURE:true}
+        same-site: ${SESSION_COOKIE_SAME_SITE:Lax}
+
+synapsecore:
+  access:
+    allow-header-fallback: ${ALLOW_HEADER_FALLBACK:false}

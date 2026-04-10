@@ -1,0 +1,68 @@
+spring:
+  application:
+    name: synapsecore-backend
+  profiles:
+    default: dev
+  jpa:
+    open-in-view: false
+    properties:
+      hibernate:
+        format_sql: false
+        jdbc:
+          time_zone: UTC
+  jackson:
+    serialization:
+      write-dates-as-timestamps: false
+
+server:
+  address: ${SERVER_ADDRESS:0.0.0.0}
+  port: ${PORT:${SERVER_PORT:8080}}
+  forward-headers-strategy: framework
+  servlet:
+    session:
+      timeout: ${SESSION_TIMEOUT:8h}
+      cookie:
+        http-only: true
+
+synapsecore:
+  build:
+    version: ${SYNAPSECORE_BUILD_VERSION:0.0.1-SNAPSHOT}
+    commit: ${SYNAPSECORE_BUILD_COMMIT:local-dev}
+    time: ${SYNAPSECORE_BUILD_TIME:untracked}
+  public:
+    app-url: ${PUBLIC_APP_URL:}
+    api-url: ${PUBLIC_API_URL:}
+  access:
+    allow-header-fallback: ${ALLOW_HEADER_FALLBACK:false}
+  cors:
+    allowed-origins: ${CORS_ALLOWED_ORIGINS:http://localhost:5173,http://127.0.0.1:5173}
+  simulation:
+    interval-ms: ${SIMULATION_INTERVAL_MS:4000}
+  fulfillment:
+    default-dispatch-hours: ${FULFILLMENT_DEFAULT_DISPATCH_HOURS:2}
+    default-delivery-hours: ${FULFILLMENT_DEFAULT_DELIVERY_HOURS:24}
+    analysis-window-hours: ${FULFILLMENT_ANALYSIS_WINDOW_HOURS:6}
+  dashboard:
+    cache-enabled: ${DASHBOARD_CACHE_ENABLED:true}
+    summary-cache-key: synapsecore:dashboard:summary
+  queue:
+    dispatch-interval-ms: ${DISPATCH_INTERVAL_MS:1500}
+    batch-size: ${DISPATCH_BATCH_SIZE:16}
+
+management:
+  prometheus:
+    metrics:
+      export:
+        enabled: true
+  endpoint:
+    health:
+      probes:
+        enabled: true
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics,prometheus
+
+logging:
+  pattern:
+    console: "%d{yyyy-MM-dd'T'HH:mm:ss.SSSXXX} %-5level [%thread] [%X{requestId:-system-no-request}] [%X{tenant:-unscoped}] [%X{actor:-anonymous}] %logger{36} - %msg%n"

@@ -1,0 +1,26 @@
+# OS
+.DS_Store
+Thumbs.db
+
+# IDE
+.idea/
+.vscode/
+*.iml
+
+# Java
+backend/target/
+*.class
+
+# Node
+frontend/node_modules/
+frontend/dist/
+
+# Env
+*.env
+.env
+
+# Logs
+*.log
+
+# Local recovery artifacts
+backups/

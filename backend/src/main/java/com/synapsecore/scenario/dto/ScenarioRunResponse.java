@@ -1,0 +1,49 @@
+package com.synapsecore.scenario.dto;
+
+import com.synapsecore.domain.entity.ScenarioApprovalStatus;
+import com.synapsecore.domain.entity.ScenarioApprovalPolicy;
+import com.synapsecore.domain.entity.ScenarioApprovalStage;
+import com.synapsecore.domain.entity.ScenarioReviewPriority;
+import com.synapsecore.domain.entity.ScenarioRunType;
+import java.time.Instant;
+
+public record ScenarioRunResponse(
+    Long id,
+    ScenarioRunType type,
+    String title,
+    String summary,
+    String recommendedOption,
+    String warehouseCode,
+    Long revisionOfScenarioRunId,
+    Integer revisionNumber,
+    boolean loadable,
+    boolean executable,
+    ScenarioApprovalStatus approvalStatus,
+    ScenarioApprovalPolicy approvalPolicy,
+    ScenarioApprovalStage approvalStage,
+    String requestedBy,
+    String reviewOwner,
+    String finalApprovalOwner,
+    ScenarioReviewPriority reviewPriority,
+    Integer riskScore,
+    String reviewApprovedBy,
+    Instant reviewApprovedAt,
+    String reviewApprovalNote,
+    String approvedBy,
+    String approvalNote,
+    Instant approvedAt,
+    Instant approvalDueAt,
+    String slaEscalatedTo,
+    Instant slaEscalatedAt,
+    boolean slaEscalated,
+    String slaAcknowledgedBy,
+    Instant slaAcknowledgedAt,
+    String slaAcknowledgementNote,
+    boolean slaAcknowledged,
+    boolean overdue,
+    String rejectedBy,
+    Instant rejectedAt,
+    String rejectionReason,
+    Instant createdAt
+) {
+}

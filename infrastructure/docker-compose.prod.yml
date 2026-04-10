@@ -1,0 +1,92 @@
+x-backend-build: &backend-build
+  context: ../backend
+
+services:
+  postgres:
+    image: postgres:15
+    container_name: synapse_postgres
+    environment:
+      POSTGRES_DB: synapsecore
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d synapsecore"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    restart: unless-stopped
+
+  redis:
+    image: redis:7
+    container_name: synapse_redis
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    restart: unless-stopped
+
+  backend-bootstrap:
+    build: *backend-build
+    image: synapsecore-backend:prod-local
+    container_name: synapse_backend_bootstrap
+    env_file:
+      - ${BACKEND_ENV_FILE:-./env/backend.prod.selfhost.env}
+    environment:
+      JPA_DDL_AUTO: update
+      SYNAPSECORE_BOOTSTRAP_SCHEMA_ONLY: "true"
+      SPRING_MAIN_WEB_APPLICATION_TYPE: none
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    restart: "no"
+
+  backend:
+    build:
+      <<: *backend-build
+    image: synapsecore-backend:prod-local
+    container_name: synapse_backend
+    env_file:
+      - ${BACKEND_ENV_FILE:-./env/backend.prod.selfhost.env}
+    depends_on:
+      backend-bootstrap:
+        condition: service_completed_successfully
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "curl --fail --silent http://localhost:8080/actuator/health/readiness >/dev/null || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 12
+      start_period: 30s
+    ports:
+      - "8080:8080"
+    restart: unless-stopped
+
+  frontend:
+    build:
+      context: ../frontend
+    container_name: synapse_frontend
+    env_file:
+      - ${FRONTEND_ENV_FILE:-./env/frontend.prod.selfhost.env}
+    depends_on:
+      backend:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q -O /dev/null http://127.0.0.1/healthz || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 12
+      start_period: 10s
+    ports:
+      - "80:80"
+    restart: unless-stopped
+
+volumes:
+  postgres_data:

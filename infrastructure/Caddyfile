@@ -1,0 +1,13 @@
+{
+    email {$SYNAPSECORE_ACME_EMAIL}
+}
+
+{$SYNAPSECORE_APP_DOMAIN} {
+    encode zstd gzip
+    reverse_proxy frontend:80
+}
+
+{$SYNAPSECORE_API_DOMAIN} {
+    encode zstd gzip
+    reverse_proxy backend:8080
+}
