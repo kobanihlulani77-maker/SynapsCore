@@ -15,6 +15,12 @@ services:
         fromDatabase:
           name: synapsecore-postgres
           property: connectionString
+      - key: SPRING_DATASOURCE_URL
+        value: ""
+      - key: SPRING_DATASOURCE_USERNAME
+        value: ""
+      - key: SPRING_DATASOURCE_PASSWORD
+        value: ""
       - key: REDIS_URL
         fromService:
           type: redis
