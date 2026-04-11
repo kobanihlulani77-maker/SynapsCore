@@ -8,9 +8,7 @@ spring:
       ddl-auto: update
   data:
     redis:
-      url: ${REDIS_URL:}
-      host: ${REDIS_HOST:localhost}
-      port: ${REDIS_PORT:6379}
+      url: ${SPRING_DATA_REDIS_URL:}
       repositories:
         enabled: false
 
