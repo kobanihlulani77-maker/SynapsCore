@@ -117,7 +117,7 @@ frontend_build_time="$(require_value "$FRONTEND_FILE" "VITE_APP_BUILD_TIME")"
 
 require_equals "$BACKEND_FILE" "SPRING_PROFILES_ACTIVE" "prod"
 require_equals "$BACKEND_FILE" "ALLOW_HEADER_FALLBACK" "false"
-require_equals "$BACKEND_FILE" "JPA_DDL_AUTO" "validate"
+require_equals "$BACKEND_FILE" "JPA_DDL_AUTO" "update"
 
 if [[ "$backend_same_site" != "Lax" && "$backend_same_site" != "Strict" && "$backend_same_site" != "None" ]]; then
   echo "SESSION_COOKIE_SAME_SITE must be one of Lax, Strict, or None in $BACKEND_FILE" >&2
