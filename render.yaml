@@ -29,7 +29,7 @@ services:
       - key: ALLOW_HEADER_FALLBACK
         value: "false"
       - key: JPA_DDL_AUTO
-        value: validate
+        value: update
       - key: PUBLIC_APP_URL
         value: https://synapsecore-frontend.onrender.com
       - key: PUBLIC_API_URL
