@@ -28,6 +28,7 @@ body {
 
 button {
   font: inherit;
+  transition: border-color 160ms ease, background 160ms ease, color 160ms ease, box-shadow 160ms ease, transform 160ms ease;
 }
 
 .app-shell {
@@ -1181,6 +1182,19 @@ td span {
   --panel-border: rgba(126, 168, 216, 0.16);
   --text-muted: #8ea4bc;
   --shadow: 0 28px 70px rgba(2, 10, 20, 0.42);
+  --space-tight: 12px;
+  --space-medium: 20px;
+  --space-wide: 32px;
+  --type-title: clamp(2rem, 3vw, 3rem);
+  --type-section: 1.25rem;
+  --type-label: 0.78rem;
+  --color-background: #07111b;
+  --color-panel: rgba(10, 22, 36, 0.92);
+  --color-border: rgba(126, 168, 216, 0.16);
+  --color-primary: #5be2ff;
+  --color-success: #4fd7b2;
+  --color-warning: #ffbe5c;
+  --color-danger: #ff7f7f;
 }
 
 body {
@@ -2085,10 +2099,46 @@ body {
   margin: 14px 0;
 }
 
+.signin-form-shell {
+  display: grid;
+  gap: 18px;
+}
+
 .inline-checkbox {
   display: inline-flex;
   align-items: center;
   gap: 10px;
+}
+
+.signin-trust-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.signin-trust-card {
+  padding: 16px;
+  border-radius: 18px;
+  border: 1px solid rgba(126, 168, 216, 0.1);
+  background: rgba(255, 255, 255, 0.03);
+}
+
+.signin-trust-card span {
+  display: block;
+  font-size: 0.72rem;
+  text-transform: uppercase;
+  letter-spacing: 0.14em;
+  color: var(--text-muted);
+}
+
+.signin-trust-card strong {
+  display: block;
+  margin-top: 8px;
+  font-size: 1rem;
+}
+
+.signin-trust-card p {
+  margin: 8px 0 0;
 }
 
 .signin-form-grid,
@@ -2152,6 +2202,12 @@ body {
   border-radius: 18px;
   border: 1px solid rgba(126, 168, 216, 0.08);
   background: rgba(255, 255, 255, 0.025);
+}
+
+.system-select-card {
+  appearance: none;
+  font: inherit;
+  color: inherit;
 }
 
 .signal-list-item strong {
@@ -2476,6 +2532,7 @@ tbody tr:hover {
 
   .public-hero,
   .public-signin-shell,
+  .signin-trust-grid,
   .tenant-rollout-grid,
   .profile-grid,
   .dashboard-command-grid,
@@ -2553,5 +2610,300 @@ tbody tr:hover {
 
   .workspace-nav-link {
     padding: 11px 12px;
+  }
+}
+
+.loading-state {
+  display: grid;
+  gap: 10px;
+  padding: 18px;
+  border-radius: 20px;
+  border: 1px solid var(--color-border);
+  background: linear-gradient(180deg, rgba(13, 24, 39, 0.92), rgba(8, 16, 28, 0.9));
+}
+
+.loading-state p {
+  margin: 4px 0 0;
+  color: var(--text-muted);
+}
+
+.loading-skeleton {
+  height: 12px;
+  border-radius: 999px;
+  background: linear-gradient(90deg, rgba(91, 226, 255, 0.14), rgba(91, 226, 255, 0.32), rgba(91, 226, 255, 0.14));
+  background-size: 200% 100%;
+  animation: skeleton-shift 1.3s ease infinite;
+}
+
+.loading-skeleton-wide {
+  height: 18px;
+  width: 78%;
+}
+
+.loading-skeleton-short {
+  width: 40%;
+}
+
+.data-grid {
+  overflow: auto;
+  border: 1px solid var(--color-border);
+  border-radius: 18px;
+  background: rgba(9, 18, 31, 0.72);
+}
+
+.data-grid-table {
+  width: 100%;
+  border-collapse: collapse;
+  min-width: 560px;
+}
+
+.data-grid-table th,
+.data-grid-table td {
+  padding: 14px 16px;
+  text-align: left;
+  border-bottom: 1px solid rgba(126, 168, 216, 0.12);
+}
+
+.data-grid-table th {
+  font-size: var(--type-label);
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  color: var(--text-muted);
+  background: rgba(7, 14, 24, 0.96);
+}
+
+.data-grid-table tbody tr:hover {
+  background: rgba(91, 226, 255, 0.06);
+}
+
+.enterprise-signin-shell {
+  align-items: stretch;
+}
+
+.enterprise-signin-story {
+  background:
+    linear-gradient(180deg, rgba(7, 14, 24, 0.94), rgba(11, 20, 34, 0.88)),
+    radial-gradient(circle at top right, rgba(91, 226, 255, 0.12), transparent 34%);
+  border: 1px solid rgba(126, 168, 216, 0.16);
+}
+
+.enterprise-status-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin: 18px 0 20px;
+}
+
+.enterprise-status-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  border-radius: 999px;
+  border: 1px solid rgba(126, 168, 216, 0.16);
+  background: rgba(11, 22, 36, 0.72);
+  color: #dcebf7;
+  font-size: 0.84rem;
+}
+
+.enterprise-status-pill.status-live {
+  border-color: rgba(79, 215, 178, 0.26);
+  color: #8ef0d2;
+}
+
+.enterprise-status-pill.status-missing {
+  border-color: rgba(255, 190, 92, 0.24);
+  color: #ffd289;
+}
+
+.workspace-nav-link:hover,
+.ghost-button:hover,
+.secondary-button:hover,
+.primary-button:hover,
+.signal-list-item.selectable-card:hover,
+.stack-card.selectable-card:hover {
+  transform: translateY(-1px);
+}
+
+@keyframes skeleton-shift {
+  0% {
+    background-position: 100% 0;
+  }
+
+  100% {
+    background-position: -100% 0;
+  }
+}
+
+:root {
+  --surface-bg: #07111d;
+  --surface-panel: rgba(12, 21, 36, 0.94);
+  --surface-panel-strong: rgba(15, 28, 46, 0.98);
+  --surface-border: rgba(126, 168, 216, 0.14);
+  --surface-shadow-strong: 0 30px 80px rgba(1, 6, 13, 0.46);
+  --type-page-title: clamp(2.2rem, 3vw, 3.4rem);
+  --type-section-title: 1.35rem;
+  --type-card-title: 1rem;
+  --type-label: 0.73rem;
+  --space-tight: 10px;
+  --space-medium: 18px;
+  --space-wide: 28px;
+}
+
+.panel,
+.summary-card,
+.stack-card,
+.utility-card,
+.public-section-card,
+.public-signin-card,
+.public-hero-card,
+.warehouse-health-card {
+  background: linear-gradient(180deg, rgba(10, 19, 33, 0.94), rgba(8, 16, 28, 0.98));
+  border: 1px solid var(--surface-border);
+  box-shadow: var(--surface-shadow-strong);
+}
+
+.page-intro-panel h2,
+.public-hero-copy h1 {
+  font-size: var(--type-page-title);
+  letter-spacing: -0.04em;
+}
+
+.panel h2,
+.stack-title-row strong,
+.action-card strong,
+.public-section-card h2 {
+  font-size: var(--type-section-title);
+  letter-spacing: -0.02em;
+}
+
+.summary-label,
+.panel-kicker,
+.hero-highlight-label,
+.utility-card-header .panel-kicker {
+  font-size: var(--type-label);
+}
+
+.panel-header-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.metric-card {
+  min-height: 148px;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+}
+
+.metric-card-note {
+  margin: 10px 0 0;
+  color: var(--text-muted);
+  font-size: 0.84rem;
+  line-height: 1.45;
+}
+
+.alert-card {
+  min-height: 146px;
+  transition: transform 180ms ease, border-color 180ms ease, box-shadow 180ms ease;
+}
+
+.alert-card-success {
+  border-color: rgba(79, 215, 178, 0.22);
+}
+
+.alert-card-partial {
+  border-color: rgba(255, 190, 92, 0.22);
+}
+
+.alert-card-failure {
+  border-color: rgba(255, 118, 137, 0.22);
+}
+
+.dashboard-card-button {
+  background: transparent;
+  border: 0;
+  padding: 0;
+  text-align: left;
+  cursor: pointer;
+}
+
+.dashboard-card-button .alert-card:hover,
+.action-card:hover,
+.utility-action:hover,
+.data-grid-sort.is-sortable:hover {
+  transform: translateY(-1px);
+  border-color: rgba(91, 226, 255, 0.28);
+  box-shadow: 0 18px 44px rgba(2, 8, 15, 0.42);
+}
+
+.action-panel {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-medium);
+}
+
+.activity-feed .signal-list-item {
+  border-radius: 18px;
+  border: 1px solid rgba(126, 168, 216, 0.1);
+  background: rgba(10, 18, 30, 0.72);
+}
+
+.data-grid-sort {
+  width: 100%;
+  display: inline-flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 0;
+  background: transparent;
+  border: 0;
+  color: inherit;
+  cursor: default;
+}
+
+.data-grid-sort.is-sortable {
+  cursor: pointer;
+}
+
+.enterprise-public-hero {
+  display: grid;
+  grid-template-columns: minmax(0, 1.4fr) minmax(320px, 0.9fr);
+  gap: 24px;
+  padding: 24px 0 8px;
+}
+
+.public-hero-copy,
+.public-hero-card {
+  border-radius: 30px;
+  padding: 28px;
+}
+
+.public-hero-copy {
+  background:
+    linear-gradient(180deg, rgba(8, 17, 30, 0.98), rgba(10, 20, 35, 0.92)),
+    radial-gradient(circle at top right, rgba(91, 226, 255, 0.14), transparent 38%);
+  border: 1px solid rgba(126, 168, 216, 0.14);
+}
+
+.public-command-grid {
+  margin-top: 18px;
+}
+
+.signin-trust-card,
+.public-feature-card {
+  transition: transform 180ms ease, border-color 180ms ease;
+}
+
+.signin-trust-card:hover,
+.public-feature-card:hover {
+  transform: translateY(-2px);
+  border-color: rgba(91, 226, 255, 0.24);
+}
+
+@media (max-width: 980px) {
+  .enterprise-public-hero {
+    grid-template-columns: 1fr;
   }
 }
