@@ -1,7 +1,7 @@
 import { randomUUID } from 'node:crypto'
 import { expect, request as playwrightRequest, test } from '@playwright/test'
 
-const backendUrl = process.env.PLAYWRIGHT_BACKEND_URL || 'http://127.0.0.1:8080'
+const backendUrl = process.env.PLAYWRIGHT_BACKEND_URL || 'https://synapscore-3.onrender.com'
 
 const users = {
   operationsLead: {

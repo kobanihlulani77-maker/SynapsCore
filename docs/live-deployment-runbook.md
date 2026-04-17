@@ -69,6 +69,8 @@ Update them with real values:
 - backend:
   - `CORS_ALLOWED_ORIGINS=https://app.example.com`
   - `SESSION_COOKIE_SECURE=true`
+  - `SYNAPSECORE_BOOTSTRAP_INITIAL_TOKEN=<one-time-secret>` only if this is the first tenant on an empty production database
+  - `SYNAPSECORE_PLATFORM_ADMIN_TOKEN=<rotated-secret>` for ongoing production tenant provisioning after bootstrap
   - `SYNAPSECORE_BUILD_VERSION`
   - `SYNAPSECORE_BUILD_COMMIT`
   - `SYNAPSECORE_BUILD_TIME`
@@ -83,10 +85,14 @@ Update them with real values:
   - `SYNAPSECORE_API_DOMAIN=api.example.com`
   - `SYNAPSECORE_ACME_EMAIL=ops@example.com`
 
-For the first self-hosted rollout, Postgres and Redis can stay on the Compose-internal names:
+For the first self-hosted rollout, Postgres and Redis can stay on the Compose-internal network:
 
 - `DB_HOST=postgres`
-- `REDIS_HOST=redis`
+- `SPRING_DATA_REDIS_URL=redis://redis:6379`
+
+After the first tenant workspace is created successfully, remove `SYNAPSECORE_BOOTSTRAP_INITIAL_TOKEN` from the backend env and redeploy so the bootstrap lane is closed again.
+Use `SYNAPSECORE_PLATFORM_ADMIN_TOKEN` through the `X-Synapse-Platform-Admin-Token` header for any later production tenant provisioning.
+Do not expect ordinary tenant-admin sessions to create additional tenant workspaces in production after that point. This is intentionally blocked.
 
 ## 4. Run Release Readiness
 

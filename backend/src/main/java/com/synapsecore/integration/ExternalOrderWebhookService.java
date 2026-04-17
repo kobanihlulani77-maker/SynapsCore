@@ -1,5 +1,6 @@
 package com.synapsecore.integration;
 
+import com.synapsecore.audit.RequestTraceContext;
 import com.synapsecore.domain.dto.OrderCreateRequest;
 import com.synapsecore.domain.dto.OrderItemRequest;
 import com.synapsecore.domain.dto.OrderResponse;
@@ -22,17 +23,40 @@ public class ExternalOrderWebhookService {
     private final IntegrationConnectorPolicyService integrationConnectorPolicyService;
     private final IntegrationImportRunService integrationImportRunService;
     private final IntegrationReplayService integrationReplayService;
+    private final IntegrationInboundRecordService integrationInboundRecordService;
+    private final RequestTraceContext requestTraceContext;
 
     public ExternalOrderWebhookResponse ingest(ExternalOrderWebhookRequest request) {
+        return ingest(request, null);
+    }
+
+    public ExternalOrderWebhookResponse ingest(ExternalOrderWebhookRequest request,
+                                               com.synapsecore.domain.entity.IntegrationConnector authenticatedConnector) {
         String sourceSystem = request.sourceSystem().trim().toLowerCase(Locale.ROOT);
         OrderCreateRequest mappedRequest = null;
+        Long inboundRecordId = null;
+        String tenantCode = requestTraceContext.getCurrentTenant()
+            .filter(currentTenant -> !RequestTraceContext.DEFAULT_TENANT.equalsIgnoreCase(currentTenant))
+            .orElse(authenticatedConnector != null ? authenticatedConnector.getTenant().getCode() : null);
 
         try {
-            var connector = integrationConnectorService.requireEnabledConnector(
+            var connector = authenticatedConnector != null
+                ? authenticatedConnector
+                : integrationConnectorService.requireEnabledConnector(
+                    sourceSystem,
+                    IntegrationConnectorType.WEBHOOK_ORDER,
+                    "accept webhook orders");
+            tenantCode = connector.getTenant().getCode();
+            sourceSystem = connector.getSourceSystem();
+            inboundRecordId = integrationInboundRecordService.recordReceived(
+                tenantCode,
                 sourceSystem,
                 IntegrationConnectorType.WEBHOOK_ORDER,
-                "accept webhook orders");
-            sourceSystem = connector.getSourceSystem();
+                null,
+                request.externalOrderId() == null ? null : request.externalOrderId().trim(),
+                request.warehouseCode() == null ? null : request.warehouseCode().trim(),
+                request
+            ).getId();
             PreparedConnectorOrder preparedOrder = integrationConnectorPolicyService.prepareOrder(
                 connector,
                 request.externalOrderId(),
@@ -45,6 +69,7 @@ public class ExternalOrderWebhookService {
             String ingestionSource = "integration-webhook:" + sourceSystem.toLowerCase(Locale.ROOT);
 
             OrderResponse order = orderService.createOrder(mappedRequest, ingestionSource);
+            integrationInboundRecordService.markAccepted(inboundRecordId, ingestionSource);
             integrationImportRunService.recordRun(
                 sourceSystem,
                 IntegrationConnectorType.WEBHOOK_ORDER,
@@ -62,6 +87,8 @@ public class ExternalOrderWebhookService {
                 order
             );
         } catch (org.springframework.web.server.ResponseStatusException exception) {
+            var failure = IntegrationFailureCodes.extract(exception);
+            integrationInboundRecordService.markRejected(inboundRecordId, failure.failureCode(), failure.failureMessage());
             integrationImportRunService.recordRun(
                 sourceSystem,
                 IntegrationConnectorType.WEBHOOK_ORDER,
@@ -70,9 +97,10 @@ public class ExternalOrderWebhookService {
                 0,
                 1,
                 "Rejected webhook order " + (mappedRequest == null ? request.externalOrderId().trim() : mappedRequest.externalOrderId()) + " from " + sourceSystem
-                    + ". Reason: " + exception.getReason()
+                    + ". Reason: " + failure.failureMessage()
             );
             integrationReplayService.recordFailure(
+                tenantCode,
                 sourceSystem,
                 IntegrationConnectorType.WEBHOOK_ORDER,
                 mappedRequest == null
@@ -82,7 +110,9 @@ public class ExternalOrderWebhookService {
                         mapItems(request)
                     )
                     : mappedRequest,
-                exception.getReason()
+                failure.failureCode(),
+                failure.failureMessage(),
+                inboundRecordId
             );
             throw exception;
         }

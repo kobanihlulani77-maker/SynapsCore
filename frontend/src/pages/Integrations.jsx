@@ -31,7 +31,54 @@ export default function IntegrationsPage({ context }) {
   const scheduledConnectors = connectorPortfolio.filter((connector) => connector.syncMode === 'SCHEDULED_PULL').length
   const connectedSystemCount = new Set(connectorPortfolio.map((connector) => connector.sourceSystem)).size
   const fallbackEnabledCount = connectorPortfolio.filter((connector) => connector.allowDefaultWarehouseFallback).length
-  const disabledConnectorCount = connectorPortfolio.filter((connector) => !connector.enabled).length
+  const disabledConnectorCount = connectorPortfolio.filter((connector) => connector.healthStatus === 'OFFLINE').length
+  const degradedConnectorCount = connectorPortfolio.filter((connector) => connector.healthStatus === 'DEGRADED').length
+
+  const getConnectorTone = (connector) => {
+    if (connector.healthStatus === 'OFFLINE') {
+      return 'failure'
+    }
+    if (connector.healthStatus === 'DEGRADED') {
+      return 'partial'
+    }
+    return 'success'
+  }
+
+  const getConnectorStatusClassName = (connector) => {
+    if (connector.healthStatus === 'OFFLINE') {
+      return 'status-failure'
+    }
+    if (connector.healthStatus === 'DEGRADED') {
+      return 'status-partial'
+    }
+    return 'status-success'
+  }
+
+  const getConnectorStatusLabel = (connector) => {
+    if (connector.healthStatus === 'OFFLINE') {
+      return 'Offline'
+    }
+    if (connector.healthStatus === 'DEGRADED') {
+      return 'Degraded'
+    }
+    return 'Live'
+  }
+
+  const formatReplayAge = (ageSeconds) => {
+    if (ageSeconds == null) {
+      return null
+    }
+    if (ageSeconds < 60) {
+      return `${ageSeconds}s`
+    }
+    if (ageSeconds < 3600) {
+      return `${Math.floor(ageSeconds / 60)}m`
+    }
+    if (ageSeconds < 86400) {
+      return `${Math.floor(ageSeconds / 3600)}h`
+    }
+    return `${Math.floor(ageSeconds / 86400)}d`
+  }
 
   return (
     <section className="content-grid">
@@ -44,7 +91,7 @@ export default function IntegrationsPage({ context }) {
           <MetricCard label="Enabled connectors" value={enabledConnectorCount} accent="teal" note="Routes actively feeding the workspace" />
           <MetricCard label="Connected systems" value={connectedSystemCount} accent="blue" note="Distinct external operating systems connected" />
           <MetricCard label="Replay queued" value={pendingReplayCount} accent="amber" note="Inbound items waiting on recovery" />
-          <MetricCard label="Connector attention" value={disabledConnectorCount + unownedConnectors} accent="rose" note="Lanes that need ownership or remediation" />
+          <MetricCard label="Connector attention" value={disabledConnectorCount + degradedConnectorCount + unownedConnectors} accent="rose" note="Lanes that need ownership or remediation" />
         </div>
         <div className="experience-grid experience-grid-three">
           <article className="stack-card section-card">
@@ -63,11 +110,11 @@ export default function IntegrationsPage({ context }) {
                   <AlertCard
                     title={connector.displayName}
                     body={`${connector.sourceSystem} | ${formatCodeLabel(connector.type)}`}
-                    tone={connector.enabled ? (connector.supportOwnerActorName ? 'success' : 'partial') : 'failure'}
-                    meta={`${formatCodeLabel(connector.syncMode)}${connector.syncIntervalMinutes ? ` every ${connector.syncIntervalMinutes} min` : ''}${connector.updatedAt ? ` | Last sync ${formatTimestamp(connector.updatedAt)}` : ''}`}
+                    tone={getConnectorTone(connector)}
+                    meta={`${formatCodeLabel(connector.syncMode)}${connector.syncIntervalMinutes ? ` every ${connector.syncIntervalMinutes} min` : ''}${connector.lastActivityAt ? ` | Last activity ${formatTimestamp(connector.lastActivityAt)}` : connector.updatedAt ? ` | Updated ${formatTimestamp(connector.updatedAt)}` : ''}`}
                     action={
-                      <span className={`status-tag ${connector.enabled ? (connector.supportOwnerActorName ? 'status-success' : 'status-partial') : 'status-failure'}`}>
-                        {connector.enabled ? (connector.supportOwnerActorName ? 'Live' : 'Degraded') : 'Offline'}
+                      <span className={`status-tag ${getConnectorStatusClassName(connector)}`}>
+                        {getConnectorStatusLabel(connector)}
                       </span>
                     }
                   />
@@ -84,18 +131,37 @@ export default function IntegrationsPage({ context }) {
               <div className="signal-list">
                 <div className="signal-list-item">
                   <strong>{selectedConnector.displayName}</strong>
-                  <p>{selectedConnector.notes || 'No connector notes yet. Use this space to capture support ownership and operating assumptions.'}</p>
-                  <p className="muted-text">Source {selectedConnector.sourceSystem} | Owner {selectedConnector.supportOwnerDisplayName || 'Unassigned'} | Failure count {snapshot.integrationReplayQueue.filter((record) => record.sourceSystem === selectedConnector.sourceSystem).length}</p>
+                  <p>{selectedConnector.healthSummary || selectedConnector.notes || 'No connector notes yet. Use this space to capture support ownership and operating assumptions.'}</p>
+                  <p className="muted-text">Source {selectedConnector.sourceSystem} | Owner {selectedConnector.supportOwnerDisplayName || 'Unassigned'} | Pending replay {selectedConnector.pendingReplayCount || 0} | Dead-letter {selectedConnector.deadLetterCount || 0}</p>
                   <p className="muted-text">{selectedConnector.allowDefaultWarehouseFallback ? 'Warehouse fallback is enabled for missing inbound lane data.' : 'Warehouse fallback is off. Payloads must arrive with a valid lane.'}</p>
                 </div>
                 <div className="signal-list-item">
                   <strong>Connection posture</strong>
-                  <p>{selectedConnector.enabled ? 'This connector is allowed to feed live operational state into the workspace.' : 'This connector is currently disabled and cannot feed live operational state.'}</p>
+                  <p>{selectedConnector.healthStatus === 'OFFLINE' ? 'This connector is currently disabled and cannot feed live operational state.' : selectedConnector.healthStatus === 'DEGRADED' ? 'This connector is enabled but degrading under inbound failures or replay pressure.' : 'This connector is healthy and allowed to feed live operational state into the workspace.'}</p>
                   <p className="muted-text">
                     Validation {formatCodeLabel(selectedConnector.validationPolicy)}
+                    {selectedConnector.mappingVersion ? ` | Mapping v${selectedConnector.mappingVersion}` : ''}
                     {selectedConnector.syncIntervalMinutes ? ` | Sync cadence ${selectedConnector.syncIntervalMinutes} min` : ' | Event-driven cadence'}
-                    {selectedConnector.updatedAt ? ` | Updated ${formatTimestamp(selectedConnector.updatedAt)}` : ''}
+                    {selectedConnector.lastActivityAt ? ` | Last activity ${formatTimestamp(selectedConnector.lastActivityAt)}` : selectedConnector.updatedAt ? ` | Updated ${formatTimestamp(selectedConnector.updatedAt)}` : ''}
                   </p>
+                  <p className="muted-text">
+                    Recent inbound failures {selectedConnector.recentInboundFailureCount || 0}
+                    {selectedConnector.lastImportStatus ? ` | Last import ${formatCodeLabel(selectedConnector.lastImportStatus)}` : ''}
+                    {selectedConnector.lastImportAt ? ` at ${formatTimestamp(selectedConnector.lastImportAt)}` : ''}
+                  </p>
+                  {selectedConnector.lastFailureMessage ? (
+                    <p className="muted-text">
+                      Latest failure {selectedConnector.lastFailureCode ? formatCodeLabel(selectedConnector.lastFailureCode) : 'Unknown'}
+                      {selectedConnector.lastFailureAt ? ` | ${formatTimestamp(selectedConnector.lastFailureAt)}` : ''}
+                      {` | ${selectedConnector.lastFailureMessage}`}
+                    </p>
+                  ) : null}
+                  {selectedConnector.oldestPendingReplayAgeSeconds != null ? (
+                    <p className="muted-text">
+                      Oldest replay waiting {formatReplayAge(selectedConnector.oldestPendingReplayAgeSeconds)}
+                      {selectedConnector.oldestPendingReplayAt ? ` | queued ${formatTimestamp(selectedConnector.oldestPendingReplayAt)}` : ''}
+                    </p>
+                  ) : null}
                 </div>
                 <div className="history-action-row">
                   <button className="ghost-button" onClick={() => navigateToPage('settings')} type="button">Manage Policies</button>
@@ -112,6 +178,7 @@ export default function IntegrationsPage({ context }) {
             <div className="utility-metric-grid">
               <div><span>Scheduled pull</span><strong>{scheduledConnectors}</strong></div>
               <div><span>Unowned</span><strong>{unownedConnectors}</strong></div>
+              <div><span>Degraded</span><strong>{degradedConnectorCount}</strong></div>
               <div><span>Fallback on</span><strong>{fallbackEnabledCount}</strong></div>
               <div><span>Support incidents</span><strong>{systemIncidents.length}</strong></div>
             </div>

@@ -22,6 +22,7 @@ import com.synapsecore.fulfillment.FulfillmentService;
 import com.synapsecore.intelligence.InventoryMonitoringService;
 import com.synapsecore.observability.OperationalMetricsService;
 import com.synapsecore.tenant.TenantContextService;
+import com.synapsecore.tenant.TenantScopeGuard;
 import java.math.BigDecimal;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
@@ -48,6 +49,7 @@ public class OrderService {
     private final AuditLogService auditLogService;
     private final FulfillmentService fulfillmentService;
     private final TenantContextService tenantContextService;
+    private final TenantScopeGuard tenantScopeGuard;
     private final OperationalMetricsService operationalMetricsService;
 
     @Transactional
@@ -61,6 +63,7 @@ public class OrderService {
         Warehouse warehouse = warehouseRepository.findByTenant_CodeIgnoreCaseAndCode(tenantCode, request.warehouseCode().trim())
             .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND,
                 "Warehouse not found: " + request.warehouseCode()));
+        tenantScopeGuard.requireWarehouseForTenant(warehouse, tenantCode, "order creation");
         String externalOrderId = resolveExternalOrderId(request.externalOrderId(), source);
         ensureOrderIdIsAvailable(tenantCode, externalOrderId);
 
@@ -84,6 +87,7 @@ public class OrderService {
             Inventory inventory = inventoryRepository.findByProductIdAndWarehouseId(product.getId(), warehouse.getId())
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.BAD_REQUEST,
                     "No inventory found for SKU " + product.getSku() + " in warehouse " + warehouse.getCode()));
+            tenantScopeGuard.requireInventoryForTenant(inventory, warehouse, tenantCode, "order creation");
 
             if (inventory.getQuantityAvailable() < itemRequest.quantity()) {
                 throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
@@ -107,6 +111,7 @@ public class OrderService {
 
         order.setTotalAmount(totalAmount);
         CustomerOrder savedOrder = customerOrderRepository.save(order);
+        tenantScopeGuard.requireCustomerOrder(savedOrder, "order creation");
         fulfillmentService.initializeForOrder(savedOrder, source);
         operationalMetricsService.recordOrderIngested(tenantCode, source);
 

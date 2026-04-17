@@ -3,6 +3,7 @@ package com.synapsecore.access;
 import com.synapsecore.access.dto.TenantOnboardingRequest;
 import com.synapsecore.access.dto.TenantOnboardingResponse;
 import com.synapsecore.audit.AuditLogService;
+import com.synapsecore.config.SynapseDemoProperties;
 import com.synapsecore.domain.entity.AccessOperator;
 import com.synapsecore.domain.entity.AccessUser;
 import com.synapsecore.domain.entity.Inventory;
@@ -41,6 +42,7 @@ public class TenantOnboardingService {
     private final PasswordEncoder passwordEncoder;
     private final IntegrationConnectorService integrationConnectorService;
     private final AuditLogService auditLogService;
+    private final SynapseDemoProperties demoProperties;
 
     @Transactional
     public TenantOnboardingResponse onboardTenant(TenantOnboardingRequest request, String actorName) {
@@ -134,10 +136,15 @@ public class TenantOnboardingService {
             .location(secondaryLocation == null ? primaryLocation + " Reserve" : secondaryLocation)
             .build());
 
-        seedStarterInventory(north, coast);
-        integrationConnectorService.seedStarterConnectors(tenant);
+        if (demoProperties.isSeedStarterInventoryOnTenantOnboarding()) {
+            seedStarterInventory(north, coast);
+        }
+        if (demoProperties.isSeedStarterConnectorsOnTenantOnboarding()) {
+            integrationConnectorService.seedStarterConnectors(tenant);
+        }
 
-        auditLogService.recordSuccess(
+        auditLogService.recordSuccessForTenant(
+            tenant.getCode(),
             "TENANT_ONBOARDED",
             actorName,
             "tenant-admin",
@@ -154,7 +161,6 @@ public class TenantOnboardingService {
             operationsLead.getActorName(),
             executiveUsername,
             executiveApprover.getActorName(),
-            executivePassword,
             List.of(north.getCode(), coast.getCode()),
             Instant.now()
         );

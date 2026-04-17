@@ -1,9 +1,11 @@
 package com.synapsecore.integration.dto;
 
 import com.synapsecore.domain.entity.IntegrationConnectorType;
+import com.synapsecore.domain.entity.IntegrationImportStatus;
 import com.synapsecore.domain.entity.IntegrationSyncMode;
 import com.synapsecore.domain.entity.IntegrationTransformationPolicy;
 import com.synapsecore.domain.entity.IntegrationValidationPolicy;
+import com.synapsecore.integration.IntegrationFailureCode;
 import java.time.Instant;
 
 public record IntegrationConnectorResponse(
@@ -17,11 +19,28 @@ public record IntegrationConnectorResponse(
     Integer syncIntervalMinutes,
     IntegrationValidationPolicy validationPolicy,
     IntegrationTransformationPolicy transformationPolicy,
+    Integer mappingVersion,
     boolean allowDefaultWarehouseFallback,
     String defaultWarehouseCode,
     String notes,
     String supportOwnerActorName,
     String supportOwnerDisplayName,
+    boolean inboundAccessConfigured,
+    String inboundAccessTokenHint,
+    IntegrationConnectorHealthStatus healthStatus,
+    String healthSummary,
+    Instant lastActivityAt,
+    Instant lastSuccessfulActivityAt,
+    IntegrationImportStatus lastImportStatus,
+    Instant lastImportAt,
+    long recentInboundFailureCount,
+    long pendingReplayCount,
+    long deadLetterCount,
+    IntegrationFailureCode lastFailureCode,
+    String lastFailureMessage,
+    Instant lastFailureAt,
+    Instant oldestPendingReplayAt,
+    Long oldestPendingReplayAgeSeconds,
     Instant createdAt,
     Instant updatedAt
 ) {

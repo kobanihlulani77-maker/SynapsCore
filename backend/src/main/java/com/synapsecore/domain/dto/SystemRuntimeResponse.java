@@ -20,6 +20,7 @@ public record SystemRuntimeResponse(
     SystemBackboneSummary backbone,
     SystemMetricsSummary metrics,
     SystemDiagnosticsSummary diagnostics,
+    List<SystemConnectorDiagnosticSummary> connectorDiagnostics,
     Instant observedAt
 ) {
 }

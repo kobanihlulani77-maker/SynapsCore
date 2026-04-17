@@ -31,6 +31,7 @@ import com.synapsecore.domain.repository.IntegrationReplayRecordRepository;
 import com.synapsecore.domain.repository.ScenarioRunRepository;
 import com.synapsecore.domain.repository.WarehouseRepository;
 import com.synapsecore.domain.service.SystemIncidentService;
+import com.synapsecore.integration.IntegrationConnectorService;
 import com.synapsecore.integration.dto.IntegrationConnectorResponse;
 import com.synapsecore.tenant.TenantContextService;
 import java.time.Duration;
@@ -58,6 +59,7 @@ public class TenantWorkspaceAdministrationService {
     private final ScenarioRunRepository scenarioRunRepository;
     private final SystemIncidentService systemIncidentService;
     private final AuditLogService auditLogService;
+    private final IntegrationConnectorService integrationConnectorService;
 
     public TenantWorkspaceResponse getWorkspace() {
         Tenant tenant = tenantContextService.getCurrentTenantOrDefault();
@@ -68,7 +70,7 @@ public class TenantWorkspaceAdministrationService {
             .toList();
         List<IntegrationConnectorResponse> connectors = integrationConnectorRepository
             .findAllByTenant_CodeIgnoreCaseOrderByTypeAscSourceSystemAsc(tenantCode).stream()
-            .map(this::toConnectorResponse)
+            .map(integrationConnectorService::describeConnector)
             .toList();
         List<SystemIncidentResponse> supportIncidents = systemIncidentService.getActiveIncidents();
         List<TenantWorkspaceSupportActivity> recentSupportActivity = auditLogRepository
@@ -268,7 +270,7 @@ public class TenantWorkspaceAdministrationService {
             "Updated support owner for connector " + connector.getDisplayName() + "."
         );
 
-        return toConnectorResponse(connector);
+        return integrationConnectorService.describeConnector(connector);
     }
 
     private WarehouseResponse toWarehouseResponse(Warehouse warehouse) {
@@ -278,43 +280,6 @@ public class TenantWorkspaceAdministrationService {
             warehouse.getName(),
             warehouse.getLocation()
         );
-    }
-
-    private IntegrationConnectorResponse toConnectorResponse(IntegrationConnector connector) {
-        String tenantCode = tenantContextService.getCurrentTenantCodeOrDefault();
-        AccessOperator supportOwner = resolveSupportOwner(tenantCode, connector.getSupportOwnerActorName());
-        return new IntegrationConnectorResponse(
-            connector.getId(),
-            tenantCode,
-            connector.getSourceSystem(),
-            connector.getType(),
-            connector.getDisplayName(),
-            connector.isEnabled(),
-            connector.getSyncMode(),
-            connector.getSyncIntervalMinutes(),
-            connector.getValidationPolicy(),
-            connector.getTransformationPolicy(),
-            connector.isAllowDefaultWarehouseFallback(),
-            connector.getDefaultWarehouseCode(),
-            connector.getNotes(),
-            connector.getSupportOwnerActorName(),
-            supportOwner == null ? null : supportOwner.getDisplayName(),
-            connector.getCreatedAt(),
-            connector.getUpdatedAt()
-        );
-    }
-
-    private AccessOperator resolveSupportOwner(String tenantCode, String supportOwnerActorName) {
-        if (tenantCode == null
-            || supportOwnerActorName == null
-            || supportOwnerActorName.isBlank()) {
-            return null;
-        }
-        return accessOperatorRepository.findByTenant_CodeIgnoreCaseAndActorNameIgnoreCase(
-                tenantCode,
-                supportOwnerActorName
-            )
-            .orElse(null);
     }
 
     private String normalizeOptional(String value) {

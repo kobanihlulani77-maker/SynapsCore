@@ -1,7 +1,9 @@
 package com.synapsecore.domain.repository;
 
 import com.synapsecore.domain.entity.IntegrationImportRun;
+import com.synapsecore.domain.entity.IntegrationConnectorType;
 import java.util.List;
+import java.util.Optional;
 import org.springframework.data.jpa.repository.JpaRepository;
 
 public interface IntegrationImportRunRepository extends JpaRepository<IntegrationImportRun, Long> {
@@ -9,4 +11,10 @@ public interface IntegrationImportRunRepository extends JpaRepository<Integratio
     List<IntegrationImportRun> findTop20ByOrderByCreatedAtDesc();
 
     List<IntegrationImportRun> findTop20ByTenantCodeIgnoreCaseOrderByCreatedAtDesc(String tenantCode);
+
+    Optional<IntegrationImportRun> findTopByTenantCodeIgnoreCaseAndSourceSystemIgnoreCaseAndConnectorTypeOrderByCreatedAtDesc(
+        String tenantCode,
+        String sourceSystem,
+        IntegrationConnectorType connectorType
+    );
 }

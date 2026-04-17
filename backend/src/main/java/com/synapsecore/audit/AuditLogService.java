@@ -23,7 +23,17 @@ public class AuditLogService {
                               String targetType,
                               String targetRef,
                               String details) {
-        record(action, actor, source, targetType, targetRef, AuditStatus.SUCCESS, details);
+        record(null, action, actor, source, targetType, targetRef, AuditStatus.SUCCESS, details);
+    }
+
+    public void recordSuccessForTenant(String tenantCode,
+                                       String action,
+                                       String actor,
+                                       String source,
+                                       String targetType,
+                                       String targetRef,
+                                       String details) {
+        record(tenantCode, action, actor, source, targetType, targetRef, AuditStatus.SUCCESS, details);
     }
 
     public void recordFailure(String action,
@@ -32,7 +42,17 @@ public class AuditLogService {
                               String targetType,
                               String targetRef,
                               String details) {
-        record(action, actor, source, targetType, targetRef, AuditStatus.FAILURE, details);
+        record(null, action, actor, source, targetType, targetRef, AuditStatus.FAILURE, details);
+    }
+
+    public void recordFailureForTenant(String tenantCode,
+                                       String action,
+                                       String actor,
+                                       String source,
+                                       String targetType,
+                                       String targetRef,
+                                       String details) {
+        record(tenantCode, action, actor, source, targetType, targetRef, AuditStatus.FAILURE, details);
     }
 
     public List<AuditLogResponse> getRecentAuditLogs() {
@@ -54,7 +74,8 @@ public class AuditLogService {
             .toList();
     }
 
-    private void record(String action,
+    private void record(String tenantCode,
+                        String action,
                         String actor,
                         String source,
                         String targetType,
@@ -62,7 +83,7 @@ public class AuditLogService {
                         AuditStatus status,
                         String details) {
         auditLogRepository.save(AuditLog.builder()
-            .tenantCode(resolveTenantCode())
+            .tenantCode(resolveTenantCode(tenantCode))
             .action(action)
             .actor(actor)
             .source(source)
@@ -74,10 +95,22 @@ public class AuditLogService {
             .build());
     }
 
-    private String resolveTenantCode() {
-        return requestTraceContext.getCurrentTenant()
+    private String resolveTenantCode(String explicitTenantCode) {
+        if (explicitTenantCode != null && !explicitTenantCode.isBlank()) {
+            return explicitTenantCode.trim();
+        }
+        String traceTenantCode = requestTraceContext.getCurrentTenant()
             .filter(tenantCode -> !tenantCode.isBlank())
-            .filter(tenantCode -> !RequestTraceContext.DEFAULT_TENANT.equalsIgnoreCase(tenantCode))
-            .orElseGet(tenantContextService::getCurrentTenantCodeOrDefault);
+            .orElse(null);
+        if (traceTenantCode != null) {
+            return traceTenantCode;
+        }
+
+        try {
+            return tenantContextService.getCurrentTenantCodeOrDefault();
+        } catch (IllegalStateException exception) {
+            // Request-level failures can be rejected before a tenant context exists in prod.
+            return RequestTraceContext.DEFAULT_TENANT;
+        }
     }
 }

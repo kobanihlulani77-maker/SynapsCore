@@ -30,7 +30,7 @@ export default function TenantsPage({ context }) {
         </div>
         <p className="muted-text integration-note">
           {signedInRoles.includes('TENANT_ADMIN')
-            ? 'Create a new tenant workspace with starter warehouses, connector posture, an admin account, and an approval lane.'
+            ? 'Create a new tenant workspace with controlled warehouses, an admin account, and an approval lane. Executive access is created without exposing a raw bootstrap password.'
             : 'Tenant creation is restricted to tenant admins with rollout authority.'}
         </p>
         <div className="summary-grid compact-summary-grid">
@@ -67,7 +67,7 @@ export default function TenantsPage({ context }) {
             </div>
             {tenantOnboardingState.error ? <p className="error-text">{tenantOnboardingState.error}</p> : null}
             {tenantOnboardingState.success ? <p className="success-text">{tenantOnboardingState.success}</p> : null}
-            {tenantOnboardingState.result ? <p className="muted-text">Executive approver sign-in: {tenantOnboardingState.result.executiveUsername} / {tenantOnboardingState.result.executivePassword} | Warehouses {tenantOnboardingState.result.starterWarehouseCodes.join(', ')}</p> : null}
+            {tenantOnboardingState.result ? <p className="muted-text">Executive approver account: {tenantOnboardingState.result.executiveUsername} | Reset the password from Users before first use. Warehouses {tenantOnboardingState.result.starterWarehouseCodes.join(', ')}</p> : null}
           </article>
           <article className="stack-card">
             <div className="stack-title-row"><strong>Existing workspaces</strong><span className="status-tag status-partial">Portfolio</span></div>

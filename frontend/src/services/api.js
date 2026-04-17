@@ -5,6 +5,7 @@ export const postAuthRedirectStorageKey = 'synapsecore.postAuthRedirect'
 
 export const trimTrailingSlash = (value = '') => value.replace(/\/+$/, '')
 export const isLocalHostname = (hostname = '') => ['localhost', '127.0.0.1', '0.0.0.0'].includes((hostname || '').toLowerCase())
+export const isExplicitNativeRealtimeUrl = (value = '') => /^wss?:/i.test(String(value).trim())
 
 export const normalizeAbsoluteUrl = (value) => {
   if (!value || !String(value).trim()) return ''
@@ -77,9 +78,14 @@ export const removeStoredValue = (storage, key) => {
 export const rememberedWorkspacePreference = readStoredJson(globalThis.localStorage, workspacePreferenceStorageKey, null)
 export const configuredRealtimeUrl = runtimeConfig.wsUrl || import.meta.env.VITE_WS_URL || ''
 export const apiUrl = resolveApiBaseUrl()
-export const websocketBrokerUrl = resolveRealtimeUrl(configuredRealtimeUrl, apiUrl, 'ws')
+// Treat http(s) /ws values as SockJS endpoints by default. Native STOMP over WebSocket is only
+// enabled when ws:// or wss:// is explicitly configured.
+export const websocketBrokerUrl = isExplicitNativeRealtimeUrl(configuredRealtimeUrl)
+  ? resolveRealtimeUrl(configuredRealtimeUrl, apiUrl, 'ws')
+  : ''
 export const sockJsUrl = resolveRealtimeUrl(configuredRealtimeUrl, apiUrl, 'http')
 export const wsUrl = websocketBrokerUrl || sockJsUrl
+export const realtimeTransportLabel = websocketBrokerUrl ? 'Native WebSocket / STOMP' : (sockJsUrl ? 'SockJS / STOMP' : 'Realtime not configured')
 export const frontendBuildVersion = runtimeConfig.appBuildVersion || import.meta.env.VITE_APP_BUILD_VERSION || 'local-dev'
 export const frontendBuildCommit = runtimeConfig.appBuildCommit || import.meta.env.VITE_APP_BUILD_COMMIT || 'local-dev'
 export const frontendBuildTime = runtimeConfig.appBuildTime || import.meta.env.VITE_APP_BUILD_TIME || 'untracked'

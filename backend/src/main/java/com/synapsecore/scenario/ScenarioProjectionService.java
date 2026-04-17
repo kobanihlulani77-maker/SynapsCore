@@ -18,6 +18,7 @@ import com.synapsecore.scenario.dto.ScenarioAlertProjection;
 import com.synapsecore.scenario.dto.ScenarioOrderImpactResponse;
 import com.synapsecore.scenario.dto.ScenarioRecommendationProjection;
 import com.synapsecore.tenant.TenantContextService;
+import com.synapsecore.tenant.TenantScopeGuard;
 import java.math.BigDecimal;
 import java.time.Instant;
 import java.util.ArrayList;
@@ -42,14 +43,17 @@ public class ScenarioProjectionService {
     private final RecommendationService recommendationService;
     private final AlertService alertService;
     private final TenantContextService tenantContextService;
+    private final TenantScopeGuard tenantScopeGuard;
 
     @Transactional(readOnly = true)
     public ScenarioOrderImpactResponse projectOrderImpact(OrderCreateRequest request) {
+        String tenantCode = tenantContextService.getCurrentTenantCodeOrDefault();
         Warehouse warehouse = warehouseRepository.findByTenant_CodeIgnoreCaseAndCode(
-                tenantContextService.getCurrentTenantCodeOrDefault(),
+                tenantCode,
                 request.warehouseCode().trim())
             .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND,
                 "Warehouse not found: " + request.warehouseCode()));
+        tenantScopeGuard.requireWarehouseForTenant(warehouse, tenantCode, "scenario order impact projection");
 
         BigDecimal projectedOrderValue = BigDecimal.ZERO;
         int totalUnits = 0;
@@ -63,6 +67,7 @@ public class ScenarioProjectionService {
             Inventory inventory = inventoryRepository.findByProductIdAndWarehouseId(product.getId(), warehouse.getId())
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.BAD_REQUEST,
                     "No inventory found for SKU " + product.getSku() + " in warehouse " + warehouse.getCode()));
+            tenantScopeGuard.requireInventoryForTenant(inventory, warehouse, tenantCode, "scenario order impact projection");
 
             InventoryProjectionInput projection = projectionsByInventoryId.computeIfAbsent(
                 inventory.getId(),

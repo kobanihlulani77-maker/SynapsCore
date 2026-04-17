@@ -1,6 +1,7 @@
 package com.synapsecore.simulation;
 
 import com.synapsecore.audit.AuditLogService;
+import com.synapsecore.config.SynapseDemoProperties;
 import com.synapsecore.domain.dto.OrderCreateRequest;
 import com.synapsecore.domain.dto.OrderItemRequest;
 import com.synapsecore.domain.dto.SimulationStatusResponse;
@@ -18,8 +19,10 @@ import java.util.List;
 import java.util.concurrent.ThreadLocalRandom;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.http.HttpStatus;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
+import org.springframework.web.server.ResponseStatusException;
 
 @Service
 @RequiredArgsConstructor
@@ -34,8 +37,10 @@ public class SimulationService {
     private final AuditLogService auditLogService;
     private final FulfillmentService fulfillmentService;
     private final TenantContextService tenantContextService;
+    private final SynapseDemoProperties demoProperties;
 
     public SimulationStatusResponse start() {
+        ensureSimulationEnabled();
         boolean changed = simulationStateService.activate();
         if (changed) {
             String tenantCode = tenantContextService.getCurrentTenantCodeOrDefault();
@@ -54,6 +59,7 @@ public class SimulationService {
     }
 
     public SimulationStatusResponse stop() {
+        ensureSimulationEnabled();
         boolean changed = simulationStateService.deactivate();
         if (changed) {
             String tenantCode = tenantContextService.getCurrentTenantCodeOrDefault();
@@ -72,12 +78,15 @@ public class SimulationService {
     }
 
     public SimulationStatusResponse status() {
+        if (!demoProperties.isSimulationEnabled()) {
+            return new SimulationStatusResponse(false, simulationStateService.getStatus().updatedAt());
+        }
         return simulationStateService.getStatus();
     }
 
     @Scheduled(fixedDelayString = "${synapsecore.simulation.interval-ms}")
     public void generateSimulatedOrder() {
-        if (!simulationStateService.isActive()) {
+        if (!demoProperties.isSimulationEnabled() || !simulationStateService.isActive()) {
             return;
         }
 
@@ -107,6 +116,13 @@ public class SimulationService {
             fulfillmentService.advanceSimulationFlow();
         } catch (Exception exception) {
             log.debug("Simulation skipped an order tick: {}", exception.getMessage());
+        }
+    }
+
+    private void ensureSimulationEnabled() {
+        if (!demoProperties.isSimulationEnabled()) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN,
+                "Simulation is disabled in this environment.");
         }
     }
 }

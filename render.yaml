@@ -1,6 +1,6 @@
 services:
   - type: web
-    name: synapsecore-backend
+    name: synapscore-3
     env: docker
     plan: starter
     rootDir: backend
@@ -13,27 +13,27 @@ services:
         value: 0.0.0.0
       - key: DATABASE_URL
         fromDatabase:
-          name: synapsecore-postgres
+          name: synapscore-postgres
           property: connectionString
       - key: SPRING_DATA_REDIS_URL
         fromService:
           type: redis
-          name: synapsecore-redis
+          name: synapscore-redis
           property: connectionString
       - key: CORS_ALLOWED_ORIGINS
-        value: https://synapsecore-frontend.onrender.com
+        value: https://synapscore-frontend-3.onrender.com
       - key: SESSION_COOKIE_SECURE
         value: "true"
       - key: SESSION_COOKIE_SAME_SITE
         value: None
       - key: ALLOW_HEADER_FALLBACK
         value: "false"
-      - key: JPA_DDL_AUTO
+      - key: SPRING_JPA_HIBERNATE_DDL_AUTO
         value: update
       - key: PUBLIC_APP_URL
-        value: https://synapsecore-frontend.onrender.com
+        value: https://synapscore-frontend-3.onrender.com
       - key: PUBLIC_API_URL
-        value: https://synapsecore-backend.onrender.com
+        value: https://synapscore-3.onrender.com
       - key: SYNAPSECORE_BUILD_VERSION
         value: 0.0.1
       - key: SYNAPSECORE_BUILD_COMMIT
@@ -42,7 +42,7 @@ services:
         value: 2026-04-10T00:00:00Z
 
   - type: static
-    name: synapsecore-frontend
+    name: synapscore-frontend-3
     plan: starter
     rootDir: frontend
     buildCommand: npm ci && npm run build
@@ -53,9 +53,9 @@ services:
         destination: /index.html
     envVars:
       - key: VITE_API_URL
-        value: https://synapsecore-backend.onrender.com
+        value: https://synapscore-3.onrender.com
       - key: VITE_WS_URL
-        value: wss://synapsecore-backend.onrender.com/ws
+        value: https://synapscore-3.onrender.com/ws
       - key: VITE_APP_BUILD_VERSION
         value: 0.0.1
       - key: VITE_APP_BUILD_COMMIT
@@ -64,12 +64,12 @@ services:
         value: 2026-04-10T00:00:00Z
 
   - type: redis
-    name: synapsecore-redis
+    name: synapscore-redis
     plan: starter
     ipAllowList: []
 
 databases:
-  - name: synapsecore-postgres
+  - name: synapscore-postgres
     plan: starter
     databaseName: synapsecore
     user: synapsecore

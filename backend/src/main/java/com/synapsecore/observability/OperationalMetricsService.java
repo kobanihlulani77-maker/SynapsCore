@@ -56,7 +56,11 @@ public class OperationalMetricsService {
         Gauge.builder(
                 "synapsecore.integration.replay.backlog",
                 integrationReplayRecordRepository,
-                repository -> repository.countByStatusIn(List.of(IntegrationReplayStatus.PENDING, IntegrationReplayStatus.REPLAY_FAILED))
+                repository -> repository.countByStatusIn(List.of(
+                    IntegrationReplayStatus.PENDING,
+                    IntegrationReplayStatus.REPLAY_FAILED,
+                    IntegrationReplayStatus.DEAD_LETTERED
+                ))
             )
             .description("Current integration replay backlog across all tenants.")
             .register(meterRegistry);

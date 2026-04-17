@@ -5,10 +5,13 @@ import com.synapsecore.domain.dto.AuditLogResponse;
 import com.synapsecore.domain.dto.SystemIncidentResponse;
 import com.synapsecore.domain.dto.SystemIncidentSeverity;
 import com.synapsecore.domain.dto.SystemIncidentType;
+import com.synapsecore.domain.entity.IntegrationInboundStatus;
 import com.synapsecore.domain.entity.OperationalDispatchStatus;
+import com.synapsecore.domain.repository.IntegrationInboundRecordRepository;
 import com.synapsecore.domain.repository.OperationalDispatchWorkItemRepository;
 import com.synapsecore.integration.IntegrationConnectorService;
 import com.synapsecore.integration.IntegrationReplayService;
+import com.synapsecore.integration.dto.IntegrationConnectorHealthStatus;
 import com.synapsecore.integration.dto.IntegrationConnectorResponse;
 import com.synapsecore.integration.dto.IntegrationReplayRecordResponse;
 import com.synapsecore.scenario.ScenarioHistoryService;
@@ -31,6 +34,7 @@ public class SystemIncidentService {
     private final AuditLogService auditLogService;
     private final IntegrationConnectorService integrationConnectorService;
     private final IntegrationReplayService integrationReplayService;
+    private final IntegrationInboundRecordRepository integrationInboundRecordRepository;
     private final ScenarioHistoryService scenarioHistoryService;
     private final OperationalDispatchWorkItemRepository operationalDispatchWorkItemRepository;
     private final TenantContextService tenantContextService;
@@ -41,10 +45,16 @@ public class SystemIncidentService {
                 auditLogService.getRecentAuditLogs().stream()
                     .filter(log -> "FAILURE".equals(log.status().name()))
                     .map(this::toAuditIncident),
+                integrationInboundRecordRepository.findTop8ByTenantCodeIgnoreCaseAndStatusInOrderByUpdatedAtDesc(
+                        tenantContextService.getCurrentTenantCodeOrDefault(),
+                        List.of(IntegrationInboundStatus.REJECTED, IntegrationInboundStatus.REPLAY_QUEUED)
+                    )
+                    .stream()
+                    .map(this::toInboundIncident),
                 integrationReplayService.getReplayQueue().stream()
                     .map(this::toReplayIncident),
                 integrationConnectorService.getConnectors().stream()
-                    .filter(connector -> !connector.enabled())
+                    .filter(connector -> connector.healthStatus() != IntegrationConnectorHealthStatus.LIVE)
                     .map(this::toConnectorIncident),
                 operationalDispatchWorkItemRepository.findTop8ByTenantCodeIgnoreCaseAndStatusOrderByUpdatedAtDesc(
                         tenantContextService.getCurrentTenantCodeOrDefault(),
@@ -76,7 +86,9 @@ public class SystemIncidentService {
     }
 
     private SystemIncidentResponse toReplayIncident(IntegrationReplayRecordResponse record) {
-        SystemIncidentSeverity severity = "REPLAY_FAILED".equals(record.status().name())
+        SystemIncidentSeverity severity = "DEAD_LETTERED".equals(record.status().name())
+            ? SystemIncidentSeverity.CRITICAL
+            : "REPLAY_FAILED".equals(record.status().name())
             ? SystemIncidentSeverity.HIGH
             : SystemIncidentSeverity.MEDIUM;
         return new SystemIncidentResponse(
@@ -91,18 +103,47 @@ public class SystemIncidentService {
         );
     }
 
+    private SystemIncidentResponse toInboundIncident(com.synapsecore.domain.entity.IntegrationInboundRecord record) {
+        boolean replayQueued = record.getStatus() == IntegrationInboundStatus.REPLAY_QUEUED;
+        return new SystemIncidentResponse(
+            "inbound-" + record.getId(),
+            SystemIncidentType.INBOUND_REJECTION,
+            replayQueued ? SystemIncidentSeverity.HIGH : SystemIncidentSeverity.MEDIUM,
+            (replayQueued ? "Inbound replay queued " : "Inbound rejection ") + record.getExternalOrderId(),
+            record.getFailureMessage() == null || record.getFailureMessage().isBlank()
+                ? "Inbound activity was rejected before it could complete."
+                : record.getFailureMessage(),
+            record.getSourceSystem() + " | " + formatCodeLabel(record.getConnectorType().name()),
+            true,
+            record.getUpdatedAt()
+        );
+    }
+
     private SystemIncidentResponse toConnectorIncident(IntegrationConnectorResponse connector) {
+        boolean offline = connector.healthStatus() == IntegrationConnectorHealthStatus.OFFLINE;
+        String detail = connector.lastFailureMessage() != null && !connector.lastFailureMessage().isBlank()
+            ? (connector.lastFailureCode() == null
+                ? connector.lastFailureMessage()
+                : formatCodeLabel(connector.lastFailureCode().name()) + ": " + connector.lastFailureMessage())
+            : connector.healthSummary();
+        String replayContext = connector.oldestPendingReplayAgeSeconds() == null
+            ? "No pending replay wait"
+            : "Oldest replay waiting " + connector.oldestPendingReplayAgeSeconds() + "s";
         return new SystemIncidentResponse(
             "connector-" + connector.id(),
-            SystemIncidentType.CONNECTOR_DISABLED,
-            SystemIncidentSeverity.MEDIUM,
-            connector.displayName() + " disabled",
-            connector.notes() == null || connector.notes().isBlank()
-                ? "Connector is currently paused and will not ingest new activity."
-                : connector.notes(),
-            connector.sourceSystem() + " | " + formatCodeLabel(connector.type().name()),
+            offline ? SystemIncidentType.CONNECTOR_DISABLED : SystemIncidentType.CONNECTOR_DEGRADED,
+            offline
+                ? SystemIncidentSeverity.MEDIUM
+                : connector.deadLetterCount() > 0 ? SystemIncidentSeverity.HIGH : SystemIncidentSeverity.MEDIUM,
+            offline ? connector.displayName() + " disabled" : connector.displayName() + " degraded",
+            detail,
+            connector.sourceSystem() + " | " + formatCodeLabel(connector.type().name()) + " | " + replayContext,
             true,
-            connector.updatedAt() == null ? connector.createdAt() : connector.updatedAt()
+            connector.lastFailureAt() != null
+                ? connector.lastFailureAt()
+                : connector.lastActivityAt() != null
+                ? connector.lastActivityAt()
+                : connector.updatedAt() == null ? connector.createdAt() : connector.updatedAt()
         );
     }
 

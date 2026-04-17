@@ -60,7 +60,7 @@ public class RealtimeService {
 
     private String normalizeTenantCode(String tenantCode) {
         if (tenantCode == null || tenantCode.isBlank()) {
-            return tenantContextService.getDefaultTenantCode();
+            throw new IllegalArgumentException("Realtime updates require an explicit tenant code.");
         }
         return tenantCode.trim().toUpperCase(Locale.ROOT);
     }

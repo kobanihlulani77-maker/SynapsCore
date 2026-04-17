@@ -11,7 +11,6 @@ public record TenantOnboardingResponse(
     String adminActorName,
     String executiveUsername,
     String executiveActorName,
-    String executivePassword,
     List<String> starterWarehouseCodes,
     Instant createdAt
 ) {

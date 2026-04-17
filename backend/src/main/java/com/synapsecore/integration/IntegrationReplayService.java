@@ -8,8 +8,8 @@ import com.synapsecore.domain.dto.OrderCreateRequest;
 import com.synapsecore.domain.dto.OrderResponse;
 import com.synapsecore.domain.entity.BusinessEventType;
 import com.synapsecore.domain.entity.IntegrationConnectorType;
-import com.synapsecore.domain.entity.IntegrationReplayRecord;
 import com.synapsecore.domain.entity.IntegrationReplayStatus;
+import com.synapsecore.domain.entity.IntegrationReplayRecord;
 import com.synapsecore.domain.repository.IntegrationReplayRecordRepository;
 import com.synapsecore.domain.service.OrderService;
 import com.synapsecore.event.BusinessEventService;
@@ -24,6 +24,7 @@ import java.util.List;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.http.HttpStatus;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
@@ -44,23 +45,53 @@ public class IntegrationReplayService {
     private final ObjectMapper objectMapper;
     private final TenantContextService tenantContextService;
     private final OperationalMetricsService operationalMetricsService;
+    private final IntegrationInboundRecordService integrationInboundRecordService;
+
+    @Value("${synapsecore.integration.replay.max-attempts:3}")
+    private int maxReplayAttempts;
+
+    @Value("${synapsecore.integration.replay.backoff-seconds:300}")
+    private long replayBackoffSeconds;
 
     @Transactional
     public IntegrationReplayRecordResponse recordFailure(String sourceSystem,
                                                          IntegrationConnectorType connectorType,
                                                          OrderCreateRequest request,
                                                          String failureMessage) {
+        return recordFailure(
+            tenantContextService.getCurrentTenantCodeOrDefault(),
+            sourceSystem,
+            connectorType,
+            request,
+            IntegrationFailureCode.UNKNOWN,
+            failureMessage,
+            null
+        );
+    }
+
+    @Transactional
+    public IntegrationReplayRecordResponse recordFailure(String tenantCode,
+                                                         String sourceSystem,
+                                                         IntegrationConnectorType connectorType,
+                                                         OrderCreateRequest request,
+                                                         IntegrationFailureCode failureCode,
+                                                         String failureMessage,
+                                                         Long inboundRecordId) {
         IntegrationReplayRecord record = integrationReplayRecordRepository.save(IntegrationReplayRecord.builder()
-            .tenantCode(tenantContextService.getCurrentTenantCodeOrDefault())
+            .tenantCode(tenantCode)
             .sourceSystem(sourceSystem)
             .connectorType(connectorType)
             .externalOrderId(request.externalOrderId())
             .warehouseCode(request.warehouseCode())
             .requestPayload(serializeRequest(request))
+            .failureCode(failureCode)
             .failureMessage(limit(failureMessage))
             .status(IntegrationReplayStatus.PENDING)
             .replayAttemptCount(0)
+            .inboundRecordId(inboundRecordId)
+            .nextEligibleAt(Instant.now())
             .build());
+        integrationInboundRecordService.markReplayQueued(inboundRecordId, record.getId(), failureCode, failureMessage);
 
         businessEventService.record(
             BusinessEventType.INTEGRATION_REPLAY_QUEUED,
@@ -85,7 +116,7 @@ public class IntegrationReplayService {
         var currentOperator = accessDirectoryService.getCurrentOperator();
         return integrationReplayRecordRepository.findQueueSummariesByTenantCodeIgnoreCaseAndStatusIn(
                 tenantContextService.getCurrentTenantCodeOrDefault(),
-                List.of(IntegrationReplayStatus.PENDING, IntegrationReplayStatus.REPLAY_FAILED),
+                List.of(IntegrationReplayStatus.PENDING, IntegrationReplayStatus.REPLAY_FAILED, IntegrationReplayStatus.DEAD_LETTERED),
                 PageRequest.of(0, DEFAULT_QUEUE_LIMIT))
             .stream()
             .filter(record -> currentOperator.isEmpty()
@@ -112,12 +143,21 @@ public class IntegrationReplayService {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
                 "Integration replay record " + replayRecordId + " has already been resolved.");
         }
+        if (record.getStatus() == IntegrationReplayStatus.DEAD_LETTERED) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                "Integration replay record " + replayRecordId + " is dead-lettered and must be re-ingested manually.");
+        }
 
         OrderCreateRequest request = deserializeRequest(record);
         Instant attemptedAt = Instant.now();
+        if (record.getNextEligibleAt() != null && record.getNextEligibleAt().isAfter(attemptedAt)) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT,
+                "Integration replay record " + replayRecordId + " is not eligible for replay until " + record.getNextEligibleAt() + ".");
+        }
 
         try {
-            integrationConnectorService.requireEnabledConnector(
+            integrationConnectorService.requireEnabledConnectorForTenant(
+                tenantCode,
                 record.getSourceSystem(),
                 record.getConnectorType(),
                 "replay failed inbound orders");
@@ -130,10 +170,13 @@ public class IntegrationReplayService {
             record.setStatus(IntegrationReplayStatus.REPLAYED);
             record.setReplayAttemptCount(record.getReplayAttemptCount() + 1);
             record.setLastAttemptedAt(attemptedAt);
+            record.setNextEligibleAt(null);
             record.setResolvedAt(attemptedAt);
             record.setReplayedOrderExternalId(order.externalOrderId());
+            record.setFailureCode(null);
             record.setLastReplayMessage(limit("Replayed successfully as live order " + order.externalOrderId() + "."));
             record = integrationReplayRecordRepository.save(record);
+            integrationInboundRecordService.markReplayed(record.getInboundRecordId(), order.externalOrderId());
 
             businessEventService.record(
                 BusinessEventType.INTEGRATION_REPLAY_COMPLETED,
@@ -153,17 +196,29 @@ public class IntegrationReplayService {
             operationalStateChangePublisher.publish(OperationalUpdateType.INTEGRATION_STATE, "integration-replay");
             return new IntegrationReplayResultResponse(toResponse(record), order, attemptedAt);
         } catch (ResponseStatusException exception) {
-            record.setStatus(IntegrationReplayStatus.REPLAY_FAILED);
-            record.setReplayAttemptCount(record.getReplayAttemptCount() + 1);
+            var failure = IntegrationFailureCodes.extract(exception);
+            int nextAttemptCount = record.getReplayAttemptCount() + 1;
+            record.setReplayAttemptCount(nextAttemptCount);
             record.setLastAttemptedAt(attemptedAt);
-            record.setLastReplayMessage(limit(exception.getReason()));
+            record.setFailureCode(failure.failureCode());
+            boolean exhausted = nextAttemptCount >= Math.max(maxReplayAttempts, 1);
+            if (exhausted) {
+                record.setStatus(IntegrationReplayStatus.DEAD_LETTERED);
+                record.setDeadLetteredAt(attemptedAt);
+                record.setNextEligibleAt(null);
+                record.setLastReplayMessage(limit(failure.failureMessage() + " Dead-lettered after " + nextAttemptCount + " attempts."));
+            } else {
+                record.setStatus(IntegrationReplayStatus.REPLAY_FAILED);
+                record.setNextEligibleAt(nextEligibleAt(attemptedAt, nextAttemptCount));
+                record.setLastReplayMessage(limit(failure.failureMessage()));
+            }
             record = integrationReplayRecordRepository.save(record);
 
             businessEventService.record(
                 BusinessEventType.INTEGRATION_REPLAY_FAILED,
                 "integration-replay",
                 "Replay failed for " + record.getExternalOrderId() + " from " + record.getSourceSystem()
-                    + " by " + actorName + ". Reason: " + exception.getReason()
+                    + " by " + actorName + ". Reason: " + failure.failureMessage()
             );
             auditLogService.recordFailure(
                 "INTEGRATION_REPLAY_FAILED",
@@ -172,7 +227,7 @@ public class IntegrationReplayService {
                 "IntegrationReplayRecord",
                 String.valueOf(record.getId()),
                 "Replay failed for inbound order " + record.getExternalOrderId() + ". Reason: "
-                    + exception.getReason()
+                    + failure.failureMessage()
             );
             operationalMetricsService.recordReplayAttempt(tenantCode, false);
             operationalStateChangePublisher.publish(OperationalUpdateType.INTEGRATION_STATE, "integration-replay");
@@ -205,16 +260,27 @@ public class IntegrationReplayService {
             record.getConnectorType(),
             record.getExternalOrderId(),
             record.getWarehouseCode(),
+            record.getFailureCode(),
             record.getFailureMessage(),
             record.getStatus(),
             record.getReplayAttemptCount(),
             record.getLastReplayMessage(),
             record.getLastAttemptedAt(),
+            record.getNextEligibleAt(),
             record.getResolvedAt(),
+            record.getDeadLetteredAt(),
             record.getReplayedOrderExternalId(),
             record.getCreatedAt(),
             record.getUpdatedAt()
         );
+    }
+
+    private Instant nextEligibleAt(Instant attemptedAt, int attemptCount) {
+        long backoffSeconds = Math.max(replayBackoffSeconds, 0L);
+        if (backoffSeconds == 0L) {
+            return attemptedAt;
+        }
+        return attemptedAt.plusSeconds(backoffSeconds * Math.max(attemptCount, 1));
     }
 
     private String limit(String value) {

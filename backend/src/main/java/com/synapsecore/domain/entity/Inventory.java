@@ -18,6 +18,7 @@ import lombok.Builder;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
+import com.synapsecore.tenant.TenantOwnershipAssertions;
 
 @Entity
 @Table(
@@ -56,11 +57,13 @@ public class Inventory {
 
     @PrePersist
     void onCreate() {
+        TenantOwnershipAssertions.requireInventoryConsistency(this, "Inventory persistence");
         updatedAt = Instant.now();
     }
 
     @PreUpdate
     void onUpdate() {
+        TenantOwnershipAssertions.requireInventoryConsistency(this, "Inventory persistence");
         updatedAt = Instant.now();
     }
 }

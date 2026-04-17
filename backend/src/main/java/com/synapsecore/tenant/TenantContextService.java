@@ -3,7 +3,7 @@ package com.synapsecore.tenant;
 import com.synapsecore.access.AccessControlService;
 import com.synapsecore.audit.RequestTraceContext;
 import com.synapsecore.auth.AuthSessionService;
-import com.synapsecore.auth.DemoAccessUsers;
+import com.synapsecore.config.SynapseDemoProperties;
 import com.synapsecore.config.SynapseAccessProperties;
 import com.synapsecore.domain.entity.Tenant;
 import com.synapsecore.domain.repository.TenantRepository;
@@ -23,6 +23,7 @@ public class TenantContextService {
 
     private final TenantRepository tenantRepository;
     private final SynapseAccessProperties accessProperties;
+    private final SynapseDemoProperties demoProperties;
     private final AuthSessionService authSessionService;
     private final RequestTraceContext requestTraceContext;
 
@@ -39,17 +40,20 @@ public class TenantContextService {
         if (tenantCode != null) {
             return tenantCode;
         }
+        if (!demoProperties.isAllowDefaultTenantFallback()) {
+            throw new IllegalStateException("Tenant context is required when default tenant fallback is disabled.");
+        }
         return getDefaultTenantCode();
     }
 
     public String getDefaultTenantCode() {
-        return tenantRepository.findByCodeIgnoreCase(DemoAccessUsers.DEFAULT_TENANT_CODE)
-            .filter(Tenant::isActive)
+        if (!demoProperties.isAllowDefaultTenantFallback()) {
+            throw new IllegalStateException("Default tenant fallback is disabled for this environment.");
+        }
+        return tenantRepository.findAllByActiveTrueOrderByNameAsc().stream()
+            .findFirst()
             .map(Tenant::getCode)
-            .orElseGet(() -> tenantRepository.findAllByActiveTrueOrderByNameAsc().stream()
-                .findFirst()
-                .map(Tenant::getCode)
-                .orElse(DemoAccessUsers.DEFAULT_TENANT_CODE));
+            .orElseThrow(() -> new IllegalStateException("No active tenant is available for default tenant fallback."));
     }
 
     public Tenant getCurrentTenantOrDefault() {

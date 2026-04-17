@@ -39,9 +39,9 @@ public class AccessDirectoryService {
     }
 
     public List<AccessOperatorResponse> getActiveOperators(String tenantCode) {
-        List<AccessOperator> operators = tenantCode == null || tenantCode.isBlank()
-            ? accessOperatorRepository.findAllByActiveTrueOrderByDisplayNameAsc()
-            : accessOperatorRepository.findAllByTenant_CodeIgnoreCaseAndActiveTrueOrderByDisplayNameAsc(tenantCode.trim());
+        String effectiveTenantCode = resolveScopedTenantCode(tenantCode, "view workspace operators");
+        List<AccessOperator> operators = accessOperatorRepository
+            .findAllByTenant_CodeIgnoreCaseAndActiveTrueOrderByDisplayNameAsc(effectiveTenantCode);
         return operators.stream()
             .map(this::toResponse)
             .toList();
@@ -52,23 +52,16 @@ public class AccessDirectoryService {
     }
 
     public AccessOperator requireActiveOperator(String actorName, String tenantCode, String actionDescription) {
-        if (tenantCode != null && !tenantCode.isBlank()) {
-            return accessOperatorRepository.findByTenant_CodeIgnoreCaseAndActorNameIgnoreCaseAndActiveTrue(
-                    tenantCode.trim(),
-                    actorName.trim()
-                )
-                .orElseThrow(() -> new ResponseStatusException(
-                    HttpStatus.FORBIDDEN,
-                    "Current actor " + actorName.trim()
-                        + " is not a known active operator in tenant " + tenantCode.trim()
-                        + " and cannot " + actionDescription + "."
-                ));
-        }
-        return accessOperatorRepository.findByActorNameIgnoreCaseAndActiveTrue(actorName.trim())
+        String effectiveTenantCode = resolveScopedTenantCode(tenantCode, actionDescription);
+        return accessOperatorRepository.findByTenant_CodeIgnoreCaseAndActorNameIgnoreCaseAndActiveTrue(
+                effectiveTenantCode,
+                actorName.trim()
+            )
             .orElseThrow(() -> new ResponseStatusException(
                 HttpStatus.FORBIDDEN,
                 "Current actor " + actorName.trim()
-                    + " is not a known active operator and cannot " + actionDescription + "."
+                    + " is not a known active operator in tenant " + effectiveTenantCode
+                    + " and cannot " + actionDescription + "."
             ));
     }
 
@@ -225,5 +218,22 @@ public class AccessDirectoryService {
             return null;
         }
         return warehouseCode.trim().toUpperCase(Locale.ROOT);
+    }
+
+    private String resolveScopedTenantCode(String tenantCode, String actionDescription) {
+        String currentTenantCode = tenantContextService.getCurrentTenantCodeOrDefault();
+        if (tenantCode == null || tenantCode.isBlank()) {
+            return currentTenantCode;
+        }
+
+        String requestedTenantCode = tenantCode.trim();
+        if (!requestedTenantCode.equalsIgnoreCase(currentTenantCode)) {
+            throw new ResponseStatusException(
+                HttpStatus.FORBIDDEN,
+                "Current tenant " + currentTenantCode + " cannot " + actionDescription
+                    + " for tenant " + requestedTenantCode + "."
+            );
+        }
+        return requestedTenantCode;
     }
 }

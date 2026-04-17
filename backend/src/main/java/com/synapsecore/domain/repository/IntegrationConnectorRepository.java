@@ -14,6 +14,10 @@ public interface IntegrationConnectorRepository extends JpaRepository<Integratio
                                                                                                String sourceSystem,
                                                                                                IntegrationConnectorType type);
 
+    Optional<IntegrationConnector> findBySourceSystemIgnoreCaseAndTypeAndInboundAccessTokenHash(String sourceSystem,
+                                                                                                 IntegrationConnectorType type,
+                                                                                                 String inboundAccessTokenHash);
+
     Optional<IntegrationConnector> findByTenant_CodeIgnoreCaseAndId(String tenantCode, Long id);
 
     List<IntegrationConnector> findAllByOrderByTypeAscSourceSystemAsc();

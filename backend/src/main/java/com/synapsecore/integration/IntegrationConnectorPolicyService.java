@@ -18,17 +18,26 @@ import org.springframework.web.server.ResponseStatusException;
 @Service
 public class IntegrationConnectorPolicyService {
 
+    private static final int SUPPORTED_MAPPING_VERSION = 1;
+
     public PreparedConnectorOrder prepareOrder(IntegrationConnector connector,
                                                String externalOrderId,
                                                String warehouseCode,
                                                String customerReference,
                                                Instant occurredAt,
                                                List<OrderItemRequest> rawItems) {
+        if (connector.getMappingVersion() != null && connector.getMappingVersion() != SUPPORTED_MAPPING_VERSION) {
+            throw IntegrationFailureCodes.badRequest(
+                IntegrationFailureCode.UNSUPPORTED_MAPPING_VERSION,
+                "Connector " + connector.getSourceSystem() + " uses unsupported mappingVersion "
+                    + connector.getMappingVersion() + "."
+            );
+        }
         if (externalOrderId == null || externalOrderId.isBlank()) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "externalOrderId is required");
+            throw IntegrationFailureCodes.badRequest(IntegrationFailureCode.MISSING_EXTERNAL_ORDER_ID, "externalOrderId is required");
         }
         if (rawItems == null || rawItems.isEmpty()) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "items must contain at least one entry");
+            throw IntegrationFailureCodes.badRequest(IntegrationFailureCode.MISSING_ITEMS, "items must contain at least one entry");
         }
 
         String resolvedWarehouseCode = resolveWarehouseCode(connector, warehouseCode);
@@ -49,14 +58,14 @@ public class IntegrationConnectorPolicyService {
             if (connector.isAllowDefaultWarehouseFallback() && defaultWarehouseCode != null) {
                 return defaultWarehouseCode;
             }
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+            throw IntegrationFailureCodes.badRequest(IntegrationFailureCode.MISSING_WAREHOUSE_CODE,
                 "warehouseCode is required for connector " + connector.getSourceSystem());
         }
 
         if (connector.getValidationPolicy() == IntegrationValidationPolicy.STRICT
             && defaultWarehouseCode != null
             && !defaultWarehouseCode.equalsIgnoreCase(normalizedWarehouseCode)) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+            throw IntegrationFailureCodes.badRequest(IntegrationFailureCode.STRICT_WAREHOUSE_MISMATCH,
                 "Connector " + connector.getSourceSystem() + " only accepts warehouse " + defaultWarehouseCode);
         }
 
@@ -86,11 +95,11 @@ public class IntegrationConnectorPolicyService {
         if (connector.getType() == IntegrationConnectorType.WEBHOOK_ORDER
             && connector.getValidationPolicy() == IntegrationValidationPolicy.STRICT) {
             if (customerReference == null || customerReference.isBlank()) {
-                throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                throw IntegrationFailureCodes.badRequest(IntegrationFailureCode.MISSING_CUSTOMER_REFERENCE,
                     "customerReference is required for strict webhook connectors");
             }
             if (occurredAt == null) {
-                throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                throw IntegrationFailureCodes.badRequest(IntegrationFailureCode.MISSING_OCCURRED_AT,
                     "occurredAt is required for strict webhook connectors");
             }
         }
@@ -107,14 +116,14 @@ public class IntegrationConnectorPolicyService {
                 .map(Map.Entry::getKey)
                 .toList();
             if (!duplicates.isEmpty()) {
-                throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                throw IntegrationFailureCodes.badRequest(IntegrationFailureCode.DUPLICATE_PRODUCT_LINES,
                     "Strict connector validation does not allow duplicate product lines: " + duplicates);
             }
         }
 
         if ((warehouseCode == null || warehouseCode.isBlank())
             && (!connector.isAllowDefaultWarehouseFallback() || connector.getDefaultWarehouseCode() == null || connector.getDefaultWarehouseCode().isBlank())) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+            throw IntegrationFailureCodes.badRequest(IntegrationFailureCode.MISSING_WAREHOUSE_CODE,
                 "warehouseCode is required for connector " + connector.getSourceSystem());
         }
     }
@@ -139,7 +148,7 @@ public class IntegrationConnectorPolicyService {
 
     private String normalizeProductSku(String productSku, IntegrationTransformationPolicy transformationPolicy) {
         if (productSku == null || productSku.isBlank()) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "productSku is required");
+            throw IntegrationFailureCodes.badRequest(IntegrationFailureCode.MISSING_PRODUCT_SKU, "productSku is required");
         }
         return normalizeCode(productSku, transformationPolicy);
     }

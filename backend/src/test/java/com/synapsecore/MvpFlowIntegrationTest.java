@@ -29,6 +29,7 @@ import com.synapsecore.domain.repository.CustomerOrderRepository;
 import com.synapsecore.domain.repository.FulfillmentTaskRepository;
 import com.synapsecore.domain.repository.InventoryRepository;
 import com.synapsecore.domain.repository.IntegrationConnectorRepository;
+import com.synapsecore.domain.repository.IntegrationInboundRecordRepository;
 import com.synapsecore.domain.repository.OperationalDispatchWorkItemRepository;
 import com.synapsecore.domain.repository.ProductRepository;
 import com.synapsecore.domain.repository.RecommendationRepository;
@@ -85,6 +86,9 @@ class MvpFlowIntegrationTest {
 
     @Autowired
     private IntegrationConnectorRepository integrationConnectorRepository;
+
+    @Autowired
+    private IntegrationInboundRecordRepository integrationInboundRecordRepository;
 
     @Autowired
     private AlertRepository alertRepository;
@@ -2238,6 +2242,120 @@ class MvpFlowIntegrationTest {
     }
 
     @Test
+    void webhookConnectorTokenAllowsExternalIngressWithoutWorkspaceSession() throws Exception {
+        configureConnectorToken(
+            "SYNAPSE-DEMO",
+            "erp_north",
+            com.synapsecore.domain.entity.IntegrationConnectorType.WEBHOOK_ORDER,
+            "north-webhook-token-2026"
+        );
+
+        mockMvc.perform(post("/api/integrations/orders/webhook")
+                .header(com.synapsecore.integration.IntegrationInboundAccessService.CONNECTOR_TOKEN_HEADER,
+                    "north-webhook-token-2026")
+                .contentType(APPLICATION_JSON)
+                .content("""
+                    {
+                      "sourceSystem": "erp_north",
+                      "externalOrderId": "ERP-TOKEN-1001",
+                      "warehouseCode": "",
+                      "customerReference": "CUST-900",
+                      "occurredAt": "2026-04-01T12:00:00Z",
+                      "items": [
+                        {
+                          "productSku": "sku-flx-100",
+                          "quantity": 2,
+                          "unitPrice": 95.00
+                        }
+                      ]
+                    }
+                    """))
+            .andExpect(status().isCreated())
+            .andExpect(jsonPath("$.sourceSystem").value("erp_north"))
+            .andExpect(jsonPath("$.order.externalOrderId").value("ERP-TOKEN-1001"))
+            .andExpect(jsonPath("$.order.warehouseCode").value("WH-NORTH"));
+
+        assertThat(customerOrderRepository.existsByTenant_CodeIgnoreCaseAndExternalOrderId("SYNAPSE-DEMO", "ERP-TOKEN-1001"))
+            .isTrue();
+        assertThat(integrationInboundRecordRepository.findAll())
+            .anyMatch(record -> "ERP-TOKEN-1001".equals(record.getExternalOrderId())
+                && record.getStatus() == com.synapsecore.domain.entity.IntegrationInboundStatus.ACCEPTED);
+    }
+
+    @Test
+    void invalidWebhookConnectorTokenIsRejectedBeforeOrderCreation() throws Exception {
+        configureConnectorToken(
+            "SYNAPSE-DEMO",
+            "erp_north",
+            com.synapsecore.domain.entity.IntegrationConnectorType.WEBHOOK_ORDER,
+            "north-webhook-token-2026"
+        );
+        long startingOrderCount = customerOrderRepository.count();
+
+        mockMvc.perform(post("/api/integrations/orders/webhook")
+                .header(com.synapsecore.integration.IntegrationInboundAccessService.CONNECTOR_TOKEN_HEADER,
+                    "wrong-token")
+                .contentType(APPLICATION_JSON)
+                .content("""
+                    {
+                      "sourceSystem": "erp_north",
+                      "externalOrderId": "ERP-TOKEN-FAIL",
+                      "warehouseCode": "",
+                      "customerReference": "CUST-901",
+                      "occurredAt": "2026-04-01T12:05:00Z",
+                      "items": [
+                        {
+                          "productSku": "sku-flx-100",
+                          "quantity": 2,
+                          "unitPrice": 95.00
+                        }
+                      ]
+                    }
+                    """))
+            .andExpect(status().isUnauthorized())
+            .andExpect(jsonPath("$.message").value(org.hamcrest.Matchers.containsString("Connector token is invalid")));
+
+        assertThat(customerOrderRepository.count()).isEqualTo(startingOrderCount);
+    }
+
+    @Test
+    void csvConnectorTokenAllowsExternalBatchIngressWithoutWorkspaceSession() throws Exception {
+        configureConnectorToken(
+            "SYNAPSE-DEMO",
+            "erp_batch",
+            com.synapsecore.domain.entity.IntegrationConnectorType.CSV_ORDER_IMPORT,
+            "batch-csv-token-2026"
+        );
+
+        MockMultipartFile file = new MockMultipartFile(
+            "file",
+            "batch-orders.csv",
+            "text/csv",
+            """
+                externalOrderId,warehouseCode,productSku,quantity,unitPrice
+                CSV-TOKEN-1001,WH-NORTH,SKU-FLX-100,2,95.00
+                """.getBytes()
+        );
+
+        mockMvc.perform(multipart("/api/integrations/orders/csv-import")
+                .file(file)
+                .header(com.synapsecore.integration.IntegrationInboundAccessService.CONNECTOR_TOKEN_HEADER,
+                    "batch-csv-token-2026")
+                .param("sourceSystem", "erp_batch"))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.ordersImported").value(1))
+            .andExpect(jsonPath("$.ordersFailed").value(0))
+            .andExpect(jsonPath("$.importedOrders[0].sourceSystem").value("erp_batch"))
+            .andExpect(jsonPath("$.importedOrders[0].order.externalOrderId").value("CSV-TOKEN-1001"));
+
+        assertThat(customerOrderRepository.existsByTenant_CodeIgnoreCaseAndExternalOrderId("SYNAPSE-DEMO", "CSV-TOKEN-1001"))
+            .isTrue();
+        assertThat(integrationInboundRecordRepository.findAll())
+            .anyMatch(record -> "CSV-TOKEN-1001".equals(record.getExternalOrderId())
+                && record.getStatus() == com.synapsecore.domain.entity.IntegrationInboundStatus.ACCEPTED);
+    }
+
+    @Test
     void integrationConnectorsCanBeListedAndDisabledForWebhookIngress() throws Exception {
         mockMvc.perform(get("/api/access/tenants"))
             .andExpect(status().isOk())
@@ -2265,6 +2383,8 @@ class MvpFlowIntegrationTest {
                 .value(org.hamcrest.Matchers.hasItem("STANDARD")))
             .andExpect(jsonPath("$[?(@.sourceSystem == 'erp_north' && @.type == 'WEBHOOK_ORDER')].transformationPolicy")
                 .value(org.hamcrest.Matchers.hasItem("NORMALIZE_CODES")))
+            .andExpect(jsonPath("$[?(@.sourceSystem == 'erp_north' && @.type == 'WEBHOOK_ORDER')].mappingVersion")
+                .value(org.hamcrest.Matchers.hasItem(1)))
             .andExpect(jsonPath("$[?(@.sourceSystem == 'erp_batch' && @.type == 'CSV_ORDER_IMPORT')].enabled")
                 .value(org.hamcrest.Matchers.hasItem(true)));
 
@@ -2307,14 +2427,33 @@ class MvpFlowIntegrationTest {
                       "sourceSystem": "erp_north",
                       "type": "WEBHOOK_ORDER",
                       "displayName": "ERP North Webhook",
+                      "enabled": true,
+                      "mappingVersion": 2,
+                      "defaultWarehouseCode": "WH-NORTH",
+                      "notes": "Unsupported mapping version."
+                    }
+                    """))
+            .andExpect(status().isBadRequest())
+            .andExpect(jsonPath("$.message").value(org.hamcrest.Matchers.containsString("Only mappingVersion 1 is currently supported")));
+
+        mockMvc.perform(post("/api/integrations/orders/connectors")
+                .with(accessHeaders("Integration Lead", "INTEGRATION_ADMIN"))
+                .contentType(APPLICATION_JSON)
+                .content("""
+                    {
+                      "sourceSystem": "erp_north",
+                      "type": "WEBHOOK_ORDER",
+                      "displayName": "ERP North Webhook",
                       "enabled": false,
+                      "mappingVersion": 1,
                       "defaultWarehouseCode": "WH-NORTH",
                       "notes": "Temporarily paused for maintenance."
                     }
                     """))
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.sourceSystem").value("erp_north"))
-            .andExpect(jsonPath("$.enabled").value(false));
+            .andExpect(jsonPath("$.enabled").value(false))
+            .andExpect(jsonPath("$.mappingVersion").value(1));
 
         mockMvc.perform(get("/api/dashboard/snapshot"))
             .andExpect(status().isOk())
@@ -2438,7 +2577,7 @@ class MvpFlowIntegrationTest {
             .andExpect(jsonPath("$.adminActorName").value("Operations Lead"))
             .andExpect(jsonPath("$.executiveUsername").value("acme.ops.executive"))
             .andExpect(jsonPath("$.executiveActorName").value("Executive Operations Director"))
-            .andExpect(jsonPath("$.executivePassword").exists())
+            .andExpect(jsonPath("$.executivePassword").doesNotExist())
             .andExpect(jsonPath("$.starterWarehouseCodes")
                 .value(org.hamcrest.Matchers.hasItems("WH-NORTH", "WH-COAST")))
             .andExpect(jsonPath("$.createdAt").exists());
@@ -2447,18 +2586,6 @@ class MvpFlowIntegrationTest {
             .andExpect(status().isOk())
             .andExpect(jsonPath("$[?(@.code == 'ACME-OPS')].name")
                 .value(org.hamcrest.Matchers.hasItem("Acme Operations")));
-
-        mockMvc.perform(get("/api/access/operators")
-                .param("tenantCode", "ACME-OPS"))
-            .andExpect(status().isOk())
-            .andExpect(jsonPath("$[?(@.actorName == 'Operations Lead')].tenantCode")
-                .value(org.hamcrest.Matchers.hasItem("ACME-OPS")))
-            .andExpect(jsonPath("$[?(@.actorName == 'Operations Lead')].roles[*]")
-                .value(org.hamcrest.Matchers.hasItem("TENANT_ADMIN")))
-            .andExpect(jsonPath("$[?(@.actorName == 'Executive Operations Director')].roles[*]")
-                .value(org.hamcrest.Matchers.hasItem("FINAL_APPROVER")))
-            .andExpect(jsonPath("$[?(@.actorName == 'Operations Planner')].actorName")
-                .value(org.hamcrest.Matchers.hasItem("Operations Planner")));
 
         mockMvc.perform(get("/api/warehouses")
                 .header("X-Synapse-Tenant", "ACME-OPS"))
@@ -2506,6 +2633,74 @@ class MvpFlowIntegrationTest {
             .andExpect(jsonPath("$.tenantCode").value("ACME-OPS"))
             .andExpect(jsonPath("$.username").value("amina.admin"))
             .andExpect(jsonPath("$.actorName").value("Operations Lead"));
+
+        mockMvc.perform(get("/api/access/operators").session(session))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$[?(@.actorName == 'Operations Lead')].tenantCode")
+                .value(org.hamcrest.Matchers.hasItem("ACME-OPS")))
+            .andExpect(jsonPath("$[?(@.actorName == 'Operations Lead')].roles[*]")
+                .value(org.hamcrest.Matchers.hasItem("TENANT_ADMIN")))
+            .andExpect(jsonPath("$[?(@.actorName == 'Executive Operations Director')].roles[*]")
+                .value(org.hamcrest.Matchers.hasItem("FINAL_APPROVER")))
+            .andExpect(jsonPath("$[?(@.actorName == 'Operations Planner')].actorName")
+                .value(org.hamcrest.Matchers.hasItem("Operations Planner")));
+    }
+
+    @Test
+    void signInRequiresExplicitTenantCode() throws Exception {
+        mockMvc.perform(post("/api/auth/session/login")
+                .contentType(APPLICATION_JSON)
+                .content("""
+                    {
+                      "username": "operations.lead",
+                      "password": "lead-2026"
+                    }
+                    """))
+            .andExpect(status().isBadRequest())
+            .andExpect(jsonPath("$.message").value("tenantCode is required for sign-in."));
+    }
+
+    @Test
+    void signedInTenantCannotQueryAnotherTenantOperatorDirectory() throws Exception {
+        mockMvc.perform(post("/api/access/tenants")
+                .with(accessHeaders("Operations Lead", "TENANT_ADMIN"))
+                .header("X-Synapse-Tenant", "SYNAPSE-DEMO")
+                .contentType(APPLICATION_JSON)
+                .content("""
+                    {
+                      "tenantCode": "ACME-OPS",
+                      "tenantName": "Acme Operations",
+                      "description": "Starter workspace for Acme's operations team.",
+                      "adminFullName": "Amina Dlamini",
+                      "adminUsername": "amina.admin",
+                      "adminPassword": "launchpad-2026",
+                      "primaryLocation": "Johannesburg",
+                      "secondaryLocation": "Cape Town"
+                    }
+                    """))
+            .andExpect(status().isOk());
+
+        MockHttpSession session = (MockHttpSession) mockMvc.perform(post("/api/auth/session/login")
+                .contentType(APPLICATION_JSON)
+                .content("""
+                    {
+                      "tenantCode": "ACME-OPS",
+                      "username": "amina.admin",
+                      "password": "launchpad-2026"
+                    }
+                    """))
+            .andExpect(status().isOk())
+            .andReturn()
+            .getRequest()
+            .getSession(false);
+
+        mockMvc.perform(get("/api/access/operators")
+                .param("tenantCode", "SYNAPSE-DEMO")
+                .session(session))
+            .andExpect(status().isForbidden())
+            .andExpect(jsonPath("$.message").value(
+                "Current tenant ACME-OPS cannot view workspace operators for tenant SYNAPSE-DEMO."
+            ));
     }
 
     @Test
@@ -3302,6 +3497,7 @@ class MvpFlowIntegrationTest {
             .andExpect(jsonPath("$.importedOrders[0].lineItemCount").value(1))
             .andExpect(jsonPath("$.importedOrders[0].order.itemCount").value(3))
             .andExpect(jsonPath("$.failedOrders[0].externalOrderId").value("CSV-EXT-1002"))
+            .andExpect(jsonPath("$.failedOrders[0].failureCode").value("PRODUCT_NOT_FOUND"))
             .andExpect(jsonPath("$.failedOrders[0].message").value(org.hamcrest.Matchers.containsString("Product not found")));
 
         mockMvc.perform(get("/api/integrations/orders/imports/recent"))
@@ -3319,7 +3515,11 @@ class MvpFlowIntegrationTest {
             .andExpect(jsonPath("$.integrationImportRuns[0].connectorType").value("CSV_ORDER_IMPORT"))
             .andExpect(jsonPath("$.integrationImportRuns[0].status").value("PARTIAL_SUCCESS"))
             .andExpect(jsonPath("$.integrationConnectors[?(@.sourceSystem == 'erp_batch' && @.type == 'CSV_ORDER_IMPORT')].displayName")
-                .value(org.hamcrest.Matchers.hasItem("ERP Batch CSV Feed")));
+                .value(org.hamcrest.Matchers.hasItem("ERP Batch CSV Feed")))
+            .andExpect(jsonPath("$.integrationConnectors[?(@.sourceSystem == 'erp_batch' && @.type == 'CSV_ORDER_IMPORT')].mappingVersion")
+                .value(org.hamcrest.Matchers.hasItem(1)))
+            .andExpect(jsonPath("$.integrationConnectors[?(@.sourceSystem == 'erp_batch' && @.type == 'CSV_ORDER_IMPORT')].lastFailureCode")
+                .value(org.hamcrest.Matchers.hasItem("PRODUCT_NOT_FOUND")));
 
         Inventory inventoryAfter = loadInventory("SKU-FLX-100", "WH-NORTH");
         assertThat(inventoryAfter.getQuantityAvailable()).isEqualTo(startingQuantity - 3);
@@ -3356,6 +3556,12 @@ class MvpFlowIntegrationTest {
         var replayRecord = integrationReplayRecordRepository.findAll().stream()
             .findFirst()
             .orElseThrow();
+        var inboundRecord = integrationInboundRecordRepository.findAll().stream()
+            .filter(record -> "CSV-RPL-1001".equals(record.getExternalOrderId()))
+            .findFirst()
+            .orElseThrow();
+        assertThat(inboundRecord.getStatus()).isEqualTo(com.synapsecore.domain.entity.IntegrationInboundStatus.REPLAY_QUEUED);
+        assertThat(replayRecord.getInboundRecordId()).isEqualTo(inboundRecord.getId());
 
         mockMvc.perform(get("/api/integrations/orders/replay-queue"))
             .andExpect(status().isOk())
@@ -3363,7 +3569,8 @@ class MvpFlowIntegrationTest {
             .andExpect(jsonPath("$[0].sourceSystem").value("erp_batch"))
             .andExpect(jsonPath("$[0].connectorType").value("CSV_ORDER_IMPORT"))
             .andExpect(jsonPath("$[0].externalOrderId").value("CSV-RPL-1001"))
-            .andExpect(jsonPath("$[0].status").value("PENDING"));
+            .andExpect(jsonPath("$[0].status").value("PENDING"))
+            .andExpect(jsonPath("$[0].nextEligibleAt").exists());
 
         mockMvc.perform(get("/api/dashboard/snapshot"))
             .andExpect(status().isOk())
@@ -3410,6 +3617,54 @@ class MvpFlowIntegrationTest {
             .anyMatch(event -> event.getEventType() == BusinessEventType.INTEGRATION_REPLAY_QUEUED);
         assertThat(businessEventRepository.findTop20ByOrderByCreatedAtDesc())
             .anyMatch(event -> event.getEventType() == BusinessEventType.INTEGRATION_REPLAY_COMPLETED);
+        assertThat(integrationInboundRecordRepository.findById(inboundRecord.getId()).orElseThrow().getStatus())
+            .isEqualTo(com.synapsecore.domain.entity.IntegrationInboundStatus.REPLAYED);
+    }
+
+    @Test
+    void replayRecordDeadLettersAfterConfiguredFailures() throws Exception {
+        String csvBody = """
+            externalOrderId,warehouseCode,productSku,quantity,unitPrice
+            CSV-DEAD-1001,WH-NORTH,SKU-DEAD-404,2,88.00
+            """;
+
+        MockMultipartFile file = new MockMultipartFile(
+            "file",
+            "dead-letter-orders.csv",
+            "text/csv",
+            csvBody.getBytes()
+        );
+
+        mockMvc.perform(multipart("/api/integrations/orders/csv-import")
+                .file(file)
+                .param("sourceSystem", "erp_batch"))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.ordersImported").value(0))
+            .andExpect(jsonPath("$.ordersFailed").value(1));
+
+        var replayRecord = integrationReplayRecordRepository.findAll().stream()
+            .filter(record -> "CSV-DEAD-1001".equals(record.getExternalOrderId()))
+            .findFirst()
+            .orElseThrow();
+
+        mockMvc.perform(post("/api/integrations/orders/replay/" + replayRecord.getId())
+                .with(accessHeaders("Integration Operator", "INTEGRATION_OPERATOR")))
+            .andExpect(status().isNotFound());
+
+        mockMvc.perform(post("/api/integrations/orders/replay/" + replayRecord.getId())
+                .with(accessHeaders("Integration Operator", "INTEGRATION_OPERATOR")))
+            .andExpect(status().isNotFound());
+
+        var updatedReplayRecord = integrationReplayRecordRepository.findById(replayRecord.getId()).orElseThrow();
+        assertThat(updatedReplayRecord.getStatus()).isEqualTo(com.synapsecore.domain.entity.IntegrationReplayStatus.DEAD_LETTERED);
+        assertThat(updatedReplayRecord.getDeadLetteredAt()).isNotNull();
+
+        mockMvc.perform(get("/api/integrations/orders/replay-queue"))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$[?(@.externalOrderId == 'CSV-DEAD-1001')].status")
+                .value(org.hamcrest.Matchers.hasItem("DEAD_LETTERED")))
+            .andExpect(jsonPath("$[?(@.externalOrderId == 'CSV-DEAD-1001')].failureCode")
+                .value(org.hamcrest.Matchers.hasItem("PRODUCT_NOT_FOUND")));
     }
 
     @Test
@@ -3789,9 +4044,11 @@ class MvpFlowIntegrationTest {
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.telemetry.disabledConnectorCount").value(1))
             .andExpect(jsonPath("$.telemetry.replayQueueDepth").value(1))
+            .andExpect(jsonPath("$.telemetry.deadLetterQueueDepth").value(0))
             .andExpect(jsonPath("$.telemetry.recentImportIssues").value(1))
-            .andExpect(jsonPath("$.telemetry.recentAuditFailures")
-                .value(org.hamcrest.Matchers.greaterThanOrEqualTo(2)))
+            .andExpect(jsonPath("$.telemetry.recentInboundRejections")
+                .value(org.hamcrest.Matchers.greaterThanOrEqualTo(1)))
+            .andExpect(jsonPath("$.telemetry.recentAuditFailures").value(org.hamcrest.Matchers.greaterThanOrEqualTo(0)))
             .andExpect(jsonPath("$.telemetry.dispatchQueueDepth").value(org.hamcrest.Matchers.greaterThanOrEqualTo(0)))
             .andExpect(jsonPath("$.telemetry.failedDispatchCount").value(1))
             .andExpect(jsonPath("$.backbone.failedDispatchCount").value(1))
@@ -3804,20 +4061,47 @@ class MvpFlowIntegrationTest {
             .andExpect(jsonPath("$.diagnostics.integrationEventsInWindow")
                 .value(org.hamcrest.Matchers.greaterThanOrEqualTo(2)))
             .andExpect(jsonPath("$.diagnostics.failureAuditsInWindow")
-                .value(org.hamcrest.Matchers.greaterThanOrEqualTo(2)))
+                .value(org.hamcrest.Matchers.greaterThanOrEqualTo(0)))
             .andExpect(jsonPath("$.diagnostics.activeIncidentCount")
-                .value(org.hamcrest.Matchers.greaterThanOrEqualTo(3)));
+                .value(org.hamcrest.Matchers.greaterThanOrEqualTo(3)))
+            .andExpect(jsonPath("$.connectorDiagnostics[?(@.sourceSystem == 'erp_batch')].lastFailureCode")
+                .value(org.hamcrest.Matchers.hasItem("PRODUCT_NOT_FOUND")))
+            .andExpect(jsonPath("$.connectorDiagnostics[?(@.sourceSystem == 'erp_batch')].oldestPendingReplayAgeSeconds")
+                .value(org.hamcrest.Matchers.hasItem(org.hamcrest.Matchers.greaterThanOrEqualTo(0))));
 
         mockMvc.perform(get("/api/system/incidents"))
             .andExpect(status().isOk())
-            .andExpect(jsonPath("$[?(@.type == 'AUDIT_FAILURE')]")
+            .andExpect(jsonPath("$[?(@.type == 'INBOUND_REJECTION')]")
                 .value(org.hamcrest.Matchers.hasSize(org.hamcrest.Matchers.greaterThanOrEqualTo(1))))
             .andExpect(jsonPath("$[?(@.type == 'REPLAY_BACKLOG')]")
+                .value(org.hamcrest.Matchers.hasSize(org.hamcrest.Matchers.greaterThanOrEqualTo(1))))
+            .andExpect(jsonPath("$[?(@.type == 'CONNECTOR_DEGRADED')]")
                 .value(org.hamcrest.Matchers.hasSize(org.hamcrest.Matchers.greaterThanOrEqualTo(1))))
             .andExpect(jsonPath("$[?(@.type == 'BACKBONE_DISPATCH_FAILURE')]")
                 .value(org.hamcrest.Matchers.hasSize(org.hamcrest.Matchers.greaterThanOrEqualTo(1))))
             .andExpect(jsonPath("$[?(@.type == 'CONNECTOR_DISABLED')]")
-                .value(org.hamcrest.Matchers.hasSize(org.hamcrest.Matchers.greaterThanOrEqualTo(1))));
+                .value(org.hamcrest.Matchers.hasSize(org.hamcrest.Matchers.greaterThanOrEqualTo(1))))
+            .andExpect(jsonPath("$[?(@.type == 'CONNECTOR_DEGRADED')].detail")
+                .value(org.hamcrest.Matchers.hasItem(org.hamcrest.Matchers.containsString("Product not found"))))
+            .andExpect(jsonPath("$[?(@.type == 'CONNECTOR_DEGRADED')].context")
+                .value(org.hamcrest.Matchers.hasItem(org.hamcrest.Matchers.containsString("Oldest replay waiting"))));
+
+        mockMvc.perform(get("/api/integrations/orders/connectors"))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$[?(@.sourceSystem == 'erp_batch' && @.type == 'CSV_ORDER_IMPORT')].mappingVersion")
+                .value(org.hamcrest.Matchers.hasItem(1)))
+            .andExpect(jsonPath("$[?(@.sourceSystem == 'erp_batch' && @.type == 'CSV_ORDER_IMPORT')].healthStatus")
+                .value(org.hamcrest.Matchers.hasItem("DEGRADED")))
+            .andExpect(jsonPath("$[?(@.sourceSystem == 'erp_batch' && @.type == 'CSV_ORDER_IMPORT')].recentInboundFailureCount")
+                .value(org.hamcrest.Matchers.hasItem(org.hamcrest.Matchers.greaterThanOrEqualTo(1))))
+            .andExpect(jsonPath("$[?(@.sourceSystem == 'erp_batch' && @.type == 'CSV_ORDER_IMPORT')].pendingReplayCount")
+                .value(org.hamcrest.Matchers.hasItem(org.hamcrest.Matchers.greaterThanOrEqualTo(1))))
+            .andExpect(jsonPath("$[?(@.sourceSystem == 'erp_batch' && @.type == 'CSV_ORDER_IMPORT')].lastFailureCode")
+                .value(org.hamcrest.Matchers.hasItem("PRODUCT_NOT_FOUND")))
+            .andExpect(jsonPath("$[?(@.sourceSystem == 'erp_batch' && @.type == 'CSV_ORDER_IMPORT')].oldestPendingReplayAgeSeconds")
+                .value(org.hamcrest.Matchers.hasItem(org.hamcrest.Matchers.greaterThanOrEqualTo(0))))
+            .andExpect(jsonPath("$[?(@.sourceSystem == 'erp_coast' && @.type == 'WEBHOOK_ORDER')].healthStatus")
+                .value(org.hamcrest.Matchers.hasItem("OFFLINE")));
 
         mockMvc.perform(get("/api/dashboard/snapshot"))
             .andExpect(status().isOk())
@@ -3864,6 +4148,20 @@ class MvpFlowIntegrationTest {
         Long productId = productRepository.findBySku(sku).orElseThrow().getId();
         Long warehouseId = warehouseRepository.findByCode(warehouseCode).orElseThrow().getId();
         return inventoryRepository.findByProductIdAndWarehouseId(productId, warehouseId).orElseThrow();
+    }
+
+    private void configureConnectorToken(String tenantCode,
+                                         String sourceSystem,
+                                         com.synapsecore.domain.entity.IntegrationConnectorType connectorType,
+                                         String inboundAccessToken) {
+        var connector = integrationConnectorRepository
+            .findByTenant_CodeIgnoreCaseAndSourceSystemIgnoreCaseAndType(tenantCode, sourceSystem, connectorType)
+            .orElseThrow();
+        connector.setInboundAccessTokenHash(
+            com.synapsecore.integration.IntegrationConnectorService.hashInboundAccessToken(inboundAccessToken)
+        );
+        connector.setInboundAccessTokenHint("••••" + inboundAccessToken.substring(inboundAccessToken.length() - 4));
+        integrationConnectorRepository.save(connector);
     }
 
     private static RequestPostProcessor accessHeaders(String actorName, String roles) {

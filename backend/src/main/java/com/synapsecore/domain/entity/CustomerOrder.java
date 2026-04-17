@@ -25,6 +25,7 @@ import lombok.Builder;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
+import com.synapsecore.tenant.TenantOwnershipAssertions;
 
 @Entity
 @Table(
@@ -72,6 +73,7 @@ public class CustomerOrder {
 
     @PrePersist
     void onCreate() {
+        TenantOwnershipAssertions.requireCustomerOrderConsistency(this, "Customer order persistence");
         Instant now = Instant.now();
         createdAt = now;
         updatedAt = now;
@@ -79,6 +81,7 @@ public class CustomerOrder {
 
     @PreUpdate
     void onUpdate() {
+        TenantOwnershipAssertions.requireCustomerOrderConsistency(this, "Customer order persistence");
         updatedAt = Instant.now();
     }
 }

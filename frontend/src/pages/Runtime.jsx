@@ -23,6 +23,7 @@ export default function RuntimePage({ context }) {
   }
 
   const selectedRuntimeIncident = systemIncidents.find((incident) => incident.incidentKey === selectedRuntimeIncidentKey) || systemIncidents[0]
+  const connectorDiagnostics = runtime?.connectorDiagnostics || []
   const runtimeSignalCards = runtime
     ? [
       { label: 'Readiness', value: formatCodeLabel(runtime.readinessState), note: 'Current service acceptance posture' },
@@ -83,6 +84,24 @@ export default function RuntimePage({ context }) {
                   <p>Orders {formatMetricValue(runtime.metrics.ordersIngested)} | Fulfillment {formatMetricValue(runtime.metrics.fulfillmentUpdates)} | Dispatch processed {formatMetricValue(runtime.metrics.dispatchProcessed)}</p>
                   <p className="muted-text">Prometheus metrics are exposed for production scraping at <code>/actuator/prometheus</code>.</p>
                 </div>
+                <div className="signal-list-item">
+                  <strong>Connector diagnostics</strong>
+                  {connectorDiagnostics.length ? (
+                    <>
+                      <p>{connectorDiagnostics.length} connector lane{connectorDiagnostics.length === 1 ? '' : 's'} currently need trust review.</p>
+                      <p className="muted-text">
+                        {connectorDiagnostics[0].displayName}
+                        {connectorDiagnostics[0].lastFailureCode ? ` | ${formatCodeLabel(connectorDiagnostics[0].lastFailureCode)}` : ''}
+                        {connectorDiagnostics[0].oldestPendingReplayAgeSeconds != null ? ` | Oldest replay ${connectorDiagnostics[0].oldestPendingReplayAgeSeconds}s` : ''}
+                      </p>
+                    </>
+                  ) : (
+                    <>
+                      <p>No degraded connector telemetry is active right now.</p>
+                      <p className="muted-text">When integration lanes slip, the latest failure and replay age will show here.</p>
+                    </>
+                  )}
+                </div>
               </div>
             ) : <EmptyState>Queue, diagnostics, and metrics posture will appear once runtime data loads.</EmptyState>}
           </article>
@@ -139,6 +158,19 @@ export default function RuntimePage({ context }) {
               <div><span>Failed dispatch</span><strong>{runtime?.backbone?.failedDispatchCount ?? 0}</strong></div>
               <div><span>High severity</span><strong>{systemIncidents.filter((incident) => ['CRITICAL', 'HIGH'].includes(incident.severity)).length}</strong></div>
               <div><span>Oldest queued</span><strong>{runtime?.backbone?.oldestPendingAgeSeconds == null ? 'Clear' : `${runtime.backbone.oldestPendingAgeSeconds}s`}</strong></div>
+            </div>
+            <div className="signal-list">
+              {connectorDiagnostics.length ? connectorDiagnostics.slice(0, 2).map((connector) => (
+                <div key={`${connector.sourceSystem}:${connector.connectorType}`} className="signal-list-item">
+                  <strong>{connector.displayName}</strong>
+                  <p>{connector.lastFailureMessage || connector.healthSummary}</p>
+                  <p className="muted-text">
+                    {connector.sourceSystem} | {formatCodeLabel(connector.healthStatus)}
+                    {connector.lastFailureCode ? ` | ${formatCodeLabel(connector.lastFailureCode)}` : ''}
+                    {connector.oldestPendingReplayAgeSeconds != null ? ` | Replay age ${connector.oldestPendingReplayAgeSeconds}s` : ''}
+                  </p>
+                </div>
+              )) : null}
             </div>
             <div className="history-action-row">
               <button className="ghost-button" onClick={() => navigateToPage('audit')} type="button">Open Audit</button>

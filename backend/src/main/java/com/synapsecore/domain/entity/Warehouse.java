@@ -21,6 +21,7 @@ import lombok.Builder;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
+import com.synapsecore.tenant.TenantOwnershipAssertions;
 
 @Entity
 @Table(
@@ -67,6 +68,7 @@ public class Warehouse {
 
     @PrePersist
     void onCreate() {
+        TenantOwnershipAssertions.requireWarehouseConsistency(this, "Warehouse persistence");
         Instant now = Instant.now();
         createdAt = now;
         updatedAt = now;
@@ -74,6 +76,7 @@ public class Warehouse {
 
     @PreUpdate
     void onUpdate() {
+        TenantOwnershipAssertions.requireWarehouseConsistency(this, "Warehouse persistence");
         updatedAt = Instant.now();
     }
 }

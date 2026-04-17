@@ -71,6 +71,8 @@ public class IntegrationConnector {
     @Column(nullable = false, length = 32)
     private IntegrationTransformationPolicy transformationPolicy = IntegrationTransformationPolicy.NONE;
 
+    private Integer mappingVersion;
+
     @Builder.Default
     @Column(nullable = false)
     private boolean allowDefaultWarehouseFallback = false;
@@ -84,6 +86,12 @@ public class IntegrationConnector {
     @Column(length = 80)
     private String supportOwnerActorName;
 
+    @Column(length = 64)
+    private String inboundAccessTokenHash;
+
+    @Column(length = 24)
+    private String inboundAccessTokenHint;
+
     @Column(nullable = false, updatable = false)
     private Instant createdAt;
 
@@ -93,12 +101,18 @@ public class IntegrationConnector {
     @PrePersist
     void onCreate() {
         Instant now = Instant.now();
+        if (mappingVersion == null || mappingVersion < 1) {
+            mappingVersion = 1;
+        }
         createdAt = now;
         updatedAt = now;
     }
 
     @PreUpdate
     void onUpdate() {
+        if (mappingVersion == null || mappingVersion < 1) {
+            mappingVersion = 1;
+        }
         updatedAt = Instant.now();
     }
 }

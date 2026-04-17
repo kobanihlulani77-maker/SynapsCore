@@ -42,6 +42,10 @@ public class AuthSessionService {
                                       String tenantCode,
                                       String username,
                                       String password) {
+        if (tenantCode == null || tenantCode.isBlank()) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                "tenantCode is required for sign-in.");
+        }
         AccessUser user = resolveUser(tenantCode, username)
             .orElseThrow(() -> new ResponseStatusException(HttpStatus.UNAUTHORIZED,
                 "Invalid operator credentials."));
@@ -263,13 +267,13 @@ public class AuthSessionService {
     }
 
     private Optional<AccessUser> resolveUser(String tenantCode, String username) {
-        if (tenantCode != null && !tenantCode.isBlank()) {
-            return accessUserRepository.findByTenant_CodeIgnoreCaseAndUsernameIgnoreCaseAndActiveTrue(
-                tenantCode.trim(),
-                username
-            );
+        if (tenantCode == null || tenantCode.isBlank()) {
+            return Optional.empty();
         }
-        return accessUserRepository.findByUsernameIgnoreCaseAndActiveTrue(username);
+        return accessUserRepository.findByTenant_CodeIgnoreCaseAndUsernameIgnoreCaseAndActiveTrue(
+            tenantCode.trim(),
+            username
+        );
     }
 
     private Tenant resolveTenant(AccessUser user, AccessOperator operator) {

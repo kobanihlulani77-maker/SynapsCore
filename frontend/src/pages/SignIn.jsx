@@ -22,6 +22,7 @@ export default function SignInPage({ context }) {
     { title: 'Prediction and guidance', body: 'Detect risk early, estimate near-term impact, and surface what the team should do next.' },
     { title: 'Control and trust', body: 'Run scenarios, route approvals, recover failed inbound work, and keep runtime confidence visible.' },
   ]
+  const signInBusy = authSessionState.loading && authSessionState.action === 'signin'
 
   return (
     <main className={`public-shell public-page-${effectivePageMeta.key}`}>
@@ -69,7 +70,7 @@ export default function SignInPage({ context }) {
                   onChange={(event) => setAuthSessionState((current) => ({ ...current, tenantCode: event.target.value.toUpperCase() }))}
                   placeholder={tenantDirectoryState.loading ? 'Loading workspace directory...' : 'Enter tenant code'}
                   autoComplete="organization"
-                  disabled={authSessionState.loading}
+                  disabled={signInBusy}
                 />
                 <datalist id="tenant-workspace-options">
                   {tenantDirectoryState.items.map((tenant) => <option key={tenant.code} value={tenant.code}>{tenant.name}</option>)}
@@ -83,7 +84,7 @@ export default function SignInPage({ context }) {
                   onChange={(event) => setAuthSessionState((current) => ({ ...current, username: event.target.value }))}
                   placeholder="workspace.admin"
                   autoComplete="username"
-                  disabled={authSessionState.loading}
+                  disabled={signInBusy}
                 />
               </label>
               <label className="field">
@@ -94,7 +95,7 @@ export default function SignInPage({ context }) {
                   onChange={(event) => setAuthSessionState((current) => ({ ...current, password: event.target.value }))}
                   placeholder="Enter workspace password"
                   autoComplete="current-password"
-                  disabled={authSessionState.loading}
+                  disabled={signInBusy}
                 />
               </label>
             </div>
@@ -106,8 +107,8 @@ export default function SignInPage({ context }) {
               <span className="muted-text">Password recovery is managed by your tenant admin.</span>
             </div>
             <div className="history-action-row">
-              <button className="primary-button" disabled={authSessionState.loading || !authSessionState.tenantCode.trim() || !authSessionState.username.trim() || !authSessionState.password.trim()} type="submit">
-                {authSessionState.action === 'signin' ? 'Opening Workspace...' : 'Enter Platform'}
+              <button className="primary-button" disabled={signInBusy || !authSessionState.tenantCode.trim() || !authSessionState.username.trim() || !authSessionState.password.trim()} type="submit">
+                {signInBusy ? 'Opening Workspace...' : 'Enter Platform'}
               </button>
               <button className="ghost-button" onClick={() => navigateToPage('product')} type="button">Product Overview</button>
             </div>

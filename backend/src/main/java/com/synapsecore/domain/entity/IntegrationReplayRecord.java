@@ -55,18 +55,28 @@ public class IntegrationReplayRecord {
     private String failureMessage;
 
     @Enumerated(EnumType.STRING)
+    @Column(length = 48)
+    private com.synapsecore.integration.IntegrationFailureCode failureCode;
+
+    @Enumerated(EnumType.STRING)
     @Column(nullable = false, length = 24)
     private IntegrationReplayStatus status;
 
     @Column(nullable = false)
     private int replayAttemptCount;
 
+    private Long inboundRecordId;
+
     @Column(length = 320)
     private String lastReplayMessage;
 
     private Instant lastAttemptedAt;
 
+    private Instant nextEligibleAt;
+
     private Instant resolvedAt;
+
+    private Instant deadLetteredAt;
 
     @Column(length = 80)
     private String replayedOrderExternalId;

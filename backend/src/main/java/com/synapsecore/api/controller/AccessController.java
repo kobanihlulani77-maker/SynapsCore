@@ -3,6 +3,8 @@ package com.synapsecore.api.controller;
 import com.synapsecore.access.AccessAdministrationService;
 import com.synapsecore.access.AccessControlService;
 import com.synapsecore.access.AccessDirectoryService;
+import com.synapsecore.access.BootstrapAccessService;
+import com.synapsecore.access.PlatformAdministrationAccessService;
 import com.synapsecore.access.TenantWorkspaceAdministrationService;
 import com.synapsecore.access.TenantOnboardingService;
 import com.synapsecore.access.dto.AccessOperatorResponse;
@@ -20,12 +22,15 @@ import com.synapsecore.access.dto.TenantWorkspaceUpdateRequest;
 import com.synapsecore.access.dto.TenantWorkspaceWarehouseUpdateRequest;
 import com.synapsecore.access.dto.TenantResponse;
 import com.synapsecore.auth.AuthSessionService;
+import com.synapsecore.config.SynapseDemoProperties;
 import com.synapsecore.domain.dto.WarehouseResponse;
 import com.synapsecore.integration.dto.IntegrationConnectorResponse;
+import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpSession;
 import jakarta.validation.Valid;
 import java.util.List;
 import lombok.RequiredArgsConstructor;
+import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
@@ -34,6 +39,7 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.server.ResponseStatusException;
 
 @RestController
 @RequestMapping("/api/access")
@@ -43,6 +49,9 @@ public class AccessController {
     private final AccessAdministrationService accessAdministrationService;
     private final AccessControlService accessControlService;
     private final AccessDirectoryService accessDirectoryService;
+    private final BootstrapAccessService bootstrapAccessService;
+    private final PlatformAdministrationAccessService platformAdministrationAccessService;
+    private final SynapseDemoProperties demoProperties;
     private final TenantWorkspaceAdministrationService tenantWorkspaceAdministrationService;
     private final TenantOnboardingService tenantOnboardingService;
     private final AuthSessionService authSessionService;
@@ -53,8 +62,22 @@ public class AccessController {
     }
 
     @PostMapping("/tenants")
-    public TenantOnboardingResponse onboardTenant(@Valid @RequestBody TenantOnboardingRequest request) {
-        String actorName = accessControlService.requireTenantAdmin("create tenant workspaces").actorName();
+    public TenantOnboardingResponse onboardTenant(@Valid @RequestBody TenantOnboardingRequest request,
+                                                  HttpServletRequest httpRequest) {
+        String actorName;
+        if (bootstrapAccessService.isInitialBootstrapAvailable()
+                || bootstrapAccessService.isBootstrapRequest(httpRequest)) {
+            bootstrapAccessService.requireInitialBootstrap(httpRequest);
+            actorName = "platform-bootstrap";
+        } else if (platformAdministrationAccessService.isPlatformAdminRequest(httpRequest)) {
+            platformAdministrationAccessService.requirePlatformAdministration(httpRequest);
+            actorName = "platform-admin";
+        } else if (demoProperties.isAllowTenantAdminTenantOnboarding()) {
+            actorName = accessControlService.requireTenantAdmin("create tenant workspaces").actorName();
+        } else {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN,
+                "Tenant workspace creation requires platform administration in this environment.");
+        }
         return tenantOnboardingService.onboardTenant(request, actorName);
     }
 

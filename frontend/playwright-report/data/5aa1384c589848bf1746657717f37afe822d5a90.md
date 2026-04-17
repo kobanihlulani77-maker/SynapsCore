@@ -12,30 +12,108 @@
 # Error details
 
 ```
-Error: expect(locator).toBeVisible() failed
+Test timeout of 180000ms exceeded.
+```
 
-Locator: getByRole('heading', { name: 'Open your company command center' })
-Expected: visible
-Timeout: 20000ms
-Error: element(s) not found
-
+```
+Error: locator.fill: Test timeout of 180000ms exceeded.
 Call log:
-  - Expect "toBeVisible" with timeout 20000ms
-  - waiting for getByRole('heading', { name: 'Open your company command center' })
+  - waiting for getByLabel('Tenant workspace')
+    - locator resolved to <input disabled value="" type="text" autocomplete="organization" list="tenant-workspace-options" placeholder="Loading workspace directory..."/>
+    - fill("SYNAPSE-DEMO")
+  - attempting fill action
+    2 × waiting for element to be visible, enabled and editable
+      - element is not enabled
+    - retrying fill action
+    - waiting 20ms
+    2 × waiting for element to be visible, enabled and editable
+      - element is not enabled
+    - retrying fill action
+      - waiting 100ms
+    318 × waiting for element to be visible, enabled and editable
+        - element is not enabled
+      - retrying fill action
+        - waiting 500ms
 
 ```
 
 # Page snapshot
 
 ```yaml
-- generic [ref=e2]: Not Found
+- main [ref=e3]:
+  - generic [ref=e4]:
+    - button "S SynapseCore Operational intelligence operating system" [ref=e5] [cursor=pointer]:
+      - generic [ref=e6]: S
+      - generic [ref=e7]:
+        - strong [ref=e8]: SynapseCore
+        - generic [ref=e9]: Operational intelligence operating system
+    - navigation [ref=e10]:
+      - button "Home" [ref=e11] [cursor=pointer]
+      - button "Product" [ref=e12] [cursor=pointer]
+      - button "Contact" [ref=e13] [cursor=pointer]
+  - generic [ref=e14]:
+    - article [ref=e15]:
+      - paragraph [ref=e16]: Secure company entry
+      - heading "Access your operational workspace." [level=1] [ref=e17]
+      - paragraph [ref=e18]: Sign in to the right company workspace and move from visibility to action without leaving the control center.
+      - generic [ref=e19]:
+        - generic [ref=e20]: Checking workspace directory
+        - generic [ref=e21]: Realtime path ready
+      - generic [ref=e22]:
+        - article [ref=e23]:
+          - strong [ref=e24]: Live visibility
+          - paragraph [ref=e25]: Orders, inventory, locations, fulfillment, incidents, and connectors pulled into one operational picture.
+        - article [ref=e26]:
+          - strong [ref=e27]: Prediction and guidance
+          - paragraph [ref=e28]: Detect risk early, estimate near-term impact, and surface what the team should do next.
+        - article [ref=e29]:
+          - strong [ref=e30]: Control and trust
+          - paragraph [ref=e31]: Run scenarios, route approvals, recover failed inbound work, and keep runtime confidence visible.
+    - article [ref=e32]:
+      - paragraph [ref=e33]: Company sign in
+      - heading "Enter the operational platform" [level=2] [ref=e34]
+      - paragraph [ref=e39]: Loading available workspaces...
+      - generic [ref=e40]:
+        - generic [ref=e41]:
+          - generic [ref=e42]:
+            - generic [ref=e43]: Tenant workspace
+            - combobox "Tenant workspace" [disabled] [ref=e44]
+          - generic [ref=e45]:
+            - generic [ref=e46]: Username
+            - textbox "Username" [disabled] [ref=e47]:
+              - /placeholder: workspace.admin
+          - generic [ref=e48]:
+            - generic [ref=e49]: Password
+            - textbox "Password" [disabled] [ref=e50]:
+              - /placeholder: Enter workspace password
+        - generic [ref=e51]:
+          - generic [ref=e52]:
+            - checkbox "Remember tenant code and username on this device" [checked] [ref=e53]
+            - generic [ref=e54]: Remember tenant code and username on this device
+          - generic [ref=e55]: Password recovery is managed by your tenant admin.
+        - generic [ref=e56]:
+          - button "Enter Platform" [disabled] [ref=e57]
+          - button "Product Overview" [ref=e58] [cursor=pointer]
+      - generic [ref=e59]:
+        - article [ref=e60]:
+          - generic [ref=e61]: Tenant scope
+          - strong [ref=e62]: Workspace required
+          - paragraph [ref=e63]: Operators enter a company workspace, not a generic app account.
+        - article [ref=e64]:
+          - generic [ref=e65]: Session model
+          - strong [ref=e66]: Secure browser session
+          - paragraph [ref=e67]: Protected actions, approvals, replay, and realtime access all follow the signed-in operator identity.
+        - article [ref=e68]:
+          - generic [ref=e69]: Realtime posture
+          - strong [ref=e70]: Live transport configured
+          - paragraph [ref=e71]: SynapseCore opens the command workspace with live operational updates when the session is valid.
+      - paragraph [ref=e72]: Loading the active workspace directory so operators can sign in against the live tenant list.
+      - paragraph [ref=e73]: API https://synapscore-3.onrender.com | Realtime wss://synapscore-3.onrender.com/ws
 ```
 
 # Test source
 
 ```ts
-  129 |   const api = await createApiContext(users.integrationLead)
-  130 |   const suffix = randomUUID().slice(0, 8).toUpperCase()
   131 |   const sourceSystem = `ui_replay_${suffix}`.toLowerCase()
   132 |   const externalOrderId = `UI-RPL-${suffix}`
   133 | 
@@ -134,10 +212,10 @@ Call log:
   226 | 
   227 | test('auth flow and the full authenticated page system render cleanly in a browser', async ({ page }) => {
   228 |   await page.goto('/dashboard')
-> 229 |   await expect(page.getByRole('heading', { name: 'Open your company command center' })).toBeVisible()
-      |                                                                                         ^ Error: expect(locator).toBeVisible() failed
+  229 |   await expect(page.getByRole('heading', { name: 'Access your operational workspace.' })).toBeVisible()
   230 | 
-  231 |   await page.getByLabel('Tenant workspace').fill(users.operationsLead.tenantCode)
+> 231 |   await page.getByLabel('Tenant workspace').fill(users.operationsLead.tenantCode)
+      |                                             ^ Error: locator.fill: Test timeout of 180000ms exceeded.
   232 |   await page.getByLabel('Username').fill(users.operationsLead.username)
   233 |   await page.getByLabel('Password').fill('wrong-code')
   234 |   await page.locator('.public-signin-card').getByRole('button', { name: 'Enter Platform' }).click()
@@ -236,4 +314,6 @@ Call log:
   327 | 
   328 |     const scenarioExecutionConsole = page.locator('.stack-card').filter({
   329 |       hasText: scenarioFixture.title,
+  330 |       has: page.getByRole('button', { name: 'Execute Scenario' }),
+  331 |     }).first()
 ```

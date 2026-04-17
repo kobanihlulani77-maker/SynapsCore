@@ -99,6 +99,12 @@ Each update can change:
 
 Receives an external order payload from another system and feeds it into the real SynapseCore order ingestion flow.
 
+Authentication:
+
+- connector-authenticated machine ingress may send `X-Synapse-Connector-Token`
+- when the connector token header is present, SynapseCore authenticates the configured connector directly and does not require a signed-in workspace session
+- when the connector token header is absent, the existing signed-in workspace or header-fallback access rules still apply
+
 Example body:
 
 ```json
@@ -234,7 +240,13 @@ Each tenant includes:
 
 ### `POST /api/access/tenants`
 
-Creates a new tenant workspace with bootstrap operators, users, warehouses, starter inventory, and inbound connectors.
+Creates a new tenant workspace with bootstrap operators, users, and warehouses.
+
+Production access rules:
+- First tenant on an empty production database: send `X-Synapse-Bootstrap-Token`.
+- Later production tenant provisioning: send `X-Synapse-Platform-Admin-Token`.
+- Signed-in tenant-admin sessions are not allowed to create additional tenant workspaces in production.
+- Starter inventory and starter connectors are only seeded when the environment explicitly enables demo onboarding seeding.
 
 Example body:
 
@@ -265,7 +277,6 @@ Returns:
 - adminActorName
 - executiveUsername
 - executiveActorName
-- executivePassword
 - starterWarehouseCodes
 - createdAt
 
@@ -561,6 +572,18 @@ The response includes:
   - activeIncidentCount
   - latestBusinessEventAt
   - latestFailureAt
+- connectorDiagnostics
+  - sourceSystem
+  - connectorType
+  - displayName
+  - healthStatus
+  - healthSummary
+  - lastFailureCode
+  - lastFailureMessage
+  - lastFailureAt
+  - pendingReplayCount
+  - deadLetterCount
+  - oldestPendingReplayAgeSeconds
 - observedAt
 
 ### `GET /api/system/incidents`
@@ -572,6 +595,7 @@ The response includes derived incident cards for:
 - audit failures
 - replay backlog
 - disabled connectors
+- degraded connectors
 - failed operational dispatch work
 - action-required control notices such as SLA escalations
 
@@ -585,6 +609,8 @@ Each incident includes:
 - context
 - actionRequired
 - createdAt
+
+Connector-related incidents now surface the most recent connector failure detail when available, plus replay-wait context for degraded lanes.
 
 ### `GET /actuator/prometheus`
 
@@ -615,6 +641,12 @@ Multipart fields:
 - `file`
 - optional `sourceSystem`
 
+Authentication:
+
+- connector-authenticated machine ingress may send `X-Synapse-Connector-Token`
+- connector-authenticated CSV imports must also send the `sourceSystem` request parameter
+- when the connector token header is absent, the existing signed-in workspace or header-fallback access rules still apply
+
 Expected CSV header columns:
 
 - `externalOrderId`
@@ -637,7 +669,7 @@ Returns:
 - number of imported orders
 - number of failed orders
 - imported order summaries including the created internal order response
-- failed order summaries including row numbers and the validation or ingestion failure
+- failed order summaries including row numbers, `failureCode`, and the validation or ingestion failure
 
 Connector policy behavior:
 
@@ -659,9 +691,28 @@ Each connector includes:
 - syncIntervalMinutes
 - validationPolicy
 - transformationPolicy
+- mappingVersion
 - allowDefaultWarehouseFallback
 - defaultWarehouseCode
 - notes
+- supportOwnerActorName
+- supportOwnerDisplayName
+- inboundAccessConfigured
+- inboundAccessTokenHint
+- healthStatus (`LIVE`, `DEGRADED`, `OFFLINE`)
+- healthSummary
+- lastActivityAt
+- lastSuccessfulActivityAt
+- lastImportStatus
+- lastImportAt
+- recentInboundFailureCount
+- pendingReplayCount
+- deadLetterCount
+- lastFailureCode
+- lastFailureMessage
+- lastFailureAt
+- oldestPendingReplayAt
+- oldestPendingReplayAgeSeconds
 - createdAt
 - updatedAt
 
@@ -679,9 +730,12 @@ The request contains:
 - syncIntervalMinutes
 - validationPolicy
 - transformationPolicy
+- `mappingVersion` (currently only `1` is supported)
 - allowDefaultWarehouseFallback
 - defaultWarehouseCode
 - notes
+- optional `inboundAccessToken` to set or rotate connector-authenticated ingress
+- optional `clearInboundAccessToken=true` to remove connector-authenticated ingress for that connector
 
 Access:
 
@@ -714,6 +768,7 @@ Each replay record includes:
 - connectorType
 - externalOrderId
 - warehouseCode
+- failureCode
 - failureMessage
 - status
 - replayAttemptCount

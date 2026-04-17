@@ -18,17 +18,36 @@ $frontendFile = Resolve-SynapseEnvPath -InfrastructureDir $infraDir -RawPath $Fr
 $backendValues = Read-SynapseEnvFile -FilePath $backendFile
 $frontendValues = Read-SynapseEnvFile -FilePath $frontendFile
 
+function Get-FirstNonEmptyEnvValue {
+    param(
+        [hashtable]$Values,
+        [string[]]$Keys
+    )
+
+    foreach ($key in $Keys) {
+        if ($Values.ContainsKey($key)) {
+            $value = [string]$Values[$key]
+            if (-not [string]::IsNullOrWhiteSpace($value)) {
+                return $value
+            }
+        }
+    }
+
+    return ""
+}
+
 $backendProfile = Get-RequiredEnvValue -Values $backendValues -Key "SPRING_PROFILES_ACTIVE" -FilePath $backendFile
-$backendDbHost = Get-RequiredEnvValue -Values $backendValues -Key "DB_HOST" -FilePath $backendFile
-$backendDbName = Get-RequiredEnvValue -Values $backendValues -Key "DB_NAME" -FilePath $backendFile
-$backendDbUser = Get-RequiredEnvValue -Values $backendValues -Key "DB_USER" -FilePath $backendFile
-$backendDbPassword = Get-RequiredEnvValue -Values $backendValues -Key "DB_PASSWORD" -FilePath $backendFile
-$backendRedisHost = Get-RequiredEnvValue -Values $backendValues -Key "REDIS_HOST" -FilePath $backendFile
+$backendDatasourceUrl = Get-FirstNonEmptyEnvValue -Values $backendValues -Keys @("SPRING_DATASOURCE_URL", "DATABASE_URL")
+$backendDbHost = if ($backendValues.ContainsKey("DB_HOST")) { [string]$backendValues["DB_HOST"] } else { "" }
+$backendDbName = if ($backendValues.ContainsKey("DB_NAME")) { [string]$backendValues["DB_NAME"] } else { "" }
+$backendDbUser = if ($backendValues.ContainsKey("DB_USER")) { [string]$backendValues["DB_USER"] } else { "" }
+$backendDbPassword = if ($backendValues.ContainsKey("DB_PASSWORD")) { [string]$backendValues["DB_PASSWORD"] } else { "" }
+$backendRedisUrl = Get-RequiredEnvValue -Values $backendValues -Key "SPRING_DATA_REDIS_URL" -FilePath $backendFile
 $backendCorsAllowed = Get-RequiredEnvValue -Values $backendValues -Key "CORS_ALLOWED_ORIGINS" -FilePath $backendFile
 $backendCookieSecure = Get-RequiredEnvValue -Values $backendValues -Key "SESSION_COOKIE_SECURE" -FilePath $backendFile
 $backendSameSite = Get-RequiredEnvValue -Values $backendValues -Key "SESSION_COOKIE_SAME_SITE" -FilePath $backendFile
 $backendHeaderFallback = Get-RequiredEnvValue -Values $backendValues -Key "ALLOW_HEADER_FALLBACK" -FilePath $backendFile
-$backendDdlAuto = Get-RequiredEnvValue -Values $backendValues -Key "JPA_DDL_AUTO" -FilePath $backendFile
+$backendDdlAuto = Get-RequiredEnvValue -Values $backendValues -Key "SPRING_JPA_HIBERNATE_DDL_AUTO" -FilePath $backendFile
 $backendBuildVersion = Get-RequiredEnvValue -Values $backendValues -Key "SYNAPSECORE_BUILD_VERSION" -FilePath $backendFile
 $backendBuildCommit = Get-RequiredEnvValue -Values $backendValues -Key "SYNAPSECORE_BUILD_COMMIT" -FilePath $backendFile
 $backendBuildTime = Get-RequiredEnvValue -Values $backendValues -Key "SYNAPSECORE_BUILD_TIME" -FilePath $backendFile
@@ -40,7 +59,13 @@ $frontendBuildTime = Get-RequiredEnvValue -Values $frontendValues -Key "VITE_APP
 
 Assert-EnvEquals -Values $backendValues -Key "SPRING_PROFILES_ACTIVE" -Expected "prod" -FilePath $backendFile
 Assert-EnvEquals -Values $backendValues -Key "ALLOW_HEADER_FALLBACK" -Expected "false" -FilePath $backendFile
-Assert-EnvEquals -Values $backendValues -Key "JPA_DDL_AUTO" -Expected "validate" -FilePath $backendFile
+Assert-EnvEquals -Values $backendValues -Key "SPRING_JPA_HIBERNATE_DDL_AUTO" -Expected "update" -FilePath $backendFile
+
+if ([string]::IsNullOrWhiteSpace($backendDatasourceUrl)) {
+    if ([string]::IsNullOrWhiteSpace($backendDbHost) -or [string]::IsNullOrWhiteSpace($backendDbName) -or [string]::IsNullOrWhiteSpace($backendDbUser) -or [string]::IsNullOrWhiteSpace($backendDbPassword)) {
+        throw "Backend env must define DATABASE_URL or SPRING_DATASOURCE_URL, or the DB_HOST/DB_NAME/DB_USER/DB_PASSWORD fallback set in $backendFile"
+    }
+}
 
 if ($backendSameSite -notin @("Lax", "Strict", "None")) {
     throw "SESSION_COOKIE_SAME_SITE must be one of Lax, Strict, or None in $backendFile"
@@ -60,11 +85,12 @@ if (-not $frontendWsUrl.EndsWith("/ws")) {
 
 if (-not $AllowPlaceholders) {
     if (Test-SynapsePlaceholderValues -Values @(
+            $backendDatasourceUrl,
             $backendDbHost,
             $backendDbName,
             $backendDbUser,
             $backendDbPassword,
-            $backendRedisHost,
+            $backendRedisUrl,
             $backendCorsAllowed,
             $backendBuildCommit,
             $backendBuildTime

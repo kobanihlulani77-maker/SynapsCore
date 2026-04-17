@@ -25,8 +25,11 @@ public record IntegrationConnectorRequest(
     @Min(15) @Max(1440) Integer syncIntervalMinutes,
     IntegrationValidationPolicy validationPolicy,
     IntegrationTransformationPolicy transformationPolicy,
+    @Min(1) Integer mappingVersion,
     Boolean allowDefaultWarehouseFallback,
     @Size(max = 40) String defaultWarehouseCode,
-    @Size(max = 240) String notes
+    @Size(max = 240) String notes,
+    @Size(max = 120) String inboundAccessToken,
+    Boolean clearInboundAccessToken
 ) {
 }

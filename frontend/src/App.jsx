@@ -38,6 +38,7 @@ const workspacePreferenceStorageKey = 'synapsecore.workspacePreference'
 const postAuthRedirectStorageKey = 'synapsecore.postAuthRedirect'
 const trimTrailingSlash = (value = '') => value.replace(/\/+$/, '')
 const isLocalHostname = (hostname = '') => ['localhost', '127.0.0.1', '0.0.0.0'].includes((hostname || '').toLowerCase())
+const isExplicitNativeRealtimeUrl = (value = '') => /^wss?:/i.test(String(value).trim())
 const normalizeAbsoluteUrl = (value) => {
   if (!value || !String(value).trim()) return ''
   try {
@@ -102,9 +103,12 @@ const removeStoredValue = (storage, key) => {
 const rememberedWorkspacePreference = readStoredJson(globalThis.localStorage, workspacePreferenceStorageKey, null)
 const configuredRealtimeUrl = runtimeConfig.wsUrl || import.meta.env.VITE_WS_URL || ''
 const apiUrl = resolveApiBaseUrl()
-const websocketBrokerUrl = resolveRealtimeUrl(configuredRealtimeUrl, apiUrl, 'ws')
+const websocketBrokerUrl = isExplicitNativeRealtimeUrl(configuredRealtimeUrl)
+  ? resolveRealtimeUrl(configuredRealtimeUrl, apiUrl, 'ws')
+  : ''
 const sockJsUrl = resolveRealtimeUrl(configuredRealtimeUrl, apiUrl, 'http')
 const wsUrl = websocketBrokerUrl || sockJsUrl
+const realtimeTransportLabel = websocketBrokerUrl ? 'Native WebSocket / STOMP' : (sockJsUrl ? 'SockJS / STOMP' : 'Realtime not configured')
 const frontendBuildVersion = runtimeConfig.appBuildVersion || import.meta.env.VITE_APP_BUILD_VERSION || 'local-dev'
 const frontendBuildCommit = runtimeConfig.appBuildCommit || import.meta.env.VITE_APP_BUILD_COMMIT || 'local-dev'
 const frontendBuildTime = runtimeConfig.appBuildTime || import.meta.env.VITE_APP_BUILD_TIME || 'untracked'
@@ -1429,7 +1433,7 @@ export default function App() {
       : selectedTenantOption
         ? `Signing into ${selectedTenantOption.name}.`
         : 'Enter the tenant code exactly as it exists in SynapseCore, or pick it from the live directory suggestions.'
-  const signInConfigHint = `API ${apiUrl || 'missing'} | Realtime ${wsUrl || 'missing'}`
+  const signInConfigHint = `API ${apiUrl || 'missing'} | Realtime ${wsUrl || 'missing'} | Transport ${realtimeTransportLabel}`
   const metrics = [
     { label: 'Total Orders', value: summary ? summary.totalOrders : pageState.loading ? 'Loading' : 'No data', accent: 'amber' },
     { label: 'Active Alerts', value: summary ? summary.activeAlerts : pageState.loading ? 'Loading' : 'No data', accent: 'rose' },
@@ -1997,7 +2001,8 @@ export default function App() {
 
   function handleSignInSubmit(event) {
     event.preventDefault()
-    if (!authSessionState.loading && authSessionState.tenantCode.trim() && authSessionState.username.trim() && authSessionState.password.trim()) {
+    const signInBusy = authSessionState.loading && authSessionState.action === 'signin'
+    if (!signInBusy && authSessionState.tenantCode.trim() && authSessionState.username.trim() && authSessionState.password.trim()) {
       signInOperator()
     }
   }
@@ -2115,7 +2120,7 @@ export default function App() {
       setTenantOnboardingState({
         loading: false,
         error: '',
-        success: `${payload.tenantName} is ready. Bootstrap admin ${payload.adminUsername} and executive approver ${payload.executiveUsername} were created.`,
+        success: `${payload.tenantName} is ready. Bootstrap admin ${payload.adminUsername} and executive approver ${payload.executiveUsername} were created. Reset the executive password from Users before first use.`,
         result: payload,
       })
       setAuthSessionState((current) => ({
@@ -2416,6 +2421,7 @@ export default function App() {
             frontendBuildVersion,
             apiUrl,
             wsUrl,
+            realtimeTransportLabel,
             effectivePageMeta,
             pageStatusMap,
             navigateToPage,
@@ -2477,7 +2483,7 @@ export default function App() {
             <PlatformAdminPage context={{ isAuthenticated, isPlatformPage, runtime, tenantDirectoryState, systemIncidents, pendingReplayCount, selectedTenantPortfolio, setSelectedTenantPortfolioCode, signedInSession, formatBuildValue, formatCodeLabel, formatTimestamp, getIncidentStatusClassName, getRuntimeStatusClassName, navigateToPage }} />
             <TenantsPage context={{ isAuthenticated, isTenantsPage, tenantDirectoryState, signedInSession, signedInRoles, tenantOnboardingState, tenantOnboardingForm, setTenantOnboardingForm, onboardTenant, signInOperator, authSessionState, setAuthSessionState }} />
             <SystemConfigPage context={{ isAuthenticated, isSystemConfigPage, runtime, formatMetricValue }} />
-            <ReleasesPage context={{ isAuthenticated, isReleasesPage, runtime, formatBuildValue, formatCodeLabel, formatTimestamp, frontendBuildVersion, frontendBuildCommit, frontendBuildTime, apiUrl, wsUrl, getRuntimeStatusClassName }} />
+            <ReleasesPage context={{ isAuthenticated, isReleasesPage, runtime, formatBuildValue, formatCodeLabel, formatTimestamp, frontendBuildVersion, frontendBuildCommit, frontendBuildTime, apiUrl, wsUrl, realtimeTransportLabel, getRuntimeStatusClassName }} />
     </AppShell>
   )
 }

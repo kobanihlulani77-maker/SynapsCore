@@ -20,6 +20,7 @@ import com.synapsecore.event.OperationalStateChangePublisher;
 import com.synapsecore.event.OperationalUpdateType;
 import com.synapsecore.observability.OperationalMetricsService;
 import com.synapsecore.tenant.TenantContextService;
+import com.synapsecore.tenant.TenantScopeGuard;
 import java.time.Duration;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
@@ -68,6 +69,7 @@ public class FulfillmentService {
     private final AuditLogService auditLogService;
     private final OperationalStateChangePublisher operationalStateChangePublisher;
     private final TenantContextService tenantContextService;
+    private final TenantScopeGuard tenantScopeGuard;
     private final OperationalMetricsService operationalMetricsService;
 
     @Value("${synapsecore.fulfillment.default-dispatch-hours:2}")
@@ -81,6 +83,7 @@ public class FulfillmentService {
 
     @Transactional
     public FulfillmentTask initializeForOrder(CustomerOrder order, String source) {
+        tenantScopeGuard.requireCustomerOrder(order, "fulfillment initialization");
         Instant queuedAt = order.getCreatedAt() == null ? Instant.now() : order.getCreatedAt();
         FulfillmentTask task = fulfillmentTaskRepository.save(FulfillmentTask.builder()
             .tenant(order.getTenant())
@@ -93,6 +96,7 @@ public class FulfillmentService {
             .exceptionCount(0)
             .note("Order queued for fulfillment.")
             .build());
+        tenantScopeGuard.requireFulfillmentTask(task, "fulfillment initialization");
 
         businessEventService.record(
             BusinessEventType.FULFILLMENT_UPDATED,
@@ -123,14 +127,17 @@ public class FulfillmentService {
         String tenantCode = tenantContextService.getCurrentTenantCodeOrDefault();
         CustomerOrder order = customerOrderRepository.findByTenant_CodeIgnoreCaseAndExternalOrderId(tenantCode, request.externalOrderId().trim())
             .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Order not found: " + request.externalOrderId()));
+        tenantScopeGuard.requireCustomerOrder(order, "fulfillment update");
         FulfillmentTask task = fulfillmentTaskRepository.findByTenant_CodeIgnoreCaseAndCustomerOrder_ExternalOrderId(tenantCode, order.getExternalOrderId())
             .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND,
                 "Fulfillment task not found for order " + request.externalOrderId()));
+        tenantScopeGuard.requireFulfillmentTask(task, "fulfillment update");
 
         applyUpdate(task, request);
         order.setStatus(mapOrderStatus(task.getStatus()));
         customerOrderRepository.save(order);
         FulfillmentTask savedTask = fulfillmentTaskRepository.save(task);
+        tenantScopeGuard.requireFulfillmentTask(savedTask, "fulfillment update");
 
         BusinessEventType eventType = switch (savedTask.getStatus()) {
             case DELAYED -> BusinessEventType.DELIVERY_DELAY_REPORTED;

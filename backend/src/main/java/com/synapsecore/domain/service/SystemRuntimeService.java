@@ -4,6 +4,7 @@ import com.synapsecore.config.SynapseAccessProperties;
 import com.synapsecore.config.SynapseCorsProperties;
 import com.synapsecore.domain.dto.SystemBackboneSummary;
 import com.synapsecore.domain.dto.SystemBuildInfo;
+import com.synapsecore.domain.dto.SystemConnectorDiagnosticSummary;
 import com.synapsecore.domain.dto.SystemDiagnosticsSummary;
 import com.synapsecore.domain.dto.SystemMetricsSummary;
 import com.synapsecore.domain.dto.SystemTelemetrySummary;
@@ -11,6 +12,7 @@ import com.synapsecore.domain.dto.SystemRuntimeResponse;
 import com.synapsecore.domain.entity.AuditStatus;
 import com.synapsecore.domain.entity.BusinessEventType;
 import com.synapsecore.domain.entity.IntegrationImportStatus;
+import com.synapsecore.domain.entity.IntegrationInboundStatus;
 import com.synapsecore.domain.entity.IntegrationReplayStatus;
 import com.synapsecore.domain.entity.AlertStatus;
 import com.synapsecore.domain.entity.FulfillmentStatus;
@@ -20,10 +22,12 @@ import com.synapsecore.domain.repository.AuditLogRepository;
 import com.synapsecore.domain.repository.BusinessEventRepository;
 import com.synapsecore.domain.repository.FulfillmentTaskRepository;
 import com.synapsecore.domain.repository.IntegrationConnectorRepository;
+import com.synapsecore.domain.repository.IntegrationInboundRecordRepository;
 import com.synapsecore.domain.repository.IntegrationImportRunRepository;
 import com.synapsecore.domain.repository.IntegrationReplayRecordRepository;
 import com.synapsecore.domain.repository.OperationalDispatchWorkItemRepository;
 import com.synapsecore.event.OperationalDispatchQueueService;
+import com.synapsecore.integration.IntegrationConnectorService;
 import com.synapsecore.observability.OperationalMetricsService;
 import com.synapsecore.tenant.TenantContextService;
 import java.time.Duration;
@@ -51,6 +55,7 @@ public class SystemRuntimeService {
     private final BusinessEventRepository businessEventRepository;
     private final FulfillmentTaskRepository fulfillmentTaskRepository;
     private final IntegrationConnectorRepository integrationConnectorRepository;
+    private final IntegrationInboundRecordRepository integrationInboundRecordRepository;
     private final IntegrationImportRunRepository integrationImportRunRepository;
     private final IntegrationReplayRecordRepository integrationReplayRecordRepository;
     private final OperationalDispatchWorkItemRepository operationalDispatchWorkItemRepository;
@@ -58,6 +63,7 @@ public class SystemRuntimeService {
     private final OperationalDispatchQueueService operationalDispatchQueueService;
     private final OperationalMetricsService operationalMetricsService;
     private final TenantContextService tenantContextService;
+    private final IntegrationConnectorService integrationConnectorService;
 
     @Value("${spring.application.name}")
     private String applicationName;
@@ -115,6 +121,7 @@ public class SystemRuntimeService {
             buildBackboneSummary(),
             buildMetricsSummary(),
             buildDiagnosticsSummary(),
+            buildConnectorDiagnostics(),
             Instant.now()
         );
     }
@@ -129,14 +136,24 @@ public class SystemRuntimeService {
             .findTop20ByTenantCodeIgnoreCaseOrderByCreatedAtDesc(tenantCode).stream()
             .filter(log -> log.getStatus() == AuditStatus.FAILURE)
             .count();
+        Instant windowStart = Instant.now().minus(Duration.ofHours(diagnosticsWindowHours));
 
         return new SystemTelemetrySummary(
             integrationConnectorRepository.countByTenant_CodeIgnoreCaseAndEnabledFalse(tenantCode),
             integrationReplayRecordRepository.countByTenantCodeIgnoreCaseAndStatusIn(tenantCode, List.of(
                 IntegrationReplayStatus.PENDING,
-                IntegrationReplayStatus.REPLAY_FAILED
+                IntegrationReplayStatus.REPLAY_FAILED,
+                IntegrationReplayStatus.DEAD_LETTERED
+            )),
+            integrationReplayRecordRepository.countByTenantCodeIgnoreCaseAndStatusIn(tenantCode, List.of(
+                IntegrationReplayStatus.DEAD_LETTERED
             )),
             recentImportIssues,
+            integrationInboundRecordRepository.countByTenantCodeIgnoreCaseAndStatusInAndCreatedAtAfter(
+                tenantCode,
+                List.of(IntegrationInboundStatus.REJECTED, IntegrationInboundStatus.REPLAY_QUEUED),
+                windowStart
+            ),
             recentAuditFailures,
             alertRepository.countByTenant_CodeIgnoreCaseAndStatus(tenantCode, AlertStatus.ACTIVE),
             fulfillmentTaskRepository.countByTenant_CodeIgnoreCaseAndStatusIn(
@@ -250,5 +267,31 @@ public class SystemRuntimeService {
                 .map(log -> log.getCreatedAt())
                 .orElse(null)
         );
+    }
+
+    private List<SystemConnectorDiagnosticSummary> buildConnectorDiagnostics() {
+        return integrationConnectorService.getConnectors().stream()
+            .filter(connector -> connector.healthStatus() != com.synapsecore.integration.dto.IntegrationConnectorHealthStatus.LIVE
+                || connector.recentInboundFailureCount() > 0
+                || connector.pendingReplayCount() > 0
+                || connector.deadLetterCount() > 0)
+            .sorted(java.util.Comparator
+                .comparingInt((com.synapsecore.integration.dto.IntegrationConnectorResponse connector) -> connector.healthStatus() == com.synapsecore.integration.dto.IntegrationConnectorHealthStatus.OFFLINE ? 0 : 1)
+                .thenComparing((com.synapsecore.integration.dto.IntegrationConnectorResponse connector) -> connector.lastFailureAt() == null ? Instant.EPOCH : connector.lastFailureAt(), java.util.Comparator.reverseOrder()))
+            .limit(4)
+            .map(connector -> new SystemConnectorDiagnosticSummary(
+                connector.sourceSystem(),
+                connector.type(),
+                connector.displayName(),
+                connector.healthStatus(),
+                connector.healthSummary(),
+                connector.lastFailureCode(),
+                connector.lastFailureMessage(),
+                connector.lastFailureAt(),
+                connector.pendingReplayCount(),
+                connector.deadLetterCount(),
+                connector.oldestPendingReplayAgeSeconds()
+            ))
+            .toList();
     }
 }

@@ -7,6 +7,7 @@ public record ExternalOrderCsvImportFailure(
     String externalOrderId,
     String warehouseCode,
     List<Integer> rowNumbers,
+    com.synapsecore.integration.IntegrationFailureCode failureCode,
     String message
 ) {
 }

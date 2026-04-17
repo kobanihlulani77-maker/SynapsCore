@@ -1,5 +1,6 @@
 package com.synapsecore.integration;
 
+import com.synapsecore.audit.RequestTraceContext;
 import com.synapsecore.audit.AuditLogService;
 import com.synapsecore.domain.dto.OrderCreateRequest;
 import com.synapsecore.domain.dto.OrderItemRequest;
@@ -43,16 +44,24 @@ public class ExternalOrderCsvImportService {
     private final IntegrationConnectorPolicyService integrationConnectorPolicyService;
     private final IntegrationImportRunService integrationImportRunService;
     private final IntegrationReplayService integrationReplayService;
+    private final IntegrationInboundRecordService integrationInboundRecordService;
+    private final RequestTraceContext requestTraceContext;
 
     public ExternalOrderCsvImportResponse ingest(MultipartFile file, String sourceSystemDefault) {
+        return ingest(file, sourceSystemDefault, null);
+    }
+
+    public ExternalOrderCsvImportResponse ingest(MultipartFile file,
+                                                 String sourceSystemDefault,
+                                                 com.synapsecore.domain.entity.IntegrationConnector authenticatedConnector) {
         if (file == null || file.isEmpty()) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "CSV file is required.");
+            throw IntegrationFailureCodes.badRequest(IntegrationFailureCode.MISSING_FILE, "CSV file is required.");
         }
 
         String normalizedDefaultSource = normalizeOptionalSourceSystem(sourceSystemDefault);
         CsvFileContent csvContent = readCsv(file, normalizedDefaultSource);
         if (csvContent.rows().isEmpty() && csvContent.failures().isEmpty()) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "CSV import requires at least one data row.");
+            throw IntegrationFailureCodes.badRequest(IntegrationFailureCode.EMPTY_CSV, "CSV import requires at least one data row.");
         }
 
         Map<ImportOrderKey, List<ParsedCsvRow>> groupedRows = groupRows(csvContent.rows(), csvContent.failures());
@@ -60,11 +69,39 @@ public class ExternalOrderCsvImportService {
         List<ExternalOrderCsvImportFailure> failedOrders = new ArrayList<>(csvContent.failures());
 
         groupedRows.forEach((key, rows) -> {
+            Long inboundRecordId = null;
+            String tenantCode = requestTraceContext.getCurrentTenant()
+                .filter(currentTenant -> !RequestTraceContext.DEFAULT_TENANT.equalsIgnoreCase(currentTenant))
+                .orElse(authenticatedConnector != null ? authenticatedConnector.getTenant().getCode() : null);
             try {
-                var connector = integrationConnectorService.requireEnabledConnector(
-                    key.sourceSystem(),
+                if (authenticatedConnector != null
+                    && !authenticatedConnector.getSourceSystem().equalsIgnoreCase(key.sourceSystem())) {
+                    throw IntegrationFailureCodes.badRequest(IntegrationFailureCode.CONNECTOR_SOURCE_MISMATCH,
+                        "Connector-authenticated CSV imports may only submit orders for sourceSystem "
+                            + authenticatedConnector.getSourceSystem() + ".");
+                }
+                var connector = authenticatedConnector != null
+                    ? authenticatedConnector
+                    : integrationConnectorService.requireEnabledConnector(
+                        key.sourceSystem(),
+                        IntegrationConnectorType.CSV_ORDER_IMPORT,
+                        "accept CSV imports");
+                tenantCode = connector.getTenant().getCode();
+                inboundRecordId = integrationInboundRecordService.recordReceived(
+                    tenantCode,
+                    connector.getSourceSystem(),
                     IntegrationConnectorType.CSV_ORDER_IMPORT,
-                    "accept CSV imports");
+                    Objects.requireNonNullElse(file.getOriginalFilename(), "orders.csv"),
+                    key.externalOrderId(),
+                    key.warehouseCode(),
+                    new OrderCreateRequest(
+                        key.externalOrderId(),
+                        key.warehouseCode(),
+                        rows.stream()
+                            .map(row -> new OrderItemRequest(row.productSku(), row.quantity(), row.unitPrice()))
+                            .toList()
+                    )
+                ).getId();
 
                 var preparedOrder = integrationConnectorPolicyService.prepareOrder(
                     connector,
@@ -81,6 +118,7 @@ public class ExternalOrderCsvImportService {
                     preparedOrder.orderRequest(),
                     buildIngestionSource(key.sourceSystem())
                 );
+                integrationInboundRecordService.markAccepted(inboundRecordId, buildIngestionSource(key.sourceSystem()));
 
                 importedOrders.add(new ExternalOrderCsvImportOrderResult(
                     key.sourceSystem(),
@@ -92,14 +130,18 @@ public class ExternalOrderCsvImportService {
                     order
                 ));
             } catch (ResponseStatusException exception) {
+                var failure = IntegrationFailureCodes.extract(exception);
+                integrationInboundRecordService.markRejected(inboundRecordId, failure.failureCode(), failure.failureMessage());
                 failedOrders.add(new ExternalOrderCsvImportFailure(
                     key.sourceSystem(),
                     key.externalOrderId(),
                     key.warehouseCode(),
                     rows.stream().map(ParsedCsvRow::rowNumber).toList(),
-                    exception.getReason()
+                    failure.failureCode(),
+                    failure.failureMessage()
                 ));
                 integrationReplayService.recordFailure(
+                    tenantCode,
                     key.sourceSystem(),
                     IntegrationConnectorType.CSV_ORDER_IMPORT,
                     new OrderCreateRequest(
@@ -109,7 +151,9 @@ public class ExternalOrderCsvImportService {
                             .map(row -> new OrderItemRequest(row.productSku(), row.quantity(), row.unitPrice()))
                             .toList()
                     ),
-                    exception.getReason()
+                    failure.failureCode(),
+                    failure.failureMessage(),
+                    inboundRecordId
                 );
             }
         });
@@ -170,7 +214,7 @@ public class ExternalOrderCsvImportService {
             new InputStreamReader(file.getInputStream(), StandardCharsets.UTF_8))) {
             String headerLine = reader.readLine();
             if (headerLine == null || headerLine.isBlank()) {
-                throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "CSV file must include a header row.");
+                throw IntegrationFailureCodes.badRequest(IntegrationFailureCode.MISSING_CSV_HEADER, "CSV file must include a header row.");
             }
 
             CsvHeader header = CsvHeader.parse(parseCsvLine(headerLine));
@@ -187,18 +231,20 @@ public class ExternalOrderCsvImportService {
                 try {
                     rows.add(toParsedRow(header, values, rowNumber, defaultSourceSystem));
                 } catch (ResponseStatusException exception) {
+                    var failure = IntegrationFailureCodes.extract(exception);
                     failures.add(new ExternalOrderCsvImportFailure(
                         extractValue(header, values, header.sourceSystemIndex(), defaultSourceSystem),
                         extractValue(header, values, header.externalOrderIdIndex(), null),
                         extractValue(header, values, header.warehouseCodeIndex(), null),
                         List.of(rowNumber),
-                        exception.getReason()
+                        failure.failureCode(),
+                        failure.failureMessage()
                     ));
                 }
             }
             return new CsvFileContent(rows, failures);
         } catch (IOException exception) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "CSV file could not be read.", exception);
+            throw IntegrationFailureCodes.badRequest(IntegrationFailureCode.MISSING_FILE, "CSV file could not be read.");
         }
     }
 
@@ -216,12 +262,16 @@ public class ExternalOrderCsvImportService {
                                      int rowNumber,
                                      String defaultSourceSystem) {
         String sourceSystem = normalizeSourceSystem(requiredValue(header, values, header.sourceSystemIndex(),
-            null), defaultSourceSystem);
-        String externalOrderId = requiredValue(header, values, header.externalOrderIdIndex(), "externalOrderId is required");
+            null, null), defaultSourceSystem);
+        String externalOrderId = requiredValue(header, values, header.externalOrderIdIndex(),
+            IntegrationFailureCode.MISSING_EXTERNAL_ORDER_ID, "externalOrderId is required");
         String warehouseCode = extractValue(header, values, header.warehouseCodeIndex(), null);
-        String productSku = requiredValue(header, values, header.productSkuIndex(), "productSku is required");
-        int quantity = parseQuantity(requiredValue(header, values, header.quantityIndex(), "quantity is required"), rowNumber);
-        BigDecimal unitPrice = parseUnitPrice(requiredValue(header, values, header.unitPriceIndex(), "unitPrice is required"), rowNumber);
+        String productSku = requiredValue(header, values, header.productSkuIndex(),
+            IntegrationFailureCode.MISSING_PRODUCT_SKU, "productSku is required");
+        int quantity = parseQuantity(requiredValue(header, values, header.quantityIndex(),
+            IntegrationFailureCode.INVALID_QUANTITY, "quantity is required"), rowNumber);
+        BigDecimal unitPrice = parseUnitPrice(requiredValue(header, values, header.unitPriceIndex(),
+            IntegrationFailureCode.INVALID_UNIT_PRICE, "unitPrice is required"), rowNumber);
         return new ParsedCsvRow(
             rowNumber,
             sourceSystem,
@@ -236,13 +286,14 @@ public class ExternalOrderCsvImportService {
     private String requiredValue(CsvHeader header,
                                  List<String> values,
                                  int index,
+                                 IntegrationFailureCode failureCode,
                                  String message) {
         String value = extractValue(header, values, index, null);
         if (message == null) {
             return value;
         }
         if (value == null || value.isBlank()) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, message);
+            throw IntegrationFailureCodes.badRequest(failureCode == null ? IntegrationFailureCode.UNKNOWN : failureCode, message);
         }
         return value;
     }
@@ -258,11 +309,11 @@ public class ExternalOrderCsvImportService {
     private String normalizeSourceSystem(String sourceSystem, String defaultSourceSystem) {
         String resolvedSourceSystem = (sourceSystem == null || sourceSystem.isBlank()) ? defaultSourceSystem : sourceSystem.trim();
         if (resolvedSourceSystem == null || resolvedSourceSystem.isBlank()) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+            throw IntegrationFailureCodes.badRequest(IntegrationFailureCode.INVALID_SOURCE_SYSTEM,
                 "sourceSystem is required in the CSV row or as a request parameter");
         }
         if (!SOURCE_SYSTEM_PATTERN.matcher(resolvedSourceSystem).matches()) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+            throw IntegrationFailureCodes.badRequest(IntegrationFailureCode.INVALID_SOURCE_SYSTEM,
                 "sourceSystem may only contain letters, numbers, hyphens, and underscores");
         }
         return resolvedSourceSystem;
@@ -283,7 +334,7 @@ public class ExternalOrderCsvImportService {
             }
             return quantity;
         } catch (NumberFormatException exception) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+            throw IntegrationFailureCodes.badRequest(IntegrationFailureCode.INVALID_QUANTITY,
                 "Row " + rowNumber + " has invalid quantity: " + rawQuantity);
         }
     }
@@ -296,7 +347,7 @@ public class ExternalOrderCsvImportService {
             }
             return unitPrice;
         } catch (NumberFormatException exception) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+            throw IntegrationFailureCodes.badRequest(IntegrationFailureCode.INVALID_UNIT_PRICE,
                 "Row " + rowNumber + " has invalid unitPrice: " + rawUnitPrice);
         }
     }
@@ -390,7 +441,7 @@ public class ExternalOrderCsvImportService {
 
         private static void validateRequiredColumn(Map<String, Integer> indexByName, String columnName) {
             if (!indexByName.containsKey(columnName)) {
-                throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                throw IntegrationFailureCodes.badRequest(IntegrationFailureCode.MISSING_HEADER_COLUMN,
                     "CSV header must include column " + columnName);
             }
         }

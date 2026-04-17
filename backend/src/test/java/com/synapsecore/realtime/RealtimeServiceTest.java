@@ -32,6 +32,8 @@ import com.synapsecore.domain.service.OperationalViewService;
 import com.synapsecore.domain.entity.OrderStatus;
 import com.synapsecore.domain.entity.RecommendationPriority;
 import com.synapsecore.domain.entity.RecommendationType;
+import com.synapsecore.integration.IntegrationFailureCode;
+import com.synapsecore.integration.dto.IntegrationConnectorHealthStatus;
 import com.synapsecore.integration.dto.IntegrationConnectorResponse;
 import com.synapsecore.integration.dto.IntegrationImportRunResponse;
 import com.synapsecore.integration.dto.IntegrationReplayRecordResponse;
@@ -108,13 +110,13 @@ class RealtimeServiceTest {
             new SystemIncidentResponse("connector-1", SystemIncidentType.CONNECTOR_DISABLED, SystemIncidentSeverity.MEDIUM, "ERP North Webhook disabled", "Connector is paused.", "erp_north | Webhook Order", true, Instant.now())
         );
         List<IntegrationConnectorResponse> integrationConnectors = List.of(
-            new IntegrationConnectorResponse(1L, "SYNAPSE-DEMO", "erp_north", IntegrationConnectorType.WEBHOOK_ORDER, "ERP North Webhook", true, IntegrationSyncMode.REALTIME_PUSH, null, IntegrationValidationPolicy.STANDARD, IntegrationTransformationPolicy.NORMALIZE_CODES, true, "WH-NORTH", "Starter webhook connector.", "Operations Lead", "Operations Lead", Instant.now(), Instant.now())
+            new IntegrationConnectorResponse(1L, "SYNAPSE-DEMO", "erp_north", IntegrationConnectorType.WEBHOOK_ORDER, "ERP North Webhook", true, IntegrationSyncMode.REALTIME_PUSH, null, IntegrationValidationPolicy.STANDARD, IntegrationTransformationPolicy.NORMALIZE_CODES, 1, true, "WH-NORTH", "Starter webhook connector.", "Operations Lead", "Operations Lead", true, "••••2026", IntegrationConnectorHealthStatus.LIVE, "Connector is enabled and processing activity without recent integration failures.", Instant.now(), Instant.now(), null, null, 0, 0, 0, null, null, null, null, null, Instant.now(), Instant.now())
         );
         List<IntegrationImportRunResponse> integrationImportRuns = List.of(
             new IntegrationImportRunResponse(4L, "erp_batch", IntegrationConnectorType.CSV_ORDER_IMPORT, "orders.csv", 3, 1, 1, IntegrationImportStatus.PARTIAL_SUCCESS, "Processed CSV import with 1 imported order and 1 failure.", Instant.now())
         );
         List<IntegrationReplayRecordResponse> integrationReplayQueue = List.of(
-            new IntegrationReplayRecordResponse(9L, "erp_batch", IntegrationConnectorType.CSV_ORDER_IMPORT, "CSV-RPL-1001", "WH-NORTH", "Product not found: SKU-RPL-778", IntegrationReplayStatus.PENDING, 0, null, null, null, null, Instant.now(), Instant.now())
+            new IntegrationReplayRecordResponse(9L, "erp_batch", IntegrationConnectorType.CSV_ORDER_IMPORT, "CSV-RPL-1001", "WH-NORTH", IntegrationFailureCode.PRODUCT_NOT_FOUND, "Product not found: SKU-RPL-778", IntegrationReplayStatus.PENDING, 0, null, null, Instant.now(), null, null, null, Instant.now(), Instant.now())
         );
         List<ScenarioNotificationResponse> scenarioNotifications = List.of(
             new ScenarioNotificationResponse(7L, ScenarioNotificationType.SLA_ESCALATED, "Critical plan rerouted: North escalation candidate", "Final approval is overdue and was rerouted.", "WH-NORTH", null, null, "Executive Operations Director", null, true, Instant.now(), Instant.now())
@@ -180,13 +182,13 @@ class RealtimeServiceTest {
             new SystemIncidentResponse("replay-9", SystemIncidentType.REPLAY_BACKLOG, SystemIncidentSeverity.HIGH, "Replay CSV-RPL-1001", "Product not found: SKU-RPL-778", "erp_batch | Csv Order Import", true, Instant.now())
         );
         List<IntegrationConnectorResponse> integrationConnectors = List.of(
-            new IntegrationConnectorResponse(1L, "SYNAPSE-DEMO", "erp_north", IntegrationConnectorType.WEBHOOK_ORDER, "ERP North Webhook", false, IntegrationSyncMode.REALTIME_PUSH, null, IntegrationValidationPolicy.STANDARD, IntegrationTransformationPolicy.NORMALIZE_CODES, true, "WH-NORTH", "Paused for maintenance.", "Operations Lead", "Operations Lead", Instant.now(), Instant.now())
+            new IntegrationConnectorResponse(1L, "SYNAPSE-DEMO", "erp_north", IntegrationConnectorType.WEBHOOK_ORDER, "ERP North Webhook", false, IntegrationSyncMode.REALTIME_PUSH, null, IntegrationValidationPolicy.STANDARD, IntegrationTransformationPolicy.NORMALIZE_CODES, 1, true, "WH-NORTH", "Paused for maintenance.", "Operations Lead", "Operations Lead", true, "••••2026", IntegrationConnectorHealthStatus.OFFLINE, "Connector is disabled and cannot ingest live activity.", null, null, null, null, 0, 0, 0, null, null, null, null, null, Instant.now(), Instant.now())
         );
         List<IntegrationImportRunResponse> integrationImportRuns = List.of(
             new IntegrationImportRunResponse(4L, "erp_batch", IntegrationConnectorType.CSV_ORDER_IMPORT, "orders.csv", 3, 1, 1, IntegrationImportStatus.PARTIAL_SUCCESS, "Processed CSV import with 1 imported order and 1 failure.", Instant.now())
         );
         List<IntegrationReplayRecordResponse> integrationReplayQueue = List.of(
-            new IntegrationReplayRecordResponse(9L, "erp_batch", IntegrationConnectorType.CSV_ORDER_IMPORT, "CSV-RPL-1001", "WH-NORTH", "Product not found: SKU-RPL-778", IntegrationReplayStatus.PENDING, 0, null, null, null, null, Instant.now(), Instant.now())
+            new IntegrationReplayRecordResponse(9L, "erp_batch", IntegrationConnectorType.CSV_ORDER_IMPORT, "CSV-RPL-1001", "WH-NORTH", IntegrationFailureCode.PRODUCT_NOT_FOUND, "Product not found: SKU-RPL-778", IntegrationReplayStatus.PENDING, 0, null, null, Instant.now(), null, null, null, Instant.now(), Instant.now())
         );
 
         RealtimeService realtimeService = new RealtimeService(

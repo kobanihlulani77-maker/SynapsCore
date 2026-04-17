@@ -21,6 +21,7 @@ import lombok.Builder;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
+import com.synapsecore.tenant.TenantOwnershipAssertions;
 
 @Entity
 @Table(
@@ -86,6 +87,7 @@ public class FulfillmentTask {
 
     @PrePersist
     void onCreate() {
+        TenantOwnershipAssertions.requireFulfillmentTaskConsistency(this, "Fulfillment task persistence");
         Instant now = Instant.now();
         if (queuedAt == null) {
             queuedAt = now;
@@ -99,6 +101,7 @@ public class FulfillmentTask {
 
     @PreUpdate
     void onUpdate() {
+        TenantOwnershipAssertions.requireFulfillmentTaskConsistency(this, "Fulfillment task persistence");
         updatedAt = Instant.now();
     }
 }

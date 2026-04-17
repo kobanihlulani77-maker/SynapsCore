@@ -9,6 +9,7 @@ import com.synapsecore.integration.dto.IntegrationReplayResultResponse;
 import com.synapsecore.integration.dto.ExternalOrderWebhookRequest;
 import com.synapsecore.integration.dto.ExternalOrderWebhookResponse;
 import jakarta.validation.Valid;
+import jakarta.servlet.http.HttpServletRequest;
 import java.util.List;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.MediaType;
@@ -34,20 +35,46 @@ public class ExternalOrderWebhookController {
     private final IntegrationImportRunService integrationImportRunService;
     private final IntegrationReplayService integrationReplayService;
     private final AccessControlService accessControlService;
+    private final IntegrationInboundAccessService integrationInboundAccessService;
 
     @PostMapping("/webhook")
     @ResponseStatus(HttpStatus.CREATED)
-    public ExternalOrderWebhookResponse ingestOrderWebhook(@Valid @RequestBody ExternalOrderWebhookRequest request) {
-        accessControlService.requireWorkspaceAccess("ingest webhook orders");
-        return externalOrderWebhookService.ingest(request);
+    public ExternalOrderWebhookResponse ingestOrderWebhook(@Valid @RequestBody ExternalOrderWebhookRequest request,
+                                                           HttpServletRequest httpRequest) {
+        var authenticatedConnector = integrationInboundAccessService.authenticateOptional(
+            httpRequest,
+            request.sourceSystem(),
+            com.synapsecore.domain.entity.IntegrationConnectorType.WEBHOOK_ORDER,
+            "accept webhook orders"
+        );
+        if (authenticatedConnector.isEmpty()) {
+            accessControlService.requireWorkspaceAccess("ingest webhook orders");
+        }
+        return externalOrderWebhookService.ingest(request, authenticatedConnector.orElse(null));
     }
 
     @PostMapping(value = "/csv-import", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     @ResponseStatus(HttpStatus.OK)
     public ExternalOrderCsvImportResponse importOrdersFromCsv(@RequestParam("file") MultipartFile file,
-                                                              @RequestParam(required = false) String sourceSystem) {
-        accessControlService.requireWorkspaceAccess("import CSV orders");
-        return externalOrderCsvImportService.ingest(file, sourceSystem);
+                                                              @RequestParam(required = false) String sourceSystem,
+                                                              HttpServletRequest httpRequest) {
+        if (integrationInboundAccessService.hasConnectorToken(httpRequest)
+            && (sourceSystem == null || sourceSystem.isBlank())) {
+            throw IntegrationFailureCodes.badRequest(
+                IntegrationFailureCode.INVALID_SOURCE_SYSTEM,
+                "sourceSystem request parameter is required for connector-authenticated CSV imports."
+            );
+        }
+        var authenticatedConnector = integrationInboundAccessService.authenticateOptional(
+            httpRequest,
+            sourceSystem,
+            com.synapsecore.domain.entity.IntegrationConnectorType.CSV_ORDER_IMPORT,
+            "accept CSV imports"
+        );
+        if (authenticatedConnector.isEmpty()) {
+            accessControlService.requireWorkspaceAccess("import CSV orders");
+        }
+        return externalOrderCsvImportService.ingest(file, sourceSystem, authenticatedConnector.orElse(null));
     }
 
     @GetMapping("/connectors")

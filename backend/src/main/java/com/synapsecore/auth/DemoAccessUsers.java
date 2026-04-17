@@ -12,6 +12,7 @@ public final class DemoAccessUsers {
     private static final List<DemoAccessUser> USERS = List.of(
         new DemoAccessUser(DEFAULT_TENANT_CODE, "operations.planner", "planner-2026", "Operations Planner", "Operations Planner"),
         new DemoAccessUser(DEFAULT_TENANT_CODE, "operations.lead", "lead-2026", "Operations Lead", "Operations Lead"),
+        new DemoAccessUser(DEFAULT_TENANT_CODE, "demo.operator", "demo-operator-2026", "Demo Operator", "Demo Operator"),
         new DemoAccessUser(DEFAULT_TENANT_CODE, "amina.planner", "amina-2026", "Amina Planner", "Amina Planner"),
         new DemoAccessUser(DEFAULT_TENANT_CODE, "lebo.planner", "lebo-plan-2026", "Lebo Planner", "Lebo Planner"),
         new DemoAccessUser(DEFAULT_TENANT_CODE, "thando.planner", "thando-2026", "Thando Planner", "Thando Planner"),

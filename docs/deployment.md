@@ -11,10 +11,12 @@ SynapseCore now separates local development behavior from production-oriented ru
   - header fallback for protected actions is allowed by default for scripts and test tooling
 - `prod`
   - intended for deployed environments
-  - expects database and Redis hosts from environment variables
+  - expects datasource and Redis connection settings from environment variables
   - session cookie secure flag defaults to `true`
-  - protected-action header fallback is disabled by default
-  - JPA defaults to `validate` instead of schema mutation
+- protected-action header fallback is disabled by default
+- JPA defaults to `update` for first deployment unless overridden through `SPRING_JPA_HIBERNATE_DDL_AUTO`
+- tenant-admin tenant onboarding is disabled by default after bootstrap
+- tenant provisioning after bootstrap requires the platform-admin token lane
 
 ## Backend Environment
 
@@ -33,18 +35,19 @@ Self-hosted production-style default env file lives in:
 Important production variables:
 
 - `SPRING_PROFILES_ACTIVE=prod`
-- `DB_HOST`
-- `DB_PORT`
-- `DB_NAME`
-- `DB_USER`
-- `DB_PASSWORD`
-- `REDIS_HOST`
-- `REDIS_PORT`
+- `DATABASE_URL` or `SPRING_DATASOURCE_URL`
+- `SPRING_DATASOURCE_USERNAME` when using `SPRING_DATASOURCE_URL`
+- `SPRING_DATASOURCE_PASSWORD` when using `SPRING_DATASOURCE_URL`
+- `SPRING_DATA_REDIS_URL`
 - `CORS_ALLOWED_ORIGINS`
 - `SESSION_COOKIE_SECURE`
 - `SESSION_COOKIE_SAME_SITE`
 - `ALLOW_HEADER_FALLBACK=false`
-- `JPA_DDL_AUTO=validate`
+- `SPRING_JPA_HIBERNATE_DDL_AUTO=update`
+- `SYNAPSECORE_BOOTSTRAP_INITIAL_TOKEN` only for the first tenant bootstrap on an empty production environment
+- `SYNAPSECORE_PLATFORM_ADMIN_TOKEN` for ongoing production tenant provisioning after bootstrap
+- `PUBLIC_APP_URL`
+- `PUBLIC_API_URL`
 - `SYNAPSECORE_BUILD_VERSION`
 - `SYNAPSECORE_BUILD_COMMIT`
 - `SYNAPSECORE_BUILD_TIME`
@@ -149,7 +152,12 @@ Before a real deployment, copy and replace the example values in:
 - `infrastructure/env/backend.prod.example.env`
 - `infrastructure/env/frontend.prod.example.env`
 
-with your real deployed domains, credentials, and hostnames.
+with your real deployed domains, credentials, and connection strings.
+
+Render-specific production defaults now live in:
+
+- `render.yaml`
+- `docs/render-deployment.md`
 
 ## Public HTTPS Compose
 
@@ -204,9 +212,12 @@ In the production profile it is disabled by default.
 6. Verify `CORS_ALLOWED_ORIGINS` points only at the deployed frontend origin.
 7. Verify `SESSION_COOKIE_SECURE=true` behind HTTPS.
 8. Verify protected actions work through signed-in sessions.
-9. Verify `/actuator/health` and `/actuator/health/readiness`.
-10. Verify dashboard REST and WebSocket connections from the deployed frontend.
-11. Verify `/actuator/prometheus` if you plan to scrape SynapseCore metrics.
+9. If the production database is empty, set `SYNAPSECORE_BOOTSTRAP_INITIAL_TOKEN`, create the first tenant once, then remove the token.
+10. Set `SYNAPSECORE_PLATFORM_ADMIN_TOKEN` for any later production tenant provisioning and use it through `X-Synapse-Platform-Admin-Token`.
+11. Do not rely on tenant-admin sessions to create additional tenant workspaces in production. That path remains intentionally blocked.
+12. Verify `/actuator/health` and `/actuator/health/readiness`.
+13. Verify dashboard REST and WebSocket connections from the deployed frontend.
+13. Verify `/actuator/prometheus` if you plan to scrape SynapseCore metrics.
 
 ## Smoke Verification
 
@@ -245,7 +256,7 @@ That release gate validates:
 - required backend and frontend prod env values exist
 - `SPRING_PROFILES_ACTIVE=prod`
 - `ALLOW_HEADER_FALLBACK=false`
-- `JPA_DDL_AUTO=validate`
+- `SPRING_JPA_HIBERNATE_DDL_AUTO=update`
 - secure-cookie posture matches HTTPS origins
 - frontend WebSocket target ends with `/ws`
 - backend and frontend build fingerprint values are present

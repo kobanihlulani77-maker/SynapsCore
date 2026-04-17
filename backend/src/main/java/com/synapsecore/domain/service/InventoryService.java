@@ -19,6 +19,7 @@ import com.synapsecore.intelligence.InventoryMonitoringService;
 import com.synapsecore.prediction.StockPrediction;
 import com.synapsecore.prediction.StockPredictionService;
 import com.synapsecore.tenant.TenantContextService;
+import com.synapsecore.tenant.TenantScopeGuard;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
@@ -39,6 +40,7 @@ public class InventoryService {
     private final OperationalStateChangePublisher operationalStateChangePublisher;
     private final AuditLogService auditLogService;
     private final TenantContextService tenantContextService;
+    private final TenantScopeGuard tenantScopeGuard;
 
     @Transactional
     public InventoryStatusResponse updateInventory(InventoryUpdateRequest request) {
@@ -49,14 +51,19 @@ public class InventoryService {
         Warehouse warehouse = warehouseRepository.findByTenant_CodeIgnoreCaseAndCode(tenantCode, request.warehouseCode().trim())
             .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND,
                 "Warehouse not found: " + request.warehouseCode()));
+        tenantScopeGuard.requireWarehouseForTenant(warehouse, tenantCode, "inventory update");
 
         Inventory inventory = inventoryRepository.findByProductIdAndWarehouseId(product.getId(), warehouse.getId())
             .orElse(Inventory.builder().product(product).warehouse(warehouse).build());
+        if (inventory.getId() != null) {
+            tenantScopeGuard.requireInventoryForTenant(inventory, warehouse, tenantCode, "inventory update");
+        }
 
         inventory.setQuantityAvailable(request.quantityAvailable());
         inventory.setReorderThreshold(request.reorderThreshold());
 
         Inventory savedInventory = inventoryRepository.save(inventory);
+        tenantScopeGuard.requireInventoryForTenant(savedInventory, warehouse, tenantCode, "inventory update");
         businessEventService.record(
             BusinessEventType.INVENTORY_UPDATED,
             "inventory-api",

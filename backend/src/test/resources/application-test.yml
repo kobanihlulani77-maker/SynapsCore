@@ -24,5 +24,9 @@ synapsecore:
     allow-header-fallback: true
   dashboard:
     cache-enabled: false
+  integration:
+    replay:
+      max-attempts: 2
+      backoff-seconds: 0
   simulation:
     interval-ms: 60000

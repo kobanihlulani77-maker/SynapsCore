@@ -7,17 +7,31 @@ import com.synapsecore.domain.entity.AccessOperator;
 import com.synapsecore.domain.entity.BusinessEventType;
 import com.synapsecore.domain.entity.IntegrationConnector;
 import com.synapsecore.domain.entity.IntegrationConnectorType;
+import com.synapsecore.domain.entity.IntegrationImportStatus;
+import com.synapsecore.domain.entity.IntegrationInboundStatus;
+import com.synapsecore.domain.entity.IntegrationReplayStatus;
+import com.synapsecore.domain.entity.IntegrationReplayRecord;
 import com.synapsecore.domain.entity.IntegrationSyncMode;
 import com.synapsecore.domain.entity.IntegrationTransformationPolicy;
 import com.synapsecore.domain.entity.IntegrationValidationPolicy;
 import com.synapsecore.domain.repository.AccessOperatorRepository;
 import com.synapsecore.domain.repository.IntegrationConnectorRepository;
+import com.synapsecore.domain.repository.IntegrationImportRunRepository;
+import com.synapsecore.domain.repository.IntegrationInboundRecordRepository;
+import com.synapsecore.domain.repository.IntegrationReplayRecordRepository;
 import com.synapsecore.event.OperationalStateChangePublisher;
 import com.synapsecore.event.OperationalUpdateType;
 import com.synapsecore.event.BusinessEventService;
+import com.synapsecore.integration.dto.IntegrationConnectorHealthStatus;
 import com.synapsecore.integration.dto.IntegrationConnectorRequest;
 import com.synapsecore.integration.dto.IntegrationConnectorResponse;
+import java.time.Duration;
+import java.time.Instant;
 import com.synapsecore.tenant.TenantContextService;
+import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
+import java.util.HexFormat;
 import java.util.List;
 import java.util.Locale;
 import lombok.RequiredArgsConstructor;
@@ -30,13 +44,21 @@ import org.springframework.web.server.ResponseStatusException;
 @RequiredArgsConstructor
 public class IntegrationConnectorService {
 
+    private static final int SUPPORTED_MAPPING_VERSION = 1;
+
     private final IntegrationConnectorRepository integrationConnectorRepository;
     private final AccessOperatorRepository accessOperatorRepository;
     private final AccessDirectoryService accessDirectoryService;
+    private final IntegrationInboundRecordRepository integrationInboundRecordRepository;
+    private final IntegrationImportRunRepository integrationImportRunRepository;
+    private final IntegrationReplayRecordRepository integrationReplayRecordRepository;
     private final BusinessEventService businessEventService;
     private final AuditLogService auditLogService;
     private final OperationalStateChangePublisher operationalStateChangePublisher;
     private final TenantContextService tenantContextService;
+
+    @org.springframework.beans.factory.annotation.Value("${synapsecore.integration.health-window-hours:24}")
+    private long integrationHealthWindowHours;
 
     @Transactional(readOnly = true)
     public List<IntegrationConnectorResponse> getConnectors() {
@@ -48,7 +70,7 @@ public class IntegrationConnectorService {
                 || connector.getDefaultWarehouseCode() == null
                 || connector.getDefaultWarehouseCode().isBlank()
                 || accessDirectoryService.hasWarehouseAccess(currentOperator.get(), connector.getDefaultWarehouseCode()))
-            .map(this::toResponse)
+            .map(this::describeConnector)
             .toList();
     }
 
@@ -85,11 +107,13 @@ public class IntegrationConnectorService {
         connector.setTransformationPolicy(request.transformationPolicy() != null
             ? request.transformationPolicy()
             : connector.getId() == null ? defaultTransformationPolicy() : connector.getTransformationPolicy());
+        connector.setMappingVersion(resolveSupportedMappingVersion(request.mappingVersion(), connector.getMappingVersion()));
         connector.setAllowDefaultWarehouseFallback(request.allowDefaultWarehouseFallback() != null
             ? request.allowDefaultWarehouseFallback()
             : connector.getId() == null ? defaultAllowDefaultWarehouseFallback(request.type()) : connector.isAllowDefaultWarehouseFallback());
         connector.setDefaultWarehouseCode(normalizeOptional(request.defaultWarehouseCode()));
         connector.setNotes(normalizeOptional(request.notes()));
+        applyInboundAccessTokenSettings(connector, request);
         connector = integrationConnectorRepository.save(connector);
 
         businessEventService.record(
@@ -112,25 +136,41 @@ public class IntegrationConnectorService {
         );
         operationalStateChangePublisher.publish(OperationalUpdateType.INTEGRATION_STATE, "integration-admin");
 
-        return toResponse(connector);
+        return describeConnector(connector);
     }
 
     public IntegrationConnector requireEnabledConnector(String sourceSystem,
                                                         IntegrationConnectorType type,
                                                         String actionDescription) {
         String tenantCode = tenantContextService.getCurrentTenantCodeOrDefault();
+        return requireEnabledConnectorForTenant(tenantCode, sourceSystem, type, actionDescription);
+    }
+
+    public IntegrationConnector requireEnabledConnectorForTenant(String tenantCode,
+                                                                 String sourceSystem,
+                                                                 IntegrationConnectorType type,
+                                                                 String actionDescription) {
         String normalizedSourceSystem = normalizeSourceSystem(sourceSystem);
         IntegrationConnector connector = integrationConnectorRepository
             .findByTenant_CodeIgnoreCaseAndSourceSystemIgnoreCaseAndType(tenantCode, normalizedSourceSystem, type)
-            .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND,
+            .orElseThrow(() -> IntegrationFailureCodes.status(HttpStatus.NOT_FOUND,
+                IntegrationFailureCode.CONNECTOR_NOT_CONFIGURED,
                 "Integration connector not configured for sourceSystem " + normalizedSourceSystem + " and type " + type));
+        return requireEnabled(connector, actionDescription);
+    }
 
-        if (!connector.isEnabled()) {
-            throw new ResponseStatusException(HttpStatus.FORBIDDEN,
-                "Integration connector " + normalizedSourceSystem + " is disabled and cannot " + actionDescription);
-        }
-
-        return connector;
+    public IntegrationConnector requireEnabledConnectorByInboundToken(String sourceSystem,
+                                                                      IntegrationConnectorType type,
+                                                                      String inboundAccessToken,
+                                                                      String actionDescription) {
+        String normalizedSourceSystem = normalizeSourceSystem(sourceSystem);
+        String tokenHash = hashInboundAccessToken(inboundAccessToken);
+        IntegrationConnector connector = integrationConnectorRepository
+            .findBySourceSystemIgnoreCaseAndTypeAndInboundAccessTokenHash(normalizedSourceSystem, type, tokenHash)
+            .orElseThrow(() -> IntegrationFailureCodes.status(HttpStatus.UNAUTHORIZED,
+                IntegrationFailureCode.INVALID_CONNECTOR_TOKEN,
+                "Connector token is invalid for sourceSystem " + normalizedSourceSystem + " and type " + type + "."));
+        return requireEnabled(connector, actionDescription);
     }
 
     @Transactional
@@ -183,6 +223,9 @@ public class IntegrationConnectorService {
                 if (existing.getTransformationPolicy() == null) {
                     existing.setTransformationPolicy(transformationPolicy);
                 }
+                if (existing.getMappingVersion() == null || existing.getMappingVersion() < 1) {
+                    existing.setMappingVersion(1);
+                }
                 existing.setAllowDefaultWarehouseFallback(existing.isAllowDefaultWarehouseFallback() || allowDefaultWarehouseFallback);
                 return integrationConnectorRepository.save(existing);
             })
@@ -195,6 +238,7 @@ public class IntegrationConnectorService {
                 .syncMode(syncMode)
                 .validationPolicy(validationPolicy)
                 .transformationPolicy(transformationPolicy)
+                .mappingVersion(1)
                 .allowDefaultWarehouseFallback(allowDefaultWarehouseFallback)
                 .defaultWarehouseCode(defaultWarehouseCode)
                 .notes(notes)
@@ -204,7 +248,7 @@ public class IntegrationConnectorService {
 
     private String normalizeSourceSystem(String sourceSystem) {
         if (sourceSystem == null || sourceSystem.isBlank()) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "sourceSystem is required");
+            throw IntegrationFailureCodes.badRequest(IntegrationFailureCode.INVALID_SOURCE_SYSTEM, "sourceSystem is required");
         }
         return sourceSystem.trim().toLowerCase(Locale.ROOT);
     }
@@ -214,6 +258,51 @@ public class IntegrationConnectorService {
             return null;
         }
         return value.trim();
+    }
+
+    public static String hashInboundAccessToken(String inboundAccessToken) {
+        if (inboundAccessToken == null || inboundAccessToken.isBlank()) {
+            throw IntegrationFailureCodes.badRequest(IntegrationFailureCode.INVALID_CONNECTOR_TOKEN,
+                "inboundAccessToken must be non-empty when configuring connector-authenticated ingress.");
+        }
+        try {
+            MessageDigest digest = MessageDigest.getInstance("SHA-256");
+            return HexFormat.of().formatHex(digest.digest(inboundAccessToken.trim().getBytes(StandardCharsets.UTF_8)));
+        } catch (NoSuchAlgorithmException exception) {
+            throw new IllegalStateException("SHA-256 is required for inbound connector token hashing.", exception);
+        }
+    }
+
+    private void applyInboundAccessTokenSettings(IntegrationConnector connector,
+                                                 IntegrationConnectorRequest request) {
+        if (Boolean.TRUE.equals(request.clearInboundAccessToken())) {
+            connector.setInboundAccessTokenHash(null);
+            connector.setInboundAccessTokenHint(null);
+            return;
+        }
+        if (request.inboundAccessToken() == null || request.inboundAccessToken().isBlank()) {
+            return;
+        }
+        String trimmedToken = request.inboundAccessToken().trim();
+        connector.setInboundAccessTokenHash(hashInboundAccessToken(trimmedToken));
+        connector.setInboundAccessTokenHint(maskInboundAccessToken(trimmedToken));
+    }
+
+    private String maskInboundAccessToken(String inboundAccessToken) {
+        String trimmedToken = inboundAccessToken.trim();
+        if (trimmedToken.length() <= 4) {
+            return "****";
+        }
+        return "••••" + trimmedToken.substring(trimmedToken.length() - 4);
+    }
+
+    private IntegrationConnector requireEnabled(IntegrationConnector connector, String actionDescription) {
+        if (!connector.isEnabled()) {
+            throw IntegrationFailureCodes.status(HttpStatus.FORBIDDEN,
+                IntegrationFailureCode.CONNECTOR_DISABLED,
+                "Integration connector " + connector.getSourceSystem() + " is disabled and cannot " + actionDescription);
+        }
+        return connector;
     }
 
     private IntegrationSyncMode defaultSyncMode(IntegrationConnectorType type) {
@@ -256,17 +345,22 @@ public class IntegrationConnectorService {
         return resolved;
     }
 
-    private IntegrationConnectorResponse toResponse(IntegrationConnector connector) {
-        AccessOperator supportOwner = null;
-        if (connector.getTenant() != null
-            && connector.getSupportOwnerActorName() != null
-            && !connector.getSupportOwnerActorName().isBlank()) {
-            supportOwner = accessOperatorRepository.findByTenant_CodeIgnoreCaseAndActorNameIgnoreCase(
-                    connector.getTenant().getCode(),
-                    connector.getSupportOwnerActorName()
-                )
-                .orElse(null);
+    private Integer resolveSupportedMappingVersion(Integer requestedMappingVersion, Integer existingMappingVersion) {
+        int resolved = requestedMappingVersion != null
+            ? requestedMappingVersion
+            : existingMappingVersion == null || existingMappingVersion < 1 ? SUPPORTED_MAPPING_VERSION : existingMappingVersion;
+        if (resolved != SUPPORTED_MAPPING_VERSION) {
+            throw IntegrationFailureCodes.badRequest(
+                IntegrationFailureCode.UNSUPPORTED_MAPPING_VERSION,
+                "Only mappingVersion " + SUPPORTED_MAPPING_VERSION + " is currently supported for integration connectors."
+            );
         }
+        return resolved;
+    }
+
+    public IntegrationConnectorResponse describeConnector(IntegrationConnector connector) {
+        AccessOperator supportOwner = resolveSupportOwner(connector);
+        ConnectorTelemetry telemetry = buildTelemetry(connector);
         return new IntegrationConnectorResponse(
             connector.getId(),
             connector.getTenant() == null ? null : connector.getTenant().getCode(),
@@ -278,13 +372,251 @@ public class IntegrationConnectorService {
             connector.getSyncIntervalMinutes(),
             connector.getValidationPolicy(),
             connector.getTransformationPolicy(),
+            connector.getMappingVersion() == null || connector.getMappingVersion() < 1 ? 1 : connector.getMappingVersion(),
             connector.isAllowDefaultWarehouseFallback(),
             connector.getDefaultWarehouseCode(),
             connector.getNotes(),
             connector.getSupportOwnerActorName(),
             supportOwner == null ? null : supportOwner.getDisplayName(),
+            connector.getInboundAccessTokenHash() != null && !connector.getInboundAccessTokenHash().isBlank(),
+            connector.getInboundAccessTokenHint(),
+            telemetry.healthStatus(),
+            telemetry.healthSummary(),
+            telemetry.lastActivityAt(),
+            telemetry.lastSuccessfulActivityAt(),
+            telemetry.lastImportStatus(),
+            telemetry.lastImportAt(),
+            telemetry.recentInboundFailureCount(),
+            telemetry.pendingReplayCount(),
+            telemetry.deadLetterCount(),
+            telemetry.lastFailureCode(),
+            telemetry.lastFailureMessage(),
+            telemetry.lastFailureAt(),
+            telemetry.oldestPendingReplayAt(),
+            telemetry.oldestPendingReplayAgeSeconds(),
             connector.getCreatedAt(),
             connector.getUpdatedAt()
         );
+    }
+
+    private AccessOperator resolveSupportOwner(IntegrationConnector connector) {
+        if (connector.getTenant() == null
+            || connector.getSupportOwnerActorName() == null
+            || connector.getSupportOwnerActorName().isBlank()) {
+            return null;
+        }
+        return accessOperatorRepository.findByTenant_CodeIgnoreCaseAndActorNameIgnoreCase(
+                connector.getTenant().getCode(),
+                connector.getSupportOwnerActorName()
+            )
+            .orElse(null);
+    }
+
+    private ConnectorTelemetry buildTelemetry(IntegrationConnector connector) {
+        if (connector.getTenant() == null || connector.getTenant().getCode() == null) {
+            return new ConnectorTelemetry(
+                connector.isEnabled() ? IntegrationConnectorHealthStatus.LIVE : IntegrationConnectorHealthStatus.OFFLINE,
+                connector.isEnabled()
+                    ? "Connector is enabled but tenant telemetry is unavailable."
+                    : "Connector is disabled and cannot ingest live activity.",
+                null,
+                null,
+                null,
+                null,
+                0,
+                0,
+                0,
+                null,
+                null,
+                null,
+                null,
+                null
+            );
+        }
+
+        String tenantCode = connector.getTenant().getCode();
+        Instant windowStart = Instant.now().minus(Duration.ofHours(Math.max(integrationHealthWindowHours, 1)));
+
+        var lastActivity = integrationInboundRecordRepository
+            .findTopByTenantCodeIgnoreCaseAndSourceSystemIgnoreCaseAndConnectorTypeOrderByCreatedAtDesc(
+                tenantCode,
+                connector.getSourceSystem(),
+                connector.getType()
+            )
+            .orElse(null);
+        var lastSuccessfulActivity = integrationInboundRecordRepository
+            .findTopByTenantCodeIgnoreCaseAndSourceSystemIgnoreCaseAndConnectorTypeAndStatusInOrderByCreatedAtDesc(
+                tenantCode,
+                connector.getSourceSystem(),
+                connector.getType(),
+                List.of(IntegrationInboundStatus.ACCEPTED, IntegrationInboundStatus.REPLAYED)
+            )
+            .orElse(null);
+        var lastImportRun = integrationImportRunRepository
+            .findTopByTenantCodeIgnoreCaseAndSourceSystemIgnoreCaseAndConnectorTypeOrderByCreatedAtDesc(
+                tenantCode,
+                connector.getSourceSystem(),
+                connector.getType()
+            )
+            .orElse(null);
+        var latestInboundFailure = integrationInboundRecordRepository
+            .findTopByTenantCodeIgnoreCaseAndSourceSystemIgnoreCaseAndConnectorTypeAndStatusInOrderByUpdatedAtDesc(
+                tenantCode,
+                connector.getSourceSystem(),
+                connector.getType(),
+                List.of(IntegrationInboundStatus.REJECTED, IntegrationInboundStatus.REPLAY_QUEUED)
+            )
+            .orElse(null);
+        var latestReplayIssue = integrationReplayRecordRepository
+            .findTopByTenantCodeIgnoreCaseAndSourceSystemIgnoreCaseAndConnectorTypeAndStatusInOrderByUpdatedAtDesc(
+                tenantCode,
+                connector.getSourceSystem(),
+                connector.getType(),
+                List.of(IntegrationReplayStatus.REPLAY_FAILED, IntegrationReplayStatus.DEAD_LETTERED)
+            )
+            .orElse(null);
+        var oldestPendingReplay = integrationReplayRecordRepository
+            .findTopByTenantCodeIgnoreCaseAndSourceSystemIgnoreCaseAndConnectorTypeAndStatusInOrderByCreatedAtAsc(
+                tenantCode,
+                connector.getSourceSystem(),
+                connector.getType(),
+                List.of(IntegrationReplayStatus.PENDING, IntegrationReplayStatus.REPLAY_FAILED)
+            )
+            .orElse(null);
+
+        long recentInboundFailureCount = integrationInboundRecordRepository
+            .countByTenantCodeIgnoreCaseAndSourceSystemIgnoreCaseAndConnectorTypeAndStatusInAndCreatedAtAfter(
+                tenantCode,
+                connector.getSourceSystem(),
+                connector.getType(),
+                List.of(IntegrationInboundStatus.REJECTED, IntegrationInboundStatus.REPLAY_QUEUED),
+                windowStart
+            );
+        long pendingReplayCount = integrationReplayRecordRepository
+            .countByTenantCodeIgnoreCaseAndSourceSystemIgnoreCaseAndConnectorTypeAndStatusIn(
+                tenantCode,
+                connector.getSourceSystem(),
+                connector.getType(),
+                List.of(IntegrationReplayStatus.PENDING, IntegrationReplayStatus.REPLAY_FAILED)
+            );
+        long deadLetterCount = integrationReplayRecordRepository
+            .countByTenantCodeIgnoreCaseAndSourceSystemIgnoreCaseAndConnectorTypeAndStatusIn(
+                tenantCode,
+                connector.getSourceSystem(),
+                connector.getType(),
+                List.of(IntegrationReplayStatus.DEAD_LETTERED)
+            );
+
+        IntegrationConnectorHealthStatus healthStatus = resolveHealthStatus(
+            connector,
+            recentInboundFailureCount,
+            pendingReplayCount,
+            deadLetterCount,
+            lastImportRun == null ? null : lastImportRun.getStatus()
+        );
+        FailureSignal latestFailureSignal = resolveLatestFailureSignal(latestInboundFailure, latestReplayIssue);
+        Instant oldestPendingReplayAt = oldestPendingReplay == null ? null : oldestPendingReplay.getCreatedAt();
+        Long oldestPendingReplayAgeSeconds = oldestPendingReplayAt == null
+            ? null
+            : Math.max(Duration.between(oldestPendingReplayAt, Instant.now()).getSeconds(), 0L);
+
+        return new ConnectorTelemetry(
+            healthStatus,
+            buildHealthSummary(connector, healthStatus, recentInboundFailureCount, pendingReplayCount, deadLetterCount, lastActivity),
+            lastActivity == null ? null : lastActivity.getCreatedAt(),
+            lastSuccessfulActivity == null ? null : lastSuccessfulActivity.getCreatedAt(),
+            lastImportRun == null ? null : lastImportRun.getStatus(),
+            lastImportRun == null ? null : lastImportRun.getCreatedAt(),
+            recentInboundFailureCount,
+            pendingReplayCount,
+            deadLetterCount,
+            latestFailureSignal.failureCode(),
+            latestFailureSignal.failureMessage(),
+            latestFailureSignal.failureAt(),
+            oldestPendingReplayAt,
+            oldestPendingReplayAgeSeconds
+        );
+    }
+
+    private IntegrationConnectorHealthStatus resolveHealthStatus(IntegrationConnector connector,
+                                                                 long recentInboundFailureCount,
+                                                                 long pendingReplayCount,
+                                                                 long deadLetterCount,
+                                                                 IntegrationImportStatus lastImportStatus) {
+        if (!connector.isEnabled()) {
+            return IntegrationConnectorHealthStatus.OFFLINE;
+        }
+        if (deadLetterCount > 0
+            || pendingReplayCount > 0
+            || recentInboundFailureCount > 0
+            || lastImportStatus == IntegrationImportStatus.FAILURE
+            || lastImportStatus == IntegrationImportStatus.PARTIAL_SUCCESS) {
+            return IntegrationConnectorHealthStatus.DEGRADED;
+        }
+        return IntegrationConnectorHealthStatus.LIVE;
+    }
+
+    private String buildHealthSummary(IntegrationConnector connector,
+                                      IntegrationConnectorHealthStatus healthStatus,
+                                      long recentInboundFailureCount,
+                                      long pendingReplayCount,
+                                      long deadLetterCount,
+                                      com.synapsecore.domain.entity.IntegrationInboundRecord lastActivity) {
+        return switch (healthStatus) {
+            case OFFLINE -> "Connector is disabled and cannot ingest live activity.";
+            case DEGRADED -> "Connector is enabled but needs attention: "
+                + recentInboundFailureCount + " recent inbound issue(s), "
+                + pendingReplayCount + " replay item(s), "
+                + deadLetterCount + " dead-lettered item(s).";
+            case LIVE -> lastActivity == null
+                ? "Connector is enabled and ready for live traffic."
+                : "Connector is enabled and processing activity without recent integration failures.";
+        };
+    }
+
+    private FailureSignal resolveLatestFailureSignal(com.synapsecore.domain.entity.IntegrationInboundRecord latestInboundFailure,
+                                                     IntegrationReplayRecord latestReplayIssue) {
+        Instant inboundFailureAt = latestInboundFailure == null ? null : latestInboundFailure.getUpdatedAt();
+        Instant replayFailureAt = latestReplayIssue == null ? null : latestReplayIssue.getUpdatedAt();
+        if (replayFailureAt != null && (inboundFailureAt == null || replayFailureAt.isAfter(inboundFailureAt))) {
+            return new FailureSignal(
+                latestReplayIssue.getFailureCode(),
+                latestReplayIssue.getFailureMessage(),
+                replayFailureAt
+            );
+        }
+        if (latestInboundFailure != null) {
+            return new FailureSignal(
+                latestInboundFailure.getFailureCode(),
+                latestInboundFailure.getFailureMessage(),
+                inboundFailureAt
+            );
+        }
+        return new FailureSignal(null, null, null);
+    }
+
+    private record ConnectorTelemetry(
+        IntegrationConnectorHealthStatus healthStatus,
+        String healthSummary,
+        Instant lastActivityAt,
+        Instant lastSuccessfulActivityAt,
+        IntegrationImportStatus lastImportStatus,
+        Instant lastImportAt,
+        long recentInboundFailureCount,
+        long pendingReplayCount,
+        long deadLetterCount,
+        IntegrationFailureCode lastFailureCode,
+        String lastFailureMessage,
+        Instant lastFailureAt,
+        Instant oldestPendingReplayAt,
+        Long oldestPendingReplayAgeSeconds
+    ) {
+    }
+
+    private record FailureSignal(
+        IntegrationFailureCode failureCode,
+        String failureMessage,
+        Instant failureAt
+    ) {
     }
 }

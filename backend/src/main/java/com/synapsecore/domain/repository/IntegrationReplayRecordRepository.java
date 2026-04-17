@@ -25,12 +25,15 @@ public interface IntegrationReplayRecordRepository extends JpaRepository<Integra
             record.connectorType,
             record.externalOrderId,
             record.warehouseCode,
+            record.failureCode,
             record.failureMessage,
             record.status,
             record.replayAttemptCount,
             record.lastReplayMessage,
             record.lastAttemptedAt,
+            record.nextEligibleAt,
             record.resolvedAt,
+            record.deadLetteredAt,
             record.replayedOrderExternalId,
             record.createdAt,
             record.updatedAt
@@ -47,6 +50,27 @@ public interface IntegrationReplayRecordRepository extends JpaRepository<Integra
     long countByStatusIn(Collection<IntegrationReplayStatus> statuses);
 
     long countByTenantCodeIgnoreCaseAndStatusIn(String tenantCode, Collection<IntegrationReplayStatus> statuses);
+
+    long countByTenantCodeIgnoreCaseAndSourceSystemIgnoreCaseAndConnectorTypeAndStatusIn(
+        String tenantCode,
+        String sourceSystem,
+        com.synapsecore.domain.entity.IntegrationConnectorType connectorType,
+        Collection<IntegrationReplayStatus> statuses
+    );
+
+    java.util.Optional<IntegrationReplayRecord> findTopByTenantCodeIgnoreCaseAndSourceSystemIgnoreCaseAndConnectorTypeAndStatusInOrderByUpdatedAtDesc(
+        String tenantCode,
+        String sourceSystem,
+        com.synapsecore.domain.entity.IntegrationConnectorType connectorType,
+        Collection<IntegrationReplayStatus> statuses
+    );
+
+    java.util.Optional<IntegrationReplayRecord> findTopByTenantCodeIgnoreCaseAndSourceSystemIgnoreCaseAndConnectorTypeAndStatusInOrderByCreatedAtAsc(
+        String tenantCode,
+        String sourceSystem,
+        com.synapsecore.domain.entity.IntegrationConnectorType connectorType,
+        Collection<IntegrationReplayStatus> statuses
+    );
 
     java.util.Optional<IntegrationReplayRecord> findByTenantCodeIgnoreCaseAndId(String tenantCode, Long id);
 }

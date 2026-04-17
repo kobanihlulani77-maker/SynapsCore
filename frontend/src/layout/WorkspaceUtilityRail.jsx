@@ -35,6 +35,7 @@ export default function WorkspaceUtilityRail({ context }) {
     frontendBuildVersion,
     apiUrl,
     wsUrl,
+    realtimeTransportLabel,
     effectivePageMeta,
     pageStatusMap,
     navigateToPage,
@@ -223,12 +224,12 @@ export default function WorkspaceUtilityRail({ context }) {
           kicker: 'Release focus',
           state: runtime?.overallStatus || 'Loading',
           title: `Backend ${runtime?.build?.version || 'Waiting'}`,
-          detail: `Frontend ${frontendBuildVersion || 'Waiting'} | API ${apiUrl || 'Default'} | WS ${wsUrl || 'Default'}`,
+          detail: `Frontend ${frontendBuildVersion || 'Waiting'} | API ${apiUrl || 'Default'} | Realtime ${wsUrl || 'Default'} | ${realtimeTransportLabel || 'Transport unknown'}`,
           metrics: [
             { label: 'Profile', value: runtime?.activeProfiles?.join(', ') || 'Loading' },
             { label: 'Readiness', value: runtime ? formatCodeLabel(runtime.readinessState) : 'Loading' },
             { label: 'API', value: apiUrl ? 'Configured' : 'Default' },
-            { label: 'WS', value: wsUrl ? 'Configured' : 'Default' },
+            { label: 'Realtime', value: wsUrl ? 'Configured' : 'Default' },
           ],
           actions: [{ title: 'Open runtime', note: 'Check live trust after release posture.', target: 'runtime' }],
         }

@@ -1,100 +1,134 @@
 # Render Deployment Guide
 
-This guide prepares SynapseCore for Render with a backend Docker web service, a frontend static site, a managed Postgres database, and a managed Redis key-value store.
+This guide reflects the current live Render setup for SynapsCore.
 
-## Blueprint
+## Live Render Topology
 
-Use the repo root `render.yaml`. It defines:
+The repo blueprint in `render.yaml` defines:
 
-- `synapsecore-backend` (Docker web service)
-- `synapsecore-frontend` (static site)
-- `synapsecore-postgres` (managed Postgres)
-- `synapsecore-redis` (managed Redis)
+- `synapscore-3` as the backend Docker web service
+- `synapscore-frontend-3` as the frontend static site
+- `synapscore-postgres` as the managed Postgres database
+- `synapscore-redis` as the managed Redis service
 
-## Backend Service (Docker)
+## Exact Live Public URLs
 
-Render uses the Dockerfile in `backend/Dockerfile`.
+- Frontend: `https://synapscore-frontend-3.onrender.com`
+- Backend: `https://synapscore-3.onrender.com`
+- Backend health: `https://synapscore-3.onrender.com/actuator/health`
 
-Build command (Render-managed):
+## Backend Service
 
-```bash
-docker build -t synapsecore-backend .
-```
+Render builds the backend from:
 
-Start command (from Dockerfile):
+- Root Directory: `backend`
+- Dockerfile Path: `Dockerfile`
+- Docker Environment: `docker`
+- Health Check Path: `/actuator/health`
 
-```bash
-java -jar /app/app.jar
-```
+Render injects `PORT`. Do not hardcode it in the Render service.
 
-Health check path:
+### Exact backend env keys
 
-```
-/actuator/health
-```
+Use these backend env vars on Render:
 
-### Backend env vars to set (Render)
-
-Paste or confirm these in the backend service:
-
-```
+```text
 SPRING_PROFILES_ACTIVE=prod
 SERVER_ADDRESS=0.0.0.0
-DATABASE_URL=<from synapsecore-postgres connection string>
-REDIS_URL=<from synapsecore-redis connection string>
-CORS_ALLOWED_ORIGINS=https://<your-frontend-domain>
+DATABASE_URL=<Render Postgres internal connection string>
+SPRING_DATA_REDIS_URL=<Render Redis internal connection string>
+CORS_ALLOWED_ORIGINS=https://synapscore-frontend-3.onrender.com
 SESSION_COOKIE_SECURE=true
 SESSION_COOKIE_SAME_SITE=None
 ALLOW_HEADER_FALLBACK=false
-JPA_DDL_AUTO=validate
-PUBLIC_APP_URL=https://<your-frontend-domain>
-PUBLIC_API_URL=https://<your-backend-domain>
+SPRING_JPA_HIBERNATE_DDL_AUTO=update
+PUBLIC_APP_URL=https://synapscore-frontend-3.onrender.com
+PUBLIC_API_URL=https://synapscore-3.onrender.com
 SYNAPSECORE_BUILD_VERSION=0.0.1
 SYNAPSECORE_BUILD_COMMIT=render-deploy
 SYNAPSECORE_BUILD_TIME=2026-04-10T00:00:00Z
 ```
 
+Optional for a brand-new empty production database only:
+
+```text
+SYNAPSECORE_BOOTSTRAP_INITIAL_TOKEN=<one-time-bootstrap-secret>
+SYNAPSECORE_PLATFORM_ADMIN_TOKEN=<rotated-platform-admin-secret>
+```
+
+### Keys to remove
+
+Do not use these old keys for the Render backend:
+
+```text
+REDIS_URL
+REDIS_HOST
+REDIS_PORT
+JPA_DDL_AUTO
+```
+
 Notes:
 
-- Render supplies `PORT`; the backend binds to it automatically.
-- Keep `SESSION_COOKIE_SECURE=true` and `SESSION_COOKIE_SAME_SITE=None` for HTTPS and cross-subdomain cookies.
+- `DATABASE_URL` is supported because the backend normalizes Render `postgres://` / `postgresql://` connection strings into JDBC at startup.
+- `SPRING_DATA_REDIS_URL` must point at the internal Render Redis URL and must not be blank in production.
+- `SPRING_JPA_HIBERNATE_DDL_AUTO=update` is the first-deploy default for a fresh Render database.
+- `SYNAPSECORE_BOOTSTRAP_INITIAL_TOKEN` is only for the first tenant creation on an empty production environment. Remove it after the first workspace is created.
+- `SYNAPSECORE_PLATFORM_ADMIN_TOKEN` is the dedicated production tenant-provisioning lane after bootstrap. Use it through the `X-Synapse-Platform-Admin-Token` header and rotate it like any other privileged secret.
+- Signed-in tenant admins still cannot create additional tenant workspaces in production.
 
-## Frontend Service (Static Site)
+## Frontend Service
 
-Render builds the frontend from `frontend/`.
+Render builds the frontend from:
 
-Build command:
+- Root Directory: `frontend`
+- Build Command: `npm ci && npm run build`
+- Publish Directory: `dist`
 
-```bash
-npm ci && npm run build
+The static service must keep the SPA rewrite:
+
+```yaml
+routes:
+  - type: rewrite
+    source: /*
+    destination: /index.html
 ```
 
-Publish directory:
+### Exact frontend env keys
 
-```
-frontend/dist
-```
-
-### Frontend env vars to set (Render)
-
-```
-VITE_API_URL=https://<your-backend-domain>
-VITE_WS_URL=wss://<your-backend-domain>/ws
+```text
+VITE_API_URL=https://synapscore-3.onrender.com
+VITE_WS_URL=https://synapscore-3.onrender.com/ws
 VITE_APP_BUILD_VERSION=0.0.1
 VITE_APP_BUILD_COMMIT=render-deploy
 VITE_APP_BUILD_TIME=2026-04-10T00:00:00Z
 ```
 
-## Postgres and Redis
+`VITE_WS_URL` uses the public `/ws` endpoint. The frontend normalizes it for both native WebSocket and SockJS transport usage.
 
-Render creates both from the blueprint. Copy the connection strings into:
+## Final Render Setup Summary
 
-- `DATABASE_URL` for Postgres
-- `REDIS_URL` for Redis
+Backend:
 
-## Post-deploy checks
+- service name: `synapscore-3`
+- root directory: `backend`
+- dockerfile path: `Dockerfile`
+- health check: `/actuator/health`
+- required envs: the backend list above
 
-1. Backend health: `https://<your-backend-domain>/actuator/health`
-2. Frontend loads: `https://<your-frontend-domain>`
-3. Sign in with demo credentials.
-4. Verify dashboard summary updates and WebSocket live status.
+Frontend:
+
+- service name: `synapscore-frontend-3`
+- root directory: `frontend`
+- build command: `npm ci && npm run build`
+- static publish path: `dist`
+- SPA rewrite: `/* -> /index.html`
+- required envs: the frontend list above
+
+## Post-Deploy Checks
+
+1. Open `https://synapscore-frontend-3.onrender.com`
+2. Verify direct deep links like `/sign-in` and `/dashboard` resolve through the SPA rewrite
+3. Verify `https://synapscore-3.onrender.com/actuator/health`
+4. Verify sign-in loads tenant directory successfully
+5. Verify login sets a secure session cookie and redirects into `/dashboard`
+6. Verify dashboard, integrations, runtime, and audit pages load without API or CORS failures

@@ -3,7 +3,6 @@ package com.synapsecore.audit;
 import com.synapsecore.access.AccessControlService;
 import com.synapsecore.auth.AuthSessionService;
 import com.synapsecore.config.SynapseAccessProperties;
-import com.synapsecore.tenant.TenantContextService;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
@@ -25,7 +24,6 @@ public class RequestTraceFilter extends OncePerRequestFilter {
 
     private final RequestTraceContext requestTraceContext;
     private final SynapseAccessProperties accessProperties;
-    private final TenantContextService tenantContextService;
     private final AuthSessionService authSessionService;
 
     @Override
@@ -93,6 +91,6 @@ public class RequestTraceFilter extends OncePerRequestFilter {
             }
         }
 
-        return tenantContextService.getDefaultTenantCode();
+        return RequestTraceContext.DEFAULT_TENANT;
     }
 }

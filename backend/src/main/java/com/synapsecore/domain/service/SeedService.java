@@ -3,6 +3,7 @@ package com.synapsecore.domain.service;
 import com.synapsecore.audit.AuditLogService;
 import com.synapsecore.access.SynapseAccessRole;
 import com.synapsecore.auth.DemoAccessUsers;
+import com.synapsecore.config.SynapseDemoProperties;
 import com.synapsecore.domain.dto.SeedResetResponse;
 import com.synapsecore.domain.entity.AccessOperator;
 import com.synapsecore.domain.entity.AccessUser;
@@ -69,11 +70,16 @@ public class SeedService {
     private final TransactionTemplate transactionTemplate;
     private final AuditLogService auditLogService;
     private final PasswordEncoder passwordEncoder;
+    private final SynapseDemoProperties demoProperties;
 
     public boolean seedIfEmpty() {
         Boolean seeded = transactionTemplate.execute(status -> {
             if (productRepository.count() > 0 || warehouseRepository.count() > 0) {
                 backfillTenantAwareData();
+                return false;
+            }
+
+            if (!demoProperties.isAutoSeedOnEmpty()) {
                 return false;
             }
 
@@ -139,6 +145,7 @@ public class SeedService {
             operator(tenant, "Operations Planner", "Operations Planner", "Default planning identity for scenario creation."),
             operator(tenant, "Operations Lead", "Operations Lead", "Default owner reviewer for scenario approvals.",
                 SynapseAccessRole.TENANT_ADMIN, SynapseAccessRole.REVIEW_OWNER),
+            operator(tenant, "Demo Operator", "Demo Operator", "General-purpose demo operator for hosted product walkthroughs."),
             operator(tenant, "Amina Planner", "Amina Planner", "Planning operator used in scenario exploration."),
             operator(tenant, "Lebo Planner", "Lebo Planner", "Planning operator used in scenario exploration."),
             operator(tenant, "Thando Planner", "Thando Planner", "Planning operator used in scenario exploration."),

@@ -14,6 +14,7 @@ export default function ReleasesPage({ context }) {
     frontendBuildTime,
     apiUrl,
     wsUrl,
+    realtimeTransportLabel,
     getRuntimeStatusClassName,
   } = context
 
@@ -41,7 +42,8 @@ export default function ReleasesPage({ context }) {
           <div className="stack-card">
             <div className="stack-title-row"><strong>Frontend build</strong><span className="status-tag status-success">{formatBuildValue(frontendBuildVersion)}</span></div>
             <p>Commit {formatBuildValue(frontendBuildCommit)} | Built {formatBuildValue(frontendBuildTime)}</p>
-            <p className="muted-text">API {apiUrl} | WS {wsUrl}</p>
+            <p className="muted-text">API {apiUrl} | Realtime {wsUrl}</p>
+            <p className="muted-text">{realtimeTransportLabel}</p>
           </div>
         </div>
         <div className="experience-grid experience-grid-three">
@@ -56,7 +58,7 @@ export default function ReleasesPage({ context }) {
               <div className="signal-list-item">
                 <strong>Realtime endpoint</strong>
                 <p>{wsUrl}</p>
-                <p className="muted-text">This must align with the frontend runtime config for live updates and incident lanes.</p>
+                <p className="muted-text">{realtimeTransportLabel}. This must align with the frontend runtime config for live updates and incident lanes.</p>
               </div>
             </div>
           </article>
