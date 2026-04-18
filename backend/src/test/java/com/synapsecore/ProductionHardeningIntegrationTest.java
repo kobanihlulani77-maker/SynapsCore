@@ -25,6 +25,9 @@ import com.synapsecore.domain.repository.InventoryRepository;
 import com.synapsecore.domain.repository.ProductRepository;
 import com.synapsecore.domain.repository.TenantRepository;
 import com.synapsecore.domain.repository.WarehouseRepository;
+import com.synapsecore.domain.service.DataInitializer;
+import com.synapsecore.domain.service.SeedService;
+import com.synapsecore.integration.IntegrationConnectorService;
 import com.synapsecore.simulation.SimulationService;
 import com.synapsecore.tenant.TenantContextService;
 import java.math.BigDecimal;
@@ -86,12 +89,52 @@ class ProductionHardeningIntegrationTest {
     @Autowired
     private MockMvc mockMvc;
 
+    @Autowired
+    private SeedService seedService;
+
+    @Autowired
+    private IntegrationConnectorService integrationConnectorService;
+
+    @Autowired(required = false)
+    private DataInitializer dataInitializer;
+
     @Test
     void prodProfileDoesNotSeedStarterDataWhenAutoSeedDisabled() {
         assertThat(tenantRepository.count()).isZero();
         assertThat(productRepository.count()).isZero();
         assertThat(warehouseRepository.count()).isZero();
         assertThat(inventoryRepository.count()).isZero();
+        assertThat(integrationConnectorRepository.count()).isZero();
+    }
+
+    @Test
+    void prodProfileDoesNotRegisterStartupDataInitializer() {
+        assertThat(dataInitializer).isNull();
+    }
+
+    @Test
+    void prodProfileSeedServiceDoesNotBackfillWhenDemoSeedingIsDisabled() {
+        productRepository.save(Product.builder()
+            .sku("SKU-PROD-001")
+            .name("Production Sensor")
+            .category("Sensors")
+            .build());
+
+        assertThat(seedService.seedIfEmpty()).isFalse();
+        assertThat(tenantRepository.count()).isZero();
+        assertThat(integrationConnectorRepository.count()).isZero();
+    }
+
+    @Test
+    void prodProfileStarterConnectorSeedingIsDisabled() {
+        Tenant tenant = tenantRepository.save(Tenant.builder()
+            .code("REAL-OPS")
+            .name("Real Operations")
+            .active(true)
+            .build());
+
+        integrationConnectorService.seedStarterConnectors(tenant);
+
         assertThat(integrationConnectorRepository.count()).isZero();
     }
 

@@ -73,13 +73,13 @@ public class SeedService {
     private final SynapseDemoProperties demoProperties;
 
     public boolean seedIfEmpty() {
+        if (!demoProperties.isAutoSeedOnEmpty()) {
+            return false;
+        }
+
         Boolean seeded = transactionTemplate.execute(status -> {
             if (productRepository.count() > 0 || warehouseRepository.count() > 0) {
                 backfillTenantAwareData();
-                return false;
-            }
-
-            if (!demoProperties.isAutoSeedOnEmpty()) {
                 return false;
             }
 

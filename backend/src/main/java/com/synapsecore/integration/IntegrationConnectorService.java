@@ -3,6 +3,7 @@ package com.synapsecore.integration;
 import com.synapsecore.access.AccessDirectoryService;
 import com.synapsecore.audit.AuditLogService;
 import com.synapsecore.auth.DemoAccessUsers;
+import com.synapsecore.config.SynapseDemoProperties;
 import com.synapsecore.domain.entity.AccessOperator;
 import com.synapsecore.domain.entity.BusinessEventType;
 import com.synapsecore.domain.entity.IntegrationConnector;
@@ -56,6 +57,7 @@ public class IntegrationConnectorService {
     private final AuditLogService auditLogService;
     private final OperationalStateChangePublisher operationalStateChangePublisher;
     private final TenantContextService tenantContextService;
+    private final SynapseDemoProperties demoProperties;
 
     @org.springframework.beans.factory.annotation.Value("${synapsecore.integration.health-window-hours:24}")
     private long integrationHealthWindowHours;
@@ -175,11 +177,17 @@ public class IntegrationConnectorService {
 
     @Transactional
     public void seedStarterConnectors() {
+        if (!demoProperties.isSeedStarterConnectorsOnTenantOnboarding()) {
+            return;
+        }
         seedStarterConnectors(tenantContextService.getCurrentTenantOrDefault());
     }
 
     @Transactional
     public void seedStarterConnectors(com.synapsecore.domain.entity.Tenant tenant) {
+        if (!demoProperties.isSeedStarterConnectorsOnTenantOnboarding()) {
+            return;
+        }
         boolean defaultTenant = DemoAccessUsers.DEFAULT_TENANT_CODE.equalsIgnoreCase(tenant.getCode());
         String tenantPrefix = tenant.getCode().trim().toLowerCase(Locale.ROOT).replace('-', '_');
         ensureConnector(tenant.getCode(), tenant, defaultTenant ? "erp_north" : tenantPrefix + "_north", IntegrationConnectorType.WEBHOOK_ORDER,
