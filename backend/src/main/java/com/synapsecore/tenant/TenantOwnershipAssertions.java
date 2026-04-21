@@ -3,6 +3,8 @@ package com.synapsecore.tenant;
 import com.synapsecore.domain.entity.CustomerOrder;
 import com.synapsecore.domain.entity.FulfillmentTask;
 import com.synapsecore.domain.entity.Inventory;
+import com.synapsecore.domain.entity.OrderItem;
+import com.synapsecore.domain.entity.Product;
 import com.synapsecore.domain.entity.Tenant;
 import com.synapsecore.domain.entity.Warehouse;
 
@@ -106,6 +108,57 @@ public final class TenantOwnershipAssertions {
             throw new IllegalStateException(context + " requires inventory warehouse binding.");
         }
         requireWarehouseConsistency(inventory.getWarehouse(), context);
+        requireProductConsistency(inventory.getProduct(), context);
+        requireTenantAssigned(inventory.getWarehouse().getTenant(), "Warehouse " + inventory.getWarehouse().getCode());
+        if (!sameTenant(inventory.getProduct().getTenant(), inventory.getWarehouse().getTenant())) {
+            throw new IllegalStateException(
+                "Inventory product " + inventory.getProduct().resolveCatalogSku()
+                    + " belongs to tenant " + inventory.getProduct().getTenant().getCode()
+                    + " while warehouse " + inventory.getWarehouse().getCode()
+                    + " belongs to tenant " + inventory.getWarehouse().getTenant().getCode() + "."
+            );
+        }
+        if (inventory.getTenant() != null && !sameTenant(inventory.getTenant(), inventory.getWarehouse().getTenant())) {
+            throw new IllegalStateException(
+                "Inventory tenant " + inventory.getTenant().getCode()
+                    + " does not match warehouse tenant " + inventory.getWarehouse().getTenant().getCode() + "."
+            );
+        }
+    }
+
+    public static void requireProductConsistency(Product product, String context) {
+        if (product == null) {
+            throw new IllegalStateException(context + " requires a product.");
+        }
+        requireTenantAssigned(product.getTenant(), "Product " + product.resolveCatalogSku());
+    }
+
+    public static void requireOrderItemConsistency(OrderItem orderItem, String context) {
+        if (orderItem == null) {
+            throw new IllegalStateException(context + " requires an order item.");
+        }
+        if (orderItem.getCustomerOrder() == null) {
+            throw new IllegalStateException(context + " requires an order item customer order binding.");
+        }
+        if (orderItem.getProduct() == null) {
+            throw new IllegalStateException(context + " requires an order item product binding.");
+        }
+        requireCustomerOrderConsistency(orderItem.getCustomerOrder(), context);
+        requireProductConsistency(orderItem.getProduct(), context);
+        if (!sameTenant(orderItem.getCustomerOrder().getTenant(), orderItem.getProduct().getTenant())) {
+            throw new IllegalStateException(
+                "Order item product " + orderItem.getProduct().resolveCatalogSku()
+                    + " belongs to tenant " + orderItem.getProduct().getTenant().getCode()
+                    + " while order " + orderItem.getCustomerOrder().getExternalOrderId()
+                    + " belongs to tenant " + orderItem.getCustomerOrder().getTenant().getCode() + "."
+            );
+        }
+        if (orderItem.getTenant() != null && !sameTenant(orderItem.getTenant(), orderItem.getCustomerOrder().getTenant())) {
+            throw new IllegalStateException(
+                "Order item tenant " + orderItem.getTenant().getCode()
+                    + " does not match order tenant " + orderItem.getCustomerOrder().getTenant().getCode() + "."
+            );
+        }
     }
 
     private static void requireTenantAssigned(Tenant tenant, String ownerLabel) {

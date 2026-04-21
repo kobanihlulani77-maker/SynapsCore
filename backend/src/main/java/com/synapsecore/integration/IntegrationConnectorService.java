@@ -2,8 +2,8 @@ package com.synapsecore.integration;
 
 import com.synapsecore.access.AccessDirectoryService;
 import com.synapsecore.audit.AuditLogService;
-import com.synapsecore.auth.DemoAccessUsers;
-import com.synapsecore.config.SynapseDemoProperties;
+import com.synapsecore.auth.StarterAccessUsers;
+import com.synapsecore.config.SynapseStarterProperties;
 import com.synapsecore.domain.entity.AccessOperator;
 import com.synapsecore.domain.entity.BusinessEventType;
 import com.synapsecore.domain.entity.IntegrationConnector;
@@ -30,6 +30,8 @@ import java.time.Duration;
 import java.time.Instant;
 import com.synapsecore.tenant.TenantContextService;
 import java.nio.charset.StandardCharsets;
+import java.net.URI;
+import java.net.URISyntaxException;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.util.HexFormat;
@@ -57,7 +59,7 @@ public class IntegrationConnectorService {
     private final AuditLogService auditLogService;
     private final OperationalStateChangePublisher operationalStateChangePublisher;
     private final TenantContextService tenantContextService;
-    private final SynapseDemoProperties demoProperties;
+    private final SynapseStarterProperties starterProperties;
 
     @org.springframework.beans.factory.annotation.Value("${synapsecore.integration.health-window-hours:24}")
     private long integrationHealthWindowHours;
@@ -102,7 +104,12 @@ public class IntegrationConnectorService {
             ? request.syncMode()
             : connector.getId() == null ? defaultSyncMode(request.type()) : connector.getSyncMode();
         connector.setSyncMode(syncMode);
+        String pullEndpointUrl = normalizeOptional(
+            request.pullEndpointUrl() != null ? request.pullEndpointUrl() : connector.getPullEndpointUrl()
+        );
+        requireSupportedSyncMode(request.type(), syncMode, pullEndpointUrl);
         connector.setSyncIntervalMinutes(resolveSyncIntervalMinutes(syncMode, request.syncIntervalMinutes(), connector.getSyncIntervalMinutes()));
+        connector.setPullEndpointUrl(syncMode == IntegrationSyncMode.SCHEDULED_PULL ? pullEndpointUrl : null);
         connector.setValidationPolicy(request.validationPolicy() != null
             ? request.validationPolicy()
             : connector.getId() == null ? defaultValidationPolicy(request.type()) : connector.getValidationPolicy());
@@ -177,7 +184,7 @@ public class IntegrationConnectorService {
 
     @Transactional
     public void seedStarterConnectors() {
-        if (!demoProperties.isSeedStarterConnectorsOnTenantOnboarding()) {
+        if (!starterProperties.isSeedStarterConnectorsOnTenantOnboarding()) {
             return;
         }
         seedStarterConnectors(tenantContextService.getCurrentTenantOrDefault());
@@ -185,21 +192,25 @@ public class IntegrationConnectorService {
 
     @Transactional
     public void seedStarterConnectors(com.synapsecore.domain.entity.Tenant tenant) {
-        if (!demoProperties.isSeedStarterConnectorsOnTenantOnboarding()) {
+        if (!starterProperties.isSeedStarterConnectorsOnTenantOnboarding()) {
             return;
         }
-        boolean defaultTenant = DemoAccessUsers.DEFAULT_TENANT_CODE.equalsIgnoreCase(tenant.getCode());
-        String tenantPrefix = tenant.getCode().trim().toLowerCase(Locale.ROOT).replace('-', '_');
-        ensureConnector(tenant.getCode(), tenant, defaultTenant ? "erp_north" : tenantPrefix + "_north", IntegrationConnectorType.WEBHOOK_ORDER,
-            defaultTenant ? "ERP North Webhook" : tenant.getName() + " North Webhook", true, "WH-NORTH",
+        boolean starterTenant = StarterAccessUsers.STARTER_TENANT_CODE.equalsIgnoreCase(tenant.getCode());
+        String sourcePrefix = starterTenant
+            ? "erp"
+            : tenant.getCode().trim().toLowerCase(Locale.ROOT).replace('-', '_');
+        String displayPrefix = starterTenant ? "ERP" : tenant.getName();
+
+        ensureConnector(tenant.getCode(), tenant, sourcePrefix + "_north", IntegrationConnectorType.WEBHOOK_ORDER,
+            displayPrefix + " North Webhook", true, "WH-NORTH",
             "Starter webhook connector for inbound ERP orders.", "Operations Lead",
             IntegrationSyncMode.REALTIME_PUSH, IntegrationValidationPolicy.STANDARD, IntegrationTransformationPolicy.NORMALIZE_CODES, true);
-        ensureConnector(tenant.getCode(), tenant, defaultTenant ? "erp_coast" : tenantPrefix + "_coast", IntegrationConnectorType.WEBHOOK_ORDER,
-            defaultTenant ? "ERP Coast Webhook" : tenant.getName() + " Coast Webhook", true, "WH-COAST",
+        ensureConnector(tenant.getCode(), tenant, sourcePrefix + "_coast", IntegrationConnectorType.WEBHOOK_ORDER,
+            displayPrefix + " Coast Webhook", true, "WH-COAST",
             "Starter webhook connector for coast operations.", "Operations Lead",
             IntegrationSyncMode.REALTIME_PUSH, IntegrationValidationPolicy.STANDARD, IntegrationTransformationPolicy.NORMALIZE_CODES, true);
-        ensureConnector(tenant.getCode(), tenant, defaultTenant ? "erp_batch" : tenantPrefix + "_batch", IntegrationConnectorType.CSV_ORDER_IMPORT,
-            defaultTenant ? "ERP Batch CSV Feed" : tenant.getName() + " Batch CSV Feed", true, null,
+        ensureConnector(tenant.getCode(), tenant, sourcePrefix + "_batch", IntegrationConnectorType.CSV_ORDER_IMPORT,
+            displayPrefix + " Batch CSV Feed", true, null,
             "Starter CSV batch connector for operational order drops.", "Operations Lead",
             IntegrationSyncMode.BATCH_FILE_DROP, IntegrationValidationPolicy.RELAXED, IntegrationTransformationPolicy.NORMALIZE_CODES, false);
     }
@@ -341,16 +352,48 @@ public class IntegrationConnectorService {
         if (syncMode != IntegrationSyncMode.SCHEDULED_PULL) {
             return null;
         }
-        Integer resolved = requestedSyncIntervalMinutes != null ? requestedSyncIntervalMinutes : existingSyncIntervalMinutes;
-        if (resolved == null) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
-                "syncIntervalMinutes is required for scheduled pull connectors.");
+        if (requestedSyncIntervalMinutes != null) {
+            return requestedSyncIntervalMinutes;
         }
-        if (resolved < 15 || resolved > 1440) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
-                "syncIntervalMinutes must be between 15 and 1440 for scheduled pull connectors.");
+        if (existingSyncIntervalMinutes != null && existingSyncIntervalMinutes >= 15) {
+            return existingSyncIntervalMinutes;
         }
-        return resolved;
+        return 15;
+    }
+
+    private void requireSupportedSyncMode(IntegrationConnectorType type,
+                                          IntegrationSyncMode syncMode,
+                                          String pullEndpointUrl) {
+        if (syncMode != IntegrationSyncMode.SCHEDULED_PULL) {
+            return;
+        }
+        if (type != IntegrationConnectorType.WEBHOOK_ORDER) {
+            throw new ResponseStatusException(
+                HttpStatus.BAD_REQUEST,
+                "Scheduled pull is currently implemented only for order API feeds."
+            );
+        }
+        if (pullEndpointUrl == null || pullEndpointUrl.isBlank()) {
+            throw new ResponseStatusException(
+                HttpStatus.BAD_REQUEST,
+                "pullEndpointUrl is required for scheduled pull connectors."
+            );
+        }
+        try {
+            URI uri = new URI(pullEndpointUrl);
+            String scheme = uri.getScheme() == null ? "" : uri.getScheme().toLowerCase(Locale.ROOT);
+            if ((!scheme.equals("https") && !scheme.equals("http")) || uri.getHost() == null || uri.getHost().isBlank()) {
+                throw new ResponseStatusException(
+                    HttpStatus.BAD_REQUEST,
+                    "pullEndpointUrl must be an absolute HTTP(S) URL for scheduled pull connectors."
+                );
+            }
+        } catch (URISyntaxException exception) {
+            throw new ResponseStatusException(
+                HttpStatus.BAD_REQUEST,
+                "pullEndpointUrl must be a valid HTTP(S) URL for scheduled pull connectors."
+            );
+        }
     }
 
     private Integer resolveSupportedMappingVersion(Integer requestedMappingVersion, Integer existingMappingVersion) {
@@ -378,6 +421,11 @@ public class IntegrationConnectorService {
             connector.isEnabled(),
             connector.getSyncMode(),
             connector.getSyncIntervalMinutes(),
+            connector.getPullEndpointUrl(),
+            connector.getLastPullAttemptAt(),
+            connector.getLastPullSuccessAt(),
+            connector.getLastPullStatus(),
+            connector.getLastPullMessage(),
             connector.getValidationPolicy(),
             connector.getTransformationPolicy(),
             connector.getMappingVersion() == null || connector.getMappingVersion() < 1 ? 1 : connector.getMappingVersion(),

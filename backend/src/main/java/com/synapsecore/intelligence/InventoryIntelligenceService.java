@@ -2,25 +2,37 @@ package com.synapsecore.intelligence;
 
 import com.synapsecore.domain.entity.AlertSeverity;
 import com.synapsecore.domain.entity.Inventory;
+import com.synapsecore.domain.service.TenantOperationalPolicyService;
 import com.synapsecore.prediction.StockPrediction;
 import java.util.Locale;
+import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
 @Service
+@RequiredArgsConstructor
 public class InventoryIntelligenceService {
 
+    private final TenantOperationalPolicyService tenantOperationalPolicyService;
+
     public InventoryInsight evaluate(Inventory inventory, StockPrediction prediction) {
+        var policy = tenantOperationalPolicyService.getPolicy(
+            inventory.getTenant() != null
+                ? inventory.getTenant().getCode()
+                : inventory.getWarehouse().getTenant().getCode()
+        );
         boolean lowStock = inventory.getQuantityAvailable() <= inventory.getReorderThreshold();
         boolean depletionRisk = !lowStock && prediction.depletionRisk();
         boolean criticalQuantity = inventory.getQuantityAvailable() == 0
-            || inventory.getQuantityAvailable() <= Math.max(1, inventory.getReorderThreshold() / 2);
+            || inventory.getQuantityAvailable() <= Math.max(1, Math.round(inventory.getReorderThreshold() * policy.getLowStockCriticalRatio()));
         boolean elevatedUrgency = (lowStock && criticalQuantity) || prediction.urgentRisk();
 
         AlertSeverity severity;
         if (lowStock && elevatedUrgency) {
-            severity = AlertSeverity.CRITICAL;
+            severity = policy.getLowStockCriticalSeverity();
         } else if (lowStock || depletionRisk || prediction.urgentRisk()) {
-            severity = AlertSeverity.HIGH;
+            severity = prediction.urgentRisk()
+                ? policy.getUrgentDepletionRiskSeverity()
+                : lowStock ? policy.getLowStockSeverity() : policy.getDepletionRiskSeverity();
         } else {
             severity = AlertSeverity.MEDIUM;
         }

@@ -2,21 +2,18 @@ package com.synapsecore.realtime;
 
 import com.synapsecore.domain.service.DashboardService;
 import com.synapsecore.domain.service.OperationalViewService;
-import com.synapsecore.simulation.SimulationStateService;
 import com.synapsecore.tenant.TenantContextService;
 import java.util.Locale;
 import lombok.RequiredArgsConstructor;
-import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.stereotype.Service;
 
 @Service
 @RequiredArgsConstructor
 public class RealtimeService {
 
-    private final SimpMessagingTemplate messagingTemplate;
+    private final RealtimePublisher realtimePublisher;
     private final OperationalViewService operationalViewService;
     private final DashboardService dashboardService;
-    private final SimulationStateService simulationStateService;
     private final TenantContextService tenantContextService;
 
     public void broadcastOperationalUpdates() {
@@ -28,30 +25,33 @@ public class RealtimeService {
     }
 
     public void broadcastOperationalUpdates(String tenantCode) {
-        messagingTemplate.convertAndSend(topic(tenantCode, "/dashboard.summary"), dashboardService.getSummary());
-        messagingTemplate.convertAndSend(topic(tenantCode, "/alerts"), operationalViewService.getAlertFeed());
-        messagingTemplate.convertAndSend(topic(tenantCode, "/recommendations"), operationalViewService.getRecommendations());
-        messagingTemplate.convertAndSend(topic(tenantCode, "/inventory"), operationalViewService.getInventoryOverview());
-        messagingTemplate.convertAndSend(topic(tenantCode, "/fulfillment.overview"), operationalViewService.getFulfillmentOverview());
-        messagingTemplate.convertAndSend(topic(tenantCode, "/orders.recent"), operationalViewService.getRecentOrders());
-        messagingTemplate.convertAndSend(topic(tenantCode, "/events.recent"), operationalViewService.getRecentEvents());
-        messagingTemplate.convertAndSend(topic(tenantCode, "/audit.recent"), operationalViewService.getRecentAuditLogs());
-        messagingTemplate.convertAndSend(topic(tenantCode, "/system.incidents"), operationalViewService.getSystemIncidents());
-        messagingTemplate.convertAndSend(topic(tenantCode, "/integrations.connectors"), operationalViewService.getIntegrationConnectors());
-        messagingTemplate.convertAndSend(topic(tenantCode, "/integrations.imports"), operationalViewService.getRecentIntegrationImportRuns());
-        messagingTemplate.convertAndSend(topic(tenantCode, "/integrations.replay"), operationalViewService.getIntegrationReplayQueue());
-        messagingTemplate.convertAndSend(topic(tenantCode, "/scenarios.notifications"), operationalViewService.getScenarioNotifications());
-        messagingTemplate.convertAndSend(topic(tenantCode, "/scenarios.escalated"), operationalViewService.getSlaEscalations());
-        messagingTemplate.convertAndSend(topic(tenantCode, "/simulation.status"), simulationStateService.getStatus());
+        realtimePublisher.publish(topic(tenantCode, "/dashboard.summary"), dashboardService.getSummary());
+        realtimePublisher.publish(topic(tenantCode, "/alerts"), operationalViewService.getAlertFeed());
+        realtimePublisher.publish(topic(tenantCode, "/recommendations"), operationalViewService.getRecommendations());
+        realtimePublisher.publish(topic(tenantCode, "/inventory"), operationalViewService.getInventoryOverview());
+        realtimePublisher.publish(topic(tenantCode, "/fulfillment.overview"), operationalViewService.getFulfillmentOverview());
+        realtimePublisher.publish(topic(tenantCode, "/orders.recent"), operationalViewService.getRecentOrders());
+        realtimePublisher.publish(topic(tenantCode, "/events.recent"), operationalViewService.getRecentEvents());
+        realtimePublisher.publish(topic(tenantCode, "/audit.recent"), operationalViewService.getRecentAuditLogs());
+        realtimePublisher.publish(topic(tenantCode, "/system.incidents"), operationalViewService.getSystemIncidents());
+        realtimePublisher.publish(topic(tenantCode, "/integrations.connectors"), operationalViewService.getIntegrationConnectors());
+        realtimePublisher.publish(topic(tenantCode, "/integrations.imports"), operationalViewService.getRecentIntegrationImportRuns());
+        realtimePublisher.publish(topic(tenantCode, "/integrations.replay"), operationalViewService.getIntegrationReplayQueue());
+        realtimePublisher.publish(topic(tenantCode, "/scenarios.notifications"), operationalViewService.getScenarioNotifications());
+        realtimePublisher.publish(topic(tenantCode, "/scenarios.escalated"), operationalViewService.getSlaEscalations());
     }
 
     public void broadcastIntegrationUpdates(String tenantCode) {
-        messagingTemplate.convertAndSend(topic(tenantCode, "/events.recent"), operationalViewService.getRecentEvents());
-        messagingTemplate.convertAndSend(topic(tenantCode, "/audit.recent"), operationalViewService.getRecentAuditLogs());
-        messagingTemplate.convertAndSend(topic(tenantCode, "/system.incidents"), operationalViewService.getSystemIncidents());
-        messagingTemplate.convertAndSend(topic(tenantCode, "/integrations.connectors"), operationalViewService.getIntegrationConnectors());
-        messagingTemplate.convertAndSend(topic(tenantCode, "/integrations.imports"), operationalViewService.getRecentIntegrationImportRuns());
-        messagingTemplate.convertAndSend(topic(tenantCode, "/integrations.replay"), operationalViewService.getIntegrationReplayQueue());
+        realtimePublisher.publish(topic(tenantCode, "/events.recent"), operationalViewService.getRecentEvents());
+        realtimePublisher.publish(topic(tenantCode, "/audit.recent"), operationalViewService.getRecentAuditLogs());
+        realtimePublisher.publish(topic(tenantCode, "/system.incidents"), operationalViewService.getSystemIncidents());
+        realtimePublisher.publish(topic(tenantCode, "/integrations.connectors"), operationalViewService.getIntegrationConnectors());
+        realtimePublisher.publish(topic(tenantCode, "/integrations.imports"), operationalViewService.getRecentIntegrationImportRuns());
+        realtimePublisher.publish(topic(tenantCode, "/integrations.replay"), operationalViewService.getIntegrationReplayQueue());
+    }
+
+    public RealtimeBrokerMode brokerMode() {
+        return realtimePublisher.brokerMode();
     }
 
     private String topic(String tenantCode, String suffix) {

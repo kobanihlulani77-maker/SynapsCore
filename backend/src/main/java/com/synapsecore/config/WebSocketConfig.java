@@ -31,18 +31,36 @@ public class WebSocketConfig implements WebSocketMessageBrokerConfigurer {
     private final List<String> allowedOrigins;
     private final SynapseAccessProperties accessProperties;
     private final AuthSessionService authSessionService;
+    private final SynapseRealtimeProperties realtimeProperties;
 
     public WebSocketConfig(SynapseCorsProperties corsProperties,
                            SynapseAccessProperties accessProperties,
-                           AuthSessionService authSessionService) {
+                           AuthSessionService authSessionService,
+                           SynapseRealtimeProperties realtimeProperties) {
         this.allowedOrigins = corsProperties.getAllowedOrigins();
         this.accessProperties = accessProperties;
         this.authSessionService = authSessionService;
+        this.realtimeProperties = realtimeProperties;
     }
 
     @Override
     public void configureMessageBroker(MessageBrokerRegistry registry) {
-        registry.enableSimpleBroker("/topic");
+        if (realtimeProperties.externalBrokerEnabled()) {
+            var relay = registry.enableStompBrokerRelay("/topic")
+                .setRelayHost(realtimeProperties.getRelayHost())
+                .setRelayPort(realtimeProperties.getRelayPort())
+                .setClientLogin(realtimeProperties.getRelayClientLogin())
+                .setClientPasscode(realtimeProperties.getRelayClientPasscode())
+                .setSystemLogin(realtimeProperties.getRelaySystemLogin())
+                .setSystemPasscode(realtimeProperties.getRelaySystemPasscode())
+                .setSystemHeartbeatSendInterval(realtimeProperties.getRelaySystemHeartbeatSendMs())
+                .setSystemHeartbeatReceiveInterval(realtimeProperties.getRelaySystemHeartbeatReceiveMs());
+            if (realtimeProperties.getRelayVirtualHost() != null && !realtimeProperties.getRelayVirtualHost().isBlank()) {
+                relay.setVirtualHost(realtimeProperties.getRelayVirtualHost().trim());
+            }
+        } else {
+            registry.enableSimpleBroker("/topic");
+        }
         registry.setApplicationDestinationPrefixes("/app");
     }
 

@@ -16,6 +16,9 @@ public record TenantWorkspaceConnectorSupportUpdateRequest(
     @Min(15) @Max(1440)
     Integer syncIntervalMinutes,
 
+    @Size(max = 512)
+    String pullEndpointUrl,
+
     IntegrationValidationPolicy validationPolicy,
 
     IntegrationTransformationPolicy transformationPolicy,

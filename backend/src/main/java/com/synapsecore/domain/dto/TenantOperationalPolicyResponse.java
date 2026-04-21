@@ -1,0 +1,52 @@
+package com.synapsecore.domain.dto;
+
+import com.synapsecore.access.SynapseAccessRole;
+import com.synapsecore.domain.entity.AlertSeverity;
+import com.synapsecore.domain.entity.RecommendationPriority;
+import com.synapsecore.domain.entity.ScenarioReviewPriority;
+import java.time.Instant;
+
+public record TenantOperationalPolicyResponse(
+    Long id,
+    String tenantCode,
+    double lowStockCriticalRatio,
+    double depletionRiskHoursThreshold,
+    double urgentDepletionRiskHoursThreshold,
+    int rapidConsumptionUnitsMinimum,
+    double rapidConsumptionThresholdRatio,
+    int backlogRiskCount,
+    int backlogCriticalCount,
+    double backlogClearHoursThreshold,
+    int delayedShipmentCountThreshold,
+    int overdueDispatchCountThreshold,
+    double deliveryDelayToleranceHours,
+    int highRiskScoreThreshold,
+    int criticalRiskScoreThreshold,
+    AlertSeverity lowStockSeverity,
+    AlertSeverity lowStockCriticalSeverity,
+    AlertSeverity depletionRiskSeverity,
+    AlertSeverity urgentDepletionRiskSeverity,
+    AlertSeverity backlogRiskSeverity,
+    AlertSeverity backlogCriticalSeverity,
+    AlertSeverity deliveryDelaySeverity,
+    AlertSeverity fulfillmentAnomalySeverity,
+    RecommendationPriority lowStockRecommendationPriority,
+    RecommendationPriority criticalLowStockRecommendationPriority,
+    RecommendationPriority depletionRiskRecommendationPriority,
+    RecommendationPriority urgentDepletionRiskRecommendationPriority,
+    RecommendationPriority backlogRecommendationPriority,
+    RecommendationPriority deliveryDelayRecommendationPriority,
+    RecommendationPriority fulfillmentAnomalyRecommendationPriority,
+    ScenarioReviewPriority escalatedApprovalMinimumPriority,
+    int reviewHoursMedium,
+    int reviewHoursHigh,
+    int reviewHoursCritical,
+    int finalApprovalHoursMedium,
+    int finalApprovalHoursHigh,
+    int finalApprovalHoursCritical,
+    SynapseAccessRole reviewOwnerRole,
+    SynapseAccessRole finalApproverRole,
+    SynapseAccessRole escalationOwnerRole,
+    Instant updatedAt
+) {
+}

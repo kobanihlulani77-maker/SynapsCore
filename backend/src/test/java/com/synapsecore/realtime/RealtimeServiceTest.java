@@ -11,7 +11,6 @@ import com.synapsecore.domain.dto.FulfillmentStatusResponse;
 import com.synapsecore.domain.dto.InventoryStatusResponse;
 import com.synapsecore.domain.dto.OrderResponse;
 import com.synapsecore.domain.dto.RecommendationResponse;
-import com.synapsecore.domain.dto.SimulationStatusResponse;
 import com.synapsecore.domain.dto.SystemIncidentResponse;
 import com.synapsecore.domain.dto.SystemIncidentSeverity;
 import com.synapsecore.domain.dto.SystemIncidentType;
@@ -37,7 +36,6 @@ import com.synapsecore.integration.dto.IntegrationConnectorHealthStatus;
 import com.synapsecore.integration.dto.IntegrationConnectorResponse;
 import com.synapsecore.integration.dto.IntegrationImportRunResponse;
 import com.synapsecore.integration.dto.IntegrationReplayRecordResponse;
-import com.synapsecore.simulation.SimulationStateService;
 import java.math.BigDecimal;
 import java.time.Instant;
 import java.util.LinkedHashMap;
@@ -51,18 +49,18 @@ import org.springframework.messaging.simp.SimpMessagingTemplate;
 
 class RealtimeServiceTest {
 
-    private static final String TENANT_CODE = "SYNAPSE-DEMO";
+    private static final String TENANT_CODE = "STARTER-OPS";
 
     @Test
     void broadcastOperationalUpdatesPublishesFocusedRealtimeTopics() {
         RecordingMessageChannel channel = new RecordingMessageChannel();
-        DashboardSummaryResponse summary = new DashboardSummaryResponse(1, 1, 1, 1, 2, 1, 2, 4, 2, 1, 8, false, Instant.now());
+        DashboardSummaryResponse summary = new DashboardSummaryResponse(1, 1, 1, 1, 2, 1, 2, 4, 2, 1, 8, Instant.now());
         AlertFeedResponse alerts = new AlertFeedResponse(List.of(), List.of());
         List<RecommendationResponse> recommendations = List.of(
-            new RecommendationResponse(1L, RecommendationType.REORDER_STOCK, "Reorder Flux Sensor", "Demand is elevated.", RecommendationPriority.HIGH, Instant.now())
+            new RecommendationResponse(1L, RecommendationType.REORDER_STOCK, "Reorder Flux Sensor", "Demand is elevated.", "Tenant policy selected HIGH.", RecommendationPriority.HIGH, Instant.now())
         );
         List<InventoryStatusResponse> inventory = List.of(
-            new InventoryStatusResponse(1L, "SKU-FLX-100", "Flux Sensor", "Sensors", "WH-NORTH", "Warehouse North", 18L, 20L, true, false, "HIGH", 2.0, 9.0, Instant.now())
+            new InventoryStatusResponse(1L, "SKU-FLX-100", "Flux Sensor", "Sensors", "WH-NORTH", "Warehouse North", 18L, 20L, 2L, 3L, 10L, true, false, "HIGH", 2.0, 9.0, Instant.now(), Instant.now(), Instant.now(), 0L, Instant.now())
         );
         FulfillmentOverviewResponse fulfillment = new FulfillmentOverviewResponse(
             2,
@@ -110,7 +108,7 @@ class RealtimeServiceTest {
             new SystemIncidentResponse("connector-1", SystemIncidentType.CONNECTOR_DISABLED, SystemIncidentSeverity.MEDIUM, "ERP North Webhook disabled", "Connector is paused.", "erp_north | Webhook Order", true, Instant.now())
         );
         List<IntegrationConnectorResponse> integrationConnectors = List.of(
-            new IntegrationConnectorResponse(1L, "SYNAPSE-DEMO", "erp_north", IntegrationConnectorType.WEBHOOK_ORDER, "ERP North Webhook", true, IntegrationSyncMode.REALTIME_PUSH, null, IntegrationValidationPolicy.STANDARD, IntegrationTransformationPolicy.NORMALIZE_CODES, 1, true, "WH-NORTH", "Starter webhook connector.", "Operations Lead", "Operations Lead", true, "••••2026", IntegrationConnectorHealthStatus.LIVE, "Connector is enabled and processing activity without recent integration failures.", Instant.now(), Instant.now(), null, null, 0, 0, 0, null, null, null, null, null, Instant.now(), Instant.now())
+            new IntegrationConnectorResponse(1L, "STARTER-OPS", "erp_north", IntegrationConnectorType.WEBHOOK_ORDER, "ERP North Webhook", true, IntegrationSyncMode.REALTIME_PUSH, null, null, null, null, null, null, IntegrationValidationPolicy.STANDARD, IntegrationTransformationPolicy.NORMALIZE_CODES, 1, true, "WH-NORTH", "Starter webhook connector.", "Operations Lead", "Operations Lead", true, "••••2026", IntegrationConnectorHealthStatus.LIVE, "Connector is enabled and processing activity without recent integration failures.", Instant.now(), Instant.now(), null, null, 0, 0, 0, null, null, null, null, null, Instant.now(), Instant.now())
         );
         List<IntegrationImportRunResponse> integrationImportRuns = List.of(
             new IntegrationImportRunResponse(4L, "erp_batch", IntegrationConnectorType.CSV_ORDER_IMPORT, "orders.csv", 3, 1, 1, IntegrationImportStatus.PARTIAL_SUCCESS, "Processed CSV import with 1 imported order and 1 failure.", Instant.now())
@@ -122,13 +120,11 @@ class RealtimeServiceTest {
             new ScenarioNotificationResponse(7L, ScenarioNotificationType.SLA_ESCALATED, "Critical plan rerouted: North escalation candidate", "Final approval is overdue and was rerouted.", "WH-NORTH", null, null, "Executive Operations Director", null, true, Instant.now(), Instant.now())
         );
         List<ScenarioRunResponse> slaEscalations = List.of();
-        SimulationStatusResponse simulationStatus = new SimulationStatusResponse(false, Instant.now());
 
         RealtimeService realtimeService = new RealtimeService(
-            new SimpMessagingTemplate(channel),
+            new StompRealtimePublisher(new SimpMessagingTemplate(channel), new com.synapsecore.config.SynapseRealtimeProperties()),
             new StubOperationalViewService(alerts, recommendations, inventory, fulfillment, recentOrders, recentEvents, auditLogs, systemIncidents, integrationConnectors, integrationImportRuns, integrationReplayQueue, scenarioNotifications, slaEscalations, List.of()),
             new StubDashboardService(summary),
-            new StubSimulationStateService(simulationStatus),
             null
         );
 
@@ -136,37 +132,35 @@ class RealtimeServiceTest {
 
         assertThat(channel.messagesByDestination())
             .containsOnlyKeys(
-                "/topic/tenant/SYNAPSE-DEMO/dashboard.summary",
-                "/topic/tenant/SYNAPSE-DEMO/alerts",
-                "/topic/tenant/SYNAPSE-DEMO/recommendations",
-                "/topic/tenant/SYNAPSE-DEMO/inventory",
-                "/topic/tenant/SYNAPSE-DEMO/fulfillment.overview",
-                "/topic/tenant/SYNAPSE-DEMO/orders.recent",
-                "/topic/tenant/SYNAPSE-DEMO/events.recent",
-                "/topic/tenant/SYNAPSE-DEMO/audit.recent",
-                "/topic/tenant/SYNAPSE-DEMO/system.incidents",
-                "/topic/tenant/SYNAPSE-DEMO/integrations.connectors",
-                "/topic/tenant/SYNAPSE-DEMO/integrations.imports",
-                "/topic/tenant/SYNAPSE-DEMO/integrations.replay",
-                "/topic/tenant/SYNAPSE-DEMO/scenarios.notifications",
-                "/topic/tenant/SYNAPSE-DEMO/scenarios.escalated",
-                "/topic/tenant/SYNAPSE-DEMO/simulation.status"
+                "/topic/tenant/STARTER-OPS/dashboard.summary",
+                "/topic/tenant/STARTER-OPS/alerts",
+                "/topic/tenant/STARTER-OPS/recommendations",
+                "/topic/tenant/STARTER-OPS/inventory",
+                "/topic/tenant/STARTER-OPS/fulfillment.overview",
+                "/topic/tenant/STARTER-OPS/orders.recent",
+                "/topic/tenant/STARTER-OPS/events.recent",
+                "/topic/tenant/STARTER-OPS/audit.recent",
+                "/topic/tenant/STARTER-OPS/system.incidents",
+                "/topic/tenant/STARTER-OPS/integrations.connectors",
+                "/topic/tenant/STARTER-OPS/integrations.imports",
+                "/topic/tenant/STARTER-OPS/integrations.replay",
+                "/topic/tenant/STARTER-OPS/scenarios.notifications",
+                "/topic/tenant/STARTER-OPS/scenarios.escalated"
             );
-        assertThat(channel.payloadFor("/topic/tenant/SYNAPSE-DEMO/dashboard.summary")).isEqualTo(summary);
-        assertThat(channel.payloadFor("/topic/tenant/SYNAPSE-DEMO/alerts")).isEqualTo(alerts);
-        assertThat(channel.payloadFor("/topic/tenant/SYNAPSE-DEMO/recommendations")).isEqualTo(recommendations);
-        assertThat(channel.payloadFor("/topic/tenant/SYNAPSE-DEMO/inventory")).isEqualTo(inventory);
-        assertThat(channel.payloadFor("/topic/tenant/SYNAPSE-DEMO/fulfillment.overview")).isEqualTo(fulfillment);
-        assertThat(channel.payloadFor("/topic/tenant/SYNAPSE-DEMO/orders.recent")).isEqualTo(recentOrders);
-        assertThat(channel.payloadFor("/topic/tenant/SYNAPSE-DEMO/events.recent")).isEqualTo(recentEvents);
-        assertThat(channel.payloadFor("/topic/tenant/SYNAPSE-DEMO/audit.recent")).isEqualTo(auditLogs);
-        assertThat(channel.payloadFor("/topic/tenant/SYNAPSE-DEMO/system.incidents")).isEqualTo(systemIncidents);
-        assertThat(channel.payloadFor("/topic/tenant/SYNAPSE-DEMO/integrations.connectors")).isEqualTo(integrationConnectors);
-        assertThat(channel.payloadFor("/topic/tenant/SYNAPSE-DEMO/integrations.imports")).isEqualTo(integrationImportRuns);
-        assertThat(channel.payloadFor("/topic/tenant/SYNAPSE-DEMO/integrations.replay")).isEqualTo(integrationReplayQueue);
-        assertThat(channel.payloadFor("/topic/tenant/SYNAPSE-DEMO/scenarios.notifications")).isEqualTo(scenarioNotifications);
-        assertThat(channel.payloadFor("/topic/tenant/SYNAPSE-DEMO/scenarios.escalated")).isEqualTo(slaEscalations);
-        assertThat(channel.payloadFor("/topic/tenant/SYNAPSE-DEMO/simulation.status")).isEqualTo(simulationStatus);
+        assertThat(channel.payloadFor("/topic/tenant/STARTER-OPS/dashboard.summary")).isEqualTo(summary);
+        assertThat(channel.payloadFor("/topic/tenant/STARTER-OPS/alerts")).isEqualTo(alerts);
+        assertThat(channel.payloadFor("/topic/tenant/STARTER-OPS/recommendations")).isEqualTo(recommendations);
+        assertThat(channel.payloadFor("/topic/tenant/STARTER-OPS/inventory")).isEqualTo(inventory);
+        assertThat(channel.payloadFor("/topic/tenant/STARTER-OPS/fulfillment.overview")).isEqualTo(fulfillment);
+        assertThat(channel.payloadFor("/topic/tenant/STARTER-OPS/orders.recent")).isEqualTo(recentOrders);
+        assertThat(channel.payloadFor("/topic/tenant/STARTER-OPS/events.recent")).isEqualTo(recentEvents);
+        assertThat(channel.payloadFor("/topic/tenant/STARTER-OPS/audit.recent")).isEqualTo(auditLogs);
+        assertThat(channel.payloadFor("/topic/tenant/STARTER-OPS/system.incidents")).isEqualTo(systemIncidents);
+        assertThat(channel.payloadFor("/topic/tenant/STARTER-OPS/integrations.connectors")).isEqualTo(integrationConnectors);
+        assertThat(channel.payloadFor("/topic/tenant/STARTER-OPS/integrations.imports")).isEqualTo(integrationImportRuns);
+        assertThat(channel.payloadFor("/topic/tenant/STARTER-OPS/integrations.replay")).isEqualTo(integrationReplayQueue);
+        assertThat(channel.payloadFor("/topic/tenant/STARTER-OPS/scenarios.notifications")).isEqualTo(scenarioNotifications);
+        assertThat(channel.payloadFor("/topic/tenant/STARTER-OPS/scenarios.escalated")).isEqualTo(slaEscalations);
     }
 
     @Test
@@ -182,7 +176,7 @@ class RealtimeServiceTest {
             new SystemIncidentResponse("replay-9", SystemIncidentType.REPLAY_BACKLOG, SystemIncidentSeverity.HIGH, "Replay CSV-RPL-1001", "Product not found: SKU-RPL-778", "erp_batch | Csv Order Import", true, Instant.now())
         );
         List<IntegrationConnectorResponse> integrationConnectors = List.of(
-            new IntegrationConnectorResponse(1L, "SYNAPSE-DEMO", "erp_north", IntegrationConnectorType.WEBHOOK_ORDER, "ERP North Webhook", false, IntegrationSyncMode.REALTIME_PUSH, null, IntegrationValidationPolicy.STANDARD, IntegrationTransformationPolicy.NORMALIZE_CODES, 1, true, "WH-NORTH", "Paused for maintenance.", "Operations Lead", "Operations Lead", true, "••••2026", IntegrationConnectorHealthStatus.OFFLINE, "Connector is disabled and cannot ingest live activity.", null, null, null, null, 0, 0, 0, null, null, null, null, null, Instant.now(), Instant.now())
+            new IntegrationConnectorResponse(1L, "STARTER-OPS", "erp_north", IntegrationConnectorType.WEBHOOK_ORDER, "ERP North Webhook", false, IntegrationSyncMode.REALTIME_PUSH, null, null, null, null, null, null, IntegrationValidationPolicy.STANDARD, IntegrationTransformationPolicy.NORMALIZE_CODES, 1, true, "WH-NORTH", "Paused for maintenance.", "Operations Lead", "Operations Lead", true, "••••2026", IntegrationConnectorHealthStatus.OFFLINE, "Connector is disabled and cannot ingest live activity.", null, null, null, null, 0, 0, 0, null, null, null, null, null, Instant.now(), Instant.now())
         );
         List<IntegrationImportRunResponse> integrationImportRuns = List.of(
             new IntegrationImportRunResponse(4L, "erp_batch", IntegrationConnectorType.CSV_ORDER_IMPORT, "orders.csv", 3, 1, 1, IntegrationImportStatus.PARTIAL_SUCCESS, "Processed CSV import with 1 imported order and 1 failure.", Instant.now())
@@ -192,7 +186,7 @@ class RealtimeServiceTest {
         );
 
         RealtimeService realtimeService = new RealtimeService(
-            new SimpMessagingTemplate(channel),
+            new StompRealtimePublisher(new SimpMessagingTemplate(channel), new com.synapsecore.config.SynapseRealtimeProperties()),
             new StubOperationalViewService(
                 new AlertFeedResponse(List.of(), List.of()),
                 List.of(),
@@ -209,8 +203,7 @@ class RealtimeServiceTest {
                 List.of(),
                 List.of()
             ),
-            new StubDashboardService(new DashboardSummaryResponse(0, 0, 0, 0, 0, 0, 0, 4, 2, 0, 8, false, Instant.now())),
-            new StubSimulationStateService(new SimulationStatusResponse(false, Instant.now())),
+            new StubDashboardService(new DashboardSummaryResponse(0, 0, 0, 0, 0, 0, 0, 4, 2, 0, 8, Instant.now())),
             null
         );
 
@@ -218,19 +211,19 @@ class RealtimeServiceTest {
 
         assertThat(channel.messagesByDestination())
             .containsOnlyKeys(
-                "/topic/tenant/SYNAPSE-DEMO/events.recent",
-                "/topic/tenant/SYNAPSE-DEMO/audit.recent",
-                "/topic/tenant/SYNAPSE-DEMO/system.incidents",
-                "/topic/tenant/SYNAPSE-DEMO/integrations.connectors",
-                "/topic/tenant/SYNAPSE-DEMO/integrations.imports",
-                "/topic/tenant/SYNAPSE-DEMO/integrations.replay"
+                "/topic/tenant/STARTER-OPS/events.recent",
+                "/topic/tenant/STARTER-OPS/audit.recent",
+                "/topic/tenant/STARTER-OPS/system.incidents",
+                "/topic/tenant/STARTER-OPS/integrations.connectors",
+                "/topic/tenant/STARTER-OPS/integrations.imports",
+                "/topic/tenant/STARTER-OPS/integrations.replay"
             );
-        assertThat(channel.payloadFor("/topic/tenant/SYNAPSE-DEMO/events.recent")).isEqualTo(recentEvents);
-        assertThat(channel.payloadFor("/topic/tenant/SYNAPSE-DEMO/audit.recent")).isEqualTo(auditLogs);
-        assertThat(channel.payloadFor("/topic/tenant/SYNAPSE-DEMO/system.incidents")).isEqualTo(systemIncidents);
-        assertThat(channel.payloadFor("/topic/tenant/SYNAPSE-DEMO/integrations.connectors")).isEqualTo(integrationConnectors);
-        assertThat(channel.payloadFor("/topic/tenant/SYNAPSE-DEMO/integrations.imports")).isEqualTo(integrationImportRuns);
-        assertThat(channel.payloadFor("/topic/tenant/SYNAPSE-DEMO/integrations.replay")).isEqualTo(integrationReplayQueue);
+        assertThat(channel.payloadFor("/topic/tenant/STARTER-OPS/events.recent")).isEqualTo(recentEvents);
+        assertThat(channel.payloadFor("/topic/tenant/STARTER-OPS/audit.recent")).isEqualTo(auditLogs);
+        assertThat(channel.payloadFor("/topic/tenant/STARTER-OPS/system.incidents")).isEqualTo(systemIncidents);
+        assertThat(channel.payloadFor("/topic/tenant/STARTER-OPS/integrations.connectors")).isEqualTo(integrationConnectors);
+        assertThat(channel.payloadFor("/topic/tenant/STARTER-OPS/integrations.imports")).isEqualTo(integrationImportRuns);
+        assertThat(channel.payloadFor("/topic/tenant/STARTER-OPS/integrations.replay")).isEqualTo(integrationReplayQueue);
     }
 
     private static final class RecordingMessageChannel implements MessageChannel {
@@ -266,7 +259,7 @@ class RealtimeServiceTest {
         private final DashboardSummaryResponse summary;
 
         private StubDashboardService(DashboardSummaryResponse summary) {
-            super(null, null, null, null, null, null, null, null, null, null, null);
+            super(null, null, null, null, null, null, null, null, null);
             this.summary = summary;
         }
 
@@ -309,7 +302,7 @@ class RealtimeServiceTest {
             List<ScenarioRunResponse> slaEscalations,
             List<ScenarioRunResponse> recentScenarios
         ) {
-            super(null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null);
+            super(null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null);
             this.alerts = alerts;
             this.recommendations = recommendations;
             this.inventory = inventory;
@@ -394,21 +387,6 @@ class RealtimeServiceTest {
         @Override
         public List<ScenarioRunResponse> getRecentScenarios() {
             return recentScenarios;
-        }
-    }
-
-    private static final class StubSimulationStateService extends SimulationStateService {
-
-        private final SimulationStatusResponse status;
-
-        private StubSimulationStateService(SimulationStatusResponse status) {
-            super(null);
-            this.status = status;
-        }
-
-        @Override
-        public SimulationStatusResponse getStatus() {
-            return status;
         }
     }
 }

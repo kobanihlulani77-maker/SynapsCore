@@ -29,6 +29,7 @@ export default function RuntimePage({ context }) {
       { label: 'Readiness', value: formatCodeLabel(runtime.readinessState), note: 'Current service acceptance posture' },
       { label: 'Queue depth', value: runtime.backbone.pendingDispatchCount, note: 'Pending work in dispatch backbone' },
       { label: 'Failed dispatch', value: runtime.backbone.failedDispatchCount, note: 'Dispatch work needing operator attention' },
+      { label: 'Realtime broker', value: formatCodeLabel(runtime.backbone.realtimeBrokerMode || 'unknown'), note: 'Current websocket delivery strategy' },
       { label: 'Observed', value: formatTimestamp(runtime.observedAt), note: 'Latest runtime observation point' },
     ]
     : []
@@ -73,6 +74,11 @@ export default function RuntimePage({ context }) {
                   <strong>Dispatch backbone</strong>
                   <p>Drains every {runtime.backbone.dispatchIntervalMs} ms in batches of {runtime.backbone.batchSize}.</p>
                   <p className="muted-text">Oldest queued work {runtime.backbone.oldestPendingAgeSeconds == null ? 'clear' : `${runtime.backbone.oldestPendingAgeSeconds}s`} | Latest processed {formatTimestamp(runtime.backbone.latestProcessedAt)}</p>
+                </div>
+                <div className="signal-list-item">
+                  <strong>Realtime broker</strong>
+                  <p>{formatCodeLabel(runtime.backbone.realtimeBrokerMode || 'unknown')}</p>
+                  <p className="muted-text">{runtime.backbone.realtimeBrokerDetail || 'Tenant-scoped websocket publishing is behind a replaceable broker boundary.'}</p>
                 </div>
                 <div className="signal-list-item">
                   <strong>Telemetry window</strong>
@@ -156,6 +162,7 @@ export default function RuntimePage({ context }) {
             <div className="utility-metric-grid">
               <div><span>Queue pending</span><strong>{runtime?.backbone?.pendingDispatchCount ?? 0}</strong></div>
               <div><span>Failed dispatch</span><strong>{runtime?.backbone?.failedDispatchCount ?? 0}</strong></div>
+              <div><span>Realtime</span><strong>{formatCodeLabel(runtime?.backbone?.realtimeBrokerMode || 'unknown')}</strong></div>
               <div><span>High severity</span><strong>{systemIncidents.filter((incident) => ['CRITICAL', 'HIGH'].includes(incident.severity)).length}</strong></div>
               <div><span>Oldest queued</span><strong>{runtime?.backbone?.oldestPendingAgeSeconds == null ? 'Clear' : `${runtime.backbone.oldestPendingAgeSeconds}s`}</strong></div>
             </div>

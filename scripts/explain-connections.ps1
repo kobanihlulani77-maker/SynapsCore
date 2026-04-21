@@ -19,7 +19,7 @@ It can receive activity from:
 - CSV imports
 - manual operator actions in the UI
 - replayed failed inbound work
-- simulation for controlled verification
+- local development reseed for controlled verification
 
 PRIMARY INBOUND LANES
 

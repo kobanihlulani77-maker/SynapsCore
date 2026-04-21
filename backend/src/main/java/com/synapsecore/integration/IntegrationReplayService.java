@@ -4,6 +4,7 @@ import com.synapsecore.access.AccessDirectoryService;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.synapsecore.audit.AuditLogService;
+import com.synapsecore.audit.RequestTraceContext;
 import com.synapsecore.domain.dto.OrderCreateRequest;
 import com.synapsecore.domain.dto.OrderResponse;
 import com.synapsecore.domain.entity.BusinessEventType;
@@ -34,6 +35,7 @@ import org.springframework.web.server.ResponseStatusException;
 public class IntegrationReplayService {
 
     private static final int DEFAULT_QUEUE_LIMIT = 12;
+    private static final String AUTO_REPLAY_ACTOR = "system-replay";
 
     private final IntegrationReplayRecordRepository integrationReplayRecordRepository;
     private final AccessDirectoryService accessDirectoryService;
@@ -46,6 +48,7 @@ public class IntegrationReplayService {
     private final TenantContextService tenantContextService;
     private final OperationalMetricsService operationalMetricsService;
     private final IntegrationInboundRecordService integrationInboundRecordService;
+    private final RequestTraceContext requestTraceContext;
 
     @Value("${synapsecore.integration.replay.max-attempts:3}")
     private int maxReplayAttempts;
@@ -155,6 +158,57 @@ public class IntegrationReplayService {
                 "Integration replay record " + replayRecordId + " is not eligible for replay until " + record.getNextEligibleAt() + ".");
         }
 
+        return replayRecord(record, request, attemptedAt, actorName, true);
+    }
+
+    @Transactional
+    public int processAutomatedReplayBatch(int batchSize) {
+        Instant now = Instant.now();
+        return integrationReplayRecordRepository.findEligibleForAutomatedReplay(
+                List.of(IntegrationReplayStatus.PENDING, IntegrationReplayStatus.REPLAY_FAILED),
+                now,
+                PageRequest.of(0, Math.max(batchSize, 1)))
+            .stream()
+            .mapToInt(record -> attemptAutomatedReplay(record, now))
+            .sum();
+    }
+
+    private int attemptAutomatedReplay(IntegrationReplayRecord record, Instant attemptedAt) {
+        OrderCreateRequest request = deserializeRequest(record);
+        String previousRequestId = requestTraceContext.getCurrentRequestId().orElse(null);
+        String previousActor = requestTraceContext.getCurrentActor().orElse(null);
+        String previousTenant = requestTraceContext.getCurrentTenant().orElse(null);
+        try {
+            requestTraceContext.setCurrentRequestId("auto-replay-" + record.getId());
+            requestTraceContext.setCurrentActor(AUTO_REPLAY_ACTOR);
+            requestTraceContext.setCurrentTenant(record.getTenantCode());
+            replayRecord(record, request, attemptedAt, AUTO_REPLAY_ACTOR, false);
+            return 1;
+        } catch (ResponseStatusException exception) {
+            return 0;
+        } finally {
+            requestTraceContext.clear();
+            restoreTraceValue(previousRequestId, requestTraceContext::setCurrentRequestId);
+            restoreTraceValue(previousActor, requestTraceContext::setCurrentActor);
+            restoreTraceValue(previousTenant, requestTraceContext::setCurrentTenant);
+        }
+    }
+
+    private IntegrationReplayResultResponse replayRecord(IntegrationReplayRecord record,
+                                                         OrderCreateRequest request,
+                                                         Instant attemptedAt,
+                                                         String actorName,
+                                                         boolean enforceWarehouseAccess) {
+        String tenantCode = record.getTenantCode();
+        if (enforceWarehouseAccess) {
+            accessDirectoryService.requireOperatorWarehouseAccess(
+                actorName,
+                tenantCode,
+                record.getWarehouseCode(),
+                "replay failed inbound orders for warehouse " + record.getWarehouseCode()
+            );
+        }
+
         try {
             integrationConnectorService.requireEnabledConnectorForTenant(
                 tenantCode,
@@ -162,9 +216,10 @@ public class IntegrationReplayService {
                 record.getConnectorType(),
                 "replay failed inbound orders");
 
-            OrderResponse order = orderService.createOrder(
+            OrderResponse order = orderService.createOrderForTenant(
+                tenantCode,
                 request,
-                "integration-replay:" + record.getSourceSystem()
+                (enforceWarehouseAccess ? "integration-replay:" : "integration-replay:auto:") + record.getSourceSystem()
             );
 
             record.setStatus(IntegrationReplayStatus.REPLAYED);
@@ -232,6 +287,12 @@ public class IntegrationReplayService {
             operationalMetricsService.recordReplayAttempt(tenantCode, false);
             operationalStateChangePublisher.publish(OperationalUpdateType.INTEGRATION_STATE, "integration-replay");
             throw exception;
+        }
+    }
+
+    private void restoreTraceValue(String value, java.util.function.Consumer<String> setter) {
+        if (value != null && !value.isBlank()) {
+            setter.accept(value);
         }
     }
 

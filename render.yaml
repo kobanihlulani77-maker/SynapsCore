@@ -28,6 +28,14 @@ services:
         value: None
       - key: ALLOW_HEADER_FALLBACK
         value: "false"
+      - key: SYNAPSECORE_REALTIME_BROKER_MODE
+        value: SIMPLE_IN_MEMORY
+      - key: SYNAPSECORE_INTEGRATION_PULL_WORKER_ENABLED
+        value: "true"
+      - key: SYNAPSECORE_INTEGRATION_PULL_WORKER_INTERVAL_MS
+        value: "60000"
+      - key: SYNAPSECORE_INTEGRATION_PULL_WORKER_BATCH_SIZE
+        value: "10"
       - key: SPRING_JPA_HIBERNATE_DDL_AUTO
         value: update
       - key: PUBLIC_APP_URL

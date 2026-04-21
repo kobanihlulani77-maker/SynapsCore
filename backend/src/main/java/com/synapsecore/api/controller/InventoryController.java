@@ -1,6 +1,9 @@
 package com.synapsecore.api.controller;
 
 import com.synapsecore.access.AccessControlService;
+import com.synapsecore.domain.dto.InventoryAdjustmentRequest;
+import com.synapsecore.domain.dto.InventoryReceiptRequest;
+import com.synapsecore.domain.dto.InventoryReconciliationRequest;
 import com.synapsecore.domain.dto.InventoryStatusResponse;
 import com.synapsecore.domain.dto.InventoryUpdateRequest;
 import com.synapsecore.domain.service.InventoryService;
@@ -33,6 +36,36 @@ public class InventoryController {
             "update inventory levels"
         );
         return inventoryService.updateInventory(request);
+    }
+
+    @PostMapping("/receive")
+    @ResponseStatus(HttpStatus.OK)
+    public InventoryStatusResponse receiveInventory(@Valid @RequestBody InventoryReceiptRequest request) {
+        accessControlService.requireWorkspaceWarehouseAccess(
+            request.warehouseCode(),
+            "receive inbound inventory"
+        );
+        return inventoryService.receiveInventory(request);
+    }
+
+    @PostMapping("/adjust")
+    @ResponseStatus(HttpStatus.OK)
+    public InventoryStatusResponse adjustInventory(@Valid @RequestBody InventoryAdjustmentRequest request) {
+        accessControlService.requireWorkspaceWarehouseAccess(
+            request.warehouseCode(),
+            "adjust inventory stock"
+        );
+        return inventoryService.adjustInventory(request);
+    }
+
+    @PostMapping("/reconcile")
+    @ResponseStatus(HttpStatus.OK)
+    public InventoryStatusResponse reconcileInventory(@Valid @RequestBody InventoryReconciliationRequest request) {
+        accessControlService.requireWorkspaceWarehouseAccess(
+            request.warehouseCode(),
+            "reconcile inventory stock"
+        );
+        return inventoryService.reconcileInventory(request);
     }
 
     @GetMapping

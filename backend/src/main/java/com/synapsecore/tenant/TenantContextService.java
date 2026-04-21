@@ -3,8 +3,8 @@ package com.synapsecore.tenant;
 import com.synapsecore.access.AccessControlService;
 import com.synapsecore.audit.RequestTraceContext;
 import com.synapsecore.auth.AuthSessionService;
-import com.synapsecore.config.SynapseDemoProperties;
 import com.synapsecore.config.SynapseAccessProperties;
+import com.synapsecore.config.SynapseStarterProperties;
 import com.synapsecore.domain.entity.Tenant;
 import com.synapsecore.domain.repository.TenantRepository;
 import jakarta.servlet.http.HttpServletRequest;
@@ -23,14 +23,14 @@ public class TenantContextService {
 
     private final TenantRepository tenantRepository;
     private final SynapseAccessProperties accessProperties;
-    private final SynapseDemoProperties demoProperties;
+    private final SynapseStarterProperties starterProperties;
     private final AuthSessionService authSessionService;
     private final RequestTraceContext requestTraceContext;
 
     public String getCurrentTenantCodeOrDefault() {
         String traceTenantCode = requestTraceContext.getCurrentTenant()
             .filter(tenantCode -> !tenantCode.isBlank())
-            .filter(tenantCode -> !RequestTraceContext.DEFAULT_TENANT.equalsIgnoreCase(tenantCode))
+            .filter(tenantCode -> !RequestTraceContext.MISSING_TENANT_CONTEXT.equalsIgnoreCase(tenantCode))
             .orElse(null);
         if (traceTenantCode != null) {
             return traceTenantCode;
@@ -40,14 +40,14 @@ public class TenantContextService {
         if (tenantCode != null) {
             return tenantCode;
         }
-        if (!demoProperties.isAllowDefaultTenantFallback()) {
+        if (!starterProperties.isAllowDefaultTenantFallback()) {
             throw new IllegalStateException("Tenant context is required when default tenant fallback is disabled.");
         }
         return getDefaultTenantCode();
     }
 
     public String getDefaultTenantCode() {
-        if (!demoProperties.isAllowDefaultTenantFallback()) {
+        if (!starterProperties.isAllowDefaultTenantFallback()) {
             throw new IllegalStateException("Default tenant fallback is disabled for this environment.");
         }
         return tenantRepository.findAllByActiveTrueOrderByNameAsc().stream()

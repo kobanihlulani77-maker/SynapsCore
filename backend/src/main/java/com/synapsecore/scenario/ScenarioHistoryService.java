@@ -13,6 +13,7 @@ import com.synapsecore.domain.dto.OrderCreateRequest;
 import com.synapsecore.domain.dto.OrderResponse;
 import com.synapsecore.domain.repository.ScenarioRunRepository;
 import com.synapsecore.domain.entity.BusinessEventType;
+import com.synapsecore.domain.service.TenantOperationalPolicyService;
 import com.synapsecore.event.BusinessEventService;
 import com.synapsecore.scenario.dto.ScenarioApprovalRequest;
 import com.synapsecore.scenario.dto.ScenarioApprovalResponse;
@@ -58,6 +59,7 @@ public class ScenarioHistoryService {
     private final AccessControlService accessControlService;
     private final AccessDirectoryService accessDirectoryService;
     private final TenantContextService tenantContextService;
+    private final TenantOperationalPolicyService tenantOperationalPolicyService;
 
     private static final ScenarioHistoryFilter DEFAULT_HISTORY_FILTER =
         new ScenarioHistoryFilter(null, null, null, null, null, null, null, null, null, null, null, null, null);
@@ -702,7 +704,7 @@ public class ScenarioHistoryService {
     private String resolveRequestedBy(String requestedBy, String warehouseCode) {
         if (requestedBy == null || requestedBy.isBlank()) {
             return resolvePreferredOperatorName(
-                List.of("Operations Planner", "Operations Lead"),
+                List.of(),
                 null,
                 "scenario requester",
                 null,
@@ -715,10 +717,11 @@ public class ScenarioHistoryService {
     }
 
     private String resolveReviewOwner(String reviewOwner, String warehouseCode) {
+        var policy = tenantOperationalPolicyService.getCurrentPolicy();
         if (reviewOwner == null || reviewOwner.isBlank()) {
             return resolvePreferredOperatorName(
-                List.of("Operations Lead", "Naledi Lead"),
-                SynapseAccessRole.REVIEW_OWNER,
+                List.of(),
+                policy.getReviewOwnerRole(),
                 "review owner",
                 null,
                 warehouseCode
@@ -726,22 +729,17 @@ public class ScenarioHistoryService {
         }
         return accessDirectoryService.requireOperatorWithRoleName(
             reviewOwner.trim(),
-            SynapseAccessRole.REVIEW_OWNER,
+            policy.getReviewOwnerRole(),
             "review owner",
             warehouseCode
         );
     }
 
     private String resolveFinalApprovalOwner(String warehouseCode, String reviewOwner) {
-        String normalizedWarehouseCode = warehouseCode == null ? "" : warehouseCode.trim().toUpperCase();
-        List<String> preferredCandidates = switch (normalizedWarehouseCode) {
-            case "WH-NORTH" -> List.of("North Operations Director", "Executive Operations Director");
-            case "WH-COAST" -> List.of("Coast Operations Director", "Executive Operations Director");
-            default -> List.of("Executive Operations Director");
-        };
+        var policy = tenantOperationalPolicyService.getCurrentPolicy();
         return resolvePreferredOperatorName(
-            preferredCandidates,
-            SynapseAccessRole.FINAL_APPROVER,
+            List.of(),
+            policy.getFinalApproverRole(),
             "final approval owner",
             reviewOwner,
             warehouseCode
@@ -760,18 +758,28 @@ public class ScenarioHistoryService {
                                                 String excludedActorName,
                                                 String warehouseCode) {
         String tenantCode = tenantContextService.getCurrentTenantCodeOrDefault();
-        List<String> availableOperators = accessDirectoryService.getActiveOperators(tenantCode).stream()
+        String normalizedWarehouseCode = warehouseCode == null ? null : warehouseCode.trim().toUpperCase();
+        List<com.synapsecore.access.dto.AccessOperatorResponse> availableOperators = accessDirectoryService.getActiveOperators(tenantCode).stream()
             .filter(operator -> requiredRole == null || operator.roles().contains(requiredRole))
-            .filter(operator -> warehouseCode == null || warehouseCode.isBlank()
+            .filter(operator -> normalizedWarehouseCode == null || normalizedWarehouseCode.isBlank()
                 || operator.warehouseScopes().isEmpty()
                 || operator.warehouseScopes().stream()
-                    .anyMatch(scope -> scope.equalsIgnoreCase(warehouseCode.trim())))
-            .map(operator -> operator.actorName())
-            .filter(actorName -> excludedActorName == null || !actorName.equalsIgnoreCase(excludedActorName))
+                    .anyMatch(scope -> scope.equalsIgnoreCase(normalizedWarehouseCode)))
+            .filter(operator -> excludedActorName == null || !operator.actorName().equalsIgnoreCase(excludedActorName))
+            .sorted(Comparator
+                .comparingInt((com.synapsecore.access.dto.AccessOperatorResponse operator) ->
+                    normalizedWarehouseCode != null
+                        && !normalizedWarehouseCode.isBlank()
+                        && operator.warehouseScopes().stream()
+                            .anyMatch(scope -> scope.equalsIgnoreCase(normalizedWarehouseCode))
+                        ? 0
+                        : operator.warehouseScopes().isEmpty() ? 1 : 2)
+                .thenComparing(com.synapsecore.access.dto.AccessOperatorResponse::displayName, String.CASE_INSENSITIVE_ORDER))
             .toList();
 
         for (String preferredName : preferredNames) {
             String match = availableOperators.stream()
+                .map(com.synapsecore.access.dto.AccessOperatorResponse::actorName)
                 .filter(actorName -> actorName.equalsIgnoreCase(preferredName))
                 .findFirst()
                 .orElse(null);
@@ -781,6 +789,7 @@ public class ScenarioHistoryService {
         }
 
         return availableOperators.stream()
+            .map(com.synapsecore.access.dto.AccessOperatorResponse::actorName)
             .findFirst()
             .orElseThrow(() -> new ResponseStatusException(
                 HttpStatus.BAD_REQUEST,
@@ -798,7 +807,8 @@ public class ScenarioHistoryService {
     }
 
     private ScenarioApprovalPolicy determineApprovalPolicy(ScenarioReviewPriority reviewPriority) {
-        if (reviewPriority == ScenarioReviewPriority.CRITICAL) {
+        var policy = tenantOperationalPolicyService.getCurrentPolicy();
+        if (reviewPriority.ordinal() >= policy.getEscalatedApprovalMinimumPriority().ordinal()) {
             return ScenarioApprovalPolicy.ESCALATED;
         }
         return ScenarioApprovalPolicy.STANDARD;
@@ -813,22 +823,18 @@ public class ScenarioHistoryService {
             return null;
         }
 
+        var policy = tenantOperationalPolicyService.getCurrentPolicy();
         Duration duration = switch (approvalStage) {
-            case PENDING_FINAL_APPROVAL -> switch (reviewPriority) {
-                case CRITICAL -> Duration.ofHours(1);
-                case HIGH -> Duration.ofHours(2);
-                case MEDIUM -> Duration.ofHours(4);
-            };
-            case PENDING_REVIEW -> {
-                if (approvalPolicy == ScenarioApprovalPolicy.ESCALATED) {
-                    yield Duration.ofHours(2);
-                }
-                yield switch (reviewPriority) {
-                    case CRITICAL -> Duration.ofHours(2);
-                    case HIGH -> Duration.ofHours(4);
-                    case MEDIUM -> Duration.ofHours(8);
-                };
-            }
+            case PENDING_FINAL_APPROVAL -> Duration.ofHours(switch (reviewPriority) {
+                case CRITICAL -> policy.getFinalApprovalHoursCritical();
+                case HIGH -> policy.getFinalApprovalHoursHigh();
+                case MEDIUM -> policy.getFinalApprovalHoursMedium();
+            });
+            case PENDING_REVIEW -> Duration.ofHours(switch (reviewPriority) {
+                case CRITICAL -> policy.getReviewHoursCritical();
+                case HIGH -> policy.getReviewHoursHigh();
+                case MEDIUM -> policy.getReviewHoursMedium();
+            });
             default -> null;
         };
 
@@ -910,9 +916,10 @@ public class ScenarioHistoryService {
         }
 
         String previousFinalApprovalOwner = run.getFinalApprovalOwner();
-        String escalatedTo = resolveSlaEscalationOwner(run);
-        run.setFinalApprovalOwner(escalatedTo);
-        run.setSlaEscalatedTo(escalatedTo);
+        String escalatedFinalApprovalOwner = resolveSlaEscalatedFinalApprovalOwner(run);
+        String escalationOwner = resolveSlaEscalationOwner(run);
+        run.setFinalApprovalOwner(escalatedFinalApprovalOwner);
+        run.setSlaEscalatedTo(escalationOwner);
         run.setSlaEscalatedAt(Instant.now());
         run = scenarioRunRepository.save(run);
 
@@ -920,7 +927,8 @@ public class ScenarioHistoryService {
             BusinessEventType.SCENARIO_SLA_ESCALATED,
             "scenario-planner",
             "Escalated overdue plan " + run.getTitle() + " from final approver "
-                + previousFinalApprovalOwner + " to " + escalatedTo + "."
+                + previousFinalApprovalOwner + " to " + escalatedFinalApprovalOwner
+                + " with escalation owner " + escalationOwner + "."
         );
         return run;
     }
@@ -935,13 +943,32 @@ public class ScenarioHistoryService {
     }
 
     private String resolveSlaEscalationOwner(ScenarioRun run) {
-        String candidate = "Executive Operations Director";
-        if (candidate.equalsIgnoreCase(run.getFinalApprovalOwner())
-            || (run.getReviewApprovedBy() != null && candidate.equalsIgnoreCase(run.getReviewApprovedBy()))
-            || (run.getRequestedBy() != null && candidate.equalsIgnoreCase(run.getRequestedBy()))) {
-            return "Chief Operations Officer";
+        var policy = tenantOperationalPolicyService.getCurrentPolicy();
+        return resolvePreferredOperatorName(
+            List.of(),
+            policy.getEscalationOwnerRole(),
+            "escalation owner",
+            run.getFinalApprovalOwner(),
+            run.getWarehouseCode()
+        );
+    }
+
+    private String resolveSlaEscalatedFinalApprovalOwner(ScenarioRun run) {
+        var policy = tenantOperationalPolicyService.getCurrentPolicy();
+        try {
+            return resolvePreferredOperatorName(
+                List.of(),
+                policy.getFinalApproverRole(),
+                "escalated final approval owner",
+                run.getFinalApprovalOwner(),
+                run.getWarehouseCode()
+            );
+        } catch (ResponseStatusException exception) {
+            if (run.getFinalApprovalOwner() != null && !run.getFinalApprovalOwner().isBlank()) {
+                return run.getFinalApprovalOwner();
+            }
+            throw exception;
         }
-        return candidate;
     }
 
     private ScenarioRun processEscalatedApproval(ScenarioRun run,

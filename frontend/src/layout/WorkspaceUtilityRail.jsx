@@ -299,7 +299,7 @@ export default function WorkspaceUtilityRail({ context }) {
           <p className="panel-kicker">Realtime state</p>
           <span className={`utility-state utility-${connectionState}`}>{connectionState === 'live' ? 'Live' : formatCodeLabel(connectionState)}</span>
         </div>
-        <strong>{snapshot.simulation.active ? 'Continuous activity is flowing' : 'Monitoring live operating state'}</strong>
+        <strong>{connectionState === 'live' ? 'Operational signals are streaming cleanly' : 'Monitoring live operating state'}</strong>
         <p className="muted-text">{snapshot.generatedAt ? `Snapshot ${formatTimestamp(snapshot.generatedAt)}` : 'Awaiting the first synchronized snapshot.'}</p>
         <div className="utility-metric-grid">
           <div><span>Alerts</span><strong>{snapshot.alerts.activeAlerts.length}</strong></div>

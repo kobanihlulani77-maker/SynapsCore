@@ -2,8 +2,8 @@ package com.synapsecore.domain.service;
 
 import com.synapsecore.audit.AuditLogService;
 import com.synapsecore.access.SynapseAccessRole;
-import com.synapsecore.auth.DemoAccessUsers;
-import com.synapsecore.config.SynapseDemoProperties;
+import com.synapsecore.auth.StarterAccessUsers;
+import com.synapsecore.config.SynapseStarterProperties;
 import com.synapsecore.domain.dto.SeedResetResponse;
 import com.synapsecore.domain.entity.AccessOperator;
 import com.synapsecore.domain.entity.AccessUser;
@@ -28,12 +28,12 @@ import com.synapsecore.domain.repository.OrderItemRepository;
 import com.synapsecore.domain.repository.ProductRepository;
 import com.synapsecore.domain.repository.RecommendationRepository;
 import com.synapsecore.domain.repository.ScenarioRunRepository;
+import com.synapsecore.domain.repository.TenantOperationalPolicyRepository;
 import com.synapsecore.domain.repository.TenantRepository;
 import com.synapsecore.domain.repository.WarehouseRepository;
 import com.synapsecore.event.OperationalStateChangePublisher;
 import com.synapsecore.event.OperationalUpdateType;
 import com.synapsecore.integration.IntegrationConnectorService;
-import com.synapsecore.simulation.SimulationStateService;
 import java.time.Instant;
 import java.util.EnumSet;
 import java.util.List;
@@ -64,16 +64,16 @@ public class SeedService {
     private final BusinessEventRepository businessEventRepository;
     private final AuditLogRepository auditLogRepository;
     private final ScenarioRunRepository scenarioRunRepository;
-    private final SimulationStateService simulationStateService;
+    private final TenantOperationalPolicyRepository tenantOperationalPolicyRepository;
     private final IntegrationConnectorService integrationConnectorService;
     private final OperationalStateChangePublisher operationalStateChangePublisher;
     private final TransactionTemplate transactionTemplate;
     private final AuditLogService auditLogService;
     private final PasswordEncoder passwordEncoder;
-    private final SynapseDemoProperties demoProperties;
+    private final SynapseStarterProperties starterProperties;
 
     public boolean seedIfEmpty() {
-        if (!demoProperties.isAutoSeedOnEmpty()) {
+        if (!starterProperties.isAutoSeedOnEmpty()) {
             return false;
         }
 
@@ -90,7 +90,6 @@ public class SeedService {
     }
 
     public SeedResetResponse reseedStarterData() {
-        simulationStateService.deactivate();
         SeedCounts counts = transactionTemplate.execute(status -> {
             clearExistingData();
             return seedStarterData();
@@ -110,7 +109,6 @@ public class SeedService {
             counts.productsSeeded(),
             counts.warehousesSeeded(),
             counts.inventoryRecordsSeeded(),
-            simulationStateService.getStatus(),
             Instant.now()
         );
     }
@@ -131,21 +129,23 @@ public class SeedService {
         integrationConnectorRepository.deleteAllInBatch();
         productRepository.deleteAllInBatch();
         warehouseRepository.deleteAllInBatch();
+        tenantOperationalPolicyRepository.deleteAllInBatch();
         tenantRepository.deleteAllInBatch();
     }
 
     private SeedCounts seedStarterData() {
         Tenant tenant = tenantRepository.save(Tenant.builder()
-            .code(DemoAccessUsers.DEFAULT_TENANT_CODE)
-            .name("Synapse Demo Company")
-            .description("Starter operating context for the default SynapseCore tenant.")
+            .code(StarterAccessUsers.STARTER_TENANT_CODE)
+            .name("Starter Operations Workspace")
+            .description("Starter operating context for local and development workspaces.")
             .active(true)
             .build());
         var operators = accessOperatorRepository.saveAll(List.of(
             operator(tenant, "Operations Planner", "Operations Planner", "Default planning identity for scenario creation."),
             operator(tenant, "Operations Lead", "Operations Lead", "Default owner reviewer for scenario approvals.",
                 SynapseAccessRole.TENANT_ADMIN, SynapseAccessRole.REVIEW_OWNER),
-            operator(tenant, "Demo Operator", "Demo Operator", "General-purpose demo operator for hosted product walkthroughs."),
+            operator(tenant, "Operations Operator", "Operations Operator",
+                "General-purpose operator identity for local workspace walkthroughs."),
             operator(tenant, "Amina Planner", "Amina Planner", "Planning operator used in scenario exploration."),
             operator(tenant, "Lebo Planner", "Lebo Planner", "Planning operator used in scenario exploration."),
             operator(tenant, "Thando Planner", "Thando Planner", "Planning operator used in scenario exploration."),
@@ -175,22 +175,26 @@ public class SeedService {
         seedAccessUsers(tenant, operators);
 
         Product fluxSensor = productRepository.save(Product.builder()
-            .sku("SKU-FLX-100")
+            .tenant(tenant)
+            .catalogSku("SKU-FLX-100")
             .name("Flux Sensor")
             .category("Sensors")
             .build());
         Product vectorDrive = productRepository.save(Product.builder()
-            .sku("SKU-VDR-210")
+            .tenant(tenant)
+            .catalogSku("SKU-VDR-210")
             .name("Vector Drive")
             .category("Power")
             .build());
         Product pulseRelay = productRepository.save(Product.builder()
-            .sku("SKU-PLS-330")
+            .tenant(tenant)
+            .catalogSku("SKU-PLS-330")
             .name("Pulse Relay")
             .category("Control")
             .build());
         Product orbitValve = productRepository.save(Product.builder()
-            .sku("SKU-ORB-440")
+            .tenant(tenant)
+            .catalogSku("SKU-ORB-440")
             .name("Orbit Valve")
             .category("Flow")
             .build());
@@ -209,14 +213,14 @@ public class SeedService {
             .build());
 
         List<Inventory> inventories = inventoryRepository.saveAll(List.of(
-            Inventory.builder().product(fluxSensor).warehouse(north).quantityAvailable(28L).reorderThreshold(20L).build(),
-            Inventory.builder().product(vectorDrive).warehouse(north).quantityAvailable(40L).reorderThreshold(18L).build(),
-            Inventory.builder().product(pulseRelay).warehouse(north).quantityAvailable(18L).reorderThreshold(12L).build(),
-            Inventory.builder().product(orbitValve).warehouse(north).quantityAvailable(32L).reorderThreshold(15L).build(),
-            Inventory.builder().product(fluxSensor).warehouse(coast).quantityAvailable(22L).reorderThreshold(14L).build(),
-            Inventory.builder().product(vectorDrive).warehouse(coast).quantityAvailable(30L).reorderThreshold(12L).build(),
-            Inventory.builder().product(pulseRelay).warehouse(coast).quantityAvailable(26L).reorderThreshold(10L).build(),
-            Inventory.builder().product(orbitValve).warehouse(coast).quantityAvailable(16L).reorderThreshold(8L).build()
+            Inventory.builder().tenant(tenant).product(fluxSensor).warehouse(north).quantityAvailable(28L).quantityOnHand(28L).quantityReserved(0L).quantityInbound(0L).reorderThreshold(20L).build(),
+            Inventory.builder().tenant(tenant).product(vectorDrive).warehouse(north).quantityAvailable(40L).quantityOnHand(40L).quantityReserved(0L).quantityInbound(0L).reorderThreshold(18L).build(),
+            Inventory.builder().tenant(tenant).product(pulseRelay).warehouse(north).quantityAvailable(18L).quantityOnHand(18L).quantityReserved(0L).quantityInbound(0L).reorderThreshold(12L).build(),
+            Inventory.builder().tenant(tenant).product(orbitValve).warehouse(north).quantityAvailable(32L).quantityOnHand(32L).quantityReserved(0L).quantityInbound(0L).reorderThreshold(15L).build(),
+            Inventory.builder().tenant(tenant).product(fluxSensor).warehouse(coast).quantityAvailable(22L).quantityOnHand(22L).quantityReserved(0L).quantityInbound(0L).reorderThreshold(14L).build(),
+            Inventory.builder().tenant(tenant).product(vectorDrive).warehouse(coast).quantityAvailable(30L).quantityOnHand(30L).quantityReserved(0L).quantityInbound(0L).reorderThreshold(12L).build(),
+            Inventory.builder().tenant(tenant).product(pulseRelay).warehouse(coast).quantityAvailable(26L).quantityOnHand(26L).quantityReserved(0L).quantityInbound(0L).reorderThreshold(10L).build(),
+            Inventory.builder().tenant(tenant).product(orbitValve).warehouse(coast).quantityAvailable(16L).quantityOnHand(16L).quantityReserved(0L).quantityInbound(0L).reorderThreshold(8L).build()
         ));
 
         integrationConnectorService.seedStarterConnectors();
@@ -225,11 +229,11 @@ public class SeedService {
     }
 
     private void backfillTenantAwareData() {
-        Tenant tenant = tenantRepository.findByCodeIgnoreCase(DemoAccessUsers.DEFAULT_TENANT_CODE)
+        Tenant tenant = tenantRepository.findByCodeIgnoreCase(StarterAccessUsers.STARTER_TENANT_CODE)
             .orElseGet(() -> tenantRepository.save(Tenant.builder()
-                .code(DemoAccessUsers.DEFAULT_TENANT_CODE)
-                .name("Synapse Demo Company")
-                .description("Starter operating context for the default SynapseCore tenant.")
+                .code(StarterAccessUsers.STARTER_TENANT_CODE)
+                .name("Starter Operations Workspace")
+                .description("Starter operating context for local and development workspaces.")
                 .active(true)
                 .build()));
 
@@ -305,7 +309,7 @@ public class SeedService {
                 user -> user, (left, right) -> left));
         java.util.List<AccessUser> updates = new java.util.ArrayList<>();
 
-        for (DemoAccessUsers.DemoAccessUser demoUser : DemoAccessUsers.all()) {
+        for (StarterAccessUsers.StarterAccessUser demoUser : StarterAccessUsers.all()) {
             AccessOperator operator = operatorsByActor.get(demoUser.actorName());
             if (operator == null) {
                 continue;
@@ -381,6 +385,25 @@ public class SeedService {
             customerOrderRepository.saveAll(orderUpdates);
         }
 
+        java.util.List<Product> productUpdates = new java.util.ArrayList<>();
+        for (Product product : productRepository.findAll()) {
+            boolean changed = false;
+            if (product.getTenant() == null) {
+                product.setTenant(tenant);
+                changed = true;
+            }
+            if (product.getCatalogSku() == null || product.getCatalogSku().isBlank()) {
+                product.setCatalogSku(product.getSku());
+                changed = true;
+            }
+            if (changed) {
+                productUpdates.add(product);
+            }
+        }
+        if (!productUpdates.isEmpty()) {
+            productRepository.saveAll(productUpdates);
+        }
+
         java.util.List<FulfillmentTask> fulfillmentBackfills = new java.util.ArrayList<>();
         for (var order : customerOrderRepository.findAll()) {
             if (fulfillmentTaskRepository.findByTenant_CodeIgnoreCaseAndCustomerOrder_ExternalOrderId(
@@ -394,6 +417,8 @@ public class SeedService {
                     .warehouse(order.getWarehouse())
                     .status(FulfillmentStatus.QUEUED)
                     .queuedAt(queuedAt)
+                    .totalUnits(order.getItems().stream().mapToInt(item -> item.getQuantity()).sum())
+                    .fulfilledUnits(order.getItems().stream().mapToInt(item -> item.getFulfilledQuantity()).sum())
                     .promisedDispatchAt(queuedAt.plusSeconds(2 * 3600))
                     .expectedDeliveryAt(queuedAt.plusSeconds(24 * 3600))
                     .note("Backfilled fulfillment lane for an existing order.")
@@ -403,6 +428,65 @@ public class SeedService {
         }
         if (!fulfillmentBackfills.isEmpty()) {
             fulfillmentTaskRepository.saveAll(fulfillmentBackfills);
+        }
+
+        java.util.List<Inventory> inventoryUpdates = new java.util.ArrayList<>();
+        for (Inventory inventory : inventoryRepository.findAll()) {
+            boolean changed = false;
+            if (inventory.getTenant() == null && inventory.getWarehouse() != null) {
+                inventory.setTenant(inventory.getWarehouse().getTenant());
+                changed = true;
+            }
+            if (inventory.getQuantityOnHand() == null) {
+                inventory.setQuantityOnHand(inventory.getQuantityAvailable());
+                changed = true;
+            }
+            if (inventory.getQuantityReserved() == null) {
+                inventory.setQuantityReserved(0L);
+                changed = true;
+            }
+            if (inventory.getQuantityInbound() == null) {
+                inventory.setQuantityInbound(0L);
+                changed = true;
+            }
+            if (changed) {
+                inventory.synchronizeStockModel();
+                inventoryUpdates.add(inventory);
+            }
+        }
+        if (!inventoryUpdates.isEmpty()) {
+            inventoryRepository.saveAll(inventoryUpdates);
+        }
+
+        java.util.List<com.synapsecore.domain.entity.OrderItem> orderItemUpdates = new java.util.ArrayList<>();
+        for (var orderItem : orderItemRepository.findAll()) {
+            boolean changed = false;
+            if (orderItem.getTenant() == null && orderItem.getCustomerOrder() != null) {
+                orderItem.setTenant(orderItem.getCustomerOrder().getTenant());
+                changed = true;
+            }
+            if (orderItem.getReservedQuantity() == null) {
+                orderItem.setReservedQuantity(orderItem.getQuantity());
+                changed = true;
+            }
+            if (orderItem.getFulfilledQuantity() == null) {
+                orderItem.setFulfilledQuantity(0);
+                changed = true;
+            }
+            if (orderItem.getCancelledQuantity() == null) {
+                orderItem.setCancelledQuantity(0);
+                changed = true;
+            }
+            if (orderItem.getReturnedQuantity() == null) {
+                orderItem.setReturnedQuantity(0);
+                changed = true;
+            }
+            if (changed) {
+                orderItemUpdates.add(orderItem);
+            }
+        }
+        if (!orderItemUpdates.isEmpty()) {
+            orderItemRepository.saveAll(orderItemUpdates);
         }
 
         java.util.List<com.synapsecore.domain.entity.Alert> alertUpdates = new java.util.ArrayList<>();
@@ -488,7 +572,7 @@ public class SeedService {
     private void seedAccessUsers(Tenant tenant, java.util.List<AccessOperator> operators) {
         var operatorsByActor = operators.stream()
             .collect(java.util.stream.Collectors.toMap(AccessOperator::getActorName, operator -> operator));
-        java.util.List<AccessUser> users = DemoAccessUsers.all().stream()
+        java.util.List<AccessUser> users = StarterAccessUsers.all().stream()
             .map(user -> AccessUser.builder()
                 .tenant(tenant)
                 .username(user.username())

@@ -9,5 +9,9 @@ public interface ProductRepository extends JpaRepository<Product, Long> {
 
     Optional<Product> findBySku(String sku);
 
-    List<Product> findAllByOrderByNameAsc();
+    Optional<Product> findByTenant_CodeIgnoreCaseAndCatalogSkuIgnoreCase(String tenantCode, String catalogSku);
+
+    List<Product> findAllByTenant_CodeIgnoreCaseOrderByNameAsc(String tenantCode);
+
+    List<Product> findAllByTenantIsNullOrderByNameAsc();
 }

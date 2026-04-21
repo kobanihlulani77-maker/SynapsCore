@@ -53,7 +53,7 @@ powershell -ExecutionPolicy Bypass -File scripts\verify-deployment.ps1 -Frontend
 - dashboard snapshot loads
 - WebSocket connection becomes live
 - browser proof passes with `npm.cmd run test:e2e:prod` on Windows or `npm run test:e2e:prod` where supported
-- simulation can start and stop
+- development-only reseed helpers are absent from the production surface
 - one test order succeeds
 - inventory changes
 - alerts and recommendations react

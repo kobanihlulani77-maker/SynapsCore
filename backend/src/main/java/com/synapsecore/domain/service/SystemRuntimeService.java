@@ -29,6 +29,8 @@ import com.synapsecore.domain.repository.OperationalDispatchWorkItemRepository;
 import com.synapsecore.event.OperationalDispatchQueueService;
 import com.synapsecore.integration.IntegrationConnectorService;
 import com.synapsecore.observability.OperationalMetricsService;
+import com.synapsecore.realtime.RealtimeBrokerMode;
+import com.synapsecore.realtime.RealtimeService;
 import com.synapsecore.tenant.TenantContextService;
 import java.time.Duration;
 import java.time.Instant;
@@ -64,6 +66,7 @@ public class SystemRuntimeService {
     private final OperationalMetricsService operationalMetricsService;
     private final TenantContextService tenantContextService;
     private final IntegrationConnectorService integrationConnectorService;
+    private final RealtimeService realtimeService;
 
     @Value("${spring.application.name}")
     private String applicationName;
@@ -85,9 +88,6 @@ public class SystemRuntimeService {
 
     @Value("${server.servlet.session.cookie.secure:false}")
     private boolean secureSessionCookies;
-
-    @Value("${synapsecore.simulation.interval-ms}")
-    private long simulationIntervalMs;
 
     @Value("${synapsecore.queue.dispatch-interval-ms:1500}")
     private long dispatchIntervalMs;
@@ -116,7 +116,6 @@ public class SystemRuntimeService {
             corsProperties.getAllowedOrigins(),
             publicAppUrl,
             publicApiUrl,
-            simulationIntervalMs,
             buildTelemetrySummary(),
             buildBackboneSummary(),
             buildMetricsSummary(),
@@ -178,6 +177,8 @@ public class SystemRuntimeService {
     private SystemBackboneSummary buildBackboneSummary() {
         String tenantCode = tenantContextService.getCurrentTenantCodeOrDefault();
         return new SystemBackboneSummary(
+            realtimeService.brokerMode().name(),
+            describeRealtimeBrokerMode(realtimeService.brokerMode()),
             operationalDispatchWorkItemRepository.countByTenantCodeIgnoreCaseAndStatusIn(
                 tenantCode,
                 List.of(OperationalDispatchStatus.PENDING, OperationalDispatchStatus.PROCESSING)
@@ -196,6 +197,12 @@ public class SystemRuntimeService {
             dispatchIntervalMs,
             dispatchBatchSize
         );
+    }
+
+    private String describeRealtimeBrokerMode(RealtimeBrokerMode brokerMode) {
+        return brokerMode == RealtimeBrokerMode.EXTERNAL_BROKER
+            ? "Realtime is routed through the configured external STOMP broker relay for multi-node delivery."
+            : "Realtime is using the in-process simple broker. This is tenant-scoped but single-node only; set SYNAPSECORE_REALTIME_BROKER_MODE=EXTERNAL_BROKER and broker relay settings before horizontal scaling.";
     }
 
     private SystemMetricsSummary buildMetricsSummary() {
@@ -248,11 +255,6 @@ public class SystemRuntimeService {
                     BusinessEventType.SCENARIO_COMPARED,
                     BusinessEventType.SCENARIO_EXECUTED
                 ),
-                windowStart
-            ),
-            businessEventRepository.countByTenantCodeIgnoreCaseAndEventTypeInAndCreatedAtAfter(
-                tenantCode,
-                List.of(BusinessEventType.SIMULATION_STARTED, BusinessEventType.SIMULATION_STOPPED),
                 windowStart
             ),
             auditLogRepository.countByTenantCodeIgnoreCaseAndStatusAndCreatedAtAfter(

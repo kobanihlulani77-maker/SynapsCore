@@ -16,6 +16,7 @@ import com.synapsecore.domain.entity.AccessOperator;
 import com.synapsecore.domain.entity.AccessUser;
 import com.synapsecore.domain.entity.AuditLog;
 import com.synapsecore.domain.entity.IntegrationConnector;
+import com.synapsecore.domain.entity.IntegrationConnectorType;
 import com.synapsecore.domain.entity.IntegrationSyncMode;
 import com.synapsecore.domain.entity.IntegrationTransformationPolicy;
 import com.synapsecore.domain.entity.IntegrationValidationPolicy;
@@ -34,6 +35,8 @@ import com.synapsecore.domain.service.SystemIncidentService;
 import com.synapsecore.integration.IntegrationConnectorService;
 import com.synapsecore.integration.dto.IntegrationConnectorResponse;
 import com.synapsecore.tenant.TenantContextService;
+import java.net.URI;
+import java.net.URISyntaxException;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.Comparator;
@@ -61,6 +64,7 @@ public class TenantWorkspaceAdministrationService {
     private final AuditLogService auditLogService;
     private final IntegrationConnectorService integrationConnectorService;
 
+    @Transactional(readOnly = true)
     public TenantWorkspaceResponse getWorkspace() {
         Tenant tenant = tenantContextService.getCurrentTenantOrDefault();
         String tenantCode = tenant.getCode();
@@ -242,12 +246,17 @@ public class TenantWorkspaceAdministrationService {
         IntegrationSyncMode nextSyncMode = request.syncMode() != null
             ? request.syncMode()
             : connector.getSyncMode();
+        String pullEndpointUrl = normalizeOptional(
+            request.pullEndpointUrl() != null ? request.pullEndpointUrl() : connector.getPullEndpointUrl()
+        );
+        requireSupportedSyncMode(connector.getType(), nextSyncMode, pullEndpointUrl);
         connector.setSyncMode(nextSyncMode);
         connector.setSyncIntervalMinutes(resolveSyncIntervalMinutes(
             nextSyncMode,
             request.syncIntervalMinutes(),
             connector.getSyncIntervalMinutes()
         ));
+        connector.setPullEndpointUrl(nextSyncMode == IntegrationSyncMode.SCHEDULED_PULL ? pullEndpointUrl : null);
         connector.setValidationPolicy(request.validationPolicy() != null
             ? request.validationPolicy()
             : connector.getValidationPolicy());
@@ -295,16 +304,48 @@ public class TenantWorkspaceAdministrationService {
         if (syncMode != IntegrationSyncMode.SCHEDULED_PULL) {
             return null;
         }
-        Integer resolved = requestedSyncIntervalMinutes != null ? requestedSyncIntervalMinutes : existingSyncIntervalMinutes;
-        if (resolved == null) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
-                "syncIntervalMinutes is required for scheduled pull connectors.");
+        if (requestedSyncIntervalMinutes != null) {
+            return requestedSyncIntervalMinutes;
         }
-        if (resolved < 15 || resolved > 1440) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
-                "syncIntervalMinutes must be between 15 and 1440 for scheduled pull connectors.");
+        if (existingSyncIntervalMinutes != null && existingSyncIntervalMinutes >= 15) {
+            return existingSyncIntervalMinutes;
         }
-        return resolved;
+        return 15;
+    }
+
+    private void requireSupportedSyncMode(IntegrationConnectorType type,
+                                          IntegrationSyncMode syncMode,
+                                          String pullEndpointUrl) {
+        if (syncMode != IntegrationSyncMode.SCHEDULED_PULL) {
+            return;
+        }
+        if (type != IntegrationConnectorType.WEBHOOK_ORDER) {
+            throw new ResponseStatusException(
+                HttpStatus.BAD_REQUEST,
+                "Scheduled pull is currently implemented only for order API feeds."
+            );
+        }
+        if (pullEndpointUrl == null || pullEndpointUrl.isBlank()) {
+            throw new ResponseStatusException(
+                HttpStatus.BAD_REQUEST,
+                "pullEndpointUrl is required for scheduled pull connectors."
+            );
+        }
+        try {
+            URI uri = new URI(pullEndpointUrl);
+            String scheme = uri.getScheme() == null ? "" : uri.getScheme().toLowerCase(java.util.Locale.ROOT);
+            if ((!scheme.equals("https") && !scheme.equals("http")) || uri.getHost() == null || uri.getHost().isBlank()) {
+                throw new ResponseStatusException(
+                    HttpStatus.BAD_REQUEST,
+                    "pullEndpointUrl must be an absolute HTTP(S) URL for scheduled pull connectors."
+                );
+            }
+        } catch (URISyntaxException exception) {
+            throw new ResponseStatusException(
+                HttpStatus.BAD_REQUEST,
+                "pullEndpointUrl must be a valid HTTP(S) URL for scheduled pull connectors."
+            );
+        }
     }
 
     private boolean isPasswordRotationOverdue(AccessUser user, Tenant tenant) {

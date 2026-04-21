@@ -24,7 +24,7 @@ The architecture should always preserve this operating loop:
   - WebSocket/STOMP broker
   - profile-driven runtime settings for local versus deployment-oriented behavior
 - `api/controller/`
-  - REST APIs for orders, inventory, dashboard, alerts, recommendations, and simulation
+  - REST APIs for orders, inventory, dashboard, alerts, recommendations, integrations, runtime, and access control
 - `domain/entity/`
   - `Product`
   - `Warehouse`
@@ -60,7 +60,7 @@ The architecture should always preserve this operating loop:
   - seeded operator directory lookup so powerful actions map to known active operators
 - `auth/`
   - lightweight user-account sign-in session mapped onto the operator directory
-  - credential-checked seeded demo users for local testing
+  - credential-checked starter users for local and development testing
   - session-first identity resolution with dev/test-only header fallback for non-UI flows
 - `alert/`
   - alert lifecycle management
@@ -70,12 +70,10 @@ The architecture should always preserve this operating loop:
   - persisted operational dispatch queue for deferred dashboard refresh and realtime fan-out
 - `realtime/`
   - dashboard summary broadcasting
-  - alerts, recommendations, inventory, fulfillment overview, recent orders, business-event timeline, audit trail, integration operations, and simulation status channels
+  - alerts, recommendations, inventory, fulfillment overview, recent orders, business-event timeline, audit trail, integration operations, and scenario escalation channels
 - `observability/`
   - Micrometer-backed gauges and tenant-scoped counters
   - Prometheus-ready metrics exposure through Actuator
-- `simulation/`
-  - scheduled fake orders using the real order service
 - `scenario/`
   - non-persistent what-if order impact analysis
   - multi-line order mix projection before commit
@@ -115,11 +113,11 @@ The architecture should always preserve this operating loop:
 - single-page React control center
 - runtime-configurable API and WebSocket endpoints through `/runtime-config.js` for container deployments
 - bootstraps from the expanded dashboard snapshot plus dedicated control endpoints
-- subscribes to dedicated channels for summary, alerts, recommendations, inventory, recent orders, recent events, recent audit activity, integration connector status, recent import activity, failed inbound replay queue state, and simulation status
+- subscribes to dedicated channels for summary, alerts, recommendations, inventory, recent orders, recent events, recent audit activity, integration connector status, recent import activity, failed inbound replay queue state, and scenario escalation state
 - subscribes to a dedicated SLA escalation inbox channel for rerouted critical approvals
 - subscribes to a dedicated scenario notification channel so reroutes and acknowledgments surface as operational notices
 - uses a signed-in user session for protected control actions and an `Acting As` role boundary in the planner so review actions declare whether the mapped operator is acting as review owner, final approver, or escalation owner
-- presents summary cards, alerts, recommendations, inventory health, recent orders, operational timeline, audit traceability, integration operations including replayable failures, and simulation controls
+- presents summary cards, alerts, recommendations, inventory health, recent orders, operational timeline, audit traceability, integration operations including replayable failures, and runtime trust controls
 - includes a what-if order planner that previews projected inventory posture, compares two proposed order plans, saves named plans with assigned review ownership, automatically assigns review priority from projected risk, escalates critical plans into a staged approval policy, surfaces recent scenario history in the control center, reloads loadable plans for iteration, tracks revision-linked resubmissions after rejection, uses lightweight approval or rejection before executing saved plans, and can promote approved plans into live orders
 - includes a what-if order planner that previews projected inventory posture, compares two proposed order plans, saves named plans with assigned review ownership, automatically assigns review priority from projected risk, escalates critical plans into a staged approval policy, auto-routes final approval ownership by operational context, auto-reroutes overdue final approvals to an executive fallback, surfaces recent scenario history in the control center, exposes overdue and SLA-escalated queues from backend policy timing, supports acknowledgment of rerouted escalations as owned work, reloads loadable plans for iteration, tracks revision-linked resubmissions after rejection, uses lightweight approval or rejection before executing saved plans, and can promote approved plans into live orders
 
@@ -156,12 +154,11 @@ The architecture should always preserve this operating loop:
 5. an internal operational state-change event is published into the dispatch queue
 6. the updated operational channels are pushed live when the queue worker drains that item
 
-### Simulation path
+### Local development reseed path
 
-1. simulation mode is started
-2. a scheduled job selects live inventory
-3. a fake order is created through the real order service
-4. all downstream intelligence runs exactly as it would for a real order
+1. the local reseed endpoint is called
+2. starter tenant data is restored for local verification
+3. all downstream intelligence and realtime paths refresh from the same operational services
 
 ### External integration path
 
@@ -174,7 +171,7 @@ The architecture should always preserve this operating loop:
 
 - PostgreSQL stores the operational record of truth
 - PostgreSQL also stores audit logs for traceability of critical actions
-- Redis caches the dashboard summary and mirrors simulation status
+- Redis caches the dashboard summary; realtime transport is tenant-scoped STOMP with a configurable external broker relay path
 - WebSockets push focused tenant-scoped operational topics to connected clients
 
 ## Scale Preparation
@@ -183,14 +180,14 @@ The architecture should always preserve this operating loop:
 - each state-change event is also stored as an `OperationalDispatchWorkItem`
 - a scheduled queue worker drains dispatch work in batches and records failed fan-out attempts for support visibility
 - Micrometer counters and gauges expose alert, fulfillment, replay, and dispatch health through `GET /actuator/prometheus`
-- this keeps the current architecture simple while creating a clean seam for future broker-backed streaming later
+- realtime defaults to the simple in-process broker for single-node deployments and can be switched to `EXTERNAL_BROKER` with STOMP relay settings before horizontal scaling
 
 ## Developer Reset Flow
 
 - `SeedService` owns the starter data baseline for SynapseCore
 - startup seeding only runs when the catalog is empty
-- `POST /api/dev/reseed` clears demo operational data and restores the baseline
-- reseed also stops simulation, refreshes the dashboard summary, and pushes live updates
+- `POST /api/dev/reseed` clears local operational data and restores the starter baseline
+- reseed refreshes the dashboard summary and pushes live updates
 
 ## Test Coverage Shape
 
@@ -199,4 +196,4 @@ The MVP integration tests validate the operational loop rather than isolated CRU
 - order ingestion reduces inventory
 - low stock produces alerts and recommendations
 - dashboard summary reflects live changes
-- simulation state starts and stops cleanly
+- local reseed restores a clean operational baseline

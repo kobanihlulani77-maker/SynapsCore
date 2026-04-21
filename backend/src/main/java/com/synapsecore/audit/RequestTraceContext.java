@@ -8,7 +8,7 @@ public class RequestTraceContext {
 
     public static final String REQUEST_ID_HEADER = "X-Request-Id";
     public static final String ANONYMOUS_ACTOR = "anonymous";
-    public static final String DEFAULT_TENANT = "unscoped";
+    public static final String MISSING_TENANT_CONTEXT = "tenant-context-missing";
 
     private final ThreadLocal<String> currentRequestId = new ThreadLocal<>();
     private final ThreadLocal<String> currentActor = new ThreadLocal<>();
@@ -47,7 +47,7 @@ public class RequestTraceContext {
     }
 
     public String getCurrentTenantOrDefault() {
-        return getCurrentTenant().orElse(DEFAULT_TENANT);
+        return getCurrentTenant().orElse(MISSING_TENANT_CONTEXT);
     }
 
     public void clear() {

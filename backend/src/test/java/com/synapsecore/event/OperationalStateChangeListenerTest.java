@@ -14,7 +14,7 @@ class OperationalStateChangeListenerTest {
 
         listener.onOperationalStateChanged(new OperationalStateChangedEvent(
             OperationalUpdateType.ORDER_FLOW,
-            "SYNAPSE-DEMO",
+            "STARTER-OPS",
             "order-api",
             "req-123",
             Instant.now()

@@ -54,6 +54,9 @@ public class CustomerOrder {
     @Column(nullable = false, length = 32)
     private OrderStatus status;
 
+    @Column(length = 320)
+    private String statusReason;
+
     @Column(nullable = false, precision = 14, scale = 2)
     private BigDecimal totalAmount;
 
@@ -66,6 +69,20 @@ public class CustomerOrder {
 
     @Column(nullable = false)
     private Instant updatedAt;
+
+    private Instant processingStartedAt;
+
+    private Instant fulfilledAt;
+
+    private Instant deliveredAt;
+
+    private Instant cancelledAt;
+
+    private Instant returnedAt;
+
+    private Instant failedAt;
+
+    private Instant blockedAt;
 
     @Builder.Default
     @OneToMany(mappedBy = "customerOrder", cascade = CascadeType.ALL, orphanRemoval = true)

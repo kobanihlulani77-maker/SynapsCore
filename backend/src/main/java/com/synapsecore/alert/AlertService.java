@@ -7,7 +7,9 @@ import com.synapsecore.domain.entity.BusinessEventType;
 import com.synapsecore.domain.entity.FulfillmentTask;
 import com.synapsecore.domain.entity.Inventory;
 import com.synapsecore.domain.entity.Recommendation;
+import com.synapsecore.domain.entity.TenantOperationalPolicy;
 import com.synapsecore.domain.repository.AlertRepository;
+import com.synapsecore.domain.service.TenantOperationalPolicyService;
 import com.synapsecore.event.BusinessEventService;
 import com.synapsecore.fulfillment.FulfillmentAssessment;
 import com.synapsecore.intelligence.InventoryInsight;
@@ -25,6 +27,7 @@ public class AlertService {
 
     private final AlertRepository alertRepository;
     private final BusinessEventService businessEventService;
+    private final TenantOperationalPolicyService tenantOperationalPolicyService;
 
     public void syncInventoryAlerts(Inventory inventory,
                                     InventoryInsight insight,
@@ -68,7 +71,7 @@ public class AlertService {
         // - keep at most one ACTIVE low-stock alert per SKU/warehouse pair
         // - refresh that alert while the low-stock condition persists
         // - mark it RESOLVED once stock rises above threshold
-        String title = "Low stock detected for SKU " + inventory.getProduct().getSku()
+        String title = "Low stock detected for SKU " + inventory.getProduct().resolveCatalogSku()
             + " in " + inventory.getWarehouse().getCode();
         String tenantCode = inventory.getWarehouse().getTenant() == null ? null : inventory.getWarehouse().getTenant().getCode();
         Alert existing = alertRepository.findFirstByTenant_CodeIgnoreCaseAndTypeAndStatusAndTitle(
@@ -106,6 +109,7 @@ public class AlertService {
         alert.setDescription(preview.description());
         alert.setImpactSummary(preview.impactSummary());
         alert.setRecommendedAction(preview.recommendedAction());
+        alert.setPolicyExplanation(buildInventoryPolicyExplanation(inventory, insight, "low stock"));
         alert.setStatus(AlertStatus.ACTIVE);
         Alert saved = alertRepository.save(alert);
 
@@ -113,7 +117,7 @@ public class AlertService {
             businessEventService.record(
                 BusinessEventType.LOW_STOCK_DETECTED,
                 source,
-                inventory.getProduct().getSku() + " fell below threshold in " + inventory.getWarehouse().getCode()
+                inventory.getProduct().resolveCatalogSku() + " fell below threshold in " + inventory.getWarehouse().getCode()
             );
         }
 
@@ -123,7 +127,7 @@ public class AlertService {
     private Alert syncDepletionRiskAlert(Inventory inventory,
                                          InventoryInsight insight,
                                          Recommendation recommendation) {
-        String title = "Depletion risk rising for SKU " + inventory.getProduct().getSku()
+        String title = "Depletion risk rising for SKU " + inventory.getProduct().resolveCatalogSku()
             + " in " + inventory.getWarehouse().getCode();
         String tenantCode = inventory.getWarehouse().getTenant() == null ? null : inventory.getWarehouse().getTenant().getCode();
         Alert existing = alertRepository.findFirstByTenant_CodeIgnoreCaseAndTypeAndStatusAndTitle(
@@ -161,6 +165,7 @@ public class AlertService {
         alert.setDescription(preview.description());
         alert.setImpactSummary(preview.impactSummary());
         alert.setRecommendedAction(preview.recommendedAction());
+        alert.setPolicyExplanation(buildInventoryPolicyExplanation(inventory, insight, "depletion risk"));
         alert.setStatus(AlertStatus.ACTIVE);
         return alertRepository.save(alert);
     }
@@ -175,7 +180,7 @@ public class AlertService {
         return new ScenarioAlertProjection(
             AlertType.LOW_STOCK,
             insight.severity(),
-            "Low stock detected for SKU " + inventory.getProduct().getSku()
+            "Low stock detected for SKU " + inventory.getProduct().resolveCatalogSku()
                 + " in " + inventory.getWarehouse().getCode(),
             "Available quantity has fallen below threshold in " + inventory.getWarehouse().getName() + ".",
             insight.impactSummary(),
@@ -195,7 +200,7 @@ public class AlertService {
         return new ScenarioAlertProjection(
             AlertType.DEPLETION_RISK,
             insight.severity(),
-            "Depletion risk rising for SKU " + inventory.getProduct().getSku()
+            "Depletion risk rising for SKU " + inventory.getProduct().resolveCatalogSku()
                 + " in " + inventory.getWarehouse().getCode(),
             "Recent order velocity is rising quickly in " + inventory.getWarehouse().getName()
                 + " and may outpace the current stock buffer.",
@@ -226,6 +231,8 @@ public class AlertService {
             return null;
         }
 
+        var previousSeverity = existing == null ? null : existing.getSeverity();
+        var previousImpactSummary = existing == null ? null : existing.getImpactSummary();
         Alert alert = existing == null
             ? Alert.builder().tenant(task.getTenant()).type(AlertType.FULFILLMENT_BACKLOG).title(title).build()
             : existing;
@@ -237,9 +244,12 @@ public class AlertService {
         alert.setRecommendedAction(recommendation != null
             ? recommendation.getDescription()
             : "Prioritize picking and packing for the most time-sensitive orders in this warehouse.");
+        alert.setPolicyExplanation(buildFulfillmentPolicyExplanation(task, assessment, "fulfillment backlog"));
         alert.setStatus(AlertStatus.ACTIVE);
         Alert saved = alertRepository.save(alert);
-        if (existing == null) {
+        if (existing == null
+            || !java.util.Objects.equals(previousImpactSummary, saved.getImpactSummary())
+            || previousSeverity != saved.getSeverity()) {
             businessEventService.record(
                 BusinessEventType.FULFILLMENT_BACKLOG_DETECTED,
                 source,
@@ -279,6 +289,7 @@ public class AlertService {
         alert.setRecommendedAction(recommendation != null
             ? recommendation.getDescription()
             : "Review the carrier lane, notify stakeholders, and escalate the delivery route.");
+        alert.setPolicyExplanation(buildFulfillmentPolicyExplanation(task, assessment, "delivery delay"));
         alert.setStatus(AlertStatus.ACTIVE);
         Alert saved = alertRepository.save(alert);
         if (existing == null) {
@@ -321,6 +332,7 @@ public class AlertService {
         alert.setRecommendedAction(recommendation != null
             ? recommendation.getDescription()
             : "Investigate the blocked lane, reassign the work, and review carrier or warehouse execution health.");
+        alert.setPolicyExplanation(buildFulfillmentPolicyExplanation(task, assessment, "fulfillment anomaly"));
         alert.setStatus(AlertStatus.ACTIVE);
         Alert saved = alertRepository.save(alert);
         if (existing == null) {
@@ -331,5 +343,34 @@ public class AlertService {
             );
         }
         return saved;
+    }
+
+    private String buildInventoryPolicyExplanation(Inventory inventory,
+                                                   InventoryInsight insight,
+                                                   String signalName) {
+        TenantOperationalPolicy policy = tenantOperationalPolicyService.getPolicy(
+            inventory.getTenant() != null
+                ? inventory.getTenant().getCode()
+                : inventory.getWarehouse().getTenant().getCode()
+        );
+        return "Tenant policy raised " + signalName + " at " + insight.severity()
+            + " because available stock is " + inventory.getQuantityAvailable()
+            + ", reorder threshold is " + inventory.getReorderThreshold()
+            + ", low-stock critical ratio is " + policy.getLowStockCriticalRatio()
+            + ", depletion threshold is " + policy.getDepletionRiskHoursThreshold()
+            + "h, and urgent depletion threshold is " + policy.getUrgentDepletionRiskHoursThreshold() + "h.";
+    }
+
+    private String buildFulfillmentPolicyExplanation(FulfillmentTask task,
+                                                     FulfillmentAssessment assessment,
+                                                     String signalName) {
+        TenantOperationalPolicy policy = tenantOperationalPolicyService.getPolicy(task.getTenant().getCode());
+        return "Tenant policy raised " + signalName + " at " + assessment.severity()
+            + " because backlog is " + assessment.backlogCount()
+            + " (risk " + policy.getBacklogRiskCount() + ", critical " + policy.getBacklogCriticalCount()
+            + "), delayed shipments are " + assessment.delayedShipmentCount()
+            + " (threshold " + policy.getDelayedShipmentCountThreshold()
+            + "), and overdue dispatch count is " + assessment.overdueDispatchCount()
+            + " (threshold " + policy.getOverdueDispatchCountThreshold() + ").";
     }
 }

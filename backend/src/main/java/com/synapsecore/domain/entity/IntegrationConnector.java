@@ -61,6 +61,19 @@ public class IntegrationConnector {
 
     private Integer syncIntervalMinutes;
 
+    @Column(length = 512)
+    private String pullEndpointUrl;
+
+    private Instant lastPullAttemptAt;
+
+    private Instant lastPullSuccessAt;
+
+    @Column(length = 32)
+    private String lastPullStatus;
+
+    @Column(length = 512)
+    private String lastPullMessage;
+
     @Builder.Default
     @Enumerated(EnumType.STRING)
     @Column(nullable = false, length = 32)

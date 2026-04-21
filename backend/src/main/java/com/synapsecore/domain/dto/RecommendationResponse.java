@@ -9,6 +9,7 @@ public record RecommendationResponse(
     RecommendationType type,
     String title,
     String description,
+    String policyExplanation,
     RecommendationPriority priority,
     Instant createdAt
 ) {

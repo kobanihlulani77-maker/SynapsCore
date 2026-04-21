@@ -36,7 +36,7 @@ public class ExternalOrderWebhookService {
         OrderCreateRequest mappedRequest = null;
         Long inboundRecordId = null;
         String tenantCode = requestTraceContext.getCurrentTenant()
-            .filter(currentTenant -> !RequestTraceContext.DEFAULT_TENANT.equalsIgnoreCase(currentTenant))
+            .filter(currentTenant -> !RequestTraceContext.MISSING_TENANT_CONTEXT.equalsIgnoreCase(currentTenant))
             .orElse(authenticatedConnector != null ? authenticatedConnector.getTenant().getCode() : null);
 
         try {

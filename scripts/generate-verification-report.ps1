@@ -219,7 +219,7 @@ function New-SessionCheck {
     $session = New-Object Microsoft.PowerShell.Commands.WebRequestSession
     try {
         $body = @{
-            tenantCode = "SYNAPSE-DEMO"
+            tenantCode = "STARTER-OPS"
             username   = "operations.lead"
             password   = "lead-2026"
         } | ConvertTo-Json
@@ -397,7 +397,7 @@ $statusRows = @(
     [pscustomobject]@{ Capability = "Frontend production build"; Status = $frontendBuildStatus; Proof = "$md" + "npm.cmd run build" + "$md"; Notes = "Build completed successfully." },
     [pscustomobject]@{ Capability = "Backend automated tests"; Status = $backendTestStatus; Proof = $(if ($RunBackendTests) { "$md" + "mvnw.cmd test" + "$md" } else { "Surefire reports" }); Notes = $backendTestNotes },
     [pscustomobject]@{ Capability = "Local deployment smoke"; Status = $deploymentSmokeStatus; Proof = "$md" + "scripts/verify-deployment.ps1" + "$md"; Notes = "Health, readiness, metrics, dashboard, runtime, incidents, frontend health, and runtime config." },
-    [pscustomobject]@{ Capability = "Company-readiness flow"; Status = $companyReadinessStatus; Proof = "$md" + "scripts/verify-company-readiness.ps1" + "$md"; Notes = "Onboarding, workspace administration, integrations, replay, planning, fulfillment, trust, and simulation." },
+    [pscustomobject]@{ Capability = "Company-readiness flow"; Status = $companyReadinessStatus; Proof = "$md" + "scripts/verify-company-readiness.ps1" + "$md"; Notes = "Onboarding, workspace administration, integrations, replay, planning, fulfillment, and trust." },
     [pscustomobject]@{ Capability = "Browser end-to-end proof"; Status = $browserE2EStatus; Proof = "$md" + "npm.cmd run test:e2e:prod" + "$md"; Notes = "Real browser proof for sign-in, authenticated page rendering, replay, scenario approval/execution, and role gating. $browserReportNote" },
     [pscustomobject]@{ Capability = "Realtime browser proof"; Status = $realtimeStatus; Proof = "$md" + "scripts/verify-realtime.ps1" + "$md"; Notes = "Direct browser proof that summary cards change live without a manual refresh." },
     [pscustomobject]@{ Capability = "Frontend route sweep"; Status = $routeStatus; Proof = "$passedRoutes/$($frontendRoutes.Count) routes returned 200"; Notes = "Public, core, control, systems, and admin routes checked against the production-shaped frontend." },

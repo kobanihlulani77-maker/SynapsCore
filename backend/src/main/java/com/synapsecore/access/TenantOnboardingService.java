@@ -3,7 +3,7 @@ package com.synapsecore.access;
 import com.synapsecore.access.dto.TenantOnboardingRequest;
 import com.synapsecore.access.dto.TenantOnboardingResponse;
 import com.synapsecore.audit.AuditLogService;
-import com.synapsecore.config.SynapseDemoProperties;
+import com.synapsecore.config.SynapseStarterProperties;
 import com.synapsecore.domain.entity.AccessOperator;
 import com.synapsecore.domain.entity.AccessUser;
 import com.synapsecore.domain.entity.Inventory;
@@ -42,7 +42,7 @@ public class TenantOnboardingService {
     private final PasswordEncoder passwordEncoder;
     private final IntegrationConnectorService integrationConnectorService;
     private final AuditLogService auditLogService;
-    private final SynapseDemoProperties demoProperties;
+    private final SynapseStarterProperties starterProperties;
 
     @Transactional
     public TenantOnboardingResponse onboardTenant(TenantOnboardingRequest request, String actorName) {
@@ -136,10 +136,10 @@ public class TenantOnboardingService {
             .location(secondaryLocation == null ? primaryLocation + " Reserve" : secondaryLocation)
             .build());
 
-        if (demoProperties.isSeedStarterInventoryOnTenantOnboarding()) {
+        if (starterProperties.isSeedStarterInventoryOnTenantOnboarding()) {
             seedStarterInventory(north, coast);
         }
-        if (demoProperties.isSeedStarterConnectorsOnTenantOnboarding()) {
+        if (starterProperties.isSeedStarterConnectorsOnTenantOnboarding()) {
             integrationConnectorService.seedStarterConnectors(tenant);
         }
 
@@ -167,19 +167,44 @@ public class TenantOnboardingService {
     }
 
     private void seedStarterInventory(Warehouse north, Warehouse coast) {
-        List<Product> products = productRepository.findAllByOrderByNameAsc();
+        List<Product> products = productRepository.findAllByTenant_CodeIgnoreCaseOrderByNameAsc("STARTER-OPS");
+        if (products.isEmpty()) {
+            products = List.of(
+                productRepository.save(Product.builder().tenant(north.getTenant()).catalogSku("SKU-FLX-100").name("Flux Sensor").category("Sensors").build()),
+                productRepository.save(Product.builder().tenant(north.getTenant()).catalogSku("SKU-VDR-210").name("Vector Drive").category("Power").build()),
+                productRepository.save(Product.builder().tenant(north.getTenant()).catalogSku("SKU-PLS-330").name("Pulse Relay").category("Control").build()),
+                productRepository.save(Product.builder().tenant(north.getTenant()).catalogSku("SKU-ORB-440").name("Orbit Valve").category("Flow").build())
+            );
+        } else {
+            products = products.stream()
+                .map(product -> productRepository.save(Product.builder()
+                    .tenant(north.getTenant())
+                    .catalogSku(product.resolveCatalogSku())
+                    .name(product.getName())
+                    .category(product.getCategory())
+                    .build()))
+                .toList();
+        }
         for (int index = 0; index < products.size(); index++) {
             Product product = products.get(index);
             inventoryRepository.save(Inventory.builder()
+                .tenant(north.getTenant())
                 .product(product)
                 .warehouse(north)
                 .quantityAvailable(28L + (index * 4L))
+                .quantityOnHand(28L + (index * 4L))
+                .quantityReserved(0L)
+                .quantityInbound(0L)
                 .reorderThreshold(16L + (index * 2L))
                 .build());
             inventoryRepository.save(Inventory.builder()
+                .tenant(coast.getTenant())
                 .product(product)
                 .warehouse(coast)
                 .quantityAvailable(22L + (index * 4L))
+                .quantityOnHand(22L + (index * 4L))
+                .quantityReserved(0L)
+                .quantityInbound(0L)
                 .reorderThreshold(12L + (index * 2L))
                 .build());
         }

@@ -15,10 +15,10 @@ if [[ "$MODE" == "infra" ]]; then
   echo "Starting PostgreSQL and Redis only..."
   docker compose up -d postgres redis
 else
-  echo "Starting the full SynapseCore stack..."
+echo "Starting the full SynapseCore stack..."
   docker compose up --build
 fi
 
 echo
-echo "For a clean demo baseline after startup, run:"
+echo "For a clean local starter baseline after startup, run:"
 echo "  bash \"$ROOT_DIR/scripts/seed.sh\""

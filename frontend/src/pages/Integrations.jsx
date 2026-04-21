@@ -28,7 +28,7 @@ export default function IntegrationsPage({ context }) {
   const recentImportRuns = snapshot.integrationImportRuns.slice(0, 4)
   const selectedConnector = connectorPortfolio.find((connector) => connector.id === selectedIntegrationConnectorId) || connectorSpotlights[0]
   const unownedConnectors = connectorPortfolio.filter((connector) => !connector.supportOwnerActorName).length
-  const scheduledConnectors = connectorPortfolio.filter((connector) => connector.syncMode === 'SCHEDULED_PULL').length
+  const realtimeConnectors = connectorPortfolio.filter((connector) => connector.syncMode === 'REALTIME_PUSH').length
   const connectedSystemCount = new Set(connectorPortfolio.map((connector) => connector.sourceSystem)).size
   const fallbackEnabledCount = connectorPortfolio.filter((connector) => connector.allowDefaultWarehouseFallback).length
   const disabledConnectorCount = connectorPortfolio.filter((connector) => connector.healthStatus === 'OFFLINE').length
@@ -142,8 +142,17 @@ export default function IntegrationsPage({ context }) {
                     Validation {formatCodeLabel(selectedConnector.validationPolicy)}
                     {selectedConnector.mappingVersion ? ` | Mapping v${selectedConnector.mappingVersion}` : ''}
                     {selectedConnector.syncIntervalMinutes ? ` | Sync cadence ${selectedConnector.syncIntervalMinutes} min` : ' | Event-driven cadence'}
+                    {selectedConnector.lastPullStatus ? ` | Pull ${formatCodeLabel(selectedConnector.lastPullStatus)}` : ''}
                     {selectedConnector.lastActivityAt ? ` | Last activity ${formatTimestamp(selectedConnector.lastActivityAt)}` : selectedConnector.updatedAt ? ` | Updated ${formatTimestamp(selectedConnector.updatedAt)}` : ''}
                   </p>
+                  {selectedConnector.syncMode === 'SCHEDULED_PULL' ? (
+                    <p className="muted-text">
+                      Pull endpoint {selectedConnector.pullEndpointUrl ? 'configured' : 'missing'}
+                      {selectedConnector.lastPullAttemptAt ? ` | Last attempt ${formatTimestamp(selectedConnector.lastPullAttemptAt)}` : ''}
+                      {selectedConnector.lastPullSuccessAt ? ` | Last success ${formatTimestamp(selectedConnector.lastPullSuccessAt)}` : ''}
+                      {selectedConnector.lastPullMessage ? ` | ${selectedConnector.lastPullMessage}` : ''}
+                    </p>
+                  ) : null}
                   <p className="muted-text">
                     Recent inbound failures {selectedConnector.recentInboundFailureCount || 0}
                     {selectedConnector.lastImportStatus ? ` | Last import ${formatCodeLabel(selectedConnector.lastImportStatus)}` : ''}
@@ -176,7 +185,7 @@ export default function IntegrationsPage({ context }) {
               <span className="scenario-type-tag">{recentImportRuns.length} recent runs</span>
             </div>
             <div className="utility-metric-grid">
-              <div><span>Scheduled pull</span><strong>{scheduledConnectors}</strong></div>
+              <div><span>Realtime push</span><strong>{realtimeConnectors}</strong></div>
               <div><span>Unowned</span><strong>{unownedConnectors}</strong></div>
               <div><span>Degraded</span><strong>{degradedConnectorCount}</strong></div>
               <div><span>Fallback on</span><strong>{fallbackEnabledCount}</strong></div>
@@ -191,7 +200,7 @@ export default function IntegrationsPage({ context }) {
                 body: `${run.sourceSystem} | ${run.recordsReceived} rows`,
                 meta: `${run.ordersImported} imported | ${run.ordersFailed} failed | ${formatTimestamp(run.createdAt)}`,
               }))}
-              emptyMessage="Import telemetry will appear once webhook, CSV, or scheduled sync activity is flowing."
+              emptyMessage="Import telemetry will appear once webhook or CSV activity is flowing."
             />
             <div className="signal-list">
               <div className="signal-list-item">

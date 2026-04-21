@@ -128,7 +128,6 @@ const emptySnapshot = {
   scenarioNotifications: [],
   slaEscalations: [],
   recentScenarios: [],
-  simulation: { active: false, updatedAt: null },
   generatedAt: null,
 }
 const emptyRequestState = { loading: false, error: '', result: null }
@@ -149,6 +148,7 @@ const buildWorkspaceConnectorDrafts = (workspace) => Object.fromEntries((workspa
   supportOwnerActorName: connector.supportOwnerActorName || '',
   syncMode: connector.syncMode || 'REALTIME_PUSH',
   syncIntervalMinutes: connector.syncIntervalMinutes == null ? '' : String(connector.syncIntervalMinutes),
+  pullEndpointUrl: connector.pullEndpointUrl || '',
   validationPolicy: connector.validationPolicy || 'STANDARD',
   transformationPolicy: connector.transformationPolicy || 'NONE',
   allowDefaultWarehouseFallback: Boolean(connector.allowDefaultWarehouseFallback),
@@ -936,7 +936,6 @@ export default function App() {
         client.subscribe(`${topicPrefix}/integrations.replay`, (message) => mergeSnapshot({ integrationReplayQueue: JSON.parse(message.body) }))
         client.subscribe(`${topicPrefix}/scenarios.notifications`, (message) => mergeSnapshot({ scenarioNotifications: JSON.parse(message.body) }))
         client.subscribe(`${topicPrefix}/scenarios.escalated`, (message) => mergeSnapshot({ slaEscalations: JSON.parse(message.body) }))
-        client.subscribe(`${topicPrefix}/simulation.status`, (message) => mergeSnapshot({ simulation: JSON.parse(message.body) }))
       },
       onStompError: () => setConnectionState('degraded'),
       onWebSocketError: () => setConnectionState('degraded'),
@@ -1213,17 +1212,6 @@ export default function App() {
     return () => { active = false }
   }, [scenarioHistoryFilters, activeTenantCode])
 
-  async function toggleSimulation(nextAction) {
-    setActionState({ loading: true, error: '' })
-    try {
-      await fetchJson(`/api/simulation/${nextAction}`, { method: 'POST' })
-      await fetchSnapshot()
-      setActionState({ loading: false, error: '' })
-    } catch (error) {
-      setActionState({ loading: false, error: error.message })
-    }
-  }
-
   async function toggleConnector(connector) {
     const loadingKey = `${connector.sourceSystem}:${connector.type}`
     setIntegrationConnectorState({ loadingKey, error: '', success: '' })
@@ -1238,6 +1226,7 @@ export default function App() {
           enabled: !connector.enabled,
           syncMode: connector.syncMode,
           syncIntervalMinutes: connector.syncIntervalMinutes,
+          pullEndpointUrl: connector.pullEndpointUrl,
           validationPolicy: connector.validationPolicy,
           transformationPolicy: connector.transformationPolicy,
           allowDefaultWarehouseFallback: connector.allowDefaultWarehouseFallback,
@@ -1334,6 +1323,7 @@ export default function App() {
         supportOwnerActorName: selectedWorkspaceConnector.supportOwnerActorName || '',
         syncMode: selectedWorkspaceConnector.syncMode || 'REALTIME_PUSH',
         syncIntervalMinutes: selectedWorkspaceConnector.syncIntervalMinutes == null ? '' : String(selectedWorkspaceConnector.syncIntervalMinutes),
+        pullEndpointUrl: selectedWorkspaceConnector.pullEndpointUrl || '',
         validationPolicy: selectedWorkspaceConnector.validationPolicy || 'STANDARD',
         transformationPolicy: selectedWorkspaceConnector.transformationPolicy || 'NONE',
         allowDefaultWarehouseFallback: Boolean(selectedWorkspaceConnector.allowDefaultWarehouseFallback),
@@ -1424,7 +1414,6 @@ export default function App() {
     'sign-in': 'Access the live operational workspace',
     contact: 'Capture the business challenge and rollout context',
   }
-  const showOperationalTools = Boolean(runtime?.activeProfiles?.some((profile) => ['local', 'dev'].includes(profile)))
   const selectedTenantOption = tenantDirectoryState.items.find((tenant) => tenant.code === authSessionState.tenantCode.trim())
   const signInWorkspaceHint = tenantDirectoryState.error
     ? 'Workspace directory lookup is unavailable. Enter the tenant code manually and continue with a valid operator account.'
@@ -1805,7 +1794,8 @@ export default function App() {
         body: JSON.stringify({
           supportOwnerActorName: draft.supportOwnerActorName,
           syncMode: draft.syncMode,
-          syncIntervalMinutes: draft.syncMode === 'SCHEDULED_PULL' && draft.syncIntervalMinutes ? Number.parseInt(draft.syncIntervalMinutes, 10) : null,
+          syncIntervalMinutes: draft.syncMode === 'SCHEDULED_PULL' ? Number(draft.syncIntervalMinutes || 15) : null,
+          pullEndpointUrl: draft.syncMode === 'SCHEDULED_PULL' ? draft.pullEndpointUrl.trim() : null,
           validationPolicy: draft.validationPolicy,
           transformationPolicy: draft.transformationPolicy,
           allowDefaultWarehouseFallback: draft.allowDefaultWarehouseFallback,
@@ -2375,9 +2365,6 @@ export default function App() {
           pageState={{ ...pageState, onRefresh: fetchSnapshot }}
           actionState={actionState}
           systemRuntimeState={{ ...systemRuntimeState, onRefresh: fetchSystemRuntime }}
-          showOperationalTools={showOperationalTools}
-          snapshot={snapshot}
-          toggleSimulation={toggleSimulation}
           signedInSession={signedInSession}
           signOutOperator={signOutOperator}
           authSessionState={authSessionState}

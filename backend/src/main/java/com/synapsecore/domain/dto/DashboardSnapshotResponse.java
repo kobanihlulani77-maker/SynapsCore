@@ -24,7 +24,6 @@ public record DashboardSnapshotResponse(
     List<ScenarioNotificationResponse> scenarioNotifications,
     List<ScenarioRunResponse> slaEscalations,
     List<ScenarioRunResponse> recentScenarios,
-    SimulationStatusResponse simulation,
     Instant generatedAt
 ) {
 }

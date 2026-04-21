@@ -7,7 +7,6 @@ public record SeedResetResponse(
     long productsSeeded,
     long warehousesSeeded,
     long inventoryRecordsSeeded,
-    SimulationStatusResponse simulation,
     Instant reseededAt
 ) {
 }

@@ -38,7 +38,6 @@ import com.synapsecore.domain.repository.ScenarioRunRepository;
 import com.synapsecore.domain.repository.WarehouseRepository;
 import com.synapsecore.domain.service.SeedService;
 import com.synapsecore.event.OperationalUpdateType;
-import com.synapsecore.simulation.SimulationService;
 import java.time.Instant;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -88,6 +87,9 @@ class MvpFlowIntegrationTest {
     private IntegrationConnectorRepository integrationConnectorRepository;
 
     @Autowired
+    private com.synapsecore.integration.IntegrationScheduledPullWorkerService integrationScheduledPullWorkerService;
+
+    @Autowired
     private IntegrationInboundRecordRepository integrationInboundRecordRepository;
 
     @Autowired
@@ -104,9 +106,6 @@ class MvpFlowIntegrationTest {
 
     @Autowired
     private ScenarioRunRepository scenarioRunRepository;
-
-    @Autowired
-    private SimulationService simulationService;
 
     @Autowired
     private IntegrationReplayRecordRepository integrationReplayRecordRepository;
@@ -164,7 +163,7 @@ class MvpFlowIntegrationTest {
             .andExpect(jsonPath("$.fulfillmentBacklogCount").value(1))
             .andExpect(jsonPath("$.delayedShipmentCount").value(0))
             .andExpect(jsonPath("$.inventoryRecordsCount").value(8))
-            .andExpect(jsonPath("$.simulationRunning").value(false));
+            .andExpect(jsonPath("$.lastUpdatedAt").exists());
     }
 
     @Test
@@ -387,11 +386,7 @@ class MvpFlowIntegrationTest {
 
     @Test
     void inventoryUpdateCreatesInventoryRecordWhenMissing() throws Exception {
-        Product transientProduct = productRepository.save(Product.builder()
-            .sku("SKU-NEW-101")
-            .name("New Inventory Product")
-            .category("Diagnostics")
-            .build());
+        Product transientProduct = createTenantProduct("WH-COAST", "SKU-NEW-101", "New Inventory Product", "Diagnostics");
 
         String requestBody = """
             {
@@ -400,7 +395,7 @@ class MvpFlowIntegrationTest {
               "quantityAvailable": 14,
               "reorderThreshold": 5
             }
-            """.formatted(transientProduct.getSku());
+            """.formatted(transientProduct.resolveCatalogSku());
 
         mockMvc.perform(post("/api/inventory/update")
                 .contentType(APPLICATION_JSON)
@@ -500,7 +495,7 @@ class MvpFlowIntegrationTest {
                 .content(requestBody))
             .andExpect(status().isCreated());
 
-        assertThat(fulfillmentTaskRepository.findByTenant_CodeIgnoreCaseAndCustomerOrder_ExternalOrderId("SYNAPSE-DEMO", "FULFILL-1001"))
+        assertThat(fulfillmentTaskRepository.findByTenant_CodeIgnoreCaseAndCustomerOrder_ExternalOrderId("STARTER-OPS", "FULFILL-1001"))
             .get()
             .extracting(task -> task.getStatus())
             .isEqualTo(FulfillmentStatus.QUEUED);
@@ -642,7 +637,6 @@ class MvpFlowIntegrationTest {
             .andExpect(jsonPath("$.totalWarehouses").value(2))
             .andExpect(jsonPath("$.recentOrderCount").exists())
             .andExpect(jsonPath("$.inventoryRecordsCount").value(8))
-            .andExpect(jsonPath("$.simulationRunning").exists())
             .andExpect(jsonPath("$.lastUpdatedAt").exists());
     }
 
@@ -676,7 +670,6 @@ class MvpFlowIntegrationTest {
             .andExpect(jsonPath("$.auditLogs[0].action").exists())
             .andExpect(jsonPath("$.auditLogs[0].requestId").exists())
             .andExpect(jsonPath("$.recentScenarios").isArray())
-            .andExpect(jsonPath("$.simulation.active").value(false))
             .andExpect(jsonPath("$.generatedAt").exists());
     }
 
@@ -1604,7 +1597,7 @@ class MvpFlowIntegrationTest {
             .andExpect(jsonPath("$[0].finalApprovalOwner").value("Executive Operations Director"))
             .andExpect(jsonPath("$[0].approvalDueAt").exists())
             .andExpect(jsonPath("$[0].slaEscalated").value(true))
-            .andExpect(jsonPath("$[0].slaEscalatedTo").value("Executive Operations Director"))
+            .andExpect(jsonPath("$[0].slaEscalatedTo").value("Lebo Ops"))
             .andExpect(jsonPath("$[0].slaEscalatedAt").exists())
             .andExpect(jsonPath("$[0].overdue").value(true))
             .andExpect(jsonPath("$[0].reviewApprovedBy").value("Naledi Lead"))
@@ -1625,19 +1618,19 @@ class MvpFlowIntegrationTest {
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.length()").value(1))
             .andExpect(jsonPath("$[0].title").value("North escalation candidate"))
-            .andExpect(jsonPath("$[0].slaEscalatedTo").value("Executive Operations Director"));
+            .andExpect(jsonPath("$[0].slaEscalatedTo").value("Lebo Ops"));
 
         mockMvc.perform(get("/api/dashboard/snapshot"))
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.scenarioNotifications.length()").value(1))
             .andExpect(jsonPath("$.scenarioNotifications[0].type").value("SLA_ESCALATED"))
             .andExpect(jsonPath("$.scenarioNotifications[0].title").value(org.hamcrest.Matchers.containsString("North escalation candidate")))
-            .andExpect(jsonPath("$.scenarioNotifications[0].actor").value("Executive Operations Director"))
+            .andExpect(jsonPath("$.scenarioNotifications[0].actor").value("Lebo Ops"))
             .andExpect(jsonPath("$.scenarioNotifications[0].actionRequired").value(true))
             .andExpect(jsonPath("$.slaEscalations.length()").value(1))
             .andExpect(jsonPath("$.slaEscalations[0].title").value("North escalation candidate"))
             .andExpect(jsonPath("$.slaEscalations[0].slaEscalated").value(true))
-            .andExpect(jsonPath("$.slaEscalations[0].slaEscalatedTo").value("Executive Operations Director"));
+            .andExpect(jsonPath("$.slaEscalations[0].slaEscalatedTo").value("Lebo Ops"));
 
         mockMvc.perform(get("/api/scenarios/notifications"))
             .andExpect(status().isOk())
@@ -1645,7 +1638,7 @@ class MvpFlowIntegrationTest {
             .andExpect(jsonPath("$[0].type").value("SLA_ESCALATED"))
             .andExpect(jsonPath("$[0].scenarioRunId").value(scenarioId))
             .andExpect(jsonPath("$[0].actionRequired").value(true))
-            .andExpect(jsonPath("$[0].actor").value("Executive Operations Director"));
+            .andExpect(jsonPath("$[0].actor").value("Lebo Ops"));
 
         mockMvc.perform(post("/api/scenarios/" + scenarioId + "/acknowledge-escalation")
                 .with(accessHeaders("Lebo Ops", "REVIEW_OWNER"))
@@ -1759,7 +1752,7 @@ class MvpFlowIntegrationTest {
             .andExpect(jsonPath("$.approvalNote").value(org.hamcrest.Matchers.containsString("Final approval granted")))
             .andExpect(jsonPath("$.approvalDueAt").value(org.hamcrest.Matchers.nullValue()))
             .andExpect(jsonPath("$.slaEscalated").value(true))
-            .andExpect(jsonPath("$.slaEscalatedTo").value("Executive Operations Director"))
+            .andExpect(jsonPath("$.slaEscalatedTo").value("Lebo Ops"))
             .andExpect(jsonPath("$.overdue").value(false))
             .andExpect(jsonPath("$.executionReady").value(true));
 
@@ -1831,7 +1824,7 @@ class MvpFlowIntegrationTest {
 
         mockMvc.perform(post("/api/scenarios/" + northScenarioId + "/approve")
                 .with(accessHeaders("Naledi Lead", "REVIEW_OWNER"))
-                .header("X-Synapse-Tenant", "SYNAPSE-DEMO")
+                .header("X-Synapse-Tenant", "STARTER-OPS")
                 .contentType(APPLICATION_JSON)
                 .content("""
                     {
@@ -1845,7 +1838,7 @@ class MvpFlowIntegrationTest {
 
         mockMvc.perform(post("/api/scenarios/" + coastScenarioId + "/approve")
                 .with(accessHeaders("Naledi Lead", "REVIEW_OWNER"))
-                .header("X-Synapse-Tenant", "SYNAPSE-DEMO")
+                .header("X-Synapse-Tenant", "STARTER-OPS")
                 .contentType(APPLICATION_JSON)
                 .content("""
                     {
@@ -1859,14 +1852,14 @@ class MvpFlowIntegrationTest {
 
         mockMvc.perform(get("/api/warehouses")
                 .with(accessHeaders("North Operations Director", "FINAL_APPROVER"))
-                .header("X-Synapse-Tenant", "SYNAPSE-DEMO"))
+                .header("X-Synapse-Tenant", "STARTER-OPS"))
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.length()").value(1))
             .andExpect(jsonPath("$[0].code").value("WH-NORTH"));
 
         mockMvc.perform(get("/api/scenarios/history")
                 .with(accessHeaders("North Operations Director", "FINAL_APPROVER"))
-                .header("X-Synapse-Tenant", "SYNAPSE-DEMO")
+                .header("X-Synapse-Tenant", "STARTER-OPS")
                 .param("approvalStage", "PENDING_FINAL_APPROVAL"))
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.length()").value(1))
@@ -1875,7 +1868,7 @@ class MvpFlowIntegrationTest {
 
         mockMvc.perform(post("/api/scenarios/" + coastScenarioId + "/approve")
                 .with(accessHeaders("North Operations Director", "FINAL_APPROVER"))
-                .header("X-Synapse-Tenant", "SYNAPSE-DEMO")
+                .header("X-Synapse-Tenant", "STARTER-OPS")
                 .contentType(APPLICATION_JSON)
                 .content("""
                     {
@@ -1889,7 +1882,7 @@ class MvpFlowIntegrationTest {
 
         mockMvc.perform(post("/api/scenarios/" + coastScenarioId + "/approve")
                 .with(accessHeaders("Coast Operations Director", "FINAL_APPROVER"))
-                .header("X-Synapse-Tenant", "SYNAPSE-DEMO")
+                .header("X-Synapse-Tenant", "STARTER-OPS")
                 .contentType(APPLICATION_JSON)
                 .content("""
                     {
@@ -1994,22 +1987,10 @@ class MvpFlowIntegrationTest {
     }
 
     @Test
-    void dashboardSummaryReflectsSimulationStateChanges() throws Exception {
-        mockMvc.perform(post("/api/simulation/start"))
-            .andExpect(status().isOk())
-            .andExpect(jsonPath("$.active").value(true));
-
+    void dashboardSummaryOmitsDevelopmentOnlySimulationFields() throws Exception {
         mockMvc.perform(get("/api/dashboard/summary"))
             .andExpect(status().isOk())
-            .andExpect(jsonPath("$.simulationRunning").value(true));
-
-        mockMvc.perform(post("/api/simulation/stop"))
-            .andExpect(status().isOk())
-            .andExpect(jsonPath("$.active").value(false));
-
-        mockMvc.perform(get("/api/dashboard/summary"))
-            .andExpect(status().isOk())
-            .andExpect(jsonPath("$.simulationRunning").value(false));
+            .andExpect(jsonPath("$.simulationRunning").doesNotExist());
     }
 
     @Test
@@ -2048,11 +2029,7 @@ class MvpFlowIntegrationTest {
 
     @Test
     void orderIngestionFailsClearlyWhenInventoryRecordIsMissing() throws Exception {
-        Product transientProduct = productRepository.save(Product.builder()
-            .sku("SKU-TST-999")
-            .name("Test Product")
-            .category("Diagnostics")
-            .build());
+        Product transientProduct = createTenantProduct("WH-NORTH", "SKU-TST-999", "Test Product", "Diagnostics");
 
         String requestBody = """
             {
@@ -2065,7 +2042,7 @@ class MvpFlowIntegrationTest {
                 }
               ]
             }
-            """.formatted(transientProduct.getSku());
+            """.formatted(transientProduct.resolveCatalogSku());
 
         mockMvc.perform(post("/api/orders")
                 .contentType(MediaType.APPLICATION_JSON)
@@ -2075,41 +2052,29 @@ class MvpFlowIntegrationTest {
     }
 
     @Test
-    void simulationStartAndStopAreIdempotentAndVisible() throws Exception {
-        mockMvc.perform(post("/api/simulation/start"))
-            .andExpect(status().isOk())
-            .andExpect(jsonPath("$.active").value(true));
-
-        mockMvc.perform(post("/api/simulation/start"))
-            .andExpect(status().isOk())
-            .andExpect(jsonPath("$.active").value(true));
-
-        mockMvc.perform(post("/api/simulation/stop"))
-            .andExpect(status().isOk())
-            .andExpect(jsonPath("$.active").value(false));
-
-        mockMvc.perform(get("/api/events/recent"))
-            .andExpect(status().isOk())
-            .andExpect(jsonPath("$[0].eventType").exists());
-
-        long simulationStartedEvents = businessEventRepository.findTop20ByOrderByCreatedAtDesc().stream()
-            .filter(event -> event.getEventType() == BusinessEventType.SIMULATION_STARTED)
-            .count();
-        assertThat(simulationStartedEvents).isEqualTo(1);
-    }
-
-    @Test
-    void simulationTickUsesRealOrderFlowAndChangesOperationalState() throws Exception {
+    void generatedOrderIdsUseOperationalPrefixAndChangeOperationalState() throws Exception {
         long ordersBefore = customerOrderRepository.count();
         long totalInventoryBefore = inventoryRepository.findAll().stream()
             .mapToLong(Inventory::getQuantityAvailable)
             .sum();
 
-        mockMvc.perform(post("/api/simulation/start"))
-            .andExpect(status().isOk())
-            .andExpect(jsonPath("$.active").value(true));
+        String requestBody = """
+            {
+              "warehouseCode": "WH-NORTH",
+              "items": [
+                {
+                  "productSku": "SKU-FLX-100",
+                  "quantity": 1,
+                  "unitPrice": 95.00
+                }
+              ]
+            }
+            """;
 
-        simulationService.generateSimulatedOrder();
+        mockMvc.perform(post("/api/orders")
+                .contentType(APPLICATION_JSON)
+                .content(requestBody))
+            .andExpect(status().isCreated());
 
         long ordersAfter = customerOrderRepository.count();
         long totalInventoryAfter = inventoryRepository.findAll().stream()
@@ -2121,27 +2086,23 @@ class MvpFlowIntegrationTest {
 
         mockMvc.perform(get("/api/orders/recent"))
             .andExpect(status().isOk())
-            .andExpect(jsonPath("$[0].externalOrderId").value(org.hamcrest.Matchers.startsWith("SIM-")));
+            .andExpect(jsonPath("$[0].externalOrderId").value(org.hamcrest.Matchers.startsWith("ORD-")));
 
         assertThat(businessEventRepository.findTop20ByOrderByCreatedAtDesc())
-            .anyMatch(event -> event.getEventType() == BusinessEventType.ORDER_INGESTED && "simulation".equals(event.getSource()));
-
-        mockMvc.perform(post("/api/simulation/stop"))
-            .andExpect(status().isOk())
-            .andExpect(jsonPath("$.active").value(false));
+            .anyMatch(event -> event.getEventType() == BusinessEventType.ORDER_INGESTED && "order-api".equals(event.getSource()));
     }
 
     @Test
     void predictionLayerSurfacesStockoutWindowAcrossOperationalViews() throws Exception {
-        Product transientProduct = productRepository.save(Product.builder()
-            .sku("SKU-PRED-550")
-            .name("Prediction Test Module")
-            .category("Forecast")
-            .build());
+        Product transientProduct = createTenantProduct("WH-NORTH", "SKU-PRED-550", "Prediction Test Module", "Forecast");
         var warehouse = warehouseRepository.findByCode("WH-NORTH").orElseThrow();
         inventoryRepository.save(Inventory.builder()
+            .tenant(warehouse.getTenant())
             .product(transientProduct)
             .warehouse(warehouse)
+            .quantityOnHand(18L)
+            .quantityReserved(0L)
+            .quantityInbound(0L)
             .quantityAvailable(18L)
             .reorderThreshold(12L)
             .build());
@@ -2242,9 +2203,84 @@ class MvpFlowIntegrationTest {
     }
 
     @Test
+    void scheduledPullConnectorFetchesOrderApiFeedIntoOperationalFlow() throws Exception {
+        com.sun.net.httpserver.HttpServer server = com.sun.net.httpserver.HttpServer.create(
+            new java.net.InetSocketAddress("127.0.0.1", 0),
+            0
+        );
+        server.createContext("/orders", exchange -> {
+            byte[] response = """
+                {
+                  "orders": [
+                    {
+                      "externalOrderId": "ERP-PULL-1001",
+                      "warehouseCode": "",
+                      "customerReference": "CUST-PULL",
+                      "occurredAt": "2026-04-01T10:30:00Z",
+                      "items": [
+                        {
+                          "productSku": "sku-flx-100",
+                          "quantity": 2,
+                          "unitPrice": 95.00
+                        }
+                      ]
+                    }
+                  ]
+                }
+                """.getBytes(java.nio.charset.StandardCharsets.UTF_8);
+            exchange.getResponseHeaders().set("Content-Type", "application/json");
+            exchange.sendResponseHeaders(200, response.length);
+            exchange.getResponseBody().write(response);
+            exchange.close();
+        });
+        server.start();
+        try {
+            String endpoint = "http://127.0.0.1:" + server.getAddress().getPort() + "/orders";
+
+            mockMvc.perform(post("/api/integrations/orders/connectors")
+                    .with(accessHeaders("Integration Lead", "INTEGRATION_ADMIN"))
+                    .contentType(APPLICATION_JSON)
+                    .content("""
+                        {
+                          "sourceSystem": "erp_north",
+                          "type": "WEBHOOK_ORDER",
+                          "displayName": "ERP North Scheduled Pull",
+                          "enabled": true,
+                          "syncMode": "SCHEDULED_PULL",
+                          "syncIntervalMinutes": 15,
+                          "pullEndpointUrl": "%s",
+                          "validationPolicy": "STANDARD",
+                          "transformationPolicy": "NORMALIZE_CODES",
+                          "allowDefaultWarehouseFallback": true,
+                          "defaultWarehouseCode": "WH-NORTH",
+                          "notes": "North order API feed."
+                        }
+                        """.formatted(endpoint)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.syncMode").value("SCHEDULED_PULL"))
+                .andExpect(jsonPath("$.syncIntervalMinutes").value(15))
+                .andExpect(jsonPath("$.pullEndpointUrl").value(endpoint));
+
+            int processed = integrationScheduledPullWorkerService.processDuePulls(5);
+            assertThat(processed).isEqualTo(1);
+            assertThat(customerOrderRepository.existsByTenant_CodeIgnoreCaseAndExternalOrderId("STARTER-OPS", "ERP-PULL-1001"))
+                .isTrue();
+
+            mockMvc.perform(get("/api/integrations/orders/connectors"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[?(@.sourceSystem == 'erp_north' && @.type == 'WEBHOOK_ORDER')].lastPullStatus")
+                    .value(org.hamcrest.Matchers.hasItem("SUCCESS")))
+                .andExpect(jsonPath("$[?(@.sourceSystem == 'erp_north' && @.type == 'WEBHOOK_ORDER')].lastPullMessage")
+                    .value(org.hamcrest.Matchers.hasItem(org.hamcrest.Matchers.containsString("imported 1"))));
+        } finally {
+            server.stop(0);
+        }
+    }
+
+    @Test
     void webhookConnectorTokenAllowsExternalIngressWithoutWorkspaceSession() throws Exception {
         configureConnectorToken(
-            "SYNAPSE-DEMO",
+            "STARTER-OPS",
             "erp_north",
             com.synapsecore.domain.entity.IntegrationConnectorType.WEBHOOK_ORDER,
             "north-webhook-token-2026"
@@ -2275,7 +2311,7 @@ class MvpFlowIntegrationTest {
             .andExpect(jsonPath("$.order.externalOrderId").value("ERP-TOKEN-1001"))
             .andExpect(jsonPath("$.order.warehouseCode").value("WH-NORTH"));
 
-        assertThat(customerOrderRepository.existsByTenant_CodeIgnoreCaseAndExternalOrderId("SYNAPSE-DEMO", "ERP-TOKEN-1001"))
+        assertThat(customerOrderRepository.existsByTenant_CodeIgnoreCaseAndExternalOrderId("STARTER-OPS", "ERP-TOKEN-1001"))
             .isTrue();
         assertThat(integrationInboundRecordRepository.findAll())
             .anyMatch(record -> "ERP-TOKEN-1001".equals(record.getExternalOrderId())
@@ -2285,7 +2321,7 @@ class MvpFlowIntegrationTest {
     @Test
     void invalidWebhookConnectorTokenIsRejectedBeforeOrderCreation() throws Exception {
         configureConnectorToken(
-            "SYNAPSE-DEMO",
+            "STARTER-OPS",
             "erp_north",
             com.synapsecore.domain.entity.IntegrationConnectorType.WEBHOOK_ORDER,
             "north-webhook-token-2026"
@@ -2321,7 +2357,7 @@ class MvpFlowIntegrationTest {
     @Test
     void csvConnectorTokenAllowsExternalBatchIngressWithoutWorkspaceSession() throws Exception {
         configureConnectorToken(
-            "SYNAPSE-DEMO",
+            "STARTER-OPS",
             "erp_batch",
             com.synapsecore.domain.entity.IntegrationConnectorType.CSV_ORDER_IMPORT,
             "batch-csv-token-2026"
@@ -2348,7 +2384,7 @@ class MvpFlowIntegrationTest {
             .andExpect(jsonPath("$.importedOrders[0].sourceSystem").value("erp_batch"))
             .andExpect(jsonPath("$.importedOrders[0].order.externalOrderId").value("CSV-TOKEN-1001"));
 
-        assertThat(customerOrderRepository.existsByTenant_CodeIgnoreCaseAndExternalOrderId("SYNAPSE-DEMO", "CSV-TOKEN-1001"))
+        assertThat(customerOrderRepository.existsByTenant_CodeIgnoreCaseAndExternalOrderId("STARTER-OPS", "CSV-TOKEN-1001"))
             .isTrue();
         assertThat(integrationInboundRecordRepository.findAll())
             .anyMatch(record -> "CSV-TOKEN-1001".equals(record.getExternalOrderId())
@@ -2359,15 +2395,15 @@ class MvpFlowIntegrationTest {
     void integrationConnectorsCanBeListedAndDisabledForWebhookIngress() throws Exception {
         mockMvc.perform(get("/api/access/tenants"))
             .andExpect(status().isOk())
-            .andExpect(jsonPath("$[0].code").value("SYNAPSE-DEMO"))
-            .andExpect(jsonPath("$[0].name").value("Synapse Demo Company"));
+            .andExpect(jsonPath("$[0].code").value("STARTER-OPS"))
+            .andExpect(jsonPath("$[0].name").value("Starter Operations Workspace"));
 
         mockMvc.perform(get("/api/access/operators"))
             .andExpect(status().isOk())
             .andExpect(jsonPath("$[?(@.actorName == 'Integration Lead')].tenantCode")
-                .value(org.hamcrest.Matchers.hasItem("SYNAPSE-DEMO")))
+                .value(org.hamcrest.Matchers.hasItem("STARTER-OPS")))
             .andExpect(jsonPath("$[?(@.actorName == 'Integration Lead')].tenantName")
-                .value(org.hamcrest.Matchers.hasItem("Synapse Demo Company")))
+                .value(org.hamcrest.Matchers.hasItem("Starter Operations Workspace")))
             .andExpect(jsonPath("$[?(@.actorName == 'Integration Lead')].displayName")
                 .value(org.hamcrest.Matchers.hasItem("Integration Lead")))
             .andExpect(jsonPath("$[?(@.actorName == 'Naledi Lead')].displayName")
@@ -2492,7 +2528,7 @@ class MvpFlowIntegrationTest {
                 .contentType(APPLICATION_JSON)
                 .content("""
                     {
-                      "tenantCode": "SYNAPSE-DEMO",
+                      "tenantCode": "STARTER-OPS",
                       "username": "integration.lead",
                       "password": "wrong-code"
                     }
@@ -2504,15 +2540,15 @@ class MvpFlowIntegrationTest {
                 .contentType(APPLICATION_JSON)
                 .content("""
                     {
-                      "tenantCode": "SYNAPSE-DEMO",
+                      "tenantCode": "STARTER-OPS",
                       "username": "integration.lead",
                       "password": "integration-admin-2026"
                     }
                     """))
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.signedIn").value(true))
-            .andExpect(jsonPath("$.tenantCode").value("SYNAPSE-DEMO"))
-            .andExpect(jsonPath("$.tenantName").value("Synapse Demo Company"))
+            .andExpect(jsonPath("$.tenantCode").value("STARTER-OPS"))
+            .andExpect(jsonPath("$.tenantName").value("Starter Operations Workspace"))
             .andExpect(jsonPath("$.username").value("integration.lead"))
             .andExpect(jsonPath("$.actorName").value("Integration Lead"))
             .andExpect(jsonPath("$.sessionTimeoutMinutes").value(480))
@@ -2526,8 +2562,8 @@ class MvpFlowIntegrationTest {
         mockMvc.perform(get("/api/auth/session").session(session))
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.signedIn").value(true))
-            .andExpect(jsonPath("$.tenantCode").value("SYNAPSE-DEMO"))
-            .andExpect(jsonPath("$.tenantName").value("Synapse Demo Company"))
+            .andExpect(jsonPath("$.tenantCode").value("STARTER-OPS"))
+            .andExpect(jsonPath("$.tenantName").value("Starter Operations Workspace"))
             .andExpect(jsonPath("$.username").value("integration.lead"))
             .andExpect(jsonPath("$.actorName").value("Integration Lead"));
 
@@ -2556,7 +2592,7 @@ class MvpFlowIntegrationTest {
     void tenantAdminCanOnboardTenantWorkspaceAndUseBootstrapSession() throws Exception {
         mockMvc.perform(post("/api/access/tenants")
                 .with(accessHeaders("Operations Lead", "TENANT_ADMIN"))
-                .header("X-Synapse-Tenant", "SYNAPSE-DEMO")
+                .header("X-Synapse-Tenant", "STARTER-OPS")
                 .contentType(APPLICATION_JSON)
                 .content("""
                     {
@@ -2664,7 +2700,7 @@ class MvpFlowIntegrationTest {
     void signedInTenantCannotQueryAnotherTenantOperatorDirectory() throws Exception {
         mockMvc.perform(post("/api/access/tenants")
                 .with(accessHeaders("Operations Lead", "TENANT_ADMIN"))
-                .header("X-Synapse-Tenant", "SYNAPSE-DEMO")
+                .header("X-Synapse-Tenant", "STARTER-OPS")
                 .contentType(APPLICATION_JSON)
                 .content("""
                     {
@@ -2695,11 +2731,11 @@ class MvpFlowIntegrationTest {
             .getSession(false);
 
         mockMvc.perform(get("/api/access/operators")
-                .param("tenantCode", "SYNAPSE-DEMO")
+                .param("tenantCode", "STARTER-OPS")
                 .session(session))
             .andExpect(status().isForbidden())
             .andExpect(jsonPath("$.message").value(
-                "Current tenant ACME-OPS cannot view workspace operators for tenant SYNAPSE-DEMO."
+                "Current tenant ACME-OPS cannot view workspace operators for tenant STARTER-OPS."
             ));
     }
 
@@ -2709,7 +2745,7 @@ class MvpFlowIntegrationTest {
     void onboardedTenantAdminCanOpenWorkspaceThroughSignedInSession() throws Exception {
         mockMvc.perform(post("/api/access/tenants")
                 .with(accessHeaders("Operations Lead", "TENANT_ADMIN"))
-                .header("X-Synapse-Tenant", "SYNAPSE-DEMO")
+                .header("X-Synapse-Tenant", "STARTER-OPS")
                 .contentType(APPLICATION_JSON)
                 .content("""
                     {
@@ -2766,14 +2802,14 @@ class MvpFlowIntegrationTest {
                 .contentType(APPLICATION_JSON)
                 .content("""
                     {
-                      "tenantCode": "SYNAPSE-DEMO",
+                      "tenantCode": "STARTER-OPS",
                       "username": "operations.lead",
                       "password": "lead-2026"
                     }
                     """))
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.signedIn").value(true))
-            .andExpect(jsonPath("$.tenantCode").value("SYNAPSE-DEMO"))
+            .andExpect(jsonPath("$.tenantCode").value("STARTER-OPS"))
             .andReturn()
             .getRequest()
             .getSession(false);
@@ -2806,7 +2842,7 @@ class MvpFlowIntegrationTest {
     void seedBackfillRemainsSafeAfterAdditionalTenantsExist() throws Exception {
         mockMvc.perform(post("/api/access/tenants")
                 .with(accessHeaders("Operations Lead", "TENANT_ADMIN"))
-                .header("X-Synapse-Tenant", "SYNAPSE-DEMO")
+                .header("X-Synapse-Tenant", "STARTER-OPS")
                 .contentType(APPLICATION_JSON)
                 .content("""
                     {
@@ -2830,7 +2866,7 @@ class MvpFlowIntegrationTest {
     void tenantAdminCanCreateScopedOperatorsAndUsersForWarehouseLanes() throws Exception {
         mockMvc.perform(post("/api/access/admin/operators")
                 .with(accessHeaders("Operations Lead", "TENANT_ADMIN"))
-                .header("X-Synapse-Tenant", "SYNAPSE-DEMO")
+                .header("X-Synapse-Tenant", "STARTER-OPS")
                 .contentType(APPLICATION_JSON)
                 .content("""
                     {
@@ -2849,14 +2885,14 @@ class MvpFlowIntegrationTest {
 
         mockMvc.perform(get("/api/access/admin/operators")
                 .with(accessHeaders("Operations Lead", "TENANT_ADMIN"))
-                .header("X-Synapse-Tenant", "SYNAPSE-DEMO"))
+                .header("X-Synapse-Tenant", "STARTER-OPS"))
             .andExpect(status().isOk())
             .andExpect(jsonPath("$[?(@.actorName == 'North Review Manager')].warehouseScopes[*]")
                 .value(org.hamcrest.Matchers.hasItem("WH-NORTH")));
 
         mockMvc.perform(post("/api/access/admin/users")
                 .with(accessHeaders("Operations Lead", "TENANT_ADMIN"))
-                .header("X-Synapse-Tenant", "SYNAPSE-DEMO")
+                .header("X-Synapse-Tenant", "STARTER-OPS")
                 .contentType(APPLICATION_JSON)
                 .content("""
                     {
@@ -2875,13 +2911,13 @@ class MvpFlowIntegrationTest {
 
         mockMvc.perform(get("/api/access/admin/users")
                 .with(accessHeaders("Operations Lead", "TENANT_ADMIN"))
-                .header("X-Synapse-Tenant", "SYNAPSE-DEMO"))
+                .header("X-Synapse-Tenant", "STARTER-OPS"))
             .andExpect(status().isOk())
             .andExpect(jsonPath("$[?(@.username == 'north.review.manager')].operatorActorName")
                 .value(org.hamcrest.Matchers.hasItem("North Review Manager")));
 
         mockMvc.perform(post("/api/scenarios/save")
-                .header("X-Synapse-Tenant", "SYNAPSE-DEMO")
+                .header("X-Synapse-Tenant", "STARTER-OPS")
                 .contentType(APPLICATION_JSON)
                 .content("""
                     {
@@ -2904,7 +2940,7 @@ class MvpFlowIntegrationTest {
             .andExpect(jsonPath("$.reviewOwner").value("North Review Manager"));
 
         mockMvc.perform(post("/api/scenarios/save")
-                .header("X-Synapse-Tenant", "SYNAPSE-DEMO")
+                .header("X-Synapse-Tenant", "STARTER-OPS")
                 .contentType(APPLICATION_JSON)
                 .content("""
                     {
@@ -2936,7 +2972,7 @@ class MvpFlowIntegrationTest {
                 .contentType(APPLICATION_JSON)
                 .content("""
                     {
-                      "tenantCode": "SYNAPSE-DEMO",
+                      "tenantCode": "STARTER-OPS",
                       "username": "north.review.manager",
                       "password": "north-lane-2026"
                     }
@@ -2972,7 +3008,7 @@ class MvpFlowIntegrationTest {
     void tenantAdminCanManageUserLifecyclePasswordResetsAndOperatorActivation() throws Exception {
         mockMvc.perform(post("/api/access/admin/operators")
                 .with(accessHeaders("Operations Lead", "TENANT_ADMIN"))
-                .header("X-Synapse-Tenant", "SYNAPSE-DEMO")
+                .header("X-Synapse-Tenant", "STARTER-OPS")
                 .contentType(APPLICATION_JSON)
                 .content("""
                     {
@@ -2988,7 +3024,7 @@ class MvpFlowIntegrationTest {
 
         mockMvc.perform(post("/api/access/admin/operators")
                 .with(accessHeaders("Operations Lead", "TENANT_ADMIN"))
-                .header("X-Synapse-Tenant", "SYNAPSE-DEMO")
+                .header("X-Synapse-Tenant", "STARTER-OPS")
                 .contentType(APPLICATION_JSON)
                 .content("""
                     {
@@ -3005,7 +3041,7 @@ class MvpFlowIntegrationTest {
 
         mockMvc.perform(post("/api/access/admin/users")
                 .with(accessHeaders("Operations Lead", "TENANT_ADMIN"))
-                .header("X-Synapse-Tenant", "SYNAPSE-DEMO")
+                .header("X-Synapse-Tenant", "STARTER-OPS")
                 .contentType(APPLICATION_JSON)
                 .content("""
                     {
@@ -3019,17 +3055,17 @@ class MvpFlowIntegrationTest {
             .andExpect(jsonPath("$.operatorActorName").value("North Review Manager"));
 
         Long lifecycleUserId = accessUserRepository
-            .findByTenant_CodeIgnoreCaseAndUsernameIgnoreCase("SYNAPSE-DEMO", "north.lifecycle.manager")
+            .findByTenant_CodeIgnoreCaseAndUsernameIgnoreCase("STARTER-OPS", "north.lifecycle.manager")
             .orElseThrow()
             .getId();
         Long finalManagerOperatorId = accessOperatorRepository
-            .findByTenant_CodeIgnoreCaseAndActorNameIgnoreCase("SYNAPSE-DEMO", "North Final Manager")
+            .findByTenant_CodeIgnoreCaseAndActorNameIgnoreCase("STARTER-OPS", "North Final Manager")
             .orElseThrow()
             .getId();
 
         mockMvc.perform(put("/api/access/admin/users/" + lifecycleUserId)
                 .with(accessHeaders("Operations Lead", "TENANT_ADMIN"))
-                .header("X-Synapse-Tenant", "SYNAPSE-DEMO")
+                .header("X-Synapse-Tenant", "STARTER-OPS")
                 .contentType(APPLICATION_JSON)
                 .content("""
                     {
@@ -3045,7 +3081,7 @@ class MvpFlowIntegrationTest {
 
         mockMvc.perform(post("/api/access/admin/users/" + lifecycleUserId + "/reset-password")
                 .with(accessHeaders("Operations Lead", "TENANT_ADMIN"))
-                .header("X-Synapse-Tenant", "SYNAPSE-DEMO")
+                .header("X-Synapse-Tenant", "STARTER-OPS")
                 .contentType(APPLICATION_JSON)
                 .content("""
                     {
@@ -3059,7 +3095,7 @@ class MvpFlowIntegrationTest {
                 .contentType(APPLICATION_JSON)
                 .content("""
                     {
-                      "tenantCode": "SYNAPSE-DEMO",
+                      "tenantCode": "STARTER-OPS",
                       "username": "north.lifecycle.manager",
                       "password": "north-lifecycle-2026"
                     }
@@ -3071,7 +3107,7 @@ class MvpFlowIntegrationTest {
                 .contentType(APPLICATION_JSON)
                 .content("""
                     {
-                      "tenantCode": "SYNAPSE-DEMO",
+                      "tenantCode": "STARTER-OPS",
                       "username": "north.lifecycle.manager",
                       "password": "north-reset-2026"
                     }
@@ -3087,7 +3123,7 @@ class MvpFlowIntegrationTest {
 
         mockMvc.perform(put("/api/access/admin/operators/" + finalManagerOperatorId)
                 .with(accessHeaders("Operations Lead", "TENANT_ADMIN"))
-                .header("X-Synapse-Tenant", "SYNAPSE-DEMO")
+                .header("X-Synapse-Tenant", "STARTER-OPS")
                 .contentType(APPLICATION_JSON)
                 .content("""
                     {
@@ -3110,7 +3146,7 @@ class MvpFlowIntegrationTest {
                 .contentType(APPLICATION_JSON)
                 .content("""
                     {
-                      "tenantCode": "SYNAPSE-DEMO",
+                      "tenantCode": "STARTER-OPS",
                       "username": "north.lifecycle.manager",
                       "password": "north-reset-2026"
                     }
@@ -3120,7 +3156,7 @@ class MvpFlowIntegrationTest {
 
         mockMvc.perform(put("/api/access/admin/operators/" + finalManagerOperatorId)
                 .with(accessHeaders("Operations Lead", "TENANT_ADMIN"))
-                .header("X-Synapse-Tenant", "SYNAPSE-DEMO")
+                .header("X-Synapse-Tenant", "STARTER-OPS")
                 .contentType(APPLICATION_JSON)
                 .content("""
                     {
@@ -3137,7 +3173,7 @@ class MvpFlowIntegrationTest {
 
         mockMvc.perform(put("/api/access/admin/users/" + lifecycleUserId)
                 .with(accessHeaders("Operations Lead", "TENANT_ADMIN"))
-                .header("X-Synapse-Tenant", "SYNAPSE-DEMO")
+                .header("X-Synapse-Tenant", "STARTER-OPS")
                 .contentType(APPLICATION_JSON)
                 .content("""
                     {
@@ -3153,7 +3189,7 @@ class MvpFlowIntegrationTest {
                 .contentType(APPLICATION_JSON)
                 .content("""
                     {
-                      "tenantCode": "SYNAPSE-DEMO",
+                      "tenantCode": "STARTER-OPS",
                       "username": "north.lifecycle.manager",
                       "password": "north-reset-2026"
                     }
@@ -3163,7 +3199,7 @@ class MvpFlowIntegrationTest {
 
         mockMvc.perform(put("/api/access/admin/users/" + lifecycleUserId)
                 .with(accessHeaders("Operations Lead", "TENANT_ADMIN"))
-                .header("X-Synapse-Tenant", "SYNAPSE-DEMO")
+                .header("X-Synapse-Tenant", "STARTER-OPS")
                 .contentType(APPLICATION_JSON)
                 .content("""
                     {
@@ -3179,7 +3215,7 @@ class MvpFlowIntegrationTest {
                 .contentType(APPLICATION_JSON)
                 .content("""
                     {
-                      "tenantCode": "SYNAPSE-DEMO",
+                      "tenantCode": "STARTER-OPS",
                       "username": "north.lifecycle.manager",
                       "password": "north-reset-2026"
                     }
@@ -3200,10 +3236,10 @@ class MvpFlowIntegrationTest {
     void tenantAdminCanManageWorkspaceSettingsWarehousesAndConnectorSupport() throws Exception {
         mockMvc.perform(get("/api/access/admin/workspace")
                 .with(accessHeaders("Operations Lead", "TENANT_ADMIN"))
-                .header("X-Synapse-Tenant", "SYNAPSE-DEMO"))
+                .header("X-Synapse-Tenant", "STARTER-OPS"))
             .andExpect(status().isOk())
-            .andExpect(jsonPath("$.tenantCode").value("SYNAPSE-DEMO"))
-            .andExpect(jsonPath("$.tenantName").value("Synapse Demo Company"))
+            .andExpect(jsonPath("$.tenantCode").value("STARTER-OPS"))
+            .andExpect(jsonPath("$.tenantName").value("Starter Operations Workspace"))
             .andExpect(jsonPath("$.securitySettings.passwordRotationDays").value(90))
             .andExpect(jsonPath("$.securitySettings.sessionTimeoutMinutes").value(480))
             .andExpect(jsonPath("$.securitySettings.securityPolicyVersion").value(1))
@@ -3225,12 +3261,12 @@ class MvpFlowIntegrationTest {
             .andExpect(jsonPath("$.connectors[?(@.sourceSystem == 'erp_north')].supportOwnerActorName")
                 .value(org.hamcrest.Matchers.hasItem("Operations Lead")));
 
-        Long northWarehouseId = warehouseRepository.findByTenant_CodeIgnoreCaseAndCode("SYNAPSE-DEMO", "WH-NORTH")
+        Long northWarehouseId = warehouseRepository.findByTenant_CodeIgnoreCaseAndCode("STARTER-OPS", "WH-NORTH")
             .orElseThrow()
             .getId();
         Long northConnectorId = integrationConnectorRepository
             .findByTenant_CodeIgnoreCaseAndSourceSystemIgnoreCaseAndType(
-                "SYNAPSE-DEMO",
+                "STARTER-OPS",
                 "erp_north",
                 com.synapsecore.domain.entity.IntegrationConnectorType.WEBHOOK_ORDER
             )
@@ -3239,21 +3275,21 @@ class MvpFlowIntegrationTest {
 
         mockMvc.perform(put("/api/access/admin/workspace")
                 .with(accessHeaders("Operations Lead", "TENANT_ADMIN"))
-                .header("X-Synapse-Tenant", "SYNAPSE-DEMO")
+                .header("X-Synapse-Tenant", "STARTER-OPS")
                 .contentType(APPLICATION_JSON)
                 .content("""
                     {
-                      "tenantName": "Synapse Demo Company Updated",
+                      "tenantName": "Starter Operations Workspace Updated",
                       "description": "Tenant admin support lane updated through workspace settings."
                     }
                     """))
             .andExpect(status().isOk())
-            .andExpect(jsonPath("$.tenantName").value("Synapse Demo Company Updated"))
+            .andExpect(jsonPath("$.tenantName").value("Starter Operations Workspace Updated"))
             .andExpect(jsonPath("$.description").value("Tenant admin support lane updated through workspace settings."));
 
         mockMvc.perform(put("/api/access/admin/workspace/warehouses/" + northWarehouseId)
                 .with(accessHeaders("Operations Lead", "TENANT_ADMIN"))
-                .header("X-Synapse-Tenant", "SYNAPSE-DEMO")
+                .header("X-Synapse-Tenant", "STARTER-OPS")
                 .contentType(APPLICATION_JSON)
                 .content("""
                     {
@@ -3268,7 +3304,7 @@ class MvpFlowIntegrationTest {
 
         mockMvc.perform(put("/api/access/admin/workspace/connectors/" + northConnectorId)
                 .with(accessHeaders("Operations Lead", "TENANT_ADMIN"))
-                .header("X-Synapse-Tenant", "SYNAPSE-DEMO")
+                .header("X-Synapse-Tenant", "STARTER-OPS")
                 .contentType(APPLICATION_JSON)
                 .content("""
                     {
@@ -3281,7 +3317,7 @@ class MvpFlowIntegrationTest {
 
         mockMvc.perform(put("/api/access/admin/workspace/connectors/" + northConnectorId)
                 .with(accessHeaders("Operations Lead", "TENANT_ADMIN"))
-                .header("X-Synapse-Tenant", "SYNAPSE-DEMO")
+                .header("X-Synapse-Tenant", "STARTER-OPS")
                 .contentType(APPLICATION_JSON)
                 .content("""
                     {
@@ -3294,11 +3330,27 @@ class MvpFlowIntegrationTest {
                       "notes": "North operations director now owns webhook support."
                     }
                     """))
+            .andExpect(status().isBadRequest())
+            .andExpect(jsonPath("$.message").value(org.hamcrest.Matchers.containsString("pullEndpointUrl is required")));
+
+        mockMvc.perform(put("/api/access/admin/workspace/connectors/" + northConnectorId)
+                .with(accessHeaders("Operations Lead", "TENANT_ADMIN"))
+                .header("X-Synapse-Tenant", "STARTER-OPS")
+                .contentType(APPLICATION_JSON)
+                .content("""
+                    {
+                      "supportOwnerActorName": "North Operations Director",
+                      "syncMode": "REALTIME_PUSH",
+                      "validationPolicy": "STRICT",
+                      "transformationPolicy": "NORMALIZE_CODES",
+                      "allowDefaultWarehouseFallback": true,
+                      "notes": "North operations director now owns webhook support."
+                    }
+                    """))
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.supportOwnerActorName").value("North Operations Director"))
             .andExpect(jsonPath("$.supportOwnerDisplayName").value("North Operations Director"))
-            .andExpect(jsonPath("$.syncMode").value("SCHEDULED_PULL"))
-            .andExpect(jsonPath("$.syncIntervalMinutes").value(60))
+            .andExpect(jsonPath("$.syncMode").value("REALTIME_PUSH"))
             .andExpect(jsonPath("$.validationPolicy").value("STRICT"))
             .andExpect(jsonPath("$.transformationPolicy").value("NORMALIZE_CODES"))
             .andExpect(jsonPath("$.allowDefaultWarehouseFallback").value(true))
@@ -3306,9 +3358,9 @@ class MvpFlowIntegrationTest {
 
         mockMvc.perform(get("/api/access/admin/workspace")
                 .with(accessHeaders("Operations Lead", "TENANT_ADMIN"))
-                .header("X-Synapse-Tenant", "SYNAPSE-DEMO"))
+                .header("X-Synapse-Tenant", "STARTER-OPS"))
             .andExpect(status().isOk())
-            .andExpect(jsonPath("$.tenantName").value("Synapse Demo Company Updated"))
+            .andExpect(jsonPath("$.tenantName").value("Starter Operations Workspace Updated"))
             .andExpect(jsonPath("$.description").value("Tenant admin support lane updated through workspace settings."))
             .andExpect(jsonPath("$.supportDiagnostics.latestSupportAuditAt").isNotEmpty())
             .andExpect(jsonPath("$.recentSupportActivity[?(@.action == 'TENANT_WORKSPACE_UPDATED')].actor")
@@ -3324,9 +3376,7 @@ class MvpFlowIntegrationTest {
             .andExpect(jsonPath("$.connectors[?(@.sourceSystem == 'erp_north')].supportOwnerActorName")
                 .value(org.hamcrest.Matchers.hasItem("North Operations Director")))
             .andExpect(jsonPath("$.connectors[?(@.sourceSystem == 'erp_north')].syncMode")
-                .value(org.hamcrest.Matchers.hasItem("SCHEDULED_PULL")))
-            .andExpect(jsonPath("$.connectors[?(@.sourceSystem == 'erp_north')].syncIntervalMinutes")
-                .value(org.hamcrest.Matchers.hasItem(60)))
+                .value(org.hamcrest.Matchers.hasItem("REALTIME_PUSH")))
             .andExpect(jsonPath("$.connectors[?(@.sourceSystem == 'erp_north')].notes")
                 .value(org.hamcrest.Matchers.hasItem("North operations director now owns webhook support.")));
 
@@ -3344,7 +3394,7 @@ class MvpFlowIntegrationTest {
                 .contentType(APPLICATION_JSON)
                 .content("""
                     {
-                      "tenantCode": "SYNAPSE-DEMO",
+                      "tenantCode": "STARTER-OPS",
                       "username": "operations.lead",
                       "password": "lead-2026"
                     }
@@ -3360,7 +3410,7 @@ class MvpFlowIntegrationTest {
                 .contentType(APPLICATION_JSON)
                 .content("""
                     {
-                      "tenantCode": "SYNAPSE-DEMO",
+                      "tenantCode": "STARTER-OPS",
                       "username": "integration.lead",
                       "password": "integration-admin-2026"
                     }
@@ -3393,7 +3443,7 @@ class MvpFlowIntegrationTest {
                 .contentType(APPLICATION_JSON)
                 .content("""
                     {
-                      "tenantCode": "SYNAPSE-DEMO",
+                      "tenantCode": "STARTER-OPS",
                       "username": "operations.lead",
                       "password": "lead-2026"
                     }
@@ -3405,7 +3455,7 @@ class MvpFlowIntegrationTest {
                 .contentType(APPLICATION_JSON)
                 .content("""
                     {
-                      "tenantCode": "SYNAPSE-DEMO",
+                      "tenantCode": "STARTER-OPS",
                       "username": "operations.lead",
                       "password": "lead-2026-rotated"
                     }
@@ -3418,7 +3468,7 @@ class MvpFlowIntegrationTest {
 
         mockMvc.perform(put("/api/access/admin/workspace/security")
                 .with(accessHeaders("Operations Lead", "TENANT_ADMIN"))
-                .header("X-Synapse-Tenant", "SYNAPSE-DEMO")
+                .header("X-Synapse-Tenant", "STARTER-OPS")
                 .contentType(APPLICATION_JSON)
                 .content("""
                     {
@@ -3577,15 +3627,16 @@ class MvpFlowIntegrationTest {
             .andExpect(jsonPath("$.integrationReplayQueue.length()").value(1))
             .andExpect(jsonPath("$.integrationReplayQueue[0].externalOrderId").value("CSV-RPL-1001"));
 
-        Product replayProduct = productRepository.save(Product.builder()
-            .sku("SKU-RPL-778")
-            .name("Replay Recovery Rotor")
-            .category("Recovery")
-            .build());
+        Product replayProduct = createTenantProduct("WH-NORTH", "SKU-RPL-778", "Replay Recovery Rotor", "Recovery");
 
+        var replayWarehouse = warehouseRepository.findByCode("WH-NORTH").orElseThrow();
         inventoryRepository.save(Inventory.builder()
+            .tenant(replayWarehouse.getTenant())
             .product(replayProduct)
-            .warehouse(warehouseRepository.findByCode("WH-NORTH").orElseThrow())
+            .warehouse(replayWarehouse)
+            .quantityOnHand(14L)
+            .quantityReserved(0L)
+            .quantityInbound(0L)
             .quantityAvailable(14L)
             .reorderThreshold(4L)
             .build());
@@ -3669,15 +3720,15 @@ class MvpFlowIntegrationTest {
 
     @Test
     void depletionRiskIsDetectedBeforeThresholdBreachWhenDemandSpikes() throws Exception {
-        Product transientProduct = productRepository.save(Product.builder()
-            .sku("SKU-DSP-610")
-            .name("Demand Spike Rotor")
-            .category("Dynamics")
-            .build());
+        Product transientProduct = createTenantProduct("WH-NORTH", "SKU-DSP-610", "Demand Spike Rotor", "Dynamics");
         var warehouse = warehouseRepository.findByCode("WH-NORTH").orElseThrow();
         inventoryRepository.save(Inventory.builder()
+            .tenant(warehouse.getTenant())
             .product(transientProduct)
             .warehouse(warehouse)
+            .quantityOnHand(100L)
+            .quantityReserved(0L)
+            .quantityInbound(0L)
             .quantityAvailable(100L)
             .reorderThreshold(20L)
             .build());
@@ -3725,15 +3776,15 @@ class MvpFlowIntegrationTest {
 
     @Test
     void depletionRiskAlertResolvesWhenInventoryBufferRecovers() throws Exception {
-        Product transientProduct = productRepository.save(Product.builder()
-            .sku("SKU-DSP-611")
-            .name("Demand Spike Buffer")
-            .category("Dynamics")
-            .build());
+        Product transientProduct = createTenantProduct("WH-NORTH", "SKU-DSP-611", "Demand Spike Buffer", "Dynamics");
         var warehouse = warehouseRepository.findByCode("WH-NORTH").orElseThrow();
         inventoryRepository.save(Inventory.builder()
+            .tenant(warehouse.getTenant())
             .product(transientProduct)
             .warehouse(warehouse)
+            .quantityOnHand(100L)
+            .quantityReserved(0L)
+            .quantityInbound(0L)
             .quantityAvailable(100L)
             .reorderThreshold(20L)
             .build());
@@ -3784,23 +3835,27 @@ class MvpFlowIntegrationTest {
 
     @Test
     void transferRecommendationIsGeneratedWhenAnotherWarehouseCanCoverShortfall() throws Exception {
-        Product transientProduct = productRepository.save(Product.builder()
-            .sku("SKU-XFR-710")
-            .name("Transfer Signal Module")
-            .category("Coordination")
-            .build());
+        Product transientProduct = createTenantProduct("WH-NORTH", "SKU-XFR-710", "Transfer Signal Module", "Coordination");
         var northWarehouse = warehouseRepository.findByCode("WH-NORTH").orElseThrow();
         var coastWarehouse = warehouseRepository.findByCode("WH-COAST").orElseThrow();
 
         inventoryRepository.save(Inventory.builder()
+            .tenant(northWarehouse.getTenant())
             .product(transientProduct)
             .warehouse(northWarehouse)
+            .quantityOnHand(34L)
+            .quantityReserved(0L)
+            .quantityInbound(0L)
             .quantityAvailable(34L)
             .reorderThreshold(20L)
             .build());
         inventoryRepository.save(Inventory.builder()
+            .tenant(coastWarehouse.getTenant())
             .product(transientProduct)
             .warehouse(coastWarehouse)
+            .quantityOnHand(10L)
+            .quantityReserved(0L)
+            .quantityInbound(0L)
             .quantityAvailable(10L)
             .reorderThreshold(16L)
             .build());
@@ -3891,7 +3946,7 @@ class MvpFlowIntegrationTest {
     }
 
     @Test
-    void reseedRestoresStarterBaselineAndStopsSimulation() throws Exception {
+    void reseedRestoresStarterBaseline() throws Exception {
         String orderBody = """
             {
               "warehouseCode": "WH-NORTH",
@@ -3910,10 +3965,6 @@ class MvpFlowIntegrationTest {
                 .content(orderBody))
             .andExpect(status().isCreated());
 
-        mockMvc.perform(post("/api/simulation/start"))
-            .andExpect(status().isOk())
-            .andExpect(jsonPath("$.active").value(true));
-
         mockMvc.perform(post("/api/scenarios/order-impact")
                 .contentType(APPLICATION_JSON)
                 .content(orderBody))
@@ -3924,8 +3975,7 @@ class MvpFlowIntegrationTest {
             .andExpect(jsonPath("$.status").value("reseeded"))
             .andExpect(jsonPath("$.productsSeeded").value(4))
             .andExpect(jsonPath("$.warehousesSeeded").value(2))
-            .andExpect(jsonPath("$.inventoryRecordsSeeded").value(8))
-            .andExpect(jsonPath("$.simulation.active").value(false));
+            .andExpect(jsonPath("$.inventoryRecordsSeeded").value(8));
 
         mockMvc.perform(get("/api/dashboard/summary"))
             .andExpect(status().isOk())
@@ -3935,8 +3985,7 @@ class MvpFlowIntegrationTest {
             .andExpect(jsonPath("$.recommendationsCount").value(0))
             .andExpect(jsonPath("$.totalProducts").value(4))
             .andExpect(jsonPath("$.totalWarehouses").value(2))
-            .andExpect(jsonPath("$.inventoryRecordsCount").value(8))
-            .andExpect(jsonPath("$.simulationRunning").value(false));
+            .andExpect(jsonPath("$.inventoryRecordsCount").value(8));
 
         mockMvc.perform(get("/api/scenarios/history"))
             .andExpect(status().isOk())
@@ -3954,7 +4003,8 @@ class MvpFlowIntegrationTest {
             .andExpect(jsonPath("$.readinessState").value("ACCEPTING_TRAFFIC"))
             .andExpect(jsonPath("$.headerFallbackEnabled").value(true))
             .andExpect(jsonPath("$.secureSessionCookies").value(false))
-            .andExpect(jsonPath("$.simulationIntervalMs").value(60000))
+            .andExpect(jsonPath("$.simulationEnabled").doesNotExist())
+            .andExpect(jsonPath("$.simulationIntervalMs").doesNotExist())
             .andExpect(jsonPath("$.telemetry.disabledConnectorCount").value(0))
             .andExpect(jsonPath("$.telemetry.replayQueueDepth").value(0))
             .andExpect(jsonPath("$.telemetry.recentImportIssues").value(0))
@@ -3975,6 +4025,9 @@ class MvpFlowIntegrationTest {
             .andExpect(jsonPath("$.metrics.dispatchQueued").value(org.hamcrest.Matchers.greaterThanOrEqualTo(0.0)))
             .andExpect(jsonPath("$.metrics.dispatchProcessed").value(org.hamcrest.Matchers.greaterThanOrEqualTo(0.0)))
             .andExpect(jsonPath("$.metrics.dispatchFailures").value(org.hamcrest.Matchers.greaterThanOrEqualTo(0.0)))
+            .andExpect(jsonPath("$.metrics.httpRequests").value(org.hamcrest.Matchers.greaterThanOrEqualTo(0.0)))
+            .andExpect(jsonPath("$.metrics.failedHttpRequests").value(org.hamcrest.Matchers.greaterThanOrEqualTo(0.0)))
+            .andExpect(jsonPath("$.metrics.averageHttpRequestLatencyMs").value(org.hamcrest.Matchers.greaterThanOrEqualTo(0.0)))
             .andExpect(jsonPath("$.diagnostics.windowHours").value(24))
             .andExpect(jsonPath("$.diagnostics.activeIncidentCount").value(0))
             .andExpect(jsonPath("$.allowedOrigins.length()").value(org.hamcrest.Matchers.greaterThanOrEqualTo(1)));
@@ -3996,12 +4049,14 @@ class MvpFlowIntegrationTest {
 
         mockMvc.perform(multipart("/api/integrations/orders/csv-import")
                 .file(file)
+                .header("X-Synapse-Tenant", "STARTER-OPS")
                 .param("sourceSystem", "erp_batch"))
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.ordersImported").value(0))
             .andExpect(jsonPath("$.ordersFailed").value(1));
 
         mockMvc.perform(post("/api/inventory/update")
+                .header("X-Synapse-Tenant", "STARTER-OPS")
                 .contentType(APPLICATION_JSON)
                 .content("""
                     {
@@ -4015,6 +4070,7 @@ class MvpFlowIntegrationTest {
 
         mockMvc.perform(post("/api/integrations/orders/connectors")
                 .with(accessHeaders("Integration Lead", "INTEGRATION_ADMIN"))
+                .header("X-Synapse-Tenant", "STARTER-OPS")
                 .contentType(APPLICATION_JSON)
                 .content("""
                     {
@@ -4030,7 +4086,7 @@ class MvpFlowIntegrationTest {
             .andExpect(jsonPath("$.enabled").value(false));
 
         operationalDispatchWorkItemRepository.save(OperationalDispatchWorkItem.builder()
-            .tenantCode("SYNAPSE-DEMO")
+            .tenantCode("STARTER-OPS")
             .updateType(OperationalUpdateType.ORDER_FLOW)
             .source("runtime-test")
             .requestId("req-backbone-1")
@@ -4054,6 +4110,12 @@ class MvpFlowIntegrationTest {
             .andExpect(jsonPath("$.backbone.failedDispatchCount").value(1))
             .andExpect(jsonPath("$.metrics.integrationImportRuns")
                 .value(org.hamcrest.Matchers.greaterThanOrEqualTo(1.0)))
+            .andExpect(jsonPath("$.metrics.httpRequests")
+                .value(org.hamcrest.Matchers.greaterThanOrEqualTo(3.0)))
+            .andExpect(jsonPath("$.metrics.failedHttpRequests")
+                .value(org.hamcrest.Matchers.greaterThanOrEqualTo(1.0)))
+            .andExpect(jsonPath("$.metrics.averageHttpRequestLatencyMs")
+                .value(org.hamcrest.Matchers.greaterThanOrEqualTo(0.0)))
             .andExpect(jsonPath("$.metrics.dispatchQueued")
                 .value(org.hamcrest.Matchers.greaterThanOrEqualTo(2.0)))
             .andExpect(jsonPath("$.metrics.dispatchProcessed")
@@ -4114,6 +4176,7 @@ class MvpFlowIntegrationTest {
     @DirtiesContext(methodMode = DirtiesContext.MethodMode.AFTER_METHOD)
     void committedRequestsDrainDispatchQueueAndExposePrometheusMetrics() throws Exception {
         mockMvc.perform(post("/api/orders")
+                .header("X-Synapse-Tenant", "STARTER-OPS")
                 .contentType(APPLICATION_JSON)
                 .content("""
                     {
@@ -4140,14 +4203,31 @@ class MvpFlowIntegrationTest {
         mockMvc.perform(get("/actuator/prometheus"))
             .andExpect(status().isOk())
             .andExpect(content().string(org.hamcrest.Matchers.containsString("synapsecore_dispatch_queue_backlog")))
+            .andExpect(content().string(org.hamcrest.Matchers.containsString("synapsecore_http_requests_total")))
+            .andExpect(content().string(org.hamcrest.Matchers.containsString("synapsecore_http_request_duration_seconds")))
             .andExpect(content().string(org.hamcrest.Matchers.containsString("synapsecore_orders_ingested_total")))
             .andExpect(content().string(org.hamcrest.Matchers.containsString("synapsecore_fulfillment_backlog")));
     }
 
     private Inventory loadInventory(String sku, String warehouseCode) {
-        Long productId = productRepository.findBySku(sku).orElseThrow().getId();
-        Long warehouseId = warehouseRepository.findByCode(warehouseCode).orElseThrow().getId();
+        var warehouse = warehouseRepository.findByCode(warehouseCode).orElseThrow();
+        Long productId = productRepository.findByTenant_CodeIgnoreCaseAndCatalogSkuIgnoreCase(
+                warehouse.getTenant().getCode(),
+                sku)
+            .orElseThrow()
+            .getId();
+        Long warehouseId = warehouse.getId();
         return inventoryRepository.findByProductIdAndWarehouseId(productId, warehouseId).orElseThrow();
+    }
+
+    private Product createTenantProduct(String warehouseCode, String catalogSku, String name, String category) {
+        var tenant = warehouseRepository.findByCode(warehouseCode).orElseThrow().getTenant();
+        return productRepository.save(Product.builder()
+            .tenant(tenant)
+            .catalogSku(catalogSku)
+            .name(name)
+            .category(category)
+            .build());
     }
 
     private void configureConnectorToken(String tenantCode,

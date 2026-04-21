@@ -7,6 +7,9 @@ public record SystemMetricsSummary(
     double replayAttempts,
     double dispatchQueued,
     double dispatchProcessed,
-    double dispatchFailures
+    double dispatchFailures,
+    double httpRequests,
+    double failedHttpRequests,
+    double averageHttpRequestLatencyMs
 ) {
 }

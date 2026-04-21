@@ -4,6 +4,7 @@ public record ProductResponse(
     Long id,
     String sku,
     String name,
-    String category
+    String category,
+    String tenantCode
 ) {
 }

@@ -21,7 +21,7 @@ export default function SystemConfigPage({ context }) {
         <div className="summary-grid compact-summary-grid">
           <SummaryCard label="Dispatch interval" value={runtime ? `${runtime.backbone.dispatchIntervalMs} ms` : '...'} accent="blue" />
           <SummaryCard label="Batch size" value={runtime?.backbone?.batchSize ?? 0} accent="teal" />
-          <SummaryCard label="Simulation interval" value={runtime ? `${runtime.simulationIntervalMs} ms` : '...'} accent="amber" />
+          <SummaryCard label="Average request latency" value={runtime ? `${formatMetricValue(runtime.metrics.averageHttpRequestLatencyMs)} ms` : '...'} accent="amber" />
           <SummaryCard label="Allowed origins" value={runtime?.allowedOrigins?.length ?? 0} accent="rose" />
         </div>
         <div className="approval-board">
@@ -38,17 +38,22 @@ export default function SystemConfigPage({ context }) {
         </div>
         <div className="experience-grid experience-grid-three">
           <article className="stack-card section-card">
-            <div className="stack-title-row"><strong>Operational defaults</strong><span className="scenario-type-tag">{runtime?.activeProfiles?.join(', ') || 'Loading'}</span></div>
+            <div className="stack-title-row"><strong>Request and access posture</strong><span className="scenario-type-tag">{runtime?.activeProfiles?.join(', ') || 'Loading'}</span></div>
             <div className="signal-list">
               <div className="signal-list-item">
-                <strong>Simulation cadence</strong>
-                <p>{runtime ? `${runtime.simulationIntervalMs} ms` : '...'}</p>
-                <p className="muted-text">Controls the local live-stream behavior used for product verification and scenario movement.</p>
+                <strong>Average request latency</strong>
+                <p>{runtime ? `${formatMetricValue(runtime.metrics.averageHttpRequestLatencyMs)} ms` : '...'}</p>
+                <p className="muted-text">Tracks the average response time across live workspace traffic for this tenant scope.</p>
               </div>
               <div className="signal-list-item">
-                <strong>Header fallback</strong>
+                <strong>Tenant resolution</strong>
                 <p>{runtime?.headerFallbackEnabled ? 'Enabled' : 'Disabled'}</p>
                 <p className="muted-text">Session-only tenant resolution is the secure production target.</p>
+              </div>
+              <div className="signal-list-item">
+                <strong>Production posture</strong>
+                <p>Live-only</p>
+                <p className="muted-text">Development-only reseed helpers are not part of the live operational platform path.</p>
               </div>
             </div>
           </article>
@@ -87,4 +92,3 @@ export default function SystemConfigPage({ context }) {
     </section>
   )
 }
-

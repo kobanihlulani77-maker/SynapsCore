@@ -43,6 +43,10 @@ Important production variables:
 - `SESSION_COOKIE_SECURE`
 - `SESSION_COOKIE_SAME_SITE`
 - `ALLOW_HEADER_FALLBACK=false`
+- `SYNAPSECORE_REALTIME_BROKER_MODE=SIMPLE_IN_MEMORY` for the current single-node deployment, or `EXTERNAL_BROKER` with relay env vars for horizontal websocket scale-out
+- `SYNAPSECORE_INTEGRATION_PULL_WORKER_ENABLED=true`
+- `SYNAPSECORE_INTEGRATION_PULL_WORKER_INTERVAL_MS=60000`
+- `SYNAPSECORE_INTEGRATION_PULL_WORKER_BATCH_SIZE=10`
 - `SPRING_JPA_HIBERNATE_DDL_AUTO=update`
 - `SYNAPSECORE_BOOTSTRAP_INITIAL_TOKEN` only for the first tenant bootstrap on an empty production environment
 - `SYNAPSECORE_PLATFORM_ADMIN_TOKEN` for ongoing production tenant provisioning after bootstrap

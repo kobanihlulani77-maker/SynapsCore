@@ -9,6 +9,7 @@ import java.time.Instant;
 public record FulfillmentUpdateRequest(
     @NotBlank @Size(max = 80) String externalOrderId,
     @NotNull FulfillmentStatus status,
+    Integer fulfilledUnits,
     @Size(max = 80) String carrier,
     @Size(max = 120) String trackingReference,
     Instant promisedDispatchAt,

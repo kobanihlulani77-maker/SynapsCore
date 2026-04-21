@@ -29,7 +29,7 @@ echo "1. Start infra:      cd \"$ROOT_DIR/infrastructure\" && docker compose up 
 echo "2. Run backend:      cd \"$ROOT_DIR/backend\" && ./mvnw spring-boot:run"
 echo "3. Run frontend:     cd \"$ROOT_DIR/frontend\" && npm install && npm run dev"
 echo "4. Open dashboard:   http://localhost:5173"
-echo "5. Reseed demo data: bash \"$ROOT_DIR/scripts/seed.sh\""
+echo "5. Reset local starter data: bash \"$ROOT_DIR/scripts/seed.sh\""
 echo
 echo "Or run the full stack with Docker:"
 echo "cd \"$ROOT_DIR/infrastructure\" && docker compose up --build"

@@ -11,6 +11,7 @@ import jakarta.persistence.Id;
 import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
 import jakarta.persistence.PrePersist;
+import jakarta.persistence.PreUpdate;
 import jakarta.persistence.Table;
 import java.time.Instant;
 import lombok.AllArgsConstructor;
@@ -56,6 +57,9 @@ public class Alert {
     @Column(nullable = false, length = 1024)
     private String recommendedAction;
 
+    @Column(length = 1024)
+    private String policyExplanation;
+
     @Enumerated(EnumType.STRING)
     @Column(nullable = false, length = 32)
     private AlertStatus status;
@@ -63,8 +67,18 @@ public class Alert {
     @Column(nullable = false, updatable = false)
     private Instant createdAt;
 
+    @Column(nullable = false)
+    private Instant updatedAt;
+
     @PrePersist
     void onCreate() {
-        createdAt = Instant.now();
+        Instant now = Instant.now();
+        createdAt = now;
+        updatedAt = now;
+    }
+
+    @PreUpdate
+    void onUpdate() {
+        updatedAt = Instant.now();
     }
 }

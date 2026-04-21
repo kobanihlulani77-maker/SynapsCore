@@ -1,13 +1,18 @@
 package com.synapsecore.scenario;
 
 import com.synapsecore.domain.entity.AlertSeverity;
+import com.synapsecore.domain.service.TenantOperationalPolicyService;
 import com.synapsecore.domain.entity.RecommendationPriority;
 import com.synapsecore.domain.entity.ScenarioReviewPriority;
 import com.synapsecore.scenario.dto.ScenarioOrderImpactResponse;
+import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
 @Service
+@RequiredArgsConstructor
 public class ScenarioRiskPolicyService {
+
+    private final TenantOperationalPolicyService tenantOperationalPolicyService;
 
     public ScenarioRiskAssessment assess(ScenarioOrderImpactResponse response) {
         int score = calculateRiskScore(response);
@@ -31,13 +36,14 @@ public class ScenarioRiskPolicyService {
     }
 
     private ScenarioReviewPriority determineReviewPriority(ScenarioOrderImpactResponse response, int score) {
+        var policy = tenantOperationalPolicyService.getCurrentPolicy();
         boolean criticalExposure = response.projectedInventory().stream()
             .anyMatch(item -> "critical".equalsIgnoreCase(item.riskLevel()))
             || response.projectedAlerts().stream().anyMatch(alert -> alert.severity() == AlertSeverity.CRITICAL)
             || response.projectedRecommendations().stream()
                 .anyMatch(recommendation -> recommendation.priority() == RecommendationPriority.CRITICAL);
 
-        if (criticalExposure || score >= 100) {
+        if (criticalExposure || score >= policy.getCriticalRiskScoreThreshold()) {
             return ScenarioReviewPriority.CRITICAL;
         }
 
@@ -47,7 +53,7 @@ public class ScenarioRiskPolicyService {
             || response.projectedRecommendations().stream()
                 .anyMatch(recommendation -> recommendation.priority() == RecommendationPriority.HIGH);
 
-        if (highExposure || score >= 40) {
+        if (highExposure || score >= policy.getHighRiskScoreThreshold()) {
             return ScenarioReviewPriority.HIGH;
         }
 

@@ -22,10 +22,11 @@ server:
 synapsecore:
   access:
     allow-header-fallback: ${ALLOW_HEADER_FALLBACK:false}
-  demo:
-    auto-seed-on-empty: ${SYNAPSECORE_DEMO_AUTO_SEED_ON_EMPTY:false}
-    allow-default-tenant-fallback: ${SYNAPSECORE_DEMO_ALLOW_DEFAULT_TENANT_FALLBACK:false}
-    simulation-enabled: ${SYNAPSECORE_DEMO_SIMULATION_ENABLED:false}
-    seed-starter-inventory-on-tenant-onboarding: ${SYNAPSECORE_DEMO_SEED_STARTER_INVENTORY_ON_TENANT_ONBOARDING:false}
-    seed-starter-connectors-on-tenant-onboarding: ${SYNAPSECORE_DEMO_SEED_STARTER_CONNECTORS_ON_TENANT_ONBOARDING:false}
-    allow-tenant-admin-tenant-onboarding: ${SYNAPSECORE_DEMO_ALLOW_TENANT_ADMIN_TENANT_ONBOARDING:false}
+  realtime:
+    broker-mode: ${SYNAPSECORE_REALTIME_BROKER_MODE:SIMPLE_IN_MEMORY}
+  starter:
+    auto-seed-on-empty: ${SYNAPSECORE_STARTER_AUTO_SEED_ON_EMPTY:false}
+    allow-default-tenant-fallback: ${SYNAPSECORE_STARTER_ALLOW_DEFAULT_TENANT_FALLBACK:false}
+    seed-starter-inventory-on-tenant-onboarding: ${SYNAPSECORE_STARTER_SEED_INVENTORY_ON_TENANT_ONBOARDING:false}
+    seed-starter-connectors-on-tenant-onboarding: ${SYNAPSECORE_STARTER_SEED_CONNECTORS_ON_TENANT_ONBOARDING:false}
+    allow-tenant-admin-tenant-onboarding: ${SYNAPSECORE_STARTER_ALLOW_TENANT_ADMIN_TENANT_ONBOARDING:false}

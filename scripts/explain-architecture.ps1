@@ -94,7 +94,7 @@ SynapseCore uses tenant-scoped topics for:
 - replay queue
 - scenario notifications
 - escalations
-- simulation state
+- runtime trust diagnostics
 
 TRUST MODEL
 

@@ -2,22 +2,29 @@ import { randomUUID } from 'node:crypto'
 import { expect, request as playwrightRequest, test } from '@playwright/test'
 
 const backendUrl = process.env.PLAYWRIGHT_BACKEND_URL || 'https://synapscore-3.onrender.com'
+const requiredEnv = (name) => {
+  const value = process.env[name]
+  if (!value || !value.trim()) {
+    throw new Error(`Missing required environment variable ${name} for live production proof.`)
+  }
+  return value.trim()
+}
 
 const users = {
   operationsLead: {
-    tenantCode: 'SYNAPSE-DEMO',
-    username: 'operations.lead',
-    password: 'lead-2026',
+    tenantCode: requiredEnv('PLAYWRIGHT_TENANT_CODE'),
+    username: requiredEnv('PLAYWRIGHT_OPERATIONS_LEAD_USERNAME'),
+    password: requiredEnv('PLAYWRIGHT_OPERATIONS_LEAD_PASSWORD'),
   },
   operationsPlanner: {
-    tenantCode: 'SYNAPSE-DEMO',
-    username: 'operations.planner',
-    password: 'planner-2026',
+    tenantCode: requiredEnv('PLAYWRIGHT_TENANT_CODE'),
+    username: requiredEnv('PLAYWRIGHT_OPERATIONS_PLANNER_USERNAME'),
+    password: requiredEnv('PLAYWRIGHT_OPERATIONS_PLANNER_PASSWORD'),
   },
   integrationLead: {
-    tenantCode: 'SYNAPSE-DEMO',
-    username: 'integration.lead',
-    password: 'integration-admin-2026',
+    tenantCode: requiredEnv('PLAYWRIGHT_TENANT_CODE'),
+    username: requiredEnv('PLAYWRIGHT_INTEGRATION_LEAD_USERNAME'),
+    password: requiredEnv('PLAYWRIGHT_INTEGRATION_LEAD_PASSWORD'),
   },
 }
 

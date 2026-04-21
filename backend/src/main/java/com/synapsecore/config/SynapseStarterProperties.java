@@ -2,12 +2,11 @@ package com.synapsecore.config;
 
 import org.springframework.boot.context.properties.ConfigurationProperties;
 
-@ConfigurationProperties(prefix = "synapsecore.demo")
-public class SynapseDemoProperties {
+@ConfigurationProperties(prefix = "synapsecore.starter")
+public class SynapseStarterProperties {
 
     private boolean autoSeedOnEmpty = true;
     private boolean allowDefaultTenantFallback = true;
-    private boolean simulationEnabled = true;
     private boolean seedStarterInventoryOnTenantOnboarding = true;
     private boolean seedStarterConnectorsOnTenantOnboarding = true;
     private boolean allowTenantAdminTenantOnboarding = true;
@@ -26,14 +25,6 @@ public class SynapseDemoProperties {
 
     public void setAllowDefaultTenantFallback(boolean allowDefaultTenantFallback) {
         this.allowDefaultTenantFallback = allowDefaultTenantFallback;
-    }
-
-    public boolean isSimulationEnabled() {
-        return simulationEnabled;
-    }
-
-    public void setSimulationEnabled(boolean simulationEnabled) {
-        this.simulationEnabled = simulationEnabled;
     }
 
     public boolean isSeedStarterInventoryOnTenantOnboarding() {

@@ -3,6 +3,7 @@ package com.synapsecore;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.springframework.http.MediaType.APPLICATION_JSON;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -28,7 +29,6 @@ import com.synapsecore.domain.repository.WarehouseRepository;
 import com.synapsecore.domain.service.DataInitializer;
 import com.synapsecore.domain.service.SeedService;
 import com.synapsecore.integration.IntegrationConnectorService;
-import com.synapsecore.simulation.SimulationService;
 import com.synapsecore.tenant.TenantContextService;
 import java.math.BigDecimal;
 import java.time.Instant;
@@ -84,9 +84,6 @@ class ProductionHardeningIntegrationTest {
     private TenantOnboardingService tenantOnboardingService;
 
     @Autowired
-    private SimulationService simulationService;
-
-    @Autowired
     private MockMvc mockMvc;
 
     @Autowired
@@ -114,14 +111,20 @@ class ProductionHardeningIntegrationTest {
 
     @Test
     void prodProfileSeedServiceDoesNotBackfillWhenDemoSeedingIsDisabled() {
+        Tenant tenant = tenantRepository.save(Tenant.builder()
+            .code("CATALOG-OPS")
+            .name("Catalog Ops")
+            .active(true)
+            .build());
         productRepository.save(Product.builder()
-            .sku("SKU-PROD-001")
+            .tenant(tenant)
+            .catalogSku("SKU-PROD-001")
             .name("Production Sensor")
             .category("Sensors")
             .build());
 
         assertThat(seedService.seedIfEmpty()).isFalse();
-        assertThat(tenantRepository.count()).isZero();
+        assertThat(tenantRepository.count()).isEqualTo(1L);
         assertThat(integrationConnectorRepository.count()).isZero();
     }
 
@@ -148,8 +151,13 @@ class ProductionHardeningIntegrationTest {
 
     @Test
     void prodProfileOnboardingCreatesWorkspaceWithoutDemoInventoryOrConnectors() {
-        productRepository.save(Product.builder().sku("SKU-HARD-100").name("Hardening Sensor").category("Sensors").build());
-        productRepository.save(Product.builder().sku("SKU-HARD-200").name("Hardening Relay").category("Control").build());
+        Tenant catalogTenant = tenantRepository.save(Tenant.builder()
+            .code("CATALOG-OPS")
+            .name("Catalog Ops")
+            .active(true)
+            .build());
+        productRepository.save(Product.builder().tenant(catalogTenant).catalogSku("SKU-HARD-100").name("Hardening Sensor").category("Sensors").build());
+        productRepository.save(Product.builder().tenant(catalogTenant).catalogSku("SKU-HARD-200").name("Hardening Relay").category("Control").build());
 
         var response = tenantOnboardingService.onboardTenant(new TenantOnboardingRequest(
             "REAL-OPS",
@@ -171,10 +179,42 @@ class ProductionHardeningIntegrationTest {
     }
 
     @Test
-    void prodProfileDisablesSimulationControls() {
-        assertThatThrownBy(() -> simulationService.start())
-            .isInstanceOf(ResponseStatusException.class)
-            .hasMessageContaining("Simulation is disabled in this environment.");
+    void prodRuntimeOmitsDevelopmentOnlyControls() throws Exception {
+        mockMvc.perform(post("/api/access/tenants")
+                .header(BootstrapAccessService.BOOTSTRAP_TOKEN_HEADER, "bootstrap-secret")
+                .contentType(APPLICATION_JSON)
+                .content("""
+                    {
+                      "tenantCode": "REAL-FIRST",
+                      "tenantName": "Real First Tenant",
+                      "description": "First production workspace",
+                      "adminFullName": "Rina Patel",
+                      "adminUsername": "rina.admin",
+                      "adminPassword": "StrongPass-2026",
+                      "primaryLocation": "Johannesburg",
+                      "secondaryLocation": "Cape Town"
+                    }
+                    """))
+            .andExpect(status().isOk());
+
+        MockHttpSession session = (MockHttpSession) mockMvc.perform(post("/api/auth/session/login")
+                .contentType(APPLICATION_JSON)
+                .content("""
+                    {
+                      "tenantCode": "REAL-FIRST",
+                      "username": "rina.admin",
+                      "password": "StrongPass-2026"
+                    }
+                    """))
+            .andExpect(status().isOk())
+            .andReturn()
+            .getRequest()
+            .getSession(false);
+
+        mockMvc.perform(get("/api/system/runtime").session(session))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.simulationEnabled").doesNotExist())
+            .andExpect(jsonPath("$.simulationIntervalMs").doesNotExist());
     }
 
     @Test
@@ -376,12 +416,6 @@ class ProductionHardeningIntegrationTest {
 
     @Test
     void prodProfileAllowsConnectorAuthenticatedWebhookIngressWithoutWorkspaceSession() throws Exception {
-        Product product = productRepository.save(Product.builder()
-            .sku("SKU-HARD-100")
-            .name("Hardening Sensor")
-            .category("Sensors")
-            .build());
-
         tenantOnboardingService.onboardTenant(new TenantOnboardingRequest(
             "REAL-OPS",
             "Real Operations",
@@ -394,11 +428,21 @@ class ProductionHardeningIntegrationTest {
         ), "platform-bootstrap");
 
         var tenant = tenantRepository.findByCodeIgnoreCase("REAL-OPS").orElseThrow();
+        Product product = productRepository.save(Product.builder()
+            .tenant(tenant)
+            .catalogSku("SKU-HARD-100")
+            .name("Hardening Sensor")
+            .category("Sensors")
+            .build());
         var warehouse = warehouseRepository.findByTenant_CodeIgnoreCaseAndCode("REAL-OPS", "WH-NORTH").orElseThrow();
 
         inventoryRepository.save(com.synapsecore.domain.entity.Inventory.builder()
+            .tenant(tenant)
             .product(product)
             .warehouse(warehouse)
+            .quantityOnHand(18L)
+            .quantityReserved(0L)
+            .quantityInbound(0L)
             .quantityAvailable(18L)
             .reorderThreshold(5L)
             .build());

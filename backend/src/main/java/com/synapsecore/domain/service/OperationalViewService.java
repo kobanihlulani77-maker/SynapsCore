@@ -37,7 +37,6 @@ import com.synapsecore.intelligence.InventoryInsight;
 import com.synapsecore.intelligence.InventoryIntelligenceService;
 import com.synapsecore.prediction.StockPrediction;
 import com.synapsecore.prediction.StockPredictionService;
-import com.synapsecore.simulation.SimulationStateService;
 import com.synapsecore.tenant.TenantContextService;
 import java.time.Instant;
 import java.util.Comparator;
@@ -57,7 +56,6 @@ public class OperationalViewService {
     private final StockPredictionService stockPredictionService;
     private final InventoryIntelligenceService inventoryIntelligenceService;
     private final DashboardService dashboardService;
-    private final SimulationStateService simulationStateService;
     private final BusinessEventQueryService businessEventQueryService;
     private final AuditLogService auditLogService;
     private final SystemIncidentService systemIncidentService;
@@ -72,8 +70,11 @@ public class OperationalViewService {
         String tenantCode = tenantContextService.getCurrentTenantCodeOrDefault();
         return new AlertFeedResponse(
             alertRepository.findTop12ByTenant_CodeIgnoreCaseAndStatusOrderByCreatedAtDesc(tenantCode, AlertStatus.ACTIVE)
-                .stream().map(this::toAlertResponse).toList(),
-            alertRepository.findTop12ByTenant_CodeIgnoreCaseOrderByCreatedAtDesc(tenantCode)
+                .stream()
+                .sorted(this::compareOperationalAlertPriority)
+                .map(this::toAlertResponse)
+                .toList(),
+            alertRepository.findTop12ByTenant_CodeIgnoreCaseOrderByUpdatedAtDesc(tenantCode)
                 .stream().map(this::toAlertResponse).toList()
         );
     }
@@ -82,6 +83,7 @@ public class OperationalViewService {
         return recommendationRepository.findTop12ByTenant_CodeIgnoreCaseOrderByCreatedAtDesc(
                 tenantContextService.getCurrentTenantCodeOrDefault())
             .stream()
+            .sorted(this::compareOperationalRecommendationPriority)
             .map(this::toRecommendationResponse)
             .toList();
     }
@@ -165,7 +167,6 @@ public class OperationalViewService {
             getScenarioNotifications(),
             getSlaEscalations(),
             getRecentScenarios(),
-            simulationStateService.getStatus(),
             Instant.now()
         );
     }
@@ -179,9 +180,40 @@ public class OperationalViewService {
             alert.getDescription(),
             alert.getImpactSummary(),
             alert.getRecommendedAction(),
+            alert.getPolicyExplanation(),
             alert.getStatus(),
             alert.getCreatedAt()
         );
+    }
+
+    private int compareOperationalAlertPriority(Alert left, Alert right) {
+        int severityComparison = Integer.compare(alertSeverityPriority(left), alertSeverityPriority(right));
+        if (severityComparison != 0) {
+            return severityComparison;
+        }
+        int typeComparison = Integer.compare(alertTypePriority(left), alertTypePriority(right));
+        if (typeComparison != 0) {
+            return typeComparison;
+        }
+        return right.getCreatedAt().compareTo(left.getCreatedAt());
+    }
+
+    private int alertSeverityPriority(Alert alert) {
+        return switch (alert.getSeverity()) {
+            case CRITICAL -> 0;
+            case HIGH -> 1;
+            case MEDIUM -> 2;
+        };
+    }
+
+    private int alertTypePriority(Alert alert) {
+        return switch (alert.getType()) {
+            case LOW_STOCK -> 0;
+            case DEPLETION_RISK -> 1;
+            case DELIVERY_DELAY_RISK -> 2;
+            case FULFILLMENT_BACKLOG -> 3;
+            case FULFILLMENT_ANOMALY -> 4;
+        };
     }
 
     private RecommendationResponse toRecommendationResponse(Recommendation recommendation) {
@@ -190,9 +222,41 @@ public class OperationalViewService {
             recommendation.getType(),
             recommendation.getTitle(),
             recommendation.getDescription(),
+            recommendation.getPolicyExplanation(),
             recommendation.getPriority(),
             recommendation.getCreatedAt()
         );
+    }
+
+    private int compareOperationalRecommendationPriority(Recommendation left, Recommendation right) {
+        int priorityComparison = Integer.compare(recommendationPriority(left), recommendationPriority(right));
+        if (priorityComparison != 0) {
+            return priorityComparison;
+        }
+        int typeComparison = Integer.compare(recommendationTypePriority(left), recommendationTypePriority(right));
+        if (typeComparison != 0) {
+            return typeComparison;
+        }
+        return right.getCreatedAt().compareTo(left.getCreatedAt());
+    }
+
+    private int recommendationPriority(Recommendation recommendation) {
+        return switch (recommendation.getPriority()) {
+            case CRITICAL -> 0;
+            case HIGH -> 1;
+            case MEDIUM -> 2;
+        };
+    }
+
+    private int recommendationTypePriority(Recommendation recommendation) {
+        return switch (recommendation.getType()) {
+            case REORDER_URGENTLY -> 0;
+            case REORDER_STOCK -> 1;
+            case TRANSFER_STOCK -> 2;
+            case ESCALATE_LOGISTICS -> 3;
+            case PRIORITIZE_FULFILLMENT -> 4;
+            case INVESTIGATE_LOGISTICS_ANOMALY -> 5;
+        };
     }
 
     private InventoryStatusResponse toInventoryStatusResponse(Inventory inventory) {
@@ -200,18 +264,25 @@ public class OperationalViewService {
         InventoryInsight insight = inventoryIntelligenceService.evaluate(inventory, prediction);
         return new InventoryStatusResponse(
             inventory.getId(),
-            inventory.getProduct().getSku(),
+            inventory.getProduct().resolveCatalogSku(),
             inventory.getProduct().getName(),
             inventory.getProduct().getCategory(),
             inventory.getWarehouse().getCode(),
             inventory.getWarehouse().getName(),
             inventory.getQuantityAvailable(),
+            inventory.getQuantityOnHand(),
+            inventory.getQuantityReserved(),
+            inventory.getQuantityInbound(),
             inventory.getReorderThreshold(),
             insight.lowStock(),
             insight.rapidConsumption(),
             insight.riskLevel(),
             prediction.unitsPerHour(),
             prediction.hoursToStockout(),
+            inventory.getLastReceivedAt(),
+            inventory.getLastAdjustedAt(),
+            inventory.getLastReconciledAt(),
+            inventory.getReconciliationVariance(),
             inventory.getUpdatedAt()
         );
     }
@@ -236,9 +307,13 @@ public class OperationalViewService {
 
     private OrderItemResponse toOrderItemResponse(OrderItem orderItem) {
         return new OrderItemResponse(
-            orderItem.getProduct().getSku(),
+            orderItem.getProduct().resolveCatalogSku(),
             orderItem.getProduct().getName(),
             orderItem.getQuantity(),
+            orderItem.getReservedQuantity(),
+            orderItem.getFulfilledQuantity(),
+            orderItem.getCancelledQuantity(),
+            orderItem.getReturnedQuantity(),
             orderItem.getUnitPrice()
         );
     }

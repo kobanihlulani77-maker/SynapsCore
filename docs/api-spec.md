@@ -173,7 +173,7 @@ Example body:
 
 ```json
 {
-  "tenantCode": "SYNAPSE-DEMO",
+  "tenantCode": "STARTER-OPS",
   "username": "integration.lead",
   "password": "integration-admin-2026"
 }
@@ -196,9 +196,9 @@ Example body:
 
 Ends the current signed-in user session.
 
-The seeded demo environment includes credential-backed user sign-in. Common test accounts are:
+The starter development environment includes credential-backed user sign-in. Common local accounts are:
 
-- tenant `SYNAPSE-DEMO` -> `Synapse Demo Company`
+- tenant `STARTER-OPS` -> `Starter Operations Workspace`
 - `operations.lead` / `lead-2026` -> `Operations Lead`
 - `naledi.lead` / `naledi-2026` -> `Naledi Lead`
 - `integration.lead` / `integration-admin-2026` -> `Integration Lead`
@@ -406,13 +406,16 @@ Example body:
 {
   "supportOwnerActorName": "North Operations Director",
   "syncMode": "SCHEDULED_PULL",
-  "syncIntervalMinutes": 60,
+  "syncIntervalMinutes": 15,
+  "pullEndpointUrl": "https://company.example.com/orders-feed",
   "validationPolicy": "STRICT",
   "transformationPolicy": "NORMALIZE_CODES",
   "allowDefaultWarehouseFallback": true,
   "notes": "North operations director now owns webhook support."
 }
 ```
+
+Note: `SCHEDULED_PULL` is supported for `WEBHOOK_ORDER` order API feeds with an absolute HTTP(S) `pullEndpointUrl`. Unsupported connector types remain blocked.
 
 ### `GET /api/access/admin/operators`
 
@@ -534,7 +537,6 @@ The response includes:
 - headerFallbackEnabled
 - secureSessionCookies
 - allowedOrigins
-- simulationIntervalMs
 - telemetry
   - disabledConnectorCount
   - replayQueueDepth
@@ -567,7 +569,6 @@ The response includes:
   - inventorySignalsInWindow
   - integrationEventsInWindow
   - scenarioEventsInWindow
-  - simulationEventsInWindow
   - failureAuditsInWindow
   - activeIncidentCount
   - latestBusinessEventAt
@@ -835,7 +836,7 @@ Returns the configured warehouse locations available to the platform.
 
 ### `GET /api/events/recent`
 
-Returns the most recent business events so the operational loop is easy to inspect during demos and debugging.
+Returns the most recent business events so the operational loop is easy to inspect during operations and debugging.
 
 ## Dashboard
 
@@ -851,7 +852,6 @@ Returns the top-level dashboard metrics:
 - total warehouses
 - recent order count
 - inventory records count
-- simulation running
 - last updated at
 
 ### `GET /api/dashboard/snapshot`
@@ -870,7 +870,6 @@ Returns the full dashboard payload in one REST response for debugging or future 
 - integration replay queue
 - active SLA escalation inbox
 - recent scenario history
-- simulation status
 
 ## Scenarios
 
@@ -1187,20 +1186,6 @@ Current recommendation types include:
 - `REORDER_URGENTLY`
 - `TRANSFER_STOCK` when another warehouse has enough surplus to cover the current shortfall
 
-## Simulation
-
-### `POST /api/simulation/start`
-
-Starts the scheduled fake order generator.
-
-### `POST /api/simulation/stop`
-
-Stops the scheduled fake order generator.
-
-### `GET /api/simulation/status`
-
-Returns the current simulation state.
-
 ## Developer Support
 
 ### `POST /api/dev/reseed`
@@ -1209,8 +1194,7 @@ Development-only helper endpoint that:
 
 - clears current orders, alerts, recommendations, and business events
 - restores the starter products, warehouses, and inventory records
-- stops simulation if it is active
-- pushes a fresh live snapshot so the dashboard returns to a clean demo baseline
+- pushes a fresh live snapshot so the dashboard returns to a clean local baseline
 
 ## Realtime
 
@@ -1233,8 +1217,6 @@ Development-only helper endpoint that:
 - subscribe to `/topic/tenant/{TENANT_CODE}/integrations.replay`
 - subscribe to `/topic/tenant/{TENANT_CODE}/scenarios.notifications`
 - subscribe to `/topic/tenant/{TENANT_CODE}/scenarios.escalated`
-- subscribe to `/topic/tenant/{TENANT_CODE}/simulation.status`
-
 SynapseCore uses focused tenant-scoped live topics so the UI receives operational changes by concern instead of one oversized shared stream.
 
 ## Traceability

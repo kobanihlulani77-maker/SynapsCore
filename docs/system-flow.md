@@ -50,7 +50,7 @@ The MVP is built around one visible reaction cycle:
 - an internal dispatch work item is persisted for the tenant update
 - the dispatch worker drains queued fan-out work in small batches
 - dashboard summary is recalculated and cached
-- the backend publishes dedicated live topics for summary, alerts, recommendations, inventory, recent orders, recent events, audit activity, integration connectors, recent import activity, and simulation state
+- the backend publishes dedicated live topics for summary, alerts, recommendations, inventory, recent orders, recent events, audit activity, integration connectors, recent import activity, and scenario escalation state
 - the backend also publishes a dedicated fulfillment overview topic so backlog and delayed shipments update without refresh
 - the React UI updates without refresh
 - recent business events and audit activity are also surfaced in the control-center timeline
@@ -64,14 +64,11 @@ The MVP is built around one visible reaction cycle:
 4. focused realtime updates are pushed live
 5. queue failures surface in the system incident inbox instead of disappearing silently
 
-## Simulation Flow
+## Local Development Reseed Flow
 
-1. `POST /api/simulation/start` enables simulation mode
-2. every few seconds a fake order is generated
-3. the fake order goes through the real order ingestion path
-4. SynapseCore also advances one active fulfillment lane, so dispatch and delivery pressure evolve with the simulated order stream
-5. inventory pressure, fulfillment backlog, and delivery signals build naturally
-6. alerts and recommendations appear as operational pressure rises
+1. `POST /api/dev/reseed` resets the local development baseline
+2. starter tenant data, starter catalog, warehouses, and inventory are restored
+3. dashboard, alerts, recommendations, and business events all refresh from the same operational services
 
 ## Fulfillment Update Flow
 
@@ -182,11 +179,10 @@ The MVP is built around one visible reaction cycle:
 
 ## Reseed Flow
 
-1. `POST /api/dev/reseed` clears current demo operational data
+1. `POST /api/dev/reseed` clears current local operational data
 2. starter products, warehouses, and inventory are restored
-3. simulation is forced back to stopped state
-4. dashboard summary is recalculated
-5. fresh realtime operational updates are pushed to connected clients
+3. dashboard summary is recalculated
+4. fresh realtime operational updates are pushed to connected clients
 
 ## Control Access Flow
 
@@ -202,7 +198,7 @@ The MVP is built around one visible reaction cycle:
 
 ## What The User Should Feel
 
-When the simulation is running or a real order is posted, the user should see:
+When a real order is posted or replayed, the user should see:
 
 - order count rise
 - inventory levels drop

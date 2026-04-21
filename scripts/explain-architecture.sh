@@ -96,7 +96,7 @@ It uses tenant-scoped topics so the UI can receive focused live changes for:
 - replay queue
 - scenario notifications
 - escalations
-- simulation state
+- runtime trust diagnostics
 
 TRUST MODEL
 

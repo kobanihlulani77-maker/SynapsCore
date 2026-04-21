@@ -2,11 +2,16 @@ package com.synapsecore.domain.repository;
 
 import com.synapsecore.domain.entity.OrderItem;
 import java.time.Instant;
+import java.util.List;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.EntityGraph;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
 public interface OrderItemRepository extends JpaRepository<OrderItem, Long> {
+
+    @EntityGraph(attributePaths = {"tenant", "customerOrder", "product", "product.tenant", "customerOrder.tenant"})
+    List<OrderItem> findAll();
 
     @Query("""
         select coalesce(sum(oi.quantity), 0)

@@ -41,6 +41,10 @@ CORS_ALLOWED_ORIGINS=https://synapscore-frontend-3.onrender.com
 SESSION_COOKIE_SECURE=true
 SESSION_COOKIE_SAME_SITE=None
 ALLOW_HEADER_FALLBACK=false
+SYNAPSECORE_REALTIME_BROKER_MODE=SIMPLE_IN_MEMORY
+SYNAPSECORE_INTEGRATION_PULL_WORKER_ENABLED=true
+SYNAPSECORE_INTEGRATION_PULL_WORKER_INTERVAL_MS=60000
+SYNAPSECORE_INTEGRATION_PULL_WORKER_BATCH_SIZE=10
 SPRING_JPA_HIBERNATE_DDL_AUTO=update
 PUBLIC_APP_URL=https://synapscore-frontend-3.onrender.com
 PUBLIC_API_URL=https://synapscore-3.onrender.com
@@ -75,6 +79,8 @@ Notes:
 - `SYNAPSECORE_BOOTSTRAP_INITIAL_TOKEN` is only for the first tenant creation on an empty production environment. Remove it after the first workspace is created.
 - `SYNAPSECORE_PLATFORM_ADMIN_TOKEN` is the dedicated production tenant-provisioning lane after bootstrap. Use it through the `X-Synapse-Platform-Admin-Token` header and rotate it like any other privileged secret.
 - Signed-in tenant admins still cannot create additional tenant workspaces in production.
+- `SYNAPSECORE_REALTIME_BROKER_MODE=SIMPLE_IN_MEMORY` is correct for the current single-node Render backend. Switch it to `EXTERNAL_BROKER` only after provisioning an external STOMP broker and setting the relay host, port, login, and passcode env vars.
+- `SYNAPSECORE_INTEGRATION_PULL_WORKER_ENABLED=true` enables real scheduled order API pulls for connectors configured with `syncMode=SCHEDULED_PULL` and `pullEndpointUrl`.
 
 ## Frontend Service
 

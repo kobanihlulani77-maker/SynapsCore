@@ -31,7 +31,7 @@ public class OperationalStateChangePublisher {
     private String resolveTenantCode() {
         return requestTraceContext.getCurrentTenant()
             .filter(tenantCode -> !tenantCode.isBlank())
-            .filter(tenantCode -> !RequestTraceContext.DEFAULT_TENANT.equalsIgnoreCase(tenantCode))
+            .filter(tenantCode -> !RequestTraceContext.MISSING_TENANT_CONTEXT.equalsIgnoreCase(tenantCode))
             .orElseGet(tenantContextService::getCurrentTenantCodeOrDefault);
     }
 }

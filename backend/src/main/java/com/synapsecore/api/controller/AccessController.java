@@ -22,7 +22,7 @@ import com.synapsecore.access.dto.TenantWorkspaceUpdateRequest;
 import com.synapsecore.access.dto.TenantWorkspaceWarehouseUpdateRequest;
 import com.synapsecore.access.dto.TenantResponse;
 import com.synapsecore.auth.AuthSessionService;
-import com.synapsecore.config.SynapseDemoProperties;
+import com.synapsecore.config.SynapseStarterProperties;
 import com.synapsecore.domain.dto.WarehouseResponse;
 import com.synapsecore.integration.dto.IntegrationConnectorResponse;
 import jakarta.servlet.http.HttpServletRequest;
@@ -51,7 +51,7 @@ public class AccessController {
     private final AccessDirectoryService accessDirectoryService;
     private final BootstrapAccessService bootstrapAccessService;
     private final PlatformAdministrationAccessService platformAdministrationAccessService;
-    private final SynapseDemoProperties demoProperties;
+    private final SynapseStarterProperties starterProperties;
     private final TenantWorkspaceAdministrationService tenantWorkspaceAdministrationService;
     private final TenantOnboardingService tenantOnboardingService;
     private final AuthSessionService authSessionService;
@@ -72,7 +72,7 @@ public class AccessController {
         } else if (platformAdministrationAccessService.isPlatformAdminRequest(httpRequest)) {
             platformAdministrationAccessService.requirePlatformAdministration(httpRequest);
             actorName = "platform-admin";
-        } else if (demoProperties.isAllowTenantAdminTenantOnboarding()) {
+        } else if (starterProperties.isAllowTenantAdminTenantOnboarding()) {
             actorName = accessControlService.requireTenantAdmin("create tenant workspaces").actorName();
         } else {
             throw new ResponseStatusException(HttpStatus.FORBIDDEN,

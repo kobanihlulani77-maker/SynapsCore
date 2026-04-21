@@ -23,6 +23,7 @@ public record IntegrationConnectorRequest(
     boolean enabled,
     IntegrationSyncMode syncMode,
     @Min(15) @Max(1440) Integer syncIntervalMinutes,
+    @Size(max = 512) String pullEndpointUrl,
     IntegrationValidationPolicy validationPolicy,
     IntegrationTransformationPolicy transformationPolicy,
     @Min(1) Integer mappingVersion,

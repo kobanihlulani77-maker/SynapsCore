@@ -32,7 +32,8 @@ public final class IntegrationFailureCodes {
         if (reason.startsWith("Warehouse not found:")) {
             return IntegrationFailureCode.WAREHOUSE_NOT_FOUND;
         }
-        if (reason.startsWith("Product not found:")) {
+        if (reason.startsWith("Product not found:")
+            || reason.startsWith("Product not found for tenant ")) {
             return IntegrationFailureCode.PRODUCT_NOT_FOUND;
         }
         if (reason.startsWith("No inventory found for SKU")) {

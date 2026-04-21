@@ -60,13 +60,13 @@ public class ScenarioProjectionService {
         Map<Long, InventoryProjectionInput> projectionsByInventoryId = new LinkedHashMap<>();
 
         for (var itemRequest : request.items()) {
-            Product product = productRepository.findBySku(itemRequest.productSku().trim())
+            Product product = productRepository.findByTenant_CodeIgnoreCaseAndCatalogSkuIgnoreCase(tenantCode, itemRequest.productSku().trim())
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND,
                     "Product not found: " + itemRequest.productSku()));
 
             Inventory inventory = inventoryRepository.findByProductIdAndWarehouseId(product.getId(), warehouse.getId())
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.BAD_REQUEST,
-                    "No inventory found for SKU " + product.getSku() + " in warehouse " + warehouse.getCode()));
+                    "No inventory found for SKU " + product.resolveCatalogSku() + " in warehouse " + warehouse.getCode()));
             tenantScopeGuard.requireInventoryForTenant(inventory, warehouse, tenantCode, "scenario order impact projection");
 
             InventoryProjectionInput projection = projectionsByInventoryId.computeIfAbsent(
@@ -77,7 +77,7 @@ public class ScenarioProjectionService {
             int projectedQuantity = projection.requestedUnits() + itemRequest.quantity();
             if (inventory.getQuantityAvailable() < projectedQuantity) {
                 throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
-                    "Insufficient inventory for SKU " + product.getSku() + " in warehouse " + warehouse.getCode());
+                    "Insufficient inventory for SKU " + product.resolveCatalogSku() + " in warehouse " + warehouse.getCode());
             }
 
             projectionsByInventoryId.put(inventory.getId(), new InventoryProjectionInput(inventory, projectedQuantity));
@@ -94,12 +94,21 @@ public class ScenarioProjectionService {
         for (InventoryProjectionInput projection : projectionsByInventoryId.values()) {
             Inventory projected = Inventory.builder()
                 .id(projection.inventory().getId())
+                .tenant(projection.inventory().getTenant())
                 .product(projection.inventory().getProduct())
                 .warehouse(projection.inventory().getWarehouse())
+                .quantityOnHand(projection.inventory().getQuantityOnHand())
+                .quantityReserved(projection.inventory().getQuantityReserved() + (long) projection.requestedUnits())
+                .quantityInbound(projection.inventory().getQuantityInbound())
                 .quantityAvailable(projection.inventory().getQuantityAvailable() - projection.requestedUnits())
                 .reorderThreshold(projection.inventory().getReorderThreshold())
+                .lastReceivedAt(projection.inventory().getLastReceivedAt())
+                .lastAdjustedAt(projection.inventory().getLastAdjustedAt())
+                .lastReconciledAt(projection.inventory().getLastReconciledAt())
+                .reconciliationVariance(projection.inventory().getReconciliationVariance())
                 .updatedAt(Instant.now())
                 .build();
+            projected.synchronizeStockModel();
 
             StockPrediction prediction = stockPredictionService.estimate(projected);
             InventoryInsight insight = inventoryIntelligenceService.evaluate(projected, prediction);
@@ -129,18 +138,25 @@ public class ScenarioProjectionService {
                                                               StockPrediction prediction) {
         return new InventoryStatusResponse(
             inventory.getId(),
-            inventory.getProduct().getSku(),
+            inventory.getProduct().resolveCatalogSku(),
             inventory.getProduct().getName(),
             inventory.getProduct().getCategory(),
             inventory.getWarehouse().getCode(),
             inventory.getWarehouse().getName(),
             inventory.getQuantityAvailable(),
+            inventory.getQuantityOnHand(),
+            inventory.getQuantityReserved(),
+            inventory.getQuantityInbound(),
             inventory.getReorderThreshold(),
             insight.lowStock(),
             insight.rapidConsumption(),
             insight.riskLevel(),
             prediction.unitsPerHour(),
             prediction.hoursToStockout(),
+            inventory.getLastReceivedAt(),
+            inventory.getLastAdjustedAt(),
+            inventory.getLastReconciledAt(),
+            inventory.getReconciliationVariance(),
             inventory.getUpdatedAt()
         );
     }

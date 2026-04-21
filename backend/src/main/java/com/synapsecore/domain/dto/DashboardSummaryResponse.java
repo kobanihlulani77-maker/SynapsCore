@@ -14,7 +14,6 @@ public record DashboardSummaryResponse(
     long totalWarehouses,
     long recentOrderCount,
     long inventoryRecordsCount,
-    boolean simulationRunning,
     Instant lastUpdatedAt
 ) {
 }

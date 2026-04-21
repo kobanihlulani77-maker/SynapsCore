@@ -137,7 +137,7 @@ export default function SettingsPage({ context }) {
                 <div className="session-control-row">
                   <label className="field planner-name-field">
                     <span>Sync Mode</span>
-                    <select value={selectedWorkspaceConnectorDraft.syncMode} onChange={(event) => setWorkspaceConnectorDrafts((current) => ({ ...current, [selectedWorkspaceConnector.id]: { ...selectedWorkspaceConnectorDraft, syncMode: event.target.value, syncIntervalMinutes: event.target.value === 'SCHEDULED_PULL' ? selectedWorkspaceConnectorDraft.syncIntervalMinutes || '60' : '' } }))} disabled={accessAdminState.loading || !canManageTenantAccess}>
+                    <select value={selectedWorkspaceConnectorDraft.syncMode} onChange={(event) => setWorkspaceConnectorDrafts((current) => ({ ...current, [selectedWorkspaceConnector.id]: { ...selectedWorkspaceConnectorDraft, syncMode: event.target.value, syncIntervalMinutes: event.target.value === 'SCHEDULED_PULL' ? (selectedWorkspaceConnectorDraft.syncIntervalMinutes || '15') : '' } }))} disabled={accessAdminState.loading || !canManageTenantAccess}>
                       {integrationSyncModes.map((mode) => <option key={mode} value={mode}>{formatCodeLabel(mode)}</option>)}
                     </select>
                   </label>
@@ -156,8 +156,8 @@ export default function SettingsPage({ context }) {
                 </div>
                 <div className="session-control-row">
                   <label className="field planner-name-field">
-                    <span>Sync Interval Minutes</span>
-                    <input value={selectedWorkspaceConnectorDraft.syncIntervalMinutes} onChange={(event) => setWorkspaceConnectorDrafts((current) => ({ ...current, [selectedWorkspaceConnector.id]: { ...selectedWorkspaceConnectorDraft, syncIntervalMinutes: event.target.value } }))} disabled={accessAdminState.loading || !canManageTenantAccess || selectedWorkspaceConnectorDraft.syncMode !== 'SCHEDULED_PULL'} />
+                    <span>Connector cadence</span>
+                    <input value={selectedWorkspaceConnectorDraft.syncMode === 'SCHEDULED_PULL' ? selectedWorkspaceConnectorDraft.syncIntervalMinutes : selectedWorkspaceConnectorDraft.syncMode === 'REALTIME_PUSH' ? 'Event-driven push' : 'File-drop batch'} onChange={(event) => setWorkspaceConnectorDrafts((current) => ({ ...current, [selectedWorkspaceConnector.id]: { ...selectedWorkspaceConnectorDraft, syncIntervalMinutes: event.target.value } }))} disabled={accessAdminState.loading || !canManageTenantAccess || selectedWorkspaceConnectorDraft.syncMode !== 'SCHEDULED_PULL'} inputMode="numeric" />
                   </label>
                   <label className="field planner-name-field">
                     <span>Support Owner</span>
@@ -167,8 +167,15 @@ export default function SettingsPage({ context }) {
                     </select>
                   </label>
                 </div>
+                {selectedWorkspaceConnectorDraft.syncMode === 'SCHEDULED_PULL' ? (
+                  <label className="field planner-name-field">
+                    <span>Pull Endpoint URL</span>
+                    <input value={selectedWorkspaceConnectorDraft.pullEndpointUrl} onChange={(event) => setWorkspaceConnectorDrafts((current) => ({ ...current, [selectedWorkspaceConnector.id]: { ...selectedWorkspaceConnectorDraft, pullEndpointUrl: event.target.value } }))} placeholder="https://company.example.com/orders-feed" disabled={accessAdminState.loading || !canManageTenantAccess} />
+                  </label>
+                ) : null}
+                <p className="muted-text">Scheduled pull is available for order API feeds with an HTTP(S) JSON endpoint and a 15 minute minimum cadence.</p>
                 <div className="history-action-row">
-                  <button className="ghost-button" onClick={() => saveWorkspaceConnectorSupport(selectedWorkspaceConnector.id)} disabled={accessAdminState.loading || !canManageTenantAccess} type="button">Save Connector Policy</button>
+                  <button className="ghost-button" onClick={() => saveWorkspaceConnectorSupport(selectedWorkspaceConnector.id)} disabled={accessAdminState.loading || !canManageTenantAccess || (selectedWorkspaceConnectorDraft.syncMode === 'SCHEDULED_PULL' && !selectedWorkspaceConnectorDraft.pullEndpointUrl.trim())} type="button">Save Connector Policy</button>
                 </div>
               </>
             ) : null}

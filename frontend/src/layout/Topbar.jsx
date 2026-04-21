@@ -18,9 +18,6 @@ export default function Topbar({
   pageState,
   actionState,
   systemRuntimeState,
-  showOperationalTools,
-  snapshot,
-  toggleSimulation,
   signedInSession,
   signOutOperator,
   authSessionState,
@@ -112,11 +109,6 @@ export default function Topbar({
             <button key={action.label} className="ghost-button" onClick={() => navigateToPage(action.target)} type="button">{action.label}</button>
           ))}
           <button className="ghost-button" onClick={async () => { await Promise.all([pageState.onRefresh(), systemRuntimeState.onRefresh()]) }} disabled={pageState.loading || actionState.loading || systemRuntimeState.loading} type="button">Refresh</button>
-          {showOperationalTools ? (
-            <button className="primary-button" onClick={() => toggleSimulation(snapshot.simulation.active ? 'stop' : 'start')} disabled={actionState.loading} type="button">
-              {actionState.loading ? 'Working...' : snapshot.simulation.active ? 'Stop Live Stream' : 'Start Live Stream'}
-            </button>
-          ) : null}
           <button className="ghost-button" onClick={() => navigateToPage('profile')} type="button">{signedInSession?.displayName || 'Profile'}</button>
           <button className="ghost-button" onClick={signOutOperator} disabled={authSessionState.loading} type="button">
             {authSessionState.action === 'signout' ? 'Signing Out...' : 'Sign Out'}

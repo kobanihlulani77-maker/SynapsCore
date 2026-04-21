@@ -41,7 +41,6 @@ echo "|       |   |-- prediction/   Explainable future-outcome estimation"
 echo "|       |   |-- decision/     Recommendation generation"
 echo "|       |   |-- alert/        Alert creation and lifecycle management"
 echo "|       |   |-- realtime/     WebSocket broadcasting"
-echo "|       |   |-- simulation/   Fake activity generation for demos"
 echo '|       |   `-- api/controller/ REST endpoints for UI and external callers'
 echo '|       `-- main/resources/application.yml  Backend runtime configuration'
 echo "|-- frontend/             React + Vite live operational dashboard"

@@ -3,6 +3,7 @@ package com.synapsecore.domain.repository;
 import com.synapsecore.domain.entity.IntegrationReplayRecord;
 import com.synapsecore.domain.entity.IntegrationReplayStatus;
 import com.synapsecore.integration.dto.IntegrationReplayRecordResponse;
+import java.time.Instant;
 import java.util.Collection;
 import java.util.List;
 import org.springframework.data.domain.Pageable;
@@ -73,4 +74,16 @@ public interface IntegrationReplayRecordRepository extends JpaRepository<Integra
     );
 
     java.util.Optional<IntegrationReplayRecord> findByTenantCodeIgnoreCaseAndId(String tenantCode, Long id);
+
+    @Query("""
+        select record
+        from IntegrationReplayRecord record
+        where record.status in ?1
+          and record.nextEligibleAt is not null
+          and record.nextEligibleAt <= ?2
+        order by record.nextEligibleAt asc, record.createdAt asc
+        """)
+    List<IntegrationReplayRecord> findEligibleForAutomatedReplay(Collection<IntegrationReplayStatus> statuses,
+                                                                 Instant eligibleAt,
+                                                                 Pageable pageable);
 }

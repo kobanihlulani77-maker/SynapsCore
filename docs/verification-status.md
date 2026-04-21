@@ -114,12 +114,12 @@ Result: **14/14 key backend endpoints returned `200`**
 | Frontend production build | `PASS` | `npm.cmd run build` | Build completed successfully. |
 | Backend automated tests | `PASS` | `mvnw.cmd test` | Backend tests completed cleanly. |
 | Local deployment smoke | `PASS` | `scripts/verify-deployment.ps1` | Health, readiness, metrics, dashboard, runtime, incidents, frontend health, and runtime config. |
-| Company-readiness flow | `PASS` | `scripts/verify-company-readiness.ps1` | Onboarding, workspace administration, integrations, replay, planning, fulfillment, trust, and simulation. |
+| Company-readiness flow | `PASS` | `scripts/verify-company-readiness.ps1` | Onboarding, workspace administration, integrations, replay, planning, fulfillment, and trust. |
 | Browser end-to-end proof | `PASS` | `npm.cmd run test:e2e:prod` | Real browser proof for sign-in, authenticated page rendering, replay, scenario approval/execution, and role gating. HTML report available at C:\Users\asus\Downloads\synapsecore_starter\synapsecore\frontend\playwright-report\index.html. |
 | Realtime browser proof | `PASS` | `scripts/verify-realtime.ps1` | Direct browser proof that summary cards change live without a manual refresh. |
 | Frontend route sweep | `PASS` | 26/26 routes returned 200 | Public, core, control, systems, and admin routes checked against the production-shaped frontend. |
 | Backend endpoint sweep | `PASS` | 14/14 endpoints returned 200 | Operational, trust, and access endpoints checked with a signed-in seed admin session for protected surfaces. |
-| Tenant sign-in and session | `PASS` | `POST /api/auth/session/login` + `GET /api/auth/session` | Signed in as SYNAPSE-DEMO / operations.lead. |
+| Tenant sign-in and session | `PASS` | `POST /api/auth/session/login` + `GET /api/auth/session` | Signed in as STARTER-OPS / operations.lead. |
 | Backup snapshot proof | `PASS` | `scripts/backup-postgres.ps1` | Backup written to C:\Users\asus\Downloads\synapsecore_starter\synapsecore\backups\verification-report-20260410-122926.sql. |
 | Restore drill proof | `PASS` | `scripts/verify-restore-drill.ps1` | Scratch restore succeeded with 20 public tables, 1119 audit logs, 1761 business events, and 109 scenario runs. |
 | Public HTTPS/domain compose contract | `PASS WITH CAVEAT` | `docker compose -f docker-compose.public.yml config` | Compose contract is valid, but public hosted rollout still needs real server proof. |

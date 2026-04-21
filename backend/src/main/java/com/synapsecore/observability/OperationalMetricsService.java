@@ -14,8 +14,11 @@ import com.synapsecore.event.OperationalUpdateType;
 import io.micrometer.core.instrument.Counter;
 import io.micrometer.core.instrument.Gauge;
 import io.micrometer.core.instrument.MeterRegistry;
+import io.micrometer.core.instrument.Timer;
+import java.util.Collection;
 import java.util.List;
 import java.util.Locale;
+import java.util.concurrent.TimeUnit;
 import org.springframework.stereotype.Service;
 
 @Service
@@ -155,6 +158,38 @@ public class OperationalMetricsService {
             .increment();
     }
 
+    public void recordHttpRequest(String tenantCode, String method, int statusCode, long durationNanos) {
+        String outcome = statusCode >= 400 ? "FAILURE" : "SUCCESS";
+        String statusFamily = resolveStatusFamily(statusCode);
+        String normalizedTenantCode = normalizeTenantCode(tenantCode);
+
+        meterRegistry.counter(
+                "synapsecore.http.requests",
+                "tenant",
+                normalizedTenantCode,
+                "method",
+                normalizeTag(method),
+                "statusFamily",
+                statusFamily,
+                "outcome",
+                outcome
+            )
+            .increment();
+
+        meterRegistry.timer(
+                "synapsecore.http.request.duration",
+                "tenant",
+                normalizedTenantCode,
+                "method",
+                normalizeTag(method),
+                "statusFamily",
+                statusFamily,
+                "outcome",
+                outcome
+            )
+            .record(durationNanos, TimeUnit.NANOSECONDS);
+    }
+
     public SystemMetricsSummary snapshotForTenant(String tenantCode) {
         String normalizedTenantCode = normalizeTenantCode(tenantCode);
         return new SystemMetricsSummary(
@@ -164,20 +199,51 @@ public class OperationalMetricsService {
             countForTenant("synapsecore.integration.replay.attempts", normalizedTenantCode),
             countForTenant("synapsecore.dispatch.queued", normalizedTenantCode),
             countForTenant("synapsecore.dispatch.processed", normalizedTenantCode),
-            countForTenant("synapsecore.dispatch.failed", normalizedTenantCode)
+            countForTenant("synapsecore.dispatch.failed", normalizedTenantCode),
+            countForTenant("synapsecore.http.requests", normalizedTenantCode),
+            countForTenantWithOutcome("synapsecore.http.requests", normalizedTenantCode, "FAILURE"),
+            averageTimerDurationMsForTenant("synapsecore.http.request.duration", normalizedTenantCode)
         );
     }
 
     private double countForTenant(String metricName, String tenantCode) {
-        Counter counter = meterRegistry.find(metricName)
+        return meterRegistry.find(metricName)
             .tag("tenant", tenantCode)
-            .counter();
-        return counter == null ? 0.0 : counter.count();
+            .counters()
+            .stream()
+            .mapToDouble(Counter::count)
+            .sum();
+    }
+
+    private double countForTenantWithOutcome(String metricName, String tenantCode, String outcome) {
+        return meterRegistry.find(metricName)
+            .tag("tenant", tenantCode)
+            .tag("outcome", outcome)
+            .counters()
+            .stream()
+            .mapToDouble(Counter::count)
+            .sum();
+    }
+
+    private double averageTimerDurationMsForTenant(String metricName, String tenantCode) {
+        Collection<Timer> timers = meterRegistry.find(metricName)
+            .tag("tenant", tenantCode)
+            .timers();
+        long invocationCount = timers.stream()
+            .mapToLong(Timer::count)
+            .sum();
+        if (invocationCount == 0) {
+            return 0.0;
+        }
+        double totalDurationMs = timers.stream()
+            .mapToDouble(timer -> timer.totalTime(TimeUnit.MILLISECONDS))
+            .sum();
+        return totalDurationMs / invocationCount;
     }
 
     private String normalizeTenantCode(String tenantCode) {
         if (tenantCode == null || tenantCode.isBlank()) {
-            return "UNSCOPED";
+            return "TENANT_CONTEXT_MISSING";
         }
         return tenantCode.trim().toUpperCase(Locale.ROOT);
     }
@@ -187,5 +253,21 @@ public class OperationalMetricsService {
             return "UNKNOWN";
         }
         return value.trim().replace(' ', '_').toUpperCase(Locale.ROOT);
+    }
+
+    private String resolveStatusFamily(int statusCode) {
+        if (statusCode >= 500) {
+            return "5XX";
+        }
+        if (statusCode >= 400) {
+            return "4XX";
+        }
+        if (statusCode >= 300) {
+            return "3XX";
+        }
+        if (statusCode >= 200) {
+            return "2XX";
+        }
+        return "1XX";
     }
 }

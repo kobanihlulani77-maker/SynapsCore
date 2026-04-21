@@ -103,12 +103,12 @@ section "TOP-LEVEL REPOSITORY TOUR"
 note "/backend"
 note "The Java Spring Boot backend and the core engine of SynapseCore."
 note "This is where ingestion, persistence, intelligence, prediction, decision,"
-note "alerts, recommendations, realtime publishing, and simulation are coordinated."
+note "alerts, recommendations, realtime publishing, and runtime trust are coordinated."
 echo
 note "/frontend"
 note "The React + Vite dashboard."
 note "This is the live operational surface where users see summary metrics, alerts,"
-note "recommendations, inventory posture, recent orders, and simulation controls."
+note "recommendations, inventory posture, recent orders, and control surfaces."
 echo
 note "/infrastructure"
 note "Docker, docker-compose, environment files, and local infrastructure support."
@@ -179,7 +179,7 @@ note "are allowed only for actors with the correct operational authority."
 echo
 note "backend/src/main/java/com/synapsecore/auth"
 note "Signed-in user session handling mapped onto SynapseCore operators."
-note "This is where lightweight identity, session state, and demo-ready local"
+note "This is where lightweight identity, session state, and starter local"
 note "credential handling live today."
 echo
 note "backend/src/main/java/com/synapsecore/alert"
@@ -189,10 +189,6 @@ echo
 note "backend/src/main/java/com/synapsecore/realtime"
 note "WebSocket and live update broadcasting logic."
 note "This is what makes the dashboard feel alive instead of refresh-driven."
-echo
-note "backend/src/main/java/com/synapsecore/simulation"
-note "Fake data generation and simulation state handling so the MVP can demonstrate"
-note "real behavior before enterprise integrations are connected."
 echo
 note "backend/src/main/java/com/synapsecore/api/controller"
 note "REST endpoints used by the frontend and by external systems interacting with"
@@ -246,9 +242,9 @@ note "11. DashboardService refreshes the top-level metrics."
 note "12. RealtimeService publishes the changed state over WebSockets."
 note "13. The frontend updates the control-center view without a manual refresh."
 echo
-note "Simulation follows the same core path wherever possible."
+note "Local development reset follows the same core path wherever possible."
 note "That matters because SynapseCore should feel alive through real business logic,"
-note "not through a fake parallel demo mode."
+note "not through a fake parallel side mode."
 
 section "HOW TO RUN THE PROJECT"
 note "Full stack with Docker:"
@@ -265,11 +261,8 @@ note "  bash scripts/explain-project.sh"
 note "  bash scripts/project-tree.sh"
 note "  bash scripts/full-structure.sh"
 echo
-note "For a clean demo baseline after services are up, run:"
+note "For a clean local starter baseline after services are up, run:"
 note "  bash scripts/seed.sh"
-echo
-note "If you want the baseline reset and simulation started together, run:"
-note "  bash scripts/seed.sh --with-simulation"
 
 section "HOW TO UNDERSTAND THE ARCHITECTURE QUICKLY"
 note "If you are new to the repo, use this sequence:"

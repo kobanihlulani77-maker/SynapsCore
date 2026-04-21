@@ -57,7 +57,7 @@ public class AuditLogService {
 
     public List<AuditLogResponse> getRecentAuditLogs() {
         return auditLogRepository.findTop20ByTenantCodeIgnoreCaseOrderByCreatedAtDesc(
-                requestTraceContext.getCurrentTenantOrDefault())
+                tenantContextService.getCurrentTenantCodeOrDefault())
             .stream()
             .map(log -> new AuditLogResponse(
                 log.getId(),
@@ -101,6 +101,7 @@ public class AuditLogService {
         }
         String traceTenantCode = requestTraceContext.getCurrentTenant()
             .filter(tenantCode -> !tenantCode.isBlank())
+            .filter(tenantCode -> !RequestTraceContext.MISSING_TENANT_CONTEXT.equalsIgnoreCase(tenantCode))
             .orElse(null);
         if (traceTenantCode != null) {
             return traceTenantCode;
@@ -110,7 +111,7 @@ public class AuditLogService {
             return tenantContextService.getCurrentTenantCodeOrDefault();
         } catch (IllegalStateException exception) {
             // Request-level failures can be rejected before a tenant context exists in prod.
-            return RequestTraceContext.DEFAULT_TENANT;
+            return RequestTraceContext.MISSING_TENANT_CONTEXT;
         }
     }
 }

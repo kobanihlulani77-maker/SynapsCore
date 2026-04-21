@@ -9,7 +9,6 @@ public record SystemDiagnosticsSummary(
     long inventorySignalsInWindow,
     long integrationEventsInWindow,
     long scenarioEventsInWindow,
-    long simulationEventsInWindow,
     long failureAuditsInWindow,
     long activeIncidentCount,
     Instant latestBusinessEventAt,

@@ -6,11 +6,9 @@ import com.synapsecore.domain.entity.AlertStatus;
 import com.synapsecore.domain.repository.AlertRepository;
 import com.synapsecore.domain.repository.CustomerOrderRepository;
 import com.synapsecore.domain.repository.InventoryRepository;
-import com.synapsecore.domain.repository.ProductRepository;
 import com.synapsecore.domain.repository.RecommendationRepository;
 import com.synapsecore.domain.repository.WarehouseRepository;
 import com.synapsecore.fulfillment.FulfillmentService;
-import com.synapsecore.simulation.SimulationStateService;
 import com.synapsecore.tenant.TenantContextService;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
@@ -27,12 +25,10 @@ public class DashboardService {
     private final AlertRepository alertRepository;
     private final InventoryRepository inventoryRepository;
     private final RecommendationRepository recommendationRepository;
-    private final ProductRepository productRepository;
     private final WarehouseRepository warehouseRepository;
     private final FulfillmentService fulfillmentService;
     private final RedisTemplate<String, String> redisTemplate;
     private final ObjectMapper objectMapper;
-    private final SimulationStateService simulationStateService;
     private final TenantContextService tenantContextService;
 
     @Value("${synapsecore.dashboard.cache-enabled:true}")
@@ -69,11 +65,10 @@ public class DashboardService {
             fulfillmentOverview.backlogCount(),
             fulfillmentOverview.delayedShipmentCount(),
             fulfillmentOverview.atRiskCount(),
-            productRepository.count(),
+            inventoryRepository.countDistinctProductsByTenantCode(tenantCode),
             warehouseRepository.countByTenant_CodeIgnoreCase(tenantCode),
             customerOrderRepository.countByTenant_CodeIgnoreCaseAndCreatedAtAfter(tenantCode, recentWindow),
             inventoryRepository.countByTenantCode(tenantCode),
-            simulationStateService.getStatus().active(),
             now
         );
         if (!cacheEnabled) {

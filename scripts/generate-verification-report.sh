@@ -386,7 +386,7 @@ write_step "Run company-readiness verification"
   company_output="$(cat "$company_stdout_file" "$company_stderr_file" 2>/dev/null || true)"
   if [[ "$company_timed_out" == "false" ]] && { [[ "$company_exit" == "0" ]] || grep -q 'Company readiness verification passed' <<<"$company_output"; }; then
     company_status="PASS"
-    company_notes="Onboarding, integrations, replay, planning, fulfillment, trust, and simulation."
+    company_notes="Onboarding, integrations, replay, planning, fulfillment, and trust."
   else
     company_notes="Company-readiness verification did not pass in this run."
   fi
@@ -404,7 +404,7 @@ fi
 
 write_step "Verify sign-in session"
 cookies_file="$(mktemp)"
-login_payload='{"tenantCode":"SYNAPSE-DEMO","username":"operations.lead","password":"lead-2026"}'
+login_payload='{"tenantCode":"STARTER-OPS","username":"operations.lead","password":"lead-2026"}'
 login_status="$(curl -ksS -o /dev/null -w "%{http_code}" -c "$cookies_file" -H "Content-Type: application/json" -d "$login_payload" "$BACKEND_URL/api/auth/session/login" || true)"
 session_body="$(curl -ksS -b "$cookies_file" "$BACKEND_URL/api/auth/session" || true)"
 

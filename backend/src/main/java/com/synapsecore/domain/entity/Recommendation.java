@@ -46,6 +46,9 @@ public class Recommendation {
     @Column(nullable = false, length = 1024)
     private String description;
 
+    @Column(length = 1024)
+    private String policyExplanation;
+
     @Enumerated(EnumType.STRING)
     @Column(nullable = false, length = 32)
     private RecommendationPriority priority;

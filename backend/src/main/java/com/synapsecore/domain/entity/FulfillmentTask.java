@@ -64,6 +64,14 @@ public class FulfillmentTask {
     @Column(nullable = false)
     private Instant queuedAt;
 
+    @Column(nullable = false)
+    @Builder.Default
+    private Integer totalUnits = 0;
+
+    @Column(nullable = false)
+    @Builder.Default
+    private Integer fulfilledUnits = 0;
+
     private Instant promisedDispatchAt;
 
     private Instant expectedDeliveryAt;
@@ -92,6 +100,12 @@ public class FulfillmentTask {
         if (queuedAt == null) {
             queuedAt = now;
         }
+        if (totalUnits == null) {
+            totalUnits = 0;
+        }
+        if (fulfilledUnits == null) {
+            fulfilledUnits = 0;
+        }
         if (exceptionCount == null) {
             exceptionCount = 0;
         }
@@ -102,6 +116,12 @@ public class FulfillmentTask {
     @PreUpdate
     void onUpdate() {
         TenantOwnershipAssertions.requireFulfillmentTaskConsistency(this, "Fulfillment task persistence");
+        if (totalUnits == null) {
+            totalUnits = 0;
+        }
+        if (fulfilledUnits == null) {
+            fulfilledUnits = 0;
+        }
         updatedAt = Instant.now();
     }
 }

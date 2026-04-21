@@ -81,4 +81,11 @@ public interface InventoryRepository extends JpaRepository<Inventory, Long> {
         where upper(i.warehouse.tenant.code) = upper(:tenantCode)
         """)
     long countByTenantCode(@Param("tenantCode") String tenantCode);
+
+    @Query("""
+        select count(distinct i.product.id)
+        from Inventory i
+        where upper(i.warehouse.tenant.code) = upper(:tenantCode)
+        """)
+    long countDistinctProductsByTenantCode(@Param("tenantCode") String tenantCode);
 }

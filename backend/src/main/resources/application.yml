@@ -37,21 +37,35 @@ synapsecore:
     api-url: ${PUBLIC_API_URL:}
   access:
     allow-header-fallback: ${ALLOW_HEADER_FALLBACK:false}
+  realtime:
+    broker-mode: ${SYNAPSECORE_REALTIME_BROKER_MODE:SIMPLE_IN_MEMORY}
+    relay-host: ${SYNAPSECORE_REALTIME_RELAY_HOST:localhost}
+    relay-port: ${SYNAPSECORE_REALTIME_RELAY_PORT:61613}
+    relay-client-login: ${SYNAPSECORE_REALTIME_RELAY_CLIENT_LOGIN:guest}
+    relay-client-passcode: ${SYNAPSECORE_REALTIME_RELAY_CLIENT_PASSCODE:guest}
+    relay-system-login: ${SYNAPSECORE_REALTIME_RELAY_SYSTEM_LOGIN:guest}
+    relay-system-passcode: ${SYNAPSECORE_REALTIME_RELAY_SYSTEM_PASSCODE:guest}
+    relay-virtual-host: ${SYNAPSECORE_REALTIME_RELAY_VIRTUAL_HOST:}
+    relay-system-heartbeat-send-ms: ${SYNAPSECORE_REALTIME_RELAY_HEARTBEAT_SEND_MS:10000}
+    relay-system-heartbeat-receive-ms: ${SYNAPSECORE_REALTIME_RELAY_HEARTBEAT_RECEIVE_MS:10000}
   cors:
     allowed-origins: ${CORS_ALLOWED_ORIGINS:http://localhost:5173,http://127.0.0.1:5173}
-  demo:
-    auto-seed-on-empty: ${SYNAPSECORE_DEMO_AUTO_SEED_ON_EMPTY:true}
-    allow-default-tenant-fallback: ${SYNAPSECORE_DEMO_ALLOW_DEFAULT_TENANT_FALLBACK:true}
-    simulation-enabled: ${SYNAPSECORE_DEMO_SIMULATION_ENABLED:true}
-    seed-starter-inventory-on-tenant-onboarding: ${SYNAPSECORE_DEMO_SEED_STARTER_INVENTORY_ON_TENANT_ONBOARDING:true}
-    seed-starter-connectors-on-tenant-onboarding: ${SYNAPSECORE_DEMO_SEED_STARTER_CONNECTORS_ON_TENANT_ONBOARDING:true}
-    allow-tenant-admin-tenant-onboarding: ${SYNAPSECORE_DEMO_ALLOW_TENANT_ADMIN_TENANT_ONBOARDING:true}
-  simulation:
-    interval-ms: ${SIMULATION_INTERVAL_MS:4000}
+  starter:
+    auto-seed-on-empty: ${SYNAPSECORE_STARTER_AUTO_SEED_ON_EMPTY:true}
+    allow-default-tenant-fallback: ${SYNAPSECORE_STARTER_ALLOW_DEFAULT_TENANT_FALLBACK:true}
+    seed-starter-inventory-on-tenant-onboarding: ${SYNAPSECORE_STARTER_SEED_INVENTORY_ON_TENANT_ONBOARDING:true}
+    seed-starter-connectors-on-tenant-onboarding: ${SYNAPSECORE_STARTER_SEED_CONNECTORS_ON_TENANT_ONBOARDING:true}
+    allow-tenant-admin-tenant-onboarding: ${SYNAPSECORE_STARTER_ALLOW_TENANT_ADMIN_TENANT_ONBOARDING:true}
   fulfillment:
     default-dispatch-hours: ${FULFILLMENT_DEFAULT_DISPATCH_HOURS:2}
     default-delivery-hours: ${FULFILLMENT_DEFAULT_DELIVERY_HOURS:24}
     analysis-window-hours: ${FULFILLMENT_ANALYSIS_WINDOW_HOURS:6}
+  integration:
+    pull-worker:
+      enabled: ${SYNAPSECORE_INTEGRATION_PULL_WORKER_ENABLED:true}
+      interval-ms: ${SYNAPSECORE_INTEGRATION_PULL_WORKER_INTERVAL_MS:60000}
+      batch-size: ${SYNAPSECORE_INTEGRATION_PULL_WORKER_BATCH_SIZE:10}
+      fetch-timeout-seconds: ${SYNAPSECORE_INTEGRATION_PULL_WORKER_FETCH_TIMEOUT_SECONDS:20}
   dashboard:
     cache-enabled: ${DASHBOARD_CACHE_ENABLED:true}
     summary-cache-key: synapsecore:dashboard:summary
@@ -75,4 +89,4 @@ management:
 
 logging:
   pattern:
-    console: "%d{yyyy-MM-dd'T'HH:mm:ss.SSSXXX} %-5level [%thread] [%X{requestId:-system-no-request}] [%X{tenant:-unscoped}] [%X{actor:-anonymous}] %logger{36} - %msg%n"
+    console: "%d{yyyy-MM-dd'T'HH:mm:ss.SSSXXX} %-5level [%thread] [%X{requestId:-system-no-request}] [%X{tenant:-tenant-context-missing}] [%X{actor:-anonymous}] %logger{36} - %msg%n"

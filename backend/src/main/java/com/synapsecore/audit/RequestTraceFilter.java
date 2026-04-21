@@ -3,6 +3,7 @@ package com.synapsecore.audit;
 import com.synapsecore.access.AccessControlService;
 import com.synapsecore.auth.AuthSessionService;
 import com.synapsecore.config.SynapseAccessProperties;
+import com.synapsecore.observability.OperationalMetricsService;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
@@ -25,6 +26,7 @@ public class RequestTraceFilter extends OncePerRequestFilter {
     private final RequestTraceContext requestTraceContext;
     private final SynapseAccessProperties accessProperties;
     private final AuthSessionService authSessionService;
+    private final OperationalMetricsService operationalMetricsService;
 
     @Override
     protected void doFilterInternal(HttpServletRequest request,
@@ -36,6 +38,8 @@ public class RequestTraceFilter extends OncePerRequestFilter {
             : UUID.randomUUID().toString();
         String actorName = resolveActorName(request);
         String tenantCode = resolveTenantCode(request);
+        long startedAtNanos = System.nanoTime();
+        int responseStatus = HttpServletResponse.SC_OK;
 
         requestTraceContext.setCurrentRequestId(requestId);
         requestTraceContext.setCurrentActor(actorName);
@@ -47,7 +51,17 @@ public class RequestTraceFilter extends OncePerRequestFilter {
 
         try {
             filterChain.doFilter(request, response);
+            responseStatus = response.getStatus();
+        } catch (IOException | ServletException | RuntimeException exception) {
+            responseStatus = response.getStatus() >= 400 ? response.getStatus() : HttpServletResponse.SC_INTERNAL_SERVER_ERROR;
+            throw exception;
         } finally {
+            operationalMetricsService.recordHttpRequest(
+                tenantCode,
+                request.getMethod(),
+                responseStatus,
+                System.nanoTime() - startedAtNanos
+            );
             MDC.remove(REQUEST_ID_MDC_KEY);
             MDC.remove(ACTOR_MDC_KEY);
             MDC.remove(TENANT_MDC_KEY);
@@ -91,6 +105,6 @@ public class RequestTraceFilter extends OncePerRequestFilter {
             }
         }
 
-        return RequestTraceContext.DEFAULT_TENANT;
+        return RequestTraceContext.MISSING_TENANT_CONTEXT;
     }
 }

@@ -15,7 +15,6 @@ public record SystemRuntimeResponse(
     List<String> allowedOrigins,
     String publicAppUrl,
     String publicApiUrl,
-    long simulationIntervalMs,
     SystemTelemetrySummary telemetry,
     SystemBackboneSummary backbone,
     SystemMetricsSummary metrics,

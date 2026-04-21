@@ -13,6 +13,7 @@ public record AlertResponse(
     String description,
     String impactSummary,
     String recommendedAction,
+    String policyExplanation,
     AlertStatus status,
     Instant createdAt
 ) {

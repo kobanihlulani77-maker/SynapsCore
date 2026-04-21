@@ -1,7 +1,7 @@
 param(
     [string]$FrontendUrl = "http://127.0.0.1",
     [string]$BackendUrl = "http://127.0.0.1:8080",
-    [string]$SeedTenantCode = "SYNAPSE-DEMO",
+    [string]$SeedTenantCode = "STARTER-OPS",
     [string]$SeedAdminUsername = "operations.lead",
     [string]$SeedAdminPassword = "lead-2026",
     [int]$MaxAttempts = 20,

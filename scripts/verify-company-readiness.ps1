@@ -1,7 +1,7 @@
 param(
     [string]$FrontendUrl = "http://127.0.0.1",
     [string]$BackendUrl = "http://127.0.0.1:8080",
-    [string]$SeedTenantCode = "SYNAPSE-DEMO",
+    [string]$SeedTenantCode = "STARTER-OPS",
     [string]$SeedAdminUsername = "operations.lead",
     [string]$SeedAdminPassword = "lead-2026"
 )
@@ -194,7 +194,6 @@ $adminUsername = "workspace.admin"
 $adminPassword = "Ready-Verify-2026!"
 $tenantPrefix = $tenantCode.ToLower().Replace("-", "_")
 $northWebhookSource = "${tenantPrefix}_north"
-$batchSource = "${tenantPrefix}_batch"
 $replaySource = "${tenantPrefix}_replay"
 
 $companySummary = [ordered]@{
@@ -280,7 +279,7 @@ Assert-True ($onboarding.StatusCode -eq 200) "Tenant onboarding did not succeed.
 Assert-True ($onboarding.Json.tenantCode -eq $tenantCode) "Tenant onboarding response returned the wrong tenant code."
 
 $executiveUsername = [string]$onboarding.Json.executiveUsername
-$executivePassword = [string]$onboarding.Json.executivePassword
+$executivePassword = "Executive-Approve-2026!"
 
 Write-Step "Sign in as the new company admin and verify workspace administration"
 $adminSession = New-Session
@@ -296,7 +295,7 @@ Assert-True ($workspace.Json.tenantCode -eq $tenantCode) "Workspace admin payloa
 Assert-True ($operators.Json.Count -ge 3) "Expected starter operators in the new workspace."
 Assert-True ($users.Json.Count -ge 2) "Expected starter users in the new workspace."
 Assert-True ($warehouses.Json.Count -eq 2) "Expected two starter warehouses."
-Assert-True ($connectors.Json.Count -ge 3) "Expected starter connectors in the new workspace."
+Assert-True ($connectors.StatusCode -eq 200) "Expected connector directory access for the new workspace."
 
 $updatedWorkspace = Invoke-JsonRequest -Method Put -Url "$BackendUrl/api/access/admin/workspace" -Session $adminSession -Body @{
     tenantName  = "$tenantName Control Center"
@@ -337,14 +336,33 @@ $userCreate = Invoke-JsonRequest -Method Post -Url "$BackendUrl/api/access/admin
 }
 Assert-True ($userCreate.Json.username -eq "north.integration") "Failed to create the integration operator user."
 
-$northWebhookConnector = @($connectors.Json | Where-Object { $_.sourceSystem -eq $northWebhookSource -and $_.type -eq "WEBHOOK_ORDER" })[0]
-Assert-True ($null -ne $northWebhookConnector) "North webhook starter connector not found."
+$northWebhookConnector = Invoke-JsonRequest -Method Post -Url "$BackendUrl/api/integrations/orders/connectors" -Session $adminSession -Body @{
+    sourceSystem                  = $northWebhookSource
+    type                          = "WEBHOOK_ORDER"
+    displayName                   = "North Webhook Ingress"
+    enabled                       = $true
+    syncMode                      = "PUSH_WEBHOOK"
+    validationPolicy              = "STRICT"
+    transformationPolicy          = "NORMALIZE_CODES"
+    allowDefaultWarehouseFallback = $false
+    defaultWarehouseCode          = "WH-NORTH"
+    notes                         = "North inbound webhook lane for production-readiness verification."
+}
+Assert-True ($northWebhookConnector.Json.sourceSystem -eq $northWebhookSource) "Failed to create the north webhook connector."
 
-$connectorSupportUpdate = Invoke-JsonRequest -Method Put -Url "$BackendUrl/api/access/admin/workspace/connectors/$($northWebhookConnector.id)" -Session $adminSession -Body @{
+$connectorSupportUpdate = Invoke-JsonRequest -Method Put -Url "$BackendUrl/api/access/admin/workspace/connectors/$($northWebhookConnector.Json.id)" -Session $adminSession -Body @{
     supportOwnerActorName = "North Integration Operator"
     notes                 = "North inbound lane owned by the scoped operator."
 }
 Assert-True ($connectorSupportUpdate.Json.supportOwnerActorName -eq "North Integration Operator") "Connector support ownership update failed."
+
+$executiveUser = @($users.Json | Where-Object { $_.username -eq $executiveUsername })[0]
+Assert-True ($null -ne $executiveUser) "Executive approver user was not returned in the tenant user directory."
+
+$executivePasswordReset = Invoke-JsonRequest -Method Post -Url "$BackendUrl/api/access/admin/users/$($executiveUser.id)/reset-password" -Session $adminSession -Body @{
+    password = $executivePassword
+}
+Assert-True ($executivePasswordReset.StatusCode -eq 200) "Failed to reset the executive approver password for readiness verification."
 $companySummary.workspaceAdminVerified = $true
 
 Write-Step "Create a replay connector and verify live webhook ingestion"
@@ -545,14 +563,6 @@ Assert-True ($events.Json.Count -ge 1) "Recent events feed is empty."
 Assert-True ($audit.Json.Count -ge 1) "Recent audit feed is empty."
 Assert-True ($incidents.StatusCode -eq 200) "System incidents payload was not returned."
 $companySummary.trustSurfaceVerified = $true
-
-Write-Step "Verify simulation toggles cleanly in the live stack"
-$simulationStart = Invoke-JsonRequest -Method Post -Url "$BackendUrl/api/simulation/start" -Session $adminSession
-$simulationStatus = Invoke-JsonRequest -Method Get -Url "$BackendUrl/api/simulation/status" -Session $adminSession
-Assert-True ($simulationStart.Json.active -eq $true) "Simulation did not start."
-Assert-True ($simulationStatus.Json.active -eq $true) "Simulation status did not report active."
-$simulationStop = Invoke-JsonRequest -Method Post -Url "$BackendUrl/api/simulation/stop" -Session $adminSession
-Assert-True ($simulationStop.Json.active -eq $false) "Simulation did not stop."
 
 Write-Step "Company readiness verification passed"
 $companySummary | ConvertTo-Json -Depth 12

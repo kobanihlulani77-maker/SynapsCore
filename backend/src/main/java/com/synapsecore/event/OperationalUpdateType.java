@@ -5,6 +5,5 @@ public enum OperationalUpdateType {
     FULFILLMENT_UPDATE,
     INVENTORY_UPDATE,
     INTEGRATION_STATE,
-    SIMULATION_STATE,
     SYSTEM_RESEEDED
 }

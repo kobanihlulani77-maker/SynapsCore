@@ -11,10 +11,11 @@ import com.synapsecore.domain.entity.BusinessEventType;
 import com.synapsecore.domain.entity.CustomerOrder;
 import com.synapsecore.domain.entity.FulfillmentStatus;
 import com.synapsecore.domain.entity.FulfillmentTask;
-import com.synapsecore.domain.entity.OrderStatus;
 import com.synapsecore.domain.entity.Recommendation;
 import com.synapsecore.domain.repository.CustomerOrderRepository;
 import com.synapsecore.domain.repository.FulfillmentTaskRepository;
+import com.synapsecore.domain.service.OrderService;
+import com.synapsecore.domain.service.TenantOperationalPolicyService;
 import com.synapsecore.event.BusinessEventService;
 import com.synapsecore.event.OperationalStateChangePublisher;
 import com.synapsecore.event.OperationalUpdateType;
@@ -30,8 +31,6 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
-import java.util.Optional;
-import java.util.concurrent.ThreadLocalRandom;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpStatus;
@@ -68,9 +67,11 @@ public class FulfillmentService {
     private final BusinessEventService businessEventService;
     private final AuditLogService auditLogService;
     private final OperationalStateChangePublisher operationalStateChangePublisher;
+    private final OrderService orderService;
     private final TenantContextService tenantContextService;
     private final TenantScopeGuard tenantScopeGuard;
     private final OperationalMetricsService operationalMetricsService;
+    private final TenantOperationalPolicyService tenantOperationalPolicyService;
 
     @Value("${synapsecore.fulfillment.default-dispatch-hours:2}")
     private long defaultDispatchHours;
@@ -91,6 +92,8 @@ public class FulfillmentService {
             .warehouse(order.getWarehouse())
             .status(FulfillmentStatus.QUEUED)
             .queuedAt(queuedAt)
+            .totalUnits(order.getItems().stream().mapToInt(item -> item.getQuantity()).sum())
+            .fulfilledUnits(0)
             .promisedDispatchAt(queuedAt.plus(defaultDispatchHours, ChronoUnit.HOURS))
             .expectedDeliveryAt(queuedAt.plus(defaultDeliveryHours, ChronoUnit.HOURS))
             .exceptionCount(0)
@@ -134,8 +137,13 @@ public class FulfillmentService {
         tenantScopeGuard.requireFulfillmentTask(task, "fulfillment update");
 
         applyUpdate(task, request);
-        order.setStatus(mapOrderStatus(task.getStatus()));
-        customerOrderRepository.save(order);
+        CustomerOrder synchronizedOrder = orderService.synchronizeOrderLifecycleFromFulfillment(
+            task,
+            request.fulfilledUnits() == null ? 0 : request.fulfilledUnits(),
+            source,
+            request.note()
+        );
+        order = synchronizedOrder;
         FulfillmentTask savedTask = fulfillmentTaskRepository.save(task);
         tenantScopeGuard.requireFulfillmentTask(savedTask, "fulfillment update");
 
@@ -206,32 +214,12 @@ public class FulfillmentService {
         );
     }
 
-    @Transactional
-    public Optional<FulfillmentStatusResponse> advanceSimulationFlow() {
-        String tenantCode = tenantContextService.getCurrentTenantCodeOrDefault();
-        return fulfillmentTaskRepository.findTop1ByTenant_CodeIgnoreCaseAndStatusInOrderByUpdatedAtAsc(tenantCode, ACTIVE_STATUSES)
-            .map(task -> {
-                FulfillmentStatus nextStatus = nextSimulationStatus(task.getStatus());
-                Instant now = Instant.now();
-                FulfillmentUpdateRequest request = new FulfillmentUpdateRequest(
-                    task.getCustomerOrder().getExternalOrderId(),
-                    nextStatus,
-                    nextStatus == FulfillmentStatus.DISPATCHED || task.getCarrier() != null ? defaultCarrier(task) : null,
-                    nextStatus == FulfillmentStatus.DISPATCHED || task.getTrackingReference() != null ? defaultTracking(task) : null,
-                    task.getPromisedDispatchAt(),
-                    nextStatus == FulfillmentStatus.DISPATCHED && task.getExpectedDeliveryAt() == null
-                        ? now.plus(defaultDeliveryHours, ChronoUnit.HOURS)
-                        : task.getExpectedDeliveryAt(),
-                    now,
-                    buildSimulationNote(nextStatus)
-                );
-                return recordUpdate(request, "simulation");
-            });
-    }
-
     private void applyUpdate(FulfillmentTask task, FulfillmentUpdateRequest request) {
         Instant occurredAt = request.occurredAt() == null ? Instant.now() : request.occurredAt();
         task.setStatus(request.status());
+        if (request.fulfilledUnits() != null && request.fulfilledUnits() > 0) {
+            task.setFulfilledUnits(Math.min(task.getTotalUnits(), task.getFulfilledUnits() + request.fulfilledUnits()));
+        }
         task.setCarrier(request.carrier() == null || request.carrier().isBlank() ? task.getCarrier() : request.carrier().trim());
         task.setTrackingReference(request.trackingReference() == null || request.trackingReference().isBlank()
             ? task.getTrackingReference()
@@ -262,6 +250,9 @@ public class FulfillmentService {
                 }
             }
             case DISPATCHED -> {
+                if (task.getFulfilledUnits() < task.getTotalUnits()) {
+                    task.setFulfilledUnits(task.getTotalUnits());
+                }
                 task.setDispatchedAt(occurredAt);
                 if (task.getExpectedDeliveryAt() == null) {
                     task.setExpectedDeliveryAt(occurredAt.plus(defaultDeliveryHours, ChronoUnit.HOURS));
@@ -273,6 +264,7 @@ public class FulfillmentService {
                 }
             }
             case DELIVERED -> {
+                task.setFulfilledUnits(task.getTotalUnits());
                 if (task.getDispatchedAt() == null) {
                     task.setDispatchedAt(occurredAt);
                 }
@@ -292,6 +284,7 @@ public class FulfillmentService {
 
     private FulfillmentAssessment buildWarehouseAssessment(FulfillmentTask task, Instant now) {
         String tenantCode = task.getTenant().getCode();
+        var policy = tenantOperationalPolicyService.getPolicy(tenantCode);
         Long warehouseId = task.getWarehouse().getId();
         List<FulfillmentTask> warehouseTasks = fulfillmentTaskRepository
             .findAllByTenant_CodeIgnoreCaseAndStatusInOrderByUpdatedAtDesc(tenantCode, ACTIVE_STATUSES)
@@ -335,22 +328,32 @@ public class FulfillmentService {
             ? null
             : hoursBetween(now, task.getExpectedDeliveryAt());
 
+        boolean dispatchOverdue = overdueDispatchCount >= policy.getOverdueDispatchCountThreshold();
+        boolean backlogPressure = backlogCount >= policy.getBacklogRiskCount();
+        boolean criticalBacklog = backlogCount >= policy.getBacklogCriticalCount();
+        boolean delayedLane = delayedShipmentCount >= policy.getDelayedShipmentCountThreshold();
+        boolean deliverySlaBreached = hoursUntilDeliveryDue != null
+            && hoursUntilDeliveryDue <= -policy.getDeliveryDelayToleranceHours();
+
         boolean backlogRisk = overdueDispatchCount > 0
-            || backlogCount >= 4
+            || backlogPressure
             || backlogGrowthPerHour > 1.0
-            || (estimatedBacklogClearHours != null && estimatedBacklogClearHours >= 6);
-        boolean deliveryDelayRisk = isDeliveryDelayed(task, now);
+            || (estimatedBacklogClearHours != null
+                && estimatedBacklogClearHours >= policy.getBacklogClearHoursThreshold());
+        boolean deliveryDelayRisk = delayedLane || deliverySlaBreached || isDeliveryDelayed(task, now);
         boolean anomalyDetected = task.getStatus() == FulfillmentStatus.EXCEPTION
-            || delayedShipmentCount >= 2
-            || overdueDispatchCount >= 2
-            || (backlogCount >= 6 && backlogGrowthPerHour > 0.5)
+            || delayedLane
+            || dispatchOverdue
+            || (criticalBacklog && backlogGrowthPerHour > 0.5)
             || task.getExceptionCount() > 0;
 
         AlertSeverity severity;
-        if (anomalyDetected || overdueDispatchCount >= 2 || (hoursUntilDeliveryDue != null && hoursUntilDeliveryDue <= -2)) {
-            severity = AlertSeverity.CRITICAL;
-        } else if (backlogRisk || deliveryDelayRisk) {
-            severity = AlertSeverity.HIGH;
+        if (anomalyDetected || dispatchOverdue || deliverySlaBreached) {
+            severity = anomalyDetected ? policy.getFulfillmentAnomalySeverity() : policy.getBacklogCriticalSeverity();
+        } else if (deliveryDelayRisk) {
+            severity = policy.getDeliveryDelaySeverity();
+        } else if (backlogRisk) {
+            severity = policy.getBacklogRiskSeverity();
         } else {
             severity = AlertSeverity.MEDIUM;
         }
@@ -421,14 +424,6 @@ public class FulfillmentService {
         );
     }
 
-    private OrderStatus mapOrderStatus(FulfillmentStatus status) {
-        return switch (status) {
-            case QUEUED -> OrderStatus.RECEIVED;
-            case DELIVERED -> OrderStatus.COMPLETED;
-            default -> OrderStatus.PROCESSING;
-        };
-    }
-
     private boolean isDeliveryDelayed(FulfillmentTask task, Instant now) {
         return task.getStatus() == FulfillmentStatus.DELAYED
             || task.getStatus() == FulfillmentStatus.EXCEPTION
@@ -451,18 +446,6 @@ public class FulfillmentService {
         return String.format(Locale.US, "%.1f hours remaining before %s", hours, label);
     }
 
-    private FulfillmentStatus nextSimulationStatus(FulfillmentStatus current) {
-        return switch (current) {
-            case QUEUED -> FulfillmentStatus.PICKING;
-            case PICKING -> FulfillmentStatus.PACKED;
-            case PACKED -> FulfillmentStatus.DISPATCHED;
-            case DISPATCHED -> ThreadLocalRandom.current().nextBoolean() ? FulfillmentStatus.DELIVERED : FulfillmentStatus.DELAYED;
-            case DELAYED -> FulfillmentStatus.DELIVERED;
-            case EXCEPTION -> FulfillmentStatus.PICKING;
-            case DELIVERED -> FulfillmentStatus.DELIVERED;
-        };
-    }
-
     private String defaultCarrier(FulfillmentTask task) {
         return task.getCarrier() != null && !task.getCarrier().isBlank() ? task.getCarrier() : "Synapse Courier";
     }
@@ -473,15 +456,4 @@ public class FulfillmentService {
             : "TRK-" + task.getCustomerOrder().getExternalOrderId();
     }
 
-    private String buildSimulationNote(FulfillmentStatus nextStatus) {
-        return switch (nextStatus) {
-            case PICKING -> "Simulation advanced the order into active warehouse picking.";
-            case PACKED -> "Simulation packed the order for dispatch handoff.";
-            case DISPATCHED -> "Simulation dispatched the order into the delivery lane.";
-            case DELAYED -> "Simulation detected a delivery slowdown and marked the lane delayed.";
-            case DELIVERED -> "Simulation completed delivery for the order.";
-            case EXCEPTION -> "Simulation triggered a logistics exception for investigation.";
-            default -> "Simulation refreshed the fulfillment lane.";
-        };
-    }
 }

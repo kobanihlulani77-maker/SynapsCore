@@ -6,8 +6,10 @@ import com.synapsecore.domain.entity.Inventory;
 import com.synapsecore.domain.entity.Recommendation;
 import com.synapsecore.domain.entity.RecommendationPriority;
 import com.synapsecore.domain.entity.RecommendationType;
+import com.synapsecore.domain.entity.TenantOperationalPolicy;
 import com.synapsecore.domain.repository.InventoryRepository;
 import com.synapsecore.domain.repository.RecommendationRepository;
+import com.synapsecore.domain.service.TenantOperationalPolicyService;
 import com.synapsecore.event.BusinessEventService;
 import com.synapsecore.fulfillment.FulfillmentAssessment;
 import com.synapsecore.intelligence.InventoryInsight;
@@ -25,6 +27,7 @@ public class RecommendationService {
     private final InventoryRepository inventoryRepository;
     private final RecommendationRepository recommendationRepository;
     private final BusinessEventService businessEventService;
+    private final TenantOperationalPolicyService tenantOperationalPolicyService;
 
     public Recommendation createForInventory(Inventory inventory, InventoryInsight insight, StockPrediction prediction, String source) {
         ScenarioRecommendationProjection projection = previewForInventory(inventory, insight, prediction);
@@ -42,19 +45,21 @@ public class RecommendationService {
             && latest.getCreatedAt().isAfter(Instant.now().minusSeconds(1800))) {
             return latest;
         }
+        String policyExplanation = buildInventoryPolicyExplanation(inventory, insight, prediction, projection.priority());
 
         Recommendation recommendation = recommendationRepository.save(Recommendation.builder()
             .tenant(inventory.getWarehouse().getTenant())
             .type(projection.type())
             .title(projection.title())
             .description(projection.description())
+            .policyExplanation(policyExplanation)
             .priority(projection.priority())
             .build());
 
         businessEventService.record(
             BusinessEventType.RECOMMENDATION_GENERATED,
             source,
-            "Generated " + projection.priority() + " recommendation for " + inventory.getProduct().getSku()
+            "Generated " + projection.priority() + " recommendation for " + inventory.getProduct().resolveCatalogSku()
                 + " in " + inventory.getWarehouse().getCode()
         );
 
@@ -72,18 +77,25 @@ public class RecommendationService {
             ? findTransferPlan(inventory)
             : Optional.empty();
 
+        TenantOperationalPolicy policy = tenantOperationalPolicyService.getPolicy(
+            inventory.getTenant() != null
+                ? inventory.getTenant().getCode()
+                : inventory.getWarehouse().getTenant().getCode()
+        );
         RecommendationPriority priority;
         if (insight.lowStock()) {
             priority = insight.elevatedUrgency()
-                ? RecommendationPriority.CRITICAL
-                : prediction.depletionRisk() ? RecommendationPriority.HIGH : RecommendationPriority.MEDIUM;
+                ? policy.getCriticalLowStockRecommendationPriority()
+                : prediction.depletionRisk() ? policy.getUrgentDepletionRiskRecommendationPriority() : policy.getLowStockRecommendationPriority();
         } else {
-            priority = prediction.urgentRisk() ? RecommendationPriority.HIGH : RecommendationPriority.MEDIUM;
+            priority = prediction.urgentRisk()
+                ? policy.getUrgentDepletionRiskRecommendationPriority()
+                : policy.getDepletionRiskRecommendationPriority();
         }
 
         RecommendationType type = transferPlan.isPresent()
             ? RecommendationType.TRANSFER_STOCK
-            : insight.lowStock() && priority == RecommendationPriority.CRITICAL
+            : insight.lowStock() && insight.elevatedUrgency()
                 ? RecommendationType.REORDER_URGENTLY
                 : RecommendationType.REORDER_STOCK;
 
@@ -106,11 +118,12 @@ public class RecommendationService {
                 ? RecommendationType.ESCALATE_LOGISTICS
                 : RecommendationType.PRIORITIZE_FULFILLMENT;
 
+        TenantOperationalPolicy policy = tenantOperationalPolicyService.getPolicy(task.getTenant().getCode());
         RecommendationPriority priority = assessment.anomalyDetected()
-            ? RecommendationPriority.CRITICAL
+            ? policy.getFulfillmentAnomalyRecommendationPriority()
             : assessment.deliveryDelayRisk() || assessment.overdueDispatchCount() > 0
-                ? RecommendationPriority.HIGH
-                : RecommendationPriority.MEDIUM;
+                ? policy.getDeliveryDelayRecommendationPriority()
+                : policy.getBacklogRecommendationPriority();
 
         String title = switch (type) {
             case INVESTIGATE_LOGISTICS_ANOMALY ->
@@ -152,12 +165,14 @@ public class RecommendationService {
             && latest.getCreatedAt().isAfter(Instant.now().minusSeconds(1800))) {
             return latest;
         }
+        String policyExplanation = buildFulfillmentPolicyExplanation(assessment, priority, policy);
 
         Recommendation recommendation = recommendationRepository.save(Recommendation.builder()
             .tenant(task.getTenant())
             .type(type)
             .title(title)
             .description(description)
+            .policyExplanation(policyExplanation)
             .priority(priority)
             .build());
 
@@ -185,25 +200,64 @@ public class RecommendationService {
             .findFirst();
     }
 
+    private String buildInventoryPolicyExplanation(Inventory inventory,
+                                                   InventoryInsight insight,
+                                                   StockPrediction prediction,
+                                                   RecommendationPriority priority) {
+        TenantOperationalPolicy policy = tenantOperationalPolicyService.getPolicy(
+            inventory.getTenant() != null
+                ? inventory.getTenant().getCode()
+                : inventory.getWarehouse().getTenant().getCode()
+        );
+        if (insight.lowStock()) {
+            return "Tenant policy selected " + priority + " because available stock is "
+                + inventory.getQuantityAvailable() + " against threshold " + inventory.getReorderThreshold()
+                + " with critical ratio " + policy.getLowStockCriticalRatio()
+                + (prediction.hoursToStockout() == null
+                    ? "."
+                    : " and estimated stockout in " + String.format(java.util.Locale.US, "%.1f", prediction.hoursToStockout())
+                        + " hours.");
+        }
+        return "Tenant policy selected " + priority + " because estimated stockout is "
+            + (prediction.hoursToStockout() == null
+                ? "unknown"
+                : String.format(java.util.Locale.US, "%.1f hours", prediction.hoursToStockout()))
+            + " with depletion threshold " + policy.getDepletionRiskHoursThreshold()
+            + " hours and urgent threshold " + policy.getUrgentDepletionRiskHoursThreshold() + " hours.";
+    }
+
+    private String buildFulfillmentPolicyExplanation(FulfillmentAssessment assessment,
+                                                     RecommendationPriority priority,
+                                                     TenantOperationalPolicy policy) {
+        return "Tenant policy selected " + priority
+            + " with backlog=" + assessment.backlogCount()
+            + " (risk threshold " + policy.getBacklogRiskCount()
+            + ", critical threshold " + policy.getBacklogCriticalCount()
+            + "), delayed shipments=" + assessment.delayedShipmentCount()
+            + " (threshold " + policy.getDelayedShipmentCountThreshold()
+            + "), and overdue dispatch=" + assessment.overdueDispatchCount()
+            + " (threshold " + policy.getOverdueDispatchCountThreshold() + ").";
+    }
+
     private String buildTitle(Inventory inventory,
                               InventoryInsight insight,
                               RecommendationPriority priority,
                               Optional<TransferPlan> transferPlan) {
         if (transferPlan.isPresent()) {
-            return "Transfer stock for SKU " + inventory.getProduct().getSku()
+            return "Transfer stock for SKU " + inventory.getProduct().resolveCatalogSku()
                 + " from " + transferPlan.get().sourceInventory().getWarehouse().getCode()
                 + " to " + inventory.getWarehouse().getCode();
         }
 
         if (insight.lowStock() && priority == RecommendationPriority.CRITICAL) {
-            return "Urgent reorder for SKU " + inventory.getProduct().getSku() + " at " + inventory.getWarehouse().getCode();
+            return "Urgent reorder for SKU " + inventory.getProduct().resolveCatalogSku() + " at " + inventory.getWarehouse().getCode();
         }
 
         if (insight.depletionRisk() && !insight.lowStock()) {
-            return "Prepare replenishment for SKU " + inventory.getProduct().getSku() + " at " + inventory.getWarehouse().getCode();
+            return "Prepare replenishment for SKU " + inventory.getProduct().resolveCatalogSku() + " at " + inventory.getWarehouse().getCode();
         }
 
-        return "Reorder stock for SKU " + inventory.getProduct().getSku() + " at " + inventory.getWarehouse().getCode();
+        return "Reorder stock for SKU " + inventory.getProduct().resolveCatalogSku() + " at " + inventory.getWarehouse().getCode();
     }
 
     private String buildDescription(Inventory inventory,

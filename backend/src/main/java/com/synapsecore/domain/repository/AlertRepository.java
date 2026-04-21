@@ -13,7 +13,11 @@ public interface AlertRepository extends JpaRepository<Alert, Long> {
 
     long countByTenant_CodeIgnoreCaseAndStatus(String tenantCode, AlertStatus status);
 
+    List<Alert> findTop12ByOrderByUpdatedAtDesc();
+
     List<Alert> findTop12ByOrderByCreatedAtDesc();
+
+    List<Alert> findTop12ByTenant_CodeIgnoreCaseOrderByUpdatedAtDesc(String tenantCode);
 
     List<Alert> findTop12ByTenant_CodeIgnoreCaseOrderByCreatedAtDesc(String tenantCode);
 
