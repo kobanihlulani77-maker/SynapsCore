@@ -14,19 +14,21 @@ const requiredEnv = (...names) => {
   throw new Error(`Missing required environment variable. Set one of: ${names.join(', ')} for live production proof.`)
 }
 
+const proofTenantCode = requiredEnv('PLAYWRIGHT_TENANT_CODE').toUpperCase()
+
 const users = {
   operationsLead: {
-    tenantCode: requiredEnv('PLAYWRIGHT_TENANT_CODE'),
+    tenantCode: proofTenantCode,
     username: requiredEnv('PLAYWRIGHT_TENANT_ADMIN_USERNAME', 'PLAYWRIGHT_OPERATIONS_LEAD_USERNAME'),
     password: requiredEnv('PLAYWRIGHT_TENANT_ADMIN_PASSWORD', 'PLAYWRIGHT_OPERATIONS_LEAD_PASSWORD'),
   },
   operationsPlanner: {
-    tenantCode: requiredEnv('PLAYWRIGHT_TENANT_CODE'),
+    tenantCode: proofTenantCode,
     username: requiredEnv('PLAYWRIGHT_PLANNER_USERNAME', 'PLAYWRIGHT_OPERATIONS_PLANNER_USERNAME'),
     password: requiredEnv('PLAYWRIGHT_PLANNER_PASSWORD', 'PLAYWRIGHT_OPERATIONS_PLANNER_PASSWORD'),
   },
   integrationLead: {
-    tenantCode: requiredEnv('PLAYWRIGHT_TENANT_CODE'),
+    tenantCode: proofTenantCode,
     username: requiredEnv('PLAYWRIGHT_INTEGRATION_ADMIN_USERNAME', 'PLAYWRIGHT_INTEGRATION_LEAD_USERNAME'),
     password: requiredEnv('PLAYWRIGHT_INTEGRATION_ADMIN_PASSWORD', 'PLAYWRIGHT_INTEGRATION_LEAD_PASSWORD'),
   },

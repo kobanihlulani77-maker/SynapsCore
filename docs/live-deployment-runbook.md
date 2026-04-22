@@ -112,6 +112,8 @@ $env:SYNAPSECORE_PLATFORM_ADMIN_TOKEN="<render-platform-admin-token>"
 powershell -ExecutionPolicy Bypass -File scripts\prepare-hosted-proof.ps1
 ```
 
+Usernames must contain only letters, digits, dots, underscores, and hyphens. Email-style values with `@` are rejected by the production access-user API.
+
 Credential model:
 
 - tenant admin: tenant code from `PLAYWRIGHT_TENANT_CODE`, username from `PLAYWRIGHT_TENANT_ADMIN_USERNAME`, password from `PLAYWRIGHT_TENANT_ADMIN_PASSWORD`, operator `Operations Lead`, roles `TENANT_ADMIN`, `REVIEW_OWNER`, `ESCALATION_OWNER`, `INTEGRATION_ADMIN`, and `INTEGRATION_OPERATOR`. This account verifies sign-in, tenant admin pages, catalog onboarding, orders, inventory, scenarios, and user management.

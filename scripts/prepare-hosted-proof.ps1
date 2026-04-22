@@ -51,6 +51,32 @@ function Require-Password {
     return $password
 }
 
+function Require-TenantCode {
+    param(
+        [string]$Name,
+        [string]$Value
+    )
+
+    $tenantCode = Require-Value -Name $Name -Value $Value
+    if ($tenantCode -notmatch '^[A-Za-z0-9-]+$') {
+        throw "$Name must contain only letters, digits, and hyphens."
+    }
+    return $tenantCode.ToUpperInvariant()
+}
+
+function Require-Username {
+    param(
+        [string]$Name,
+        [string]$Value
+    )
+
+    $username = Require-Value -Name $Name -Value $Value
+    if ($username -notmatch '^[A-Za-z0-9._-]+$') {
+        throw "$Name must contain only letters, digits, dots, underscores, and hyphens. Email-style usernames with @ are not valid for SynapsCore access users."
+    }
+    return $username.ToLowerInvariant()
+}
+
 function Get-ErrorBody {
     param([object]$ErrorRecord)
 
@@ -316,13 +342,13 @@ function Ensure-ProofCatalogAndInventory {
 $script:ApiBaseUrlValue = (Require-Value `
     -Name "PLAYWRIGHT_API_BASE_URL" `
     -Value (Get-FirstValue -Values @($ApiBaseUrl, $env:PLAYWRIGHT_API_BASE_URL, $env:PLAYWRIGHT_BACKEND_URL, "https://synapscore-3.onrender.com"))).TrimEnd("/")
-$script:TenantCodeValue = (Require-Value -Name "PLAYWRIGHT_TENANT_CODE" -Value (Get-FirstValue -Values @($TenantCode, $env:PLAYWRIGHT_TENANT_CODE))).ToUpperInvariant()
+$script:TenantCodeValue = Require-TenantCode -Name "PLAYWRIGHT_TENANT_CODE" -Value (Get-FirstValue -Values @($TenantCode, $env:PLAYWRIGHT_TENANT_CODE))
 $TenantNameValue = Get-FirstValue -Values @($TenantName, $env:PLAYWRIGHT_TENANT_NAME, "$script:TenantCodeValue Hosted Verification")
-$TenantAdminUsernameValue = (Require-Value -Name "PLAYWRIGHT_TENANT_ADMIN_USERNAME" -Value (Get-FirstValue -Values @($TenantAdminUsername, $env:PLAYWRIGHT_TENANT_ADMIN_USERNAME, $env:PLAYWRIGHT_OPERATIONS_LEAD_USERNAME))).ToLowerInvariant()
+$TenantAdminUsernameValue = Require-Username -Name "PLAYWRIGHT_TENANT_ADMIN_USERNAME" -Value (Get-FirstValue -Values @($TenantAdminUsername, $env:PLAYWRIGHT_TENANT_ADMIN_USERNAME, $env:PLAYWRIGHT_OPERATIONS_LEAD_USERNAME))
 $TenantAdminPasswordValue = Require-Password -Name "PLAYWRIGHT_TENANT_ADMIN_PASSWORD" -Value (Get-FirstValue -Values @($TenantAdminPassword, $env:PLAYWRIGHT_TENANT_ADMIN_PASSWORD, $env:PLAYWRIGHT_OPERATIONS_LEAD_PASSWORD))
-$PlannerUsernameValue = (Require-Value -Name "PLAYWRIGHT_PLANNER_USERNAME" -Value (Get-FirstValue -Values @($PlannerUsername, $env:PLAYWRIGHT_PLANNER_USERNAME, $env:PLAYWRIGHT_OPERATIONS_PLANNER_USERNAME))).ToLowerInvariant()
+$PlannerUsernameValue = Require-Username -Name "PLAYWRIGHT_PLANNER_USERNAME" -Value (Get-FirstValue -Values @($PlannerUsername, $env:PLAYWRIGHT_PLANNER_USERNAME, $env:PLAYWRIGHT_OPERATIONS_PLANNER_USERNAME))
 $PlannerPasswordValue = Require-Password -Name "PLAYWRIGHT_PLANNER_PASSWORD" -Value (Get-FirstValue -Values @($PlannerPassword, $env:PLAYWRIGHT_PLANNER_PASSWORD, $env:PLAYWRIGHT_OPERATIONS_PLANNER_PASSWORD))
-$IntegrationAdminUsernameValue = (Require-Value -Name "PLAYWRIGHT_INTEGRATION_ADMIN_USERNAME" -Value (Get-FirstValue -Values @($IntegrationAdminUsername, $env:PLAYWRIGHT_INTEGRATION_ADMIN_USERNAME, $env:PLAYWRIGHT_INTEGRATION_LEAD_USERNAME))).ToLowerInvariant()
+$IntegrationAdminUsernameValue = Require-Username -Name "PLAYWRIGHT_INTEGRATION_ADMIN_USERNAME" -Value (Get-FirstValue -Values @($IntegrationAdminUsername, $env:PLAYWRIGHT_INTEGRATION_ADMIN_USERNAME, $env:PLAYWRIGHT_INTEGRATION_LEAD_USERNAME))
 $IntegrationAdminPasswordValue = Require-Password -Name "PLAYWRIGHT_INTEGRATION_ADMIN_PASSWORD" -Value (Get-FirstValue -Values @($IntegrationAdminPassword, $env:PLAYWRIGHT_INTEGRATION_ADMIN_PASSWORD, $env:PLAYWRIGHT_INTEGRATION_LEAD_PASSWORD))
 $PlatformAdminTokenValue = Get-FirstValue -Values @($PlatformAdminToken, $env:SYNAPSECORE_PLATFORM_ADMIN_TOKEN)
 $BootstrapInitialTokenValue = Get-FirstValue -Values @($BootstrapInitialToken, $env:SYNAPSECORE_BOOTSTRAP_INITIAL_TOKEN)

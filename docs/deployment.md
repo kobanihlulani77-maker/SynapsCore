@@ -266,6 +266,8 @@ $env:SYNAPSECORE_PLATFORM_ADMIN_TOKEN="<render-platform-admin-token>"
 powershell -ExecutionPolicy Bypass -File scripts\prepare-hosted-proof.ps1
 ```
 
+Usernames must contain only letters, digits, dots, underscores, and hyphens. Email-style values with `@` are intentionally rejected by the production access-user API.
+
 Then run the browser proof from `frontend`:
 
 ```powershell
