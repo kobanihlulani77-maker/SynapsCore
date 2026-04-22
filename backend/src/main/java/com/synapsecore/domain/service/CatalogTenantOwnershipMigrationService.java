@@ -27,9 +27,11 @@ public class CatalogTenantOwnershipMigrationService {
     private final InventoryRepository inventoryRepository;
     private final OrderItemRepository orderItemRepository;
     private final TransactionTemplate transactionTemplate;
+    private final InventorySchemaMigrationService inventorySchemaMigrationService;
 
     @PostConstruct
     void migrateCatalogOwnership() {
+        inventorySchemaMigrationService.migrateInventoryStockColumns();
         transactionTemplate.executeWithoutResult(status -> backfillTenantOwnedCatalog());
     }
 

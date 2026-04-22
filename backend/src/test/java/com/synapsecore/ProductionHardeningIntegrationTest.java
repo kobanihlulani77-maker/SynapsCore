@@ -95,6 +95,12 @@ class ProductionHardeningIntegrationTest {
     @Autowired(required = false)
     private DataInitializer dataInitializer;
 
+    @Autowired
+    private org.springframework.jdbc.core.JdbcTemplate jdbcTemplate;
+
+    @Autowired
+    private com.synapsecore.domain.service.InventorySchemaMigrationService inventorySchemaMigrationService;
+
     @Test
     void prodProfileDoesNotSeedStarterDataWhenAutoSeedDisabled() {
         assertThat(tenantRepository.count()).isZero();
@@ -107,6 +113,76 @@ class ProductionHardeningIntegrationTest {
     @Test
     void prodProfileDoesNotRegisterStartupDataInitializer() {
         assertThat(dataInitializer).isNull();
+    }
+
+    @Test
+    @Transactional(propagation = org.springframework.transaction.annotation.Propagation.NOT_SUPPORTED)
+    void inventorySchemaMigrationBackfillsExistingRowsBeforeNotNullConstraints() {
+        Tenant tenant = tenantRepository.save(Tenant.builder()
+            .code("SCHEMA-OPS")
+            .name("Schema Ops")
+            .active(true)
+            .build());
+        Product product = productRepository.save(Product.builder()
+            .tenant(tenant)
+            .catalogSku("SKU-SCHEMA-001")
+            .name("Schema Sensor")
+            .category("Sensors")
+            .build());
+        Warehouse warehouse = warehouseRepository.save(Warehouse.builder()
+            .tenant(tenant)
+            .code("WH-SCHEMA")
+            .name("Schema Warehouse")
+            .location("Johannesburg")
+            .build());
+        com.synapsecore.domain.entity.Inventory inventory = inventoryRepository.save(com.synapsecore.domain.entity.Inventory.builder()
+            .tenant(tenant)
+            .product(product)
+            .warehouse(warehouse)
+            .quantityAvailable(11L)
+            .quantityOnHand(11L)
+            .quantityReserved(0L)
+            .quantityInbound(0L)
+            .reorderThreshold(4L)
+            .build());
+
+        try {
+            jdbcTemplate.execute("alter table inventory alter column quantity_on_hand drop not null");
+            jdbcTemplate.execute("alter table inventory alter column quantity_reserved drop not null");
+            jdbcTemplate.execute("alter table inventory alter column quantity_inbound drop not null");
+            jdbcTemplate.update(
+                """
+                update inventory
+                set quantity_on_hand = null,
+                    quantity_reserved = null,
+                    quantity_inbound = null
+                where id = ?
+                """,
+                inventory.getId()
+            );
+
+            assertThat(jdbcTemplate.queryForObject(
+                "select count(*) from inventory where id = ? and quantity_on_hand is null and quantity_reserved is null and quantity_inbound is null",
+                Long.class,
+                inventory.getId()
+            )).isEqualTo(1L);
+
+            inventorySchemaMigrationService.migrateInventoryStockColumns();
+            inventorySchemaMigrationService.migrateInventoryStockColumns();
+
+            assertThat(jdbcTemplate.queryForObject("select quantity_on_hand from inventory where id = ?", Long.class, inventory.getId()))
+                .isEqualTo(11L);
+            assertThat(jdbcTemplate.queryForObject("select quantity_reserved from inventory where id = ?", Long.class, inventory.getId()))
+                .isZero();
+            assertThat(jdbcTemplate.queryForObject("select quantity_inbound from inventory where id = ?", Long.class, inventory.getId()))
+                .isZero();
+        } finally {
+            inventorySchemaMigrationService.migrateInventoryStockColumns();
+            jdbcTemplate.update("delete from inventory where id = ?", inventory.getId());
+            jdbcTemplate.update("delete from products where id = ?", product.getId());
+            jdbcTemplate.update("delete from warehouses where id = ?", warehouse.getId());
+            jdbcTemplate.update("delete from tenants where id = ?", tenant.getId());
+        }
     }
 
     @Test

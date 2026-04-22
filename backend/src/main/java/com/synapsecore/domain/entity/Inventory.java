@@ -53,15 +53,12 @@ public class Inventory {
     @Column(nullable = false)
     private Long quantityAvailable;
 
-    @Column(nullable = false)
     @Builder.Default
     private Long quantityOnHand = 0L;
 
-    @Column(nullable = false)
     @Builder.Default
     private Long quantityReserved = 0L;
 
-    @Column(nullable = false)
     @Builder.Default
     private Long quantityInbound = 0L;
 
