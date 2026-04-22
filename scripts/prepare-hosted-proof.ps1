@@ -103,6 +103,20 @@ function Get-ErrorBody {
     return $ErrorRecord.Exception.Message
 }
 
+function Get-ErrorStatusCode {
+    param([object]$ErrorRecord)
+
+    try {
+        if ($null -ne $ErrorRecord.Exception.Response -and $null -ne $ErrorRecord.Exception.Response.StatusCode) {
+            return [int]$ErrorRecord.Exception.Response.StatusCode
+        }
+    } catch {
+        return $null
+    }
+
+    return $null
+}
+
 function Invoke-SynapseJson {
     param(
         [ValidateSet("GET", "POST", "PUT", "DELETE")]
@@ -133,6 +147,10 @@ function Invoke-SynapseJson {
         return Invoke-RestMethod @invokeArgs
     } catch {
         $body = Get-ErrorBody -ErrorRecord $_
+        $statusCode = Get-ErrorStatusCode -ErrorRecord $_
+        if ($null -ne $statusCode) {
+            throw "$Method $Url failed with HTTP $statusCode. $body"
+        }
         throw "$Method $Url failed. $body"
     }
 }
@@ -294,38 +312,99 @@ function Ensure-User {
     Invoke-PasswordChange -Session $userLogin.Session -CurrentPassword $temporaryPassword -NewPassword $FinalPassword
 }
 
+function Find-ProofProduct {
+    param(
+        [Microsoft.PowerShell.Commands.WebRequestSession]$AdminSession,
+        [string]$Sku,
+        [string]$Name,
+        [string]$Category
+    )
+
+    $products = @(Get-JsonArray -Url "$script:ApiBaseUrlValue/api/products" -Session $AdminSession)
+    $product = $products | Where-Object {
+        $null -ne $_ -and (
+            (Get-PropertyValue -Object $_ -PropertyName "sku") -ieq $Sku -or
+            (Get-PropertyValue -Object $_ -PropertyName "catalogSku") -ieq $Sku
+        )
+    } | Select-Object -First 1
+
+    if ($null -ne $product) {
+        return $product
+    }
+
+    return $products | Where-Object {
+        $null -ne $_ -and
+        (Get-PropertyValue -Object $_ -PropertyName "name") -ieq $Name -and
+        (Get-PropertyValue -Object $_ -PropertyName "category") -ieq $Category
+    } | Select-Object -First 1
+}
+
+function Test-IsProductConflict {
+    param([string]$Message)
+
+    return $Message -match "409|Conflict|Product SKU already exists|already exists for this tenant"
+}
+
+function Upsert-ProofProduct {
+    param(
+        [Microsoft.PowerShell.Commands.WebRequestSession]$AdminSession,
+        [string]$Sku,
+        [string]$Name,
+        [string]$Category
+    )
+
+    $productBody = @{
+        sku = $Sku
+        name = $Name
+        category = $Category
+    }
+
+    $existingProduct = Find-ProofProduct -AdminSession $AdminSession -Sku $Sku -Name $Name -Category $Category
+    if ($null -ne $existingProduct) {
+        $productId = Get-PropertyValue -Object $existingProduct -PropertyName "id"
+        return Invoke-SynapseJson `
+            -Method PUT `
+            -Url "$script:ApiBaseUrlValue/api/products/$productId" `
+            -Session $AdminSession `
+            -Body $productBody
+    }
+
+    try {
+        return Invoke-SynapseJson `
+            -Method POST `
+            -Url "$script:ApiBaseUrlValue/api/products" `
+            -Session $AdminSession `
+            -Body $productBody
+    } catch {
+        $message = $_.Exception.Message
+        if (-not (Test-IsProductConflict -Message $message)) {
+            throw
+        }
+
+        Write-Host "Product $Sku already exists; refetching and reusing existing tenant product."
+        $conflictingProduct = Find-ProofProduct -AdminSession $AdminSession -Sku $Sku -Name $Name -Category $Category
+        if ($null -eq $conflictingProduct) {
+            throw "Product create for $Sku conflicted, but /api/products did not return a matching tenant product by SKU or proof name. Original error: $message"
+        }
+
+        $productId = Get-PropertyValue -Object $conflictingProduct -PropertyName "id"
+        return Invoke-SynapseJson `
+            -Method PUT `
+            -Url "$script:ApiBaseUrlValue/api/products/$productId" `
+            -Session $AdminSession `
+            -Body $productBody
+    }
+}
+
 function Ensure-ProofCatalogAndInventory {
     param([Microsoft.PowerShell.Commands.WebRequestSession]$AdminSession)
 
     $sku = "SKU-PLS-330"
-    $products = @(Get-JsonArray -Url "$script:ApiBaseUrlValue/api/products" -Session $AdminSession)
-    $existingProduct = $products | Where-Object {
-        $null -ne $_ -and (
-            (Get-PropertyValue -Object $_ -PropertyName "sku") -ieq $sku -or
-            (Get-PropertyValue -Object $_ -PropertyName "catalogSku") -ieq $sku
-        )
-    } | Select-Object -First 1
-
-    $productBody = @{
-        sku = $sku
-        name = "Pulse Relay Verification Product"
-        category = "Verification"
-    }
-
-    if ($null -eq $existingProduct) {
-        Invoke-SynapseJson `
-            -Method POST `
-            -Url "$script:ApiBaseUrlValue/api/products" `
-            -Session $AdminSession `
-            -Body $productBody | Out-Null
-    } else {
-        $productId = Get-PropertyValue -Object $existingProduct -PropertyName "id"
-        Invoke-SynapseJson `
-            -Method PUT `
-            -Url "$script:ApiBaseUrlValue/api/products/$productId" `
-            -Session $AdminSession `
-            -Body $productBody | Out-Null
-    }
+    Upsert-ProofProduct `
+        -AdminSession $AdminSession `
+        -Sku $sku `
+        -Name "Pulse Relay Verification Product" `
+        -Category "Verification" | Out-Null
 
     Invoke-SynapseJson `
         -Method POST `
