@@ -11,6 +11,8 @@ public interface ProductRepository extends JpaRepository<Product, Long> {
 
     Optional<Product> findByTenant_CodeIgnoreCaseAndCatalogSkuIgnoreCase(String tenantCode, String catalogSku);
 
+    Optional<Product> findByTenant_CodeIgnoreCaseAndId(String tenantCode, Long id);
+
     List<Product> findAllByTenant_CodeIgnoreCaseOrderByNameAsc(String tenantCode);
 
     List<Product> findAllByTenantIsNullOrderByNameAsc();

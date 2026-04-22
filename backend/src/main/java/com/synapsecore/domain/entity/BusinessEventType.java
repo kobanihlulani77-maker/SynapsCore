@@ -3,6 +3,7 @@ package com.synapsecore.domain.entity;
 public enum BusinessEventType {
     ORDER_INGESTED,
     ORDER_STATUS_TRANSITIONED,
+    PRODUCT_CATALOG_UPDATED,
     INVENTORY_UPDATED,
     INVENTORY_RECEIVED,
     INVENTORY_ADJUSTED,

@@ -1,30 +1,331 @@
 package com.synapsecore.domain.service;
 
+import com.synapsecore.audit.AuditLogService;
+import com.synapsecore.domain.dto.ProductImportResponse;
+import com.synapsecore.domain.dto.ProductImportRowResult;
 import com.synapsecore.domain.dto.ProductResponse;
+import com.synapsecore.domain.dto.ProductUpsertRequest;
+import com.synapsecore.domain.entity.BusinessEventType;
+import com.synapsecore.domain.entity.Product;
+import com.synapsecore.domain.entity.Tenant;
 import com.synapsecore.domain.repository.ProductRepository;
+import com.synapsecore.event.BusinessEventService;
+import com.synapsecore.event.OperationalStateChangePublisher;
+import com.synapsecore.event.OperationalUpdateType;
 import com.synapsecore.tenant.TenantContextService;
+import java.io.BufferedReader;
+import java.io.IOException;
+import java.io.InputStreamReader;
+import java.nio.charset.StandardCharsets;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Locale;
+import java.util.Map;
+import java.util.Set;
+import java.util.regex.Pattern;
 import lombok.RequiredArgsConstructor;
+import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.multipart.MultipartFile;
+import org.springframework.web.server.ResponseStatusException;
 
 @Service
 @RequiredArgsConstructor
 public class ProductService {
 
+    private static final Pattern CATALOG_SKU_PATTERN = Pattern.compile("^[A-Z0-9][A-Z0-9._-]{0,63}$");
+
     private final ProductRepository productRepository;
     private final TenantContextService tenantContextService;
+    private final BusinessEventService businessEventService;
+    private final OperationalStateChangePublisher operationalStateChangePublisher;
+    private final AuditLogService auditLogService;
 
+    @Transactional(readOnly = true)
     public List<ProductResponse> getProducts() {
+        String tenantCode = tenantContextService.getCurrentTenantCodeOrDefault();
         return productRepository.findAllByTenant_CodeIgnoreCaseOrderByNameAsc(
-                tenantContextService.getCurrentTenantCodeOrDefault())
+                tenantCode)
             .stream()
-            .map(product -> new ProductResponse(
-                product.getId(),
-                product.resolveCatalogSku(),
-                product.getName(),
-                product.getCategory(),
-                product.getTenant() == null ? null : product.getTenant().getCode()
-            ))
+            .map(this::toResponse)
             .toList();
+    }
+
+    @Transactional
+    public ProductResponse createProduct(ProductUpsertRequest request, String actorName) {
+        Tenant tenant = tenantContextService.getCurrentTenantOrDefault();
+        String catalogSku = normalizeCatalogSku(request.sku());
+        ensureSkuIsAvailable(tenant.getCode(), catalogSku);
+
+        Product product = productRepository.save(Product.builder()
+            .tenant(tenant)
+            .catalogSku(catalogSku)
+            .name(normalizeRequiredText(request.name(), "Product name", 120))
+            .category(normalizeRequiredText(request.category(), "Product category", 120))
+            .build());
+
+        recordCatalogChange(
+            tenant.getCode(),
+            actorName,
+            "PRODUCT_CREATED",
+            product.resolveCatalogSku(),
+            "Created catalog product " + product.resolveCatalogSku() + " (" + product.getName() + ")."
+        );
+        return toResponse(product);
+    }
+
+    @Transactional
+    public ProductResponse updateProduct(Long productId, ProductUpsertRequest request, String actorName) {
+        Tenant tenant = tenantContextService.getCurrentTenantOrDefault();
+        Product product = productRepository.findByTenant_CodeIgnoreCaseAndId(tenant.getCode(), productId)
+            .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND,
+                "Product not found for tenant " + tenant.getCode() + ": " + productId));
+        String catalogSku = normalizeCatalogSku(request.sku());
+        productRepository.findByTenant_CodeIgnoreCaseAndCatalogSkuIgnoreCase(tenant.getCode(), catalogSku)
+            .filter(existing -> !existing.getId().equals(product.getId()))
+            .ifPresent(existing -> {
+                throw new ResponseStatusException(HttpStatus.CONFLICT,
+                    "Product SKU already exists for this tenant: " + catalogSku);
+            });
+
+        product.setCatalogSku(catalogSku);
+        product.setName(normalizeRequiredText(request.name(), "Product name", 120));
+        product.setCategory(normalizeRequiredText(request.category(), "Product category", 120));
+        Product savedProduct = productRepository.save(product);
+
+        recordCatalogChange(
+            tenant.getCode(),
+            actorName,
+            "PRODUCT_UPDATED",
+            savedProduct.resolveCatalogSku(),
+            "Updated catalog product " + savedProduct.resolveCatalogSku() + " (" + savedProduct.getName() + ")."
+        );
+        return toResponse(savedProduct);
+    }
+
+    @Transactional
+    public ProductImportResponse importProducts(MultipartFile file, String actorName) {
+        if (file == null || file.isEmpty()) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "A non-empty product CSV file is required.");
+        }
+
+        Tenant tenant = tenantContextService.getCurrentTenantOrDefault();
+        List<ProductImportRowResult> rowResults = new ArrayList<>();
+        Set<String> seenSkus = new HashSet<>();
+        int totalRows = 0;
+        int created = 0;
+        int updated = 0;
+        int failed = 0;
+
+        try (BufferedReader reader = new BufferedReader(new InputStreamReader(file.getInputStream(), StandardCharsets.UTF_8))) {
+            String headerLine = reader.readLine();
+            if (headerLine == null || headerLine.isBlank()) {
+                throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Product CSV must include a header row.");
+            }
+
+            List<String> headers = parseCsvLine(headerLine);
+            Map<String, Integer> headerIndex = buildHeaderIndex(headers);
+            int skuIndex = requireHeader(headerIndex, "sku", "catalogsku", "productsku");
+            int nameIndex = requireHeader(headerIndex, "name", "productname");
+            int categoryIndex = requireHeader(headerIndex, "category");
+
+            String line;
+            int rowNumber = 1;
+            while ((line = reader.readLine()) != null) {
+                rowNumber++;
+                if (line.isBlank()) {
+                    continue;
+                }
+
+                totalRows++;
+                List<String> values = parseCsvLine(line);
+                String rawSku = valueAt(values, skuIndex);
+                try {
+                    String catalogSku = normalizeCatalogSku(rawSku);
+                    String name = normalizeRequiredText(valueAt(values, nameIndex), "Product name", 120);
+                    String category = normalizeRequiredText(valueAt(values, categoryIndex), "Product category", 120);
+                    if (!seenSkus.add(catalogSku)) {
+                        failed++;
+                        rowResults.add(new ProductImportRowResult(
+                            rowNumber,
+                            catalogSku,
+                            "FAILED",
+                            "Duplicate SKU inside this import file.",
+                            null
+                        ));
+                        continue;
+                    }
+
+                    var existingProduct = productRepository
+                        .findByTenant_CodeIgnoreCaseAndCatalogSkuIgnoreCase(tenant.getCode(), catalogSku);
+                    boolean wasCreated = existingProduct.isEmpty();
+                    Product product = existingProduct
+                        .map(existing -> {
+                            existing.setName(name);
+                            existing.setCategory(category);
+                            return productRepository.save(existing);
+                        })
+                        .orElseGet(() -> productRepository.save(Product.builder()
+                            .tenant(tenant)
+                            .catalogSku(catalogSku)
+                            .name(name)
+                            .category(category)
+                            .build()));
+
+                    if (wasCreated) {
+                        created++;
+                    } else {
+                        updated++;
+                    }
+                    rowResults.add(new ProductImportRowResult(
+                        rowNumber,
+                        catalogSku,
+                        wasCreated ? "CREATED" : "UPDATED",
+                        wasCreated ? "Product created." : "Existing product updated.",
+                        toResponse(product)
+                    ));
+                } catch (ResponseStatusException exception) {
+                    failed++;
+                    rowResults.add(new ProductImportRowResult(
+                        rowNumber,
+                        rawSku == null ? "" : rawSku.trim(),
+                        "FAILED",
+                        exception.getReason(),
+                        null
+                    ));
+                }
+            }
+        } catch (IOException exception) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Unable to read product CSV file.");
+        }
+
+        if (totalRows == 0) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Product CSV did not contain any product rows.");
+        }
+
+        recordCatalogChange(
+            tenant.getCode(),
+            actorName,
+            "PRODUCT_IMPORT",
+            file.getOriginalFilename() == null ? "catalog-import" : file.getOriginalFilename(),
+            "Imported product catalog rows: created " + created + ", updated " + updated + ", failed " + failed + "."
+        );
+        return new ProductImportResponse(totalRows, created, updated, failed, rowResults);
+    }
+
+    private void ensureSkuIsAvailable(String tenantCode, String catalogSku) {
+        productRepository.findByTenant_CodeIgnoreCaseAndCatalogSkuIgnoreCase(tenantCode, catalogSku)
+            .ifPresent(existing -> {
+                throw new ResponseStatusException(HttpStatus.CONFLICT,
+                    "Product SKU already exists for this tenant: " + catalogSku);
+            });
+    }
+
+    private String normalizeCatalogSku(String value) {
+        String normalized = normalizeRequiredText(value, "Product SKU", 64).toUpperCase(Locale.ROOT);
+        if (!CATALOG_SKU_PATTERN.matcher(normalized).matches()) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                "Product SKU must start with a letter or number and may only contain letters, numbers, dots, underscores, and hyphens.");
+        }
+        return normalized;
+    }
+
+    private String normalizeRequiredText(String value, String fieldName, int maxLength) {
+        if (value == null || value.isBlank()) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, fieldName + " is required.");
+        }
+        String normalized = value.trim();
+        if (normalized.length() > maxLength) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                fieldName + " must be " + maxLength + " characters or fewer.");
+        }
+        return normalized;
+    }
+
+    private Map<String, Integer> buildHeaderIndex(List<String> headers) {
+        Map<String, Integer> headerIndex = new HashMap<>();
+        for (int index = 0; index < headers.size(); index++) {
+            headerIndex.put(normalizeHeader(headers.get(index)), index);
+        }
+        return headerIndex;
+    }
+
+    private int requireHeader(Map<String, Integer> headerIndex, String... aliases) {
+        for (String alias : aliases) {
+            Integer index = headerIndex.get(alias);
+            if (index != null) {
+                return index;
+            }
+        }
+        throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+            "Product CSV must include headers for sku, name, and category.");
+    }
+
+    private String normalizeHeader(String header) {
+        return header == null ? "" : header.replace("\uFEFF", "").trim().toLowerCase(Locale.ROOT).replace("_", "").replace("-", "").replace(" ", "");
+    }
+
+    private String valueAt(List<String> values, int index) {
+        return index < values.size() ? values.get(index) : "";
+    }
+
+    private List<String> parseCsvLine(String line) {
+        List<String> values = new ArrayList<>();
+        StringBuilder current = new StringBuilder();
+        boolean quoted = false;
+        for (int index = 0; index < line.length(); index++) {
+            char currentChar = line.charAt(index);
+            if (currentChar == '"') {
+                boolean escapedQuote = quoted && index + 1 < line.length() && line.charAt(index + 1) == '"';
+                if (escapedQuote) {
+                    current.append('"');
+                    index++;
+                } else {
+                    quoted = !quoted;
+                }
+            } else if (currentChar == ',' && !quoted) {
+                values.add(current.toString().trim());
+                current.setLength(0);
+            } else {
+                current.append(currentChar);
+            }
+        }
+        values.add(current.toString().trim());
+        return values;
+    }
+
+    private void recordCatalogChange(String tenantCode,
+                                     String actorName,
+                                     String action,
+                                     String targetRef,
+                                     String details) {
+        businessEventService.record(
+            BusinessEventType.PRODUCT_CATALOG_UPDATED,
+            "product-catalog",
+            details
+        );
+        operationalStateChangePublisher.publish(OperationalUpdateType.INVENTORY_UPDATE, "product-catalog");
+        auditLogService.recordSuccessForTenant(
+            tenantCode,
+            action,
+            actorName,
+            "product-catalog",
+            "Product",
+            targetRef,
+            details
+        );
+    }
+
+    private ProductResponse toResponse(Product product) {
+        return new ProductResponse(
+            product.getId(),
+            product.resolveCatalogSku(),
+            product.getName(),
+            product.getCategory(),
+            product.getTenant() == null ? null : product.getTenant().getCode()
+        );
     }
 }

@@ -824,7 +824,41 @@ Returns live inventory posture with:
 
 ### `GET /api/products`
 
-Returns starter product definitions for the dashboard and future ingestion tooling.
+Returns tenant-owned product catalog definitions for inventory, orders, scenarios, and ingestion tooling.
+
+### `POST /api/products`
+
+Tenant-admin only. Creates a product in the current tenant catalog.
+
+```json
+{
+  "sku": "SKU-ACME-100",
+  "name": "Acme Sensor Module",
+  "category": "Sensors"
+}
+```
+
+Rules:
+
+- SKU is unique inside the tenant catalog.
+- SKU is normalized to uppercase.
+- Another tenant may use the same visible SKU without cross-tenant collision.
+
+### `PUT /api/products/{productId}`
+
+Tenant-admin only. Updates a product owned by the current tenant. Cross-tenant product IDs are not visible or mutable.
+
+### `POST /api/products/import`
+
+Tenant-admin only. Imports product catalog data from `multipart/form-data` with a `file` part.
+
+Required CSV headers:
+
+- `sku`
+- `name`
+- `category`
+
+The import is tenant-scoped, creates new SKUs, updates existing tenant SKUs, rejects duplicate rows inside the same file, and returns row-level success/failure results.
 
 ## Warehouses
 

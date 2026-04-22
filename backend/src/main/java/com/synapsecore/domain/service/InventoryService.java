@@ -50,7 +50,7 @@ public class InventoryService {
         String tenantCode = tenantContextService.getCurrentTenantCodeOrDefault();
         Warehouse warehouse = requireWarehouse(tenantCode, request.warehouseCode(), "inventory update");
         Product product = requireProduct(tenantCode, request.productSku(), "inventory update");
-        Inventory inventory = inventoryRepository.findByProductIdAndWarehouseId(product.getId(), warehouse.getId())
+        Inventory inventory = inventoryRepository.findByProductIdAndWarehouseIdForUpdate(product.getId(), warehouse.getId())
             .orElse(Inventory.builder().tenant(warehouse.getTenant()).product(product).warehouse(warehouse).build());
 
         if (inventory.getId() != null) {
@@ -85,7 +85,7 @@ public class InventoryService {
     @Transactional
     public InventoryStatusResponse receiveInventory(InventoryReceiptRequest request) {
         String tenantCode = tenantContextService.getCurrentTenantCodeOrDefault();
-        Inventory inventory = requireInventory(tenantCode, request.warehouseCode(), request.productSku(), "inventory receipt");
+        Inventory inventory = requireInventoryForUpdate(tenantCode, request.warehouseCode(), request.productSku(), "inventory receipt");
         inventory.setQuantityOnHand(inventory.getQuantityOnHand() + request.quantityReceived());
         long inbound = inventory.getQuantityInbound() == null ? 0L : inventory.getQuantityInbound();
         inventory.setQuantityInbound(Math.max(inbound - request.quantityReceived(), 0L));
@@ -113,7 +113,7 @@ public class InventoryService {
     @Transactional
     public InventoryStatusResponse adjustInventory(InventoryAdjustmentRequest request) {
         String tenantCode = tenantContextService.getCurrentTenantCodeOrDefault();
-        Inventory inventory = requireInventory(tenantCode, request.warehouseCode(), request.productSku(), "inventory adjustment");
+        Inventory inventory = requireInventoryForUpdate(tenantCode, request.warehouseCode(), request.productSku(), "inventory adjustment");
         long nextOnHand = inventory.getQuantityOnHand() + request.quantityDelta();
         if (nextOnHand < inventory.getQuantityReserved()) {
             throw new ResponseStatusException(HttpStatus.CONFLICT,
@@ -146,7 +146,7 @@ public class InventoryService {
     @Transactional
     public InventoryStatusResponse reconcileInventory(InventoryReconciliationRequest request) {
         String tenantCode = tenantContextService.getCurrentTenantCodeOrDefault();
-        Inventory inventory = requireInventory(tenantCode, request.warehouseCode(), request.productSku(), "inventory reconciliation");
+        Inventory inventory = requireInventoryForUpdate(tenantCode, request.warehouseCode(), request.productSku(), "inventory reconciliation");
         if (request.countedOnHand() < inventory.getQuantityReserved()) {
             throw new ResponseStatusException(HttpStatus.CONFLICT,
                 "Reconciliation count is lower than reserved commitments for SKU "
@@ -184,7 +184,7 @@ public class InventoryService {
                                   int quantity,
                                   String source,
                                   String reason) {
-        Inventory inventory = inventoryRepository.findByProductIdAndWarehouseId(product.getId(), warehouse.getId())
+        Inventory inventory = inventoryRepository.findByProductIdAndWarehouseIdForUpdate(product.getId(), warehouse.getId())
             .orElseThrow(() -> new ResponseStatusException(HttpStatus.BAD_REQUEST,
                 "No inventory found for SKU " + product.resolveCatalogSku() + " in warehouse " + warehouse.getCode()));
         tenantScopeGuard.requireInventoryForTenant(inventory, warehouse, tenantCode, "inventory reservation");
@@ -209,6 +209,7 @@ public class InventoryService {
 
     @Transactional
     public Inventory releaseReservedStock(Inventory inventory, long quantity, String source, String reason) {
+        inventory = lockInventoryForUpdate(inventory, "inventory reservation release");
         long releasable = Math.min(quantity, inventory.getQuantityReserved());
         if (releasable <= 0) {
             return inventory;
@@ -230,6 +231,7 @@ public class InventoryService {
 
     @Transactional
     public Inventory fulfillReservedStock(Inventory inventory, long quantity, String source, String reason) {
+        inventory = lockInventoryForUpdate(inventory, "inventory reservation fulfillment");
         if (quantity < 1) {
             return inventory;
         }
@@ -262,6 +264,7 @@ public class InventoryService {
 
     @Transactional
     public Inventory restockReturnedStock(Inventory inventory, long quantity, String source, String reason) {
+        inventory = lockInventoryForUpdate(inventory, "inventory return restock");
         if (quantity < 1) {
             return inventory;
         }
@@ -303,6 +306,34 @@ public class InventoryService {
             })
             .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND,
                 "Inventory not found for SKU " + product.resolveCatalogSku() + " in warehouse " + warehouse.getCode()));
+    }
+
+    private Inventory requireInventoryForUpdate(String tenantCode, String warehouseCode, String productSku, String context) {
+        Warehouse warehouse = requireWarehouse(tenantCode, warehouseCode, context);
+        Product product = requireProduct(tenantCode, productSku, context);
+        return inventoryRepository.findByProductIdAndWarehouseIdForUpdate(product.getId(), warehouse.getId())
+            .map(inventory -> {
+                tenantScopeGuard.requireInventoryForTenant(inventory, warehouse, tenantCode, context);
+                return inventory;
+            })
+            .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND,
+                "Inventory not found for SKU " + product.resolveCatalogSku() + " in warehouse " + warehouse.getCode()));
+    }
+
+    private Inventory lockInventoryForUpdate(Inventory inventory, String context) {
+        if (inventory.getId() == null) {
+            return inventory;
+        }
+        Inventory lockedInventory = inventoryRepository.findByIdForUpdate(inventory.getId())
+            .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND,
+                "Inventory record no longer exists for " + context + "."));
+        tenantScopeGuard.requireInventoryForTenant(
+            lockedInventory,
+            lockedInventory.getWarehouse(),
+            lockedInventory.getTenant().getCode(),
+            context
+        );
+        return lockedInventory;
     }
 
     @Transactional(readOnly = true)

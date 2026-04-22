@@ -247,6 +247,24 @@ cd ..
 powershell -ExecutionPolicy Bypass -File scripts\verify-realtime.ps1 -FrontendUrl http://localhost -BackendUrl http://localhost:8080
 ```
 
+For hosted Render proof, use the real non-demo credential model in `frontend/prod-proof.env.example`:
+
+```powershell
+cd frontend
+$env:PLAYWRIGHT_FRONTEND_URL="https://synapscore-frontend-3.onrender.com"
+$env:PLAYWRIGHT_BACKEND_URL="https://synapscore-3.onrender.com"
+$env:PLAYWRIGHT_TENANT_CODE="<real-company-tenant-code>"
+$env:PLAYWRIGHT_OPERATIONS_LEAD_USERNAME="<tenant-admin-username>"
+$env:PLAYWRIGHT_OPERATIONS_LEAD_PASSWORD="<tenant-admin-password>"
+$env:PLAYWRIGHT_OPERATIONS_PLANNER_USERNAME="<planner-username>"
+$env:PLAYWRIGHT_OPERATIONS_PLANNER_PASSWORD="<planner-password>"
+$env:PLAYWRIGHT_INTEGRATION_LEAD_USERNAME="<integration-admin-username>"
+$env:PLAYWRIGHT_INTEGRATION_LEAD_PASSWORD="<integration-admin-password>"
+npm.cmd run test:e2e:prod
+```
+
+The live proof expects one tenant-admin operator, one planner/operator account, and one integration-admin operator created through the production tenant bootstrap/admin flow. It does not rely on hidden seed users.
+
 `scripts/start-prod.sh` runs the same smoke verification automatically unless you pass `--skip-verify`.
 
 Before startup, `scripts/start-prod.sh` also runs:

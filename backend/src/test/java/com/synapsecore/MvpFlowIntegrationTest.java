@@ -20,6 +20,7 @@ import com.synapsecore.domain.entity.OperationalDispatchStatus;
 import com.synapsecore.domain.entity.OperationalDispatchWorkItem;
 import com.synapsecore.domain.entity.Product;
 import com.synapsecore.domain.entity.ScenarioRunType;
+import com.synapsecore.domain.entity.Tenant;
 import com.synapsecore.domain.repository.AccessOperatorRepository;
 import com.synapsecore.domain.repository.AccessUserRepository;
 import com.synapsecore.domain.repository.AlertRepository;
@@ -35,9 +36,11 @@ import com.synapsecore.domain.repository.ProductRepository;
 import com.synapsecore.domain.repository.RecommendationRepository;
 import com.synapsecore.domain.repository.IntegrationReplayRecordRepository;
 import com.synapsecore.domain.repository.ScenarioRunRepository;
+import com.synapsecore.domain.repository.TenantRepository;
 import com.synapsecore.domain.repository.WarehouseRepository;
 import com.synapsecore.domain.service.SeedService;
 import com.synapsecore.event.OperationalUpdateType;
+import java.nio.charset.StandardCharsets;
 import java.time.Instant;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -64,6 +67,9 @@ class MvpFlowIntegrationTest {
 
     @Autowired
     private ProductRepository productRepository;
+
+    @Autowired
+    private TenantRepository tenantRepository;
 
     @Autowired
     private AccessOperatorRepository accessOperatorRepository;
@@ -412,6 +418,121 @@ class MvpFlowIntegrationTest {
             .orElseThrow();
         assertThat(createdInventory.getQuantityAvailable()).isEqualTo(14);
         assertThat(createdInventory.getReorderThreshold()).isEqualTo(5);
+    }
+
+    @Test
+    void productCatalogCanBeCreatedUpdatedAndImportedThroughTenantScopedApis() throws Exception {
+        String createBody = """
+            {
+              "sku": "SKU-CAT-901",
+              "name": "Catalog Intake Sensor",
+              "category": "Telemetry"
+            }
+            """;
+
+        mockMvc.perform(post("/api/products")
+                .header("X-Synapse-Tenant", "STARTER-OPS")
+                .with(accessHeaders("Operations Lead", "TENANT_ADMIN"))
+                .contentType(APPLICATION_JSON)
+                .content(createBody))
+            .andExpect(status().isCreated())
+            .andExpect(jsonPath("$.sku").value("SKU-CAT-901"))
+            .andExpect(jsonPath("$.tenantCode").value("STARTER-OPS"));
+
+        String updateBody = """
+            {
+              "sku": "SKU-CAT-901",
+              "name": "Catalog Intake Sensor Pro",
+              "category": "Telemetry"
+            }
+            """;
+
+        Product createdProduct = productRepository
+            .findByTenant_CodeIgnoreCaseAndCatalogSkuIgnoreCase("STARTER-OPS", "SKU-CAT-901")
+            .orElseThrow();
+
+        mockMvc.perform(put("/api/products/" + createdProduct.getId())
+                .header("X-Synapse-Tenant", "STARTER-OPS")
+                .with(accessHeaders("Operations Lead", "TENANT_ADMIN"))
+                .contentType(APPLICATION_JSON)
+                .content(updateBody))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.name").value("Catalog Intake Sensor Pro"));
+
+        String csv = """
+            sku,name,category
+            SKU-CAT-902,Catalog Valve Pack,Flow Control
+            SKU-CAT-901,Catalog Intake Sensor Enterprise,Telemetry
+            SKU-CAT-902,Duplicate Valve Pack,Flow Control
+            """;
+        MockMultipartFile file = new MockMultipartFile(
+            "file",
+            "catalog.csv",
+            "text/csv",
+            csv.getBytes(StandardCharsets.UTF_8)
+        );
+
+        mockMvc.perform(multipart("/api/products/import")
+                .file(file)
+                .header("X-Synapse-Tenant", "STARTER-OPS")
+                .with(accessHeaders("Operations Lead", "TENANT_ADMIN")))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.totalRows").value(3))
+            .andExpect(jsonPath("$.created").value(1))
+            .andExpect(jsonPath("$.updated").value(1))
+            .andExpect(jsonPath("$.failed").value(1))
+            .andExpect(jsonPath("$.rows[2].status").value("FAILED"));
+
+        mockMvc.perform(get("/api/products")
+                .header("X-Synapse-Tenant", "STARTER-OPS"))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$[?(@.sku == 'SKU-CAT-901')].name")
+                .value(org.hamcrest.Matchers.hasItem("Catalog Intake Sensor Enterprise")))
+            .andExpect(jsonPath("$[?(@.sku == 'SKU-CAT-902')].tenantCode")
+                .value(org.hamcrest.Matchers.hasItem("STARTER-OPS")));
+    }
+
+    @Test
+    void productCatalogRejectsDuplicateSkuInsideTenantButAllowsSameCatalogSkuAcrossTenants() throws Exception {
+        String createBody = """
+            {
+              "sku": "SKU-CAT-903",
+              "name": "Tenant Scoped Relay",
+              "category": "Controls"
+            }
+            """;
+
+        mockMvc.perform(post("/api/products")
+                .header("X-Synapse-Tenant", "STARTER-OPS")
+                .with(accessHeaders("Operations Lead", "TENANT_ADMIN"))
+                .contentType(APPLICATION_JSON)
+                .content(createBody))
+            .andExpect(status().isCreated());
+
+        mockMvc.perform(post("/api/products")
+                .header("X-Synapse-Tenant", "STARTER-OPS")
+                .with(accessHeaders("Operations Lead", "TENANT_ADMIN"))
+                .contentType(APPLICATION_JSON)
+                .content(createBody))
+            .andExpect(status().isConflict());
+
+        Tenant otherTenant = tenantRepository.save(Tenant.builder()
+            .code("ALT-CAT-OPS")
+            .name("Alternate Catalog Tenant")
+            .description("Tenant used to prove catalog SKU isolation.")
+            .active(true)
+            .build());
+        Product otherTenantProduct = productRepository.save(Product.builder()
+            .tenant(otherTenant)
+            .catalogSku("SKU-CAT-903")
+            .name("Alternate Tenant Relay")
+            .category("Controls")
+            .build());
+        assertThat(otherTenantProduct.getSku()).isEqualTo("ALT-CAT-OPS::SKU-CAT-903");
+        assertThat(productRepository.findByTenant_CodeIgnoreCaseAndCatalogSkuIgnoreCase("STARTER-OPS", "SKU-CAT-903"))
+            .isPresent();
+        assertThat(productRepository.findByTenant_CodeIgnoreCaseAndCatalogSkuIgnoreCase("ALT-CAT-OPS", "SKU-CAT-903"))
+            .isPresent();
     }
 
     @Test

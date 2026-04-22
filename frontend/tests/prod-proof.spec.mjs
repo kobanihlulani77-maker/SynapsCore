@@ -34,6 +34,7 @@ const appPages = [
   ['/recommendations', 'Action queue for the operating team'],
   ['/orders', 'Live order operations'],
   ['/inventory', 'Inventory intelligence'],
+  ['/catalog', 'Tenant product catalog'],
   ['/locations', 'Warehouse and site health'],
   ['/fulfillment', 'Fulfillment and logistics pressure'],
   ['/scenarios', 'Decision lab and scenario planning'],
@@ -253,6 +254,63 @@ test('auth flow and the full authenticated page system render cleanly in a brows
   }
 
   await signOutViaUi(page)
+})
+
+test('product catalog onboarding works through tenant-scoped API and browser surface', async ({ page }) => {
+  const api = await createApiContext(users.operationsLead)
+  const suffix = randomUUID().slice(0, 8).toUpperCase()
+  const primarySku = `SKU-UI-${suffix}`
+  const importSku = `SKU-IMP-${suffix}`
+
+  try {
+    const createdProduct = await readJson(await api.post('/api/products', {
+      data: {
+        sku: primarySku,
+        name: `UI Catalog ${suffix}`,
+        category: 'Verification',
+      },
+    }))
+    expect(createdProduct.sku).toBe(primarySku)
+    expect(createdProduct.tenantCode).toBe(users.operationsLead.tenantCode)
+
+    const updatedProduct = await readJson(await api.put(`/api/products/${createdProduct.id}`, {
+      data: {
+        sku: primarySku,
+        name: `UI Catalog ${suffix} Updated`,
+        category: 'Verification',
+      },
+    }))
+    expect(updatedProduct.name).toContain('Updated')
+
+    const importResult = await readJson(await api.post('/api/products/import', {
+      multipart: {
+        file: {
+          name: 'products.csv',
+          mimeType: 'text/csv',
+          buffer: Buffer.from(
+            `sku,name,category\n${importSku},Imported Product ${suffix},Verification\n${primarySku},Imported Update ${suffix},Verification\n${importSku},Duplicate Product ${suffix},Verification\n`,
+            'utf8',
+          ),
+        },
+      },
+    }))
+    expect(importResult.created).toBe(1)
+    expect(importResult.updated).toBe(1)
+    expect(importResult.failed).toBe(1)
+
+    const products = await readJson(await api.get('/api/products'))
+    expect(products.some((product) => product.sku === primarySku && product.tenantCode === users.operationsLead.tenantCode)).toBeTruthy()
+    expect(products.some((product) => product.sku === importSku && product.tenantCode === users.operationsLead.tenantCode)).toBeTruthy()
+
+    await loginViaUi(page, users.operationsLead)
+    await navigateWithinApp(page, '/catalog')
+    await expect(page.getByRole('heading', { level: 1, name: 'Tenant product catalog' })).toBeVisible()
+    await expect(page.getByText(primarySku).first()).toBeVisible()
+    await expect(page.getByText(importSku).first()).toBeVisible()
+    await expectNoFatalUiErrors(page)
+  } finally {
+    await api.dispose()
+  }
 })
 
 test('@realtime dashboard summary updates live without a browser refresh', async ({ page }) => {

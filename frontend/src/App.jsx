@@ -12,6 +12,7 @@ import AlertsPage from './pages/Alerts'
 import RecommendationsPage from './pages/Recommendations'
 import OrdersPage from './pages/Orders'
 import InventoryPage from './pages/Inventory'
+import CatalogPage from './pages/Catalog'
 import IntegrationsPage from './pages/Integrations'
 import LocationsPage from './pages/Locations'
 import ReplayPage from './pages/Replay'
@@ -143,6 +144,7 @@ const createDefaultWorkspaceSecurityForm = () => ({ passwordRotationDays: '90', 
 const createDefaultAccessOperatorForm = () => ({ id: null, actorName: '', displayName: '', description: '', rolesText: 'REVIEW_OWNER', warehouseScopesText: '', active: true })
 const createDefaultAccessUserForm = () => ({ id: null, username: '', fullName: '', password: '', operatorActorName: '', active: true })
 const createDefaultPasswordChangeForm = () => ({ currentPassword: '', newPassword: '', confirmPassword: '' })
+const createDefaultCatalogForm = () => ({ id: null, sku: '', name: '', category: '' })
 const buildWorkspaceWarehouseDrafts = (workspace) => Object.fromEntries((workspace?.warehouses || []).map((warehouse) => [warehouse.id, { name: warehouse.name, location: warehouse.location }]))
 const buildWorkspaceConnectorDrafts = (workspace) => Object.fromEntries((workspace?.connectors || []).map((connector) => [connector.id, {
   supportOwnerActorName: connector.supportOwnerActorName || '',
@@ -313,6 +315,16 @@ const appPages = [
     title: 'Inventory intelligence',
     description: 'Use the inventory brain page to understand thresholds, velocity, stockout windows, and recommended actions.',
     focus: ['Stock posture', 'Risk level', 'Depletion forecast'],
+  },
+  {
+    key: 'catalog',
+    path: '/catalog',
+    audience: 'app',
+    group: 'core',
+    label: 'Catalog',
+    title: 'Tenant product catalog',
+    description: 'Create, update, and import tenant-owned product SKUs so a company can onboard without manual database work.',
+    focus: ['Product creation', 'CSV import', 'Tenant ownership'],
   },
   {
     key: 'locations',
@@ -507,7 +519,7 @@ const routeAliases = {
 }
 const navGroups = [
   { label: 'Overview', keys: ['dashboard', 'alerts', 'recommendations'] },
-  { label: 'Operations', keys: ['orders', 'inventory', 'locations', 'fulfillment'] },
+  { label: 'Operations', keys: ['orders', 'inventory', 'catalog', 'locations', 'fulfillment'] },
   { label: 'Control', keys: ['scenarios', 'scenario-history', 'approvals', 'escalations'] },
   { label: 'Systems', keys: ['integrations', 'replay', 'runtime', 'audit'] },
   { label: 'Settings', keys: ['users', 'settings', 'profile', 'platform', 'tenants', 'system-config', 'releases'] },
@@ -611,6 +623,7 @@ export default function App() {
   const [selectedRecommendationId, setSelectedRecommendationId] = useState(null)
   const [selectedOrderId, setSelectedOrderId] = useState(null)
   const [selectedInventoryId, setSelectedInventoryId] = useState(null)
+  const [selectedCatalogProductId, setSelectedCatalogProductId] = useState(null)
   const [selectedScenarioId, setSelectedScenarioId] = useState(null)
   const [selectedRuntimeIncidentKey, setSelectedRuntimeIncidentKey] = useState(null)
   const [selectedTraceEntryKey, setSelectedTraceEntryKey] = useState(null)
@@ -636,6 +649,8 @@ export default function App() {
   const [accessOperatorForm, setAccessOperatorForm] = useState(createDefaultAccessOperatorForm)
   const [accessUserForm, setAccessUserForm] = useState(createDefaultAccessUserForm)
   const [passwordChangeState, setPasswordChangeState] = useState({ loading: false, error: '', success: '', form: createDefaultPasswordChangeForm() })
+  const [catalogState, setCatalogState] = useState({ loading: true, error: '', success: '', products: [], importResult: null })
+  const [catalogForm, setCatalogForm] = useState(createDefaultCatalogForm)
   const [operatorDirectoryState, setOperatorDirectoryState] = useState({ loading: true, error: '', items: [] })
   const [integrationConnectorState, setIntegrationConnectorState] = useState({ loadingKey: null, error: '', success: '' })
   const [integrationReplayState, setIntegrationReplayState] = useState({ loadingId: null, error: '', success: '' })
@@ -668,6 +683,9 @@ export default function App() {
     setOperatorDirectoryState({ loading: false, error: '', items: [] })
     setSystemRuntimeState({ loading: false, error: '', runtime: null })
     setAccessAdminState({ loading: false, error: '', success: '', workspace: null, operators: [], users: [] })
+    setCatalogState({ loading: false, error: '', success: '', products: [], importResult: null })
+    setCatalogForm(createDefaultCatalogForm())
+    setSelectedCatalogProductId(null)
   }
   const handleExpiredSession = (message, attemptedPage = currentPage) => {
     storePendingPostAuthPage(pageLookup[attemptedPage]?.audience === 'app' ? attemptedPage : 'dashboard')
@@ -783,9 +801,25 @@ export default function App() {
     setPageState({ loading: false, error: '' })
   }
 
+  async function fetchCatalogProducts(options = {}) {
+    if (!options.quiet) {
+      setCatalogState((current) => ({ ...current, loading: true, error: '', success: '' }))
+    }
+    try {
+      const products = await fetchJson('/api/products')
+      setCatalogState((current) => ({ ...current, loading: false, error: '', products, success: options.success || current.success }))
+      setSelectedCatalogProductId((currentId) => (products.some((product) => product.id === currentId) ? currentId : products[0]?.id || null))
+      return products
+    } catch (error) {
+      setCatalogState((current) => ({ ...current, loading: false, error: error.message }))
+      if (!options.quiet) throw error
+      return []
+    }
+  }
+
   async function refreshSnapshotQuietly() {
     try {
-      await fetchSnapshot()
+      await Promise.all([fetchSnapshot(), fetchCatalogProducts({ quiet: true })])
       await refreshSystemRuntimeQuietly()
     } catch {
       // Keep planning feedback visible even if the secondary snapshot refresh misses.
@@ -898,10 +932,11 @@ export default function App() {
         if (active) {
           setSnapshot(emptySnapshot)
           setPageState({ loading: false, error: '' })
+          setCatalogState({ loading: false, error: '', success: '', products: [], importResult: null })
         }
         return
       }
-      try { await fetchSnapshot() } catch (error) { if (active) setPageState({ loading: false, error: error.message }) }
+      try { await Promise.all([fetchSnapshot(), fetchCatalogProducts({ quiet: true })]) } catch (error) { if (active) setPageState({ loading: false, error: error.message }) }
     }
     loadSnapshot()
     if (!authSessionState.session?.tenantCode) {
@@ -1212,6 +1247,61 @@ export default function App() {
     return () => { active = false }
   }, [scenarioHistoryFilters, activeTenantCode])
 
+  function resetCatalogForm() {
+    setCatalogForm(createDefaultCatalogForm())
+    setSelectedCatalogProductId(null)
+    setCatalogState((current) => ({ ...current, error: '', success: '' }))
+  }
+
+  async function saveCatalogProduct() {
+    if (!canManageTenantAccess) {
+      setCatalogState((current) => ({ ...current, error: 'Tenant admin access is required to manage the product catalog.', success: '' }))
+      return
+    }
+    const payload = {
+      sku: catalogForm.sku.trim(),
+      name: catalogForm.name.trim(),
+      category: catalogForm.category.trim(),
+    }
+    setCatalogState((current) => ({ ...current, loading: true, error: '', success: '' }))
+    try {
+      const product = await fetchJson(catalogForm.id ? `/api/products/${catalogForm.id}` : '/api/products', {
+        method: catalogForm.id ? 'PUT' : 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      })
+      await fetchCatalogProducts({ quiet: true })
+      setSelectedCatalogProductId(product.id)
+      setCatalogForm({ id: product.id, sku: product.sku, name: product.name, category: product.category })
+      setCatalogState((current) => ({ ...current, loading: false, error: '', success: `${product.sku} saved to the tenant catalog.` }))
+    } catch (error) {
+      setCatalogState((current) => ({ ...current, loading: false, error: error.message, success: '' }))
+    }
+  }
+
+  async function importCatalogProducts(file) {
+    if (!canManageTenantAccess) {
+      setCatalogState((current) => ({ ...current, error: 'Tenant admin access is required to import products.', success: '' }))
+      return
+    }
+    const formData = new FormData()
+    formData.append('file', file)
+    setCatalogState((current) => ({ ...current, loading: true, error: '', success: '', importResult: null }))
+    try {
+      const importResult = await fetchJson('/api/products/import', { method: 'POST', body: formData })
+      await fetchCatalogProducts({ quiet: true })
+      setCatalogState((current) => ({
+        ...current,
+        loading: false,
+        error: '',
+        success: `Imported ${importResult.totalRows} rows: ${importResult.created} created, ${importResult.updated} updated, ${importResult.failed} failed.`,
+        importResult,
+      }))
+    } catch (error) {
+      setCatalogState((current) => ({ ...current, loading: false, error: error.message, success: '' }))
+    }
+  }
+
   async function toggleConnector(connector) {
     const loadingKey = `${connector.sourceSystem}:${connector.type}`
     setIntegrationConnectorState({ loadingKey, error: '', success: '' })
@@ -1341,6 +1431,7 @@ export default function App() {
   const isRecommendationsPage = currentPage === 'recommendations'
   const isOrdersPage = currentPage === 'orders'
   const isInventoryPage = currentPage === 'inventory'
+  const isCatalogPage = currentPage === 'catalog'
   const isLocationsPage = currentPage === 'locations'
   const isFulfillmentPage = currentPage === 'fulfillment'
   const isScenariosPage = currentPage === 'scenarios'
@@ -1364,6 +1455,7 @@ export default function App() {
     recommendations: summary?.recommendationsCount ?? snapshot.recommendations.length,
     orders: summary?.recentOrderCount ?? snapshot.recentOrders.length,
     inventory: summary?.inventoryRecordsCount ?? snapshot.inventory.length,
+    catalog: catalogState.products.length,
     locations: summary?.totalWarehouses ?? warehouseOptions.length,
     fulfillment: fulfillmentOverview.backlogCount + fulfillmentOverview.delayedShipmentCount,
     scenarios: pendingReviewCount,
@@ -1392,6 +1484,7 @@ export default function App() {
     recommendations: isAuthenticated ? (snapshot.recommendations.length ? `${snapshot.recommendations.length} recommendation${snapshot.recommendations.length === 1 ? '' : 's'} waiting for review` : 'No immediate recommendation pressure') : 'Protected by workspace sign-in',
     orders: isAuthenticated ? (summary?.recentOrderCount ? `${summary.recentOrderCount} order${summary.recentOrderCount === 1 ? '' : 's'} moved recently` : 'Order flow is currently quiet') : 'Protected by workspace sign-in',
     inventory: isAuthenticated ? (summary?.lowStockItems ? `${summary.lowStockItems} low-stock item${summary.lowStockItems === 1 ? '' : 's'}` : 'Inventory posture is stable') : 'Protected by workspace sign-in',
+    catalog: isAuthenticated ? `${catalogState.products.length} tenant product${catalogState.products.length === 1 ? '' : 's'} available` : 'Protected by workspace sign-in',
     locations: isAuthenticated ? `${warehouseOptions.length} operational location${warehouseOptions.length === 1 ? '' : 's'} tracked` : 'Protected by workspace sign-in',
     fulfillment: isAuthenticated ? (fulfillmentOverview.backlogCount ? `${fulfillmentOverview.backlogCount} backlog item${fulfillmentOverview.backlogCount === 1 ? '' : 's'} active` : 'Fulfillment lanes are clear') : 'Protected by workspace sign-in',
     scenarios: isAuthenticated ? 'Model operational changes before they touch live flow' : 'Protected by workspace sign-in',
@@ -2453,6 +2546,7 @@ export default function App() {
             <RecommendationsPage context={{ isAuthenticated, isRecommendationsPage, snapshot, recommendationNow, recommendationSoon, recommendationWatch, selectedRecommendationId, setSelectedRecommendationId, formatTimestamp }} />
             <OrdersPage context={{ isAuthenticated, isOrdersPage, snapshot, fulfillmentOverview, selectedOrderId, setSelectedOrderId, summary, warehouseOptions, currency, formatCodeLabel, formatRelativeHours, formatTimestamp }} />
             <InventoryPage context={{ isAuthenticated, isInventoryPage, snapshot, selectedInventoryId, setSelectedInventoryId, lowStockInventory, highRiskInventory, fastMovingInventory, warehouseOptions, formatCodeLabel, formatRelativeHours }} />
+            <CatalogPage context={{ isAuthenticated, isCatalogPage, catalogState, catalogForm, setCatalogForm, selectedCatalogProductId, setSelectedCatalogProductId, saveCatalogProduct, importCatalogProducts, resetCatalogForm, canManageTenantAccess }} />
             <LocationsPage context={{ isAuthenticated, isLocationsPage, warehouseOptions, snapshot, fulfillmentOverview, activeAlerts, formatCodeLabel }} />
             <FulfillmentPage context={{ isAuthenticated, isFulfillmentPage, delayedFulfillments, fulfillmentOverview, warehouseOptions, formatCodeLabel, formatRelativeHours, getFulfillmentStatusClassName, enabledConnectorCount, snapshot, pendingReplayCount }} />
             <ScenarioControlPage context={{ isAuthenticated, isScenariosPage, isScenarioHistoryPage, isApprovalsPage, isEscalationsPage, scenarioHistoryItems, pendingApprovalScenarios, approvedScenarios, rejectedScenarios, overdueScenarios, approvalBoard, formatCodeLabel }} />

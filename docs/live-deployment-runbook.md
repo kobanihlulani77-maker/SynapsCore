@@ -94,6 +94,30 @@ After the first tenant workspace is created successfully, remove `SYNAPSECORE_BO
 Use `SYNAPSECORE_PLATFORM_ADMIN_TOKEN` through the `X-Synapse-Platform-Admin-Token` header for any later production tenant provisioning.
 Do not expect ordinary tenant-admin sessions to create additional tenant workspaces in production after that point. This is intentionally blocked.
 
+## Live Verification Credentials
+
+Hosted browser proof must use real tenant accounts, not seed assumptions. Configure these before running `npm.cmd run test:e2e:prod` from `frontend`:
+
+```text
+PLAYWRIGHT_FRONTEND_URL=https://synapscore-frontend-3.onrender.com
+PLAYWRIGHT_BACKEND_URL=https://synapscore-3.onrender.com
+PLAYWRIGHT_TENANT_CODE=<real-company-tenant-code>
+PLAYWRIGHT_OPERATIONS_LEAD_USERNAME=<tenant-admin-username>
+PLAYWRIGHT_OPERATIONS_LEAD_PASSWORD=<tenant-admin-password>
+PLAYWRIGHT_OPERATIONS_PLANNER_USERNAME=<planner-username>
+PLAYWRIGHT_OPERATIONS_PLANNER_PASSWORD=<planner-password>
+PLAYWRIGHT_INTEGRATION_LEAD_USERNAME=<integration-admin-username>
+PLAYWRIGHT_INTEGRATION_LEAD_PASSWORD=<integration-admin-password>
+```
+
+Required roles:
+
+- operations lead: `TENANT_ADMIN`
+- operations planner: workspace operator with scenario/order visibility
+- integration lead: `INTEGRATION_ADMIN`
+
+Create or reset these accounts through tenant bootstrap/admin APIs, then rotate or disable verification credentials after the proof run when required by the customer environment.
+
 ## 4. Run Release Readiness
 
 Before rollout:
