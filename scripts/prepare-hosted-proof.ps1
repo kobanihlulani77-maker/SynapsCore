@@ -346,11 +346,19 @@ function Find-ProofProduct {
         [string]$Category
     )
 
+    $normalizedSku = $Sku.ToUpperInvariant()
+    $internalSku = "{0}::{1}" -f $script:TenantCodeValue, $normalizedSku
     $products = @(Get-JsonArray -Url "$script:ApiBaseUrlValue/api/products" -Session $AdminSession)
     $product = $products | Where-Object {
+        $responseSku = Get-PropertyValue -Object $_ -PropertyName "sku"
+        $responseCatalogSku = Get-PropertyValue -Object $_ -PropertyName "catalogSku"
+        $responseInternalSku = Get-PropertyValue -Object $_ -PropertyName "internalSku"
         $null -ne $_ -and (
-            (Get-PropertyValue -Object $_ -PropertyName "sku") -ieq $Sku -or
-            (Get-PropertyValue -Object $_ -PropertyName "catalogSku") -ieq $Sku
+            $responseSku -ieq $normalizedSku -or
+            $responseSku -ieq $internalSku -or
+            $responseCatalogSku -ieq $normalizedSku -or
+            $responseCatalogSku -ieq $internalSku -or
+            $responseInternalSku -ieq $internalSku
         )
     } | Select-Object -First 1
 
