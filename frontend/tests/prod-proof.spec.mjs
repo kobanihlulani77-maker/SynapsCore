@@ -1,30 +1,34 @@
 import { randomUUID } from 'node:crypto'
 import { expect, request as playwrightRequest, test } from '@playwright/test'
 
-const backendUrl = process.env.PLAYWRIGHT_BACKEND_URL || 'https://synapscore-3.onrender.com'
-const requiredEnv = (name) => {
-  const value = process.env[name]
-  if (!value || !value.trim()) {
-    throw new Error(`Missing required environment variable ${name} for live production proof.`)
+const backendUrl = process.env.PLAYWRIGHT_API_BASE_URL
+  || process.env.PLAYWRIGHT_BACKEND_URL
+  || 'https://synapscore-3.onrender.com'
+const requiredEnv = (...names) => {
+  for (const name of names) {
+    const value = process.env[name]
+    if (value && value.trim()) {
+      return value.trim()
+    }
   }
-  return value.trim()
+  throw new Error(`Missing required environment variable. Set one of: ${names.join(', ')} for live production proof.`)
 }
 
 const users = {
   operationsLead: {
     tenantCode: requiredEnv('PLAYWRIGHT_TENANT_CODE'),
-    username: requiredEnv('PLAYWRIGHT_OPERATIONS_LEAD_USERNAME'),
-    password: requiredEnv('PLAYWRIGHT_OPERATIONS_LEAD_PASSWORD'),
+    username: requiredEnv('PLAYWRIGHT_TENANT_ADMIN_USERNAME', 'PLAYWRIGHT_OPERATIONS_LEAD_USERNAME'),
+    password: requiredEnv('PLAYWRIGHT_TENANT_ADMIN_PASSWORD', 'PLAYWRIGHT_OPERATIONS_LEAD_PASSWORD'),
   },
   operationsPlanner: {
     tenantCode: requiredEnv('PLAYWRIGHT_TENANT_CODE'),
-    username: requiredEnv('PLAYWRIGHT_OPERATIONS_PLANNER_USERNAME'),
-    password: requiredEnv('PLAYWRIGHT_OPERATIONS_PLANNER_PASSWORD'),
+    username: requiredEnv('PLAYWRIGHT_PLANNER_USERNAME', 'PLAYWRIGHT_OPERATIONS_PLANNER_USERNAME'),
+    password: requiredEnv('PLAYWRIGHT_PLANNER_PASSWORD', 'PLAYWRIGHT_OPERATIONS_PLANNER_PASSWORD'),
   },
   integrationLead: {
     tenantCode: requiredEnv('PLAYWRIGHT_TENANT_CODE'),
-    username: requiredEnv('PLAYWRIGHT_INTEGRATION_LEAD_USERNAME'),
-    password: requiredEnv('PLAYWRIGHT_INTEGRATION_LEAD_PASSWORD'),
+    username: requiredEnv('PLAYWRIGHT_INTEGRATION_ADMIN_USERNAME', 'PLAYWRIGHT_INTEGRATION_LEAD_USERNAME'),
+    password: requiredEnv('PLAYWRIGHT_INTEGRATION_ADMIN_PASSWORD', 'PLAYWRIGHT_INTEGRATION_LEAD_PASSWORD'),
   },
 }
 

@@ -16,8 +16,8 @@ Write-Host "Frontend URL : $FrontendUrl"
 Write-Host "Backend URL  : $BackendUrl"
 Write-Host ""
 
-$env:PLAYWRIGHT_FRONTEND_URL = $FrontendUrl
-$env:PLAYWRIGHT_BACKEND_URL = $BackendUrl
+$env:PLAYWRIGHT_BASE_URL = $FrontendUrl
+$env:PLAYWRIGHT_API_BASE_URL = $BackendUrl
 
 Push-Location $frontendDir
 try {
@@ -27,6 +27,6 @@ try {
     }
 } finally {
     Pop-Location
-    Remove-Item Env:PLAYWRIGHT_FRONTEND_URL -ErrorAction SilentlyContinue
-    Remove-Item Env:PLAYWRIGHT_BACKEND_URL -ErrorAction SilentlyContinue
+    Remove-Item Env:PLAYWRIGHT_BASE_URL -ErrorAction SilentlyContinue
+    Remove-Item Env:PLAYWRIGHT_API_BASE_URL -ErrorAction SilentlyContinue
 }

@@ -96,27 +96,42 @@ Do not expect ordinary tenant-admin sessions to create additional tenant workspa
 
 ## Live Verification Credentials
 
-Hosted browser proof must use real tenant accounts, not seed assumptions. Configure these before running `npm.cmd run test:e2e:prod` from `frontend`:
+Hosted browser proof must use real tenant accounts, not seed assumptions. Create or refresh the proof lane with production APIs only:
 
-```text
-PLAYWRIGHT_FRONTEND_URL=https://synapscore-frontend-3.onrender.com
-PLAYWRIGHT_BACKEND_URL=https://synapscore-3.onrender.com
-PLAYWRIGHT_TENANT_CODE=<real-company-tenant-code>
-PLAYWRIGHT_OPERATIONS_LEAD_USERNAME=<tenant-admin-username>
-PLAYWRIGHT_OPERATIONS_LEAD_PASSWORD=<tenant-admin-password>
-PLAYWRIGHT_OPERATIONS_PLANNER_USERNAME=<planner-username>
-PLAYWRIGHT_OPERATIONS_PLANNER_PASSWORD=<planner-password>
-PLAYWRIGHT_INTEGRATION_LEAD_USERNAME=<integration-admin-username>
-PLAYWRIGHT_INTEGRATION_LEAD_PASSWORD=<integration-admin-password>
+```powershell
+$env:PLAYWRIGHT_BASE_URL="https://synapscore-frontend-3.onrender.com"
+$env:PLAYWRIGHT_API_BASE_URL="https://synapscore-3.onrender.com"
+$env:PLAYWRIGHT_TENANT_CODE="<hosted-proof-tenant-code>"
+$env:PLAYWRIGHT_TENANT_ADMIN_USERNAME="<tenant-admin-username>"
+$env:PLAYWRIGHT_TENANT_ADMIN_PASSWORD="<tenant-admin-password>"
+$env:PLAYWRIGHT_PLANNER_USERNAME="<planner-operator-username>"
+$env:PLAYWRIGHT_PLANNER_PASSWORD="<planner-operator-password>"
+$env:PLAYWRIGHT_INTEGRATION_ADMIN_USERNAME="<integration-admin-username>"
+$env:PLAYWRIGHT_INTEGRATION_ADMIN_PASSWORD="<integration-admin-password>"
+$env:SYNAPSECORE_PLATFORM_ADMIN_TOKEN="<render-platform-admin-token>"
+powershell -ExecutionPolicy Bypass -File scripts\prepare-hosted-proof.ps1
 ```
 
-Required roles:
+Credential model:
 
-- operations lead: `TENANT_ADMIN`
-- operations planner: workspace operator with scenario/order visibility
-- integration lead: `INTEGRATION_ADMIN`
+- tenant admin: tenant code from `PLAYWRIGHT_TENANT_CODE`, username from `PLAYWRIGHT_TENANT_ADMIN_USERNAME`, password from `PLAYWRIGHT_TENANT_ADMIN_PASSWORD`, operator `Operations Lead`, roles `TENANT_ADMIN`, `REVIEW_OWNER`, `ESCALATION_OWNER`, `INTEGRATION_ADMIN`, and `INTEGRATION_OPERATOR`. This account verifies sign-in, tenant admin pages, catalog onboarding, orders, inventory, scenarios, and user management.
+- planner/operator: tenant code from `PLAYWRIGHT_TENANT_CODE`, username from `PLAYWRIGHT_PLANNER_USERNAME`, password from `PLAYWRIGHT_PLANNER_PASSWORD`, operator `Operations Planner`, no tenant-admin roles. This account verifies protected-route access and non-admin access boundaries.
+- integration admin: tenant code from `PLAYWRIGHT_TENANT_CODE`, username from `PLAYWRIGHT_INTEGRATION_ADMIN_USERNAME`, password from `PLAYWRIGHT_INTEGRATION_ADMIN_PASSWORD`, operator `Integration Lead`, roles `INTEGRATION_ADMIN` and `INTEGRATION_OPERATOR`. This account verifies connectors, CSV ingestion, replay, and recovery flows.
 
-Create or reset these accounts through tenant bootstrap/admin APIs, then rotate or disable verification credentials after the proof run when required by the customer environment.
+Create/reset path:
+
+- If the proof tenant does not exist, `scripts/prepare-hosted-proof.ps1` creates it through `POST /api/access/tenants`. Use `SYNAPSECORE_BOOTSTRAP_INITIAL_TOKEN` with `X-Synapse-Bootstrap-Token` for the first tenant, or `SYNAPSECORE_PLATFORM_ADMIN_TOKEN` with `X-Synapse-Platform-Admin-Token` for later tenant provisioning.
+- If the proof tenant exists, the script signs in as the tenant admin, upserts proof operators through `/api/access/admin/operators`, creates or remaps users through `/api/access/admin/users`, resets passwords through `/api/access/admin/users/{userId}/reset-password`, then clears forced password-change flags by logging in and changing from a temporary password to the supplied proof password.
+- If the tenant exists but the tenant-admin password is unknown, use another active tenant admin to reset it or create a fresh verification tenant code. Platform admin tokens intentionally do not bypass tenant user administration.
+
+After preparation, run:
+
+```powershell
+cd frontend
+npm.cmd run test:e2e:prod
+```
+
+Rotate or disable verification credentials after the proof run when required by the customer environment.
 
 ## 4. Run Release Readiness
 

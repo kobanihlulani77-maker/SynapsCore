@@ -247,23 +247,33 @@ cd ..
 powershell -ExecutionPolicy Bypass -File scripts\verify-realtime.ps1 -FrontendUrl http://localhost -BackendUrl http://localhost:8080
 ```
 
-For hosted Render proof, use the real non-demo credential model in `frontend/prod-proof.env.example`:
+For hosted Render proof, prepare a real verification tenant and credentials first. This path uses production APIs only: no `SYNAPSE-DEMO`, no hidden seed users, and no manual database edits.
+
+```powershell
+$env:PLAYWRIGHT_API_BASE_URL="https://synapscore-3.onrender.com"
+$env:PLAYWRIGHT_BASE_URL="https://synapscore-frontend-3.onrender.com"
+$env:PLAYWRIGHT_TENANT_CODE="<hosted-proof-tenant-code>"
+$env:PLAYWRIGHT_TENANT_ADMIN_USERNAME="<tenant-admin-username>"
+$env:PLAYWRIGHT_TENANT_ADMIN_PASSWORD="<tenant-admin-password>"
+$env:PLAYWRIGHT_PLANNER_USERNAME="<planner-operator-username>"
+$env:PLAYWRIGHT_PLANNER_PASSWORD="<planner-operator-password>"
+$env:PLAYWRIGHT_INTEGRATION_ADMIN_USERNAME="<integration-admin-username>"
+$env:PLAYWRIGHT_INTEGRATION_ADMIN_PASSWORD="<integration-admin-password>"
+
+# Required only when the target tenant does not already exist. Use the bootstrap token
+# for the very first tenant, otherwise use the platform admin token.
+$env:SYNAPSECORE_PLATFORM_ADMIN_TOKEN="<render-platform-admin-token>"
+powershell -ExecutionPolicy Bypass -File scripts\prepare-hosted-proof.ps1
+```
+
+Then run the browser proof from `frontend`:
 
 ```powershell
 cd frontend
-$env:PLAYWRIGHT_FRONTEND_URL="https://synapscore-frontend-3.onrender.com"
-$env:PLAYWRIGHT_BACKEND_URL="https://synapscore-3.onrender.com"
-$env:PLAYWRIGHT_TENANT_CODE="<real-company-tenant-code>"
-$env:PLAYWRIGHT_OPERATIONS_LEAD_USERNAME="<tenant-admin-username>"
-$env:PLAYWRIGHT_OPERATIONS_LEAD_PASSWORD="<tenant-admin-password>"
-$env:PLAYWRIGHT_OPERATIONS_PLANNER_USERNAME="<planner-username>"
-$env:PLAYWRIGHT_OPERATIONS_PLANNER_PASSWORD="<planner-password>"
-$env:PLAYWRIGHT_INTEGRATION_LEAD_USERNAME="<integration-admin-username>"
-$env:PLAYWRIGHT_INTEGRATION_LEAD_PASSWORD="<integration-admin-password>"
 npm.cmd run test:e2e:prod
 ```
 
-The live proof expects one tenant-admin operator, one planner/operator account, and one integration-admin operator created through the production tenant bootstrap/admin flow. It does not rely on hidden seed users.
+The live proof expects one tenant-admin operator, one planner/operator account, and one integration-admin operator created through the production tenant bootstrap/admin flow. The setup script also prepares the minimum real catalog/inventory baseline needed by the realtime and replay proof flows through the normal product and inventory APIs.
 
 `scripts/start-prod.sh` runs the same smoke verification automatically unless you pass `--skip-verify`.
 

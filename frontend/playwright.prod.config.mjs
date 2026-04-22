@@ -22,7 +22,9 @@ export default defineConfig({
     ['html', { open: 'never', outputFolder: 'playwright-report' }],
   ],
   use: {
-    baseURL: process.env.PLAYWRIGHT_FRONTEND_URL || 'https://synapscore-frontend-3.onrender.com',
+    baseURL: process.env.PLAYWRIGHT_BASE_URL
+      || process.env.PLAYWRIGHT_FRONTEND_URL
+      || 'https://synapscore-frontend-3.onrender.com',
     headless: process.env.PLAYWRIGHT_HEADED !== 'true',
     viewport: { width: 1440, height: 960 },
     trace: 'on-first-retry',
