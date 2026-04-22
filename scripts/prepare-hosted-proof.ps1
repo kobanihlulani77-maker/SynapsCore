@@ -8,6 +8,7 @@ param(
     [string]$PlannerPassword,
     [string]$IntegrationAdminUsername,
     [string]$IntegrationAdminPassword,
+    [string]$ProofProductSku,
     [string]$PlatformAdminToken,
     [string]$BootstrapInitialToken
 )
@@ -75,6 +76,31 @@ function Require-Username {
         throw "$Name must contain only letters, digits, dots, underscores, and hyphens. Email-style usernames with @ are not valid for SynapsCore access users."
     }
     return $username.ToLowerInvariant()
+}
+
+function Normalize-ProofSku {
+    param(
+        [string]$Name,
+        [string]$Value
+    )
+
+    $sku = Require-Value -Name $Name -Value $Value
+    $normalized = $sku.ToUpperInvariant()
+    if ($normalized -notmatch '^[A-Z0-9][A-Z0-9._-]{0,63}$') {
+        throw "$Name must start with a letter or number and may only contain letters, numbers, dots, underscores, and hyphens."
+    }
+    return $normalized
+}
+
+function Get-DefaultProofProductSku {
+    param([string]$TenantCode)
+
+    $normalizedTenant = ($TenantCode.ToUpperInvariant() -replace '[^A-Z0-9._-]', '-')
+    $candidate = "SKU-$normalizedTenant-PROOF"
+    if ($candidate.Length -le 64) {
+        return $candidate
+    }
+    return ("SKU-" + $normalizedTenant.Substring(0, [Math]::Min($normalizedTenant.Length, 50)) + "-PRF")
 }
 
 function Get-ErrorBody {
@@ -397,9 +423,11 @@ function Upsert-ProofProduct {
 }
 
 function Ensure-ProofCatalogAndInventory {
-    param([Microsoft.PowerShell.Commands.WebRequestSession]$AdminSession)
+    param(
+        [Microsoft.PowerShell.Commands.WebRequestSession]$AdminSession,
+        [string]$Sku
+    )
 
-    $sku = "SKU-PLS-330"
     Upsert-ProofProduct `
         -AdminSession $AdminSession `
         -Sku $sku `
@@ -429,6 +457,7 @@ $PlannerUsernameValue = Require-Username -Name "PLAYWRIGHT_PLANNER_USERNAME" -Va
 $PlannerPasswordValue = Require-Password -Name "PLAYWRIGHT_PLANNER_PASSWORD" -Value (Get-FirstValue -Values @($PlannerPassword, $env:PLAYWRIGHT_PLANNER_PASSWORD, $env:PLAYWRIGHT_OPERATIONS_PLANNER_PASSWORD))
 $IntegrationAdminUsernameValue = Require-Username -Name "PLAYWRIGHT_INTEGRATION_ADMIN_USERNAME" -Value (Get-FirstValue -Values @($IntegrationAdminUsername, $env:PLAYWRIGHT_INTEGRATION_ADMIN_USERNAME, $env:PLAYWRIGHT_INTEGRATION_LEAD_USERNAME))
 $IntegrationAdminPasswordValue = Require-Password -Name "PLAYWRIGHT_INTEGRATION_ADMIN_PASSWORD" -Value (Get-FirstValue -Values @($IntegrationAdminPassword, $env:PLAYWRIGHT_INTEGRATION_ADMIN_PASSWORD, $env:PLAYWRIGHT_INTEGRATION_LEAD_PASSWORD))
+$ProofProductSkuValue = Normalize-ProofSku -Name "PLAYWRIGHT_PROOF_PRODUCT_SKU" -Value (Get-FirstValue -Values @($ProofProductSku, $env:PLAYWRIGHT_PROOF_PRODUCT_SKU, (Get-DefaultProofProductSku -TenantCode $script:TenantCodeValue)))
 $PlatformAdminTokenValue = Get-FirstValue -Values @($PlatformAdminToken, $env:SYNAPSECORE_PLATFORM_ADMIN_TOKEN)
 $BootstrapInitialTokenValue = Get-FirstValue -Values @($BootstrapInitialToken, $env:SYNAPSECORE_BOOTSTRAP_INITIAL_TOKEN)
 
@@ -535,13 +564,14 @@ Ensure-User `
     -FinalPassword $IntegrationAdminPasswordValue
 
 Write-Host "Preparing real catalog and inventory baseline for proof flows..."
-Ensure-ProofCatalogAndInventory -AdminSession $adminSession
+Ensure-ProofCatalogAndInventory -AdminSession $adminSession -Sku $ProofProductSkuValue
 
 Write-Host ""
 Write-Host "Hosted proof credential path is ready."
 Write-Host "Use these non-secret values when running frontend hosted proof:"
 Write-Host "PLAYWRIGHT_API_BASE_URL=$script:ApiBaseUrlValue"
 Write-Host "PLAYWRIGHT_TENANT_CODE=$script:TenantCodeValue"
+Write-Host "PLAYWRIGHT_PROOF_PRODUCT_SKU=$ProofProductSkuValue"
 Write-Host "PLAYWRIGHT_TENANT_ADMIN_USERNAME=$TenantAdminUsernameValue"
 Write-Host "PLAYWRIGHT_PLANNER_USERNAME=$PlannerUsernameValue"
 Write-Host "PLAYWRIGHT_INTEGRATION_ADMIN_USERNAME=$IntegrationAdminUsernameValue"

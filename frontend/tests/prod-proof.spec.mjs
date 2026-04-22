@@ -15,6 +15,15 @@ const requiredEnv = (...names) => {
 }
 
 const proofTenantCode = requiredEnv('PLAYWRIGHT_TENANT_CODE').toUpperCase()
+const deriveDefaultProofProductSku = (tenantCode) => {
+  const normalizedTenant = tenantCode.replace(/[^A-Z0-9._-]/g, '-')
+  const candidate = `SKU-${normalizedTenant}-PROOF`
+  return candidate.length <= 64
+    ? candidate
+    : `SKU-${normalizedTenant.slice(0, Math.min(normalizedTenant.length, 50))}-PRF`
+}
+const defaultProofProductSku = deriveDefaultProofProductSku(proofTenantCode)
+const proofProductSku = (process.env.PLAYWRIGHT_PROOF_PRODUCT_SKU || defaultProofProductSku).trim().toUpperCase()
 
 const users = {
   operationsLead: {
@@ -148,7 +157,7 @@ async function createReplayFixture() {
   try {
     await readJson(await inventoryAdmin.post('/api/inventory/update', {
       data: {
-        productSku: 'SKU-PLS-330',
+        productSku: proofProductSku,
         warehouseCode: 'WH-NORTH',
         quantityAvailable: 50,
         reorderThreshold: 12,
@@ -175,7 +184,7 @@ async function createReplayFixture() {
           name: 'orders.csv',
           mimeType: 'text/csv',
           buffer: Buffer.from(
-            `externalOrderId,warehouseCode,productSku,quantity,unitPrice\n${externalOrderId},WH-NORTH,SKU-PLS-330,2,88.00\n`,
+            `externalOrderId,warehouseCode,productSku,quantity,unitPrice\n${externalOrderId},WH-NORTH,${proofProductSku},2,88.00\n`,
             'utf8',
           ),
         },
@@ -222,7 +231,7 @@ async function createScenarioFixture() {
           warehouseCode: 'WH-NORTH',
           items: [
             {
-              productSku: 'SKU-PLS-330',
+              productSku: proofProductSku,
               quantity: 1,
               unitPrice: 95,
             },

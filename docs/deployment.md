@@ -253,6 +253,7 @@ For hosted Render proof, prepare a real verification tenant and credentials firs
 $env:PLAYWRIGHT_API_BASE_URL="https://synapscore-3.onrender.com"
 $env:PLAYWRIGHT_BASE_URL="https://synapscore-frontend-3.onrender.com"
 $env:PLAYWRIGHT_TENANT_CODE="<hosted-proof-tenant-code>"
+$env:PLAYWRIGHT_PROOF_PRODUCT_SKU="<tenant-specific-proof-sku>"
 $env:PLAYWRIGHT_TENANT_ADMIN_USERNAME="<tenant-admin-username>"
 $env:PLAYWRIGHT_TENANT_ADMIN_PASSWORD="<tenant-admin-password>"
 $env:PLAYWRIGHT_PLANNER_USERNAME="<planner-operator-username>"
