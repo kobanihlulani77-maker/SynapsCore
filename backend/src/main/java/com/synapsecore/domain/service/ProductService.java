@@ -20,6 +20,7 @@ import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
@@ -256,16 +257,28 @@ public class ProductService {
 
     private Product adoptOrphanedProductIfPresent(Tenant tenant, String catalogSku, String name, String category) {
         String internalSku = Product.buildInternalSku(tenant.getCode(), catalogSku);
-        return productRepository.findBySku(internalSku)
+        Map<Long, Product> orphanMatches = new LinkedHashMap<>();
+        productRepository.findBySku(internalSku)
             .filter(existing -> existing.getTenant() == null)
-            .map(existing -> {
-                existing.setTenant(tenant);
-                existing.setCatalogSku(catalogSku);
-                existing.setName(name);
-                existing.setCategory(category);
-                return productRepository.save(existing);
-            })
-            .orElse(null);
+            .ifPresent(existing -> orphanMatches.put(existing.getId(), existing));
+        for (Product orphanByCatalogSku : productRepository.findAllByTenantIsNullAndCatalogSkuIgnoreCase(catalogSku)) {
+            orphanMatches.put(orphanByCatalogSku.getId(), orphanByCatalogSku);
+        }
+
+        if (orphanMatches.isEmpty()) {
+            return null;
+        }
+        if (orphanMatches.size() > 1) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT,
+                "Multiple orphan catalog rows exist for tenant " + tenant.getCode() + " and SKU " + catalogSku + ".");
+        }
+
+        Product existing = orphanMatches.values().iterator().next();
+        existing.setTenant(tenant);
+        existing.setCatalogSku(catalogSku);
+        existing.setName(name);
+        existing.setCategory(category);
+        return productRepository.save(existing);
     }
 
     private String normalizeCatalogSku(String value) {

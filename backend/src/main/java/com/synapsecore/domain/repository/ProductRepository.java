@@ -15,5 +15,7 @@ public interface ProductRepository extends JpaRepository<Product, Long> {
 
     List<Product> findAllByTenant_CodeIgnoreCaseOrderByNameAsc(String tenantCode);
 
+    List<Product> findAllByTenantIsNullAndCatalogSkuIgnoreCase(String catalogSku);
+
     List<Product> findAllByTenantIsNullOrderByNameAsc();
 }
