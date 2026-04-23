@@ -247,6 +247,73 @@ class ProductionHardeningIntegrationTest {
     }
 
     @Test
+    void productCreateAdoptsHiddenOrphanInternalSkuRowIntoTenantCatalog() throws Exception {
+        mockMvc.perform(post("/api/access/tenants")
+                .header(BootstrapAccessService.BOOTSTRAP_TOKEN_HEADER, "bootstrap-secret")
+                .contentType(APPLICATION_JSON)
+                .content("""
+                    {
+                      "tenantCode": "PILOT-TENANT",
+                      "tenantName": "Pilot Tenant",
+                      "description": "Hosted proof tenant",
+                      "adminFullName": "Pilot Admin",
+                      "adminUsername": "admin.pilot",
+                      "adminPassword": "Admin@123",
+                      "primaryLocation": "Johannesburg",
+                      "secondaryLocation": "Cape Town"
+                    }
+                    """))
+            .andExpect(status().isOk());
+
+        jdbcTemplate.update(
+            """
+            insert into products (tenant_id, sku, catalog_sku, name, category, created_at, updated_at)
+            values (?, ?, ?, ?, ?, ?, ?)
+            """,
+            null,
+            "PILOT-TENANT::SKU-PILOT-TENANT-PROOF",
+            null,
+            "Legacy Hidden Product",
+            "Legacy",
+            Instant.now(),
+            Instant.now()
+        );
+
+        MockHttpSession session = (MockHttpSession) mockMvc.perform(post("/api/auth/session/login")
+                .contentType(APPLICATION_JSON)
+                .content("""
+                    {
+                      "tenantCode": "PILOT-TENANT",
+                      "username": "admin.pilot",
+                      "password": "Admin@123"
+                    }
+                    """))
+            .andExpect(status().isOk())
+            .andReturn()
+            .getRequest()
+            .getSession(false);
+
+        mockMvc.perform(post("/api/products")
+                .session(session)
+                .header("X-Synapse-Tenant", "PILOT-TENANT")
+                .contentType(APPLICATION_JSON)
+                .content("""
+                    {
+                      "sku": "SKU-PILOT-TENANT-PROOF",
+                      "name": "Pulse Relay Verification Product",
+                      "category": "Verification"
+                    }
+                    """))
+            .andExpect(status().isCreated())
+            .andExpect(jsonPath("$.sku").value("SKU-PILOT-TENANT-PROOF"))
+            .andExpect(jsonPath("$.tenantCode").value("PILOT-TENANT"));
+
+        assertThat(productRepository.findAllByTenant_CodeIgnoreCaseOrderByNameAsc("PILOT-TENANT"))
+            .extracting(Product::resolveCatalogSku)
+            .contains("SKU-PILOT-TENANT-PROOF");
+    }
+
+    @Test
     void prodProfileStarterConnectorSeedingIsDisabled() {
         Tenant tenant = tenantRepository.save(Tenant.builder()
             .code("REAL-OPS")

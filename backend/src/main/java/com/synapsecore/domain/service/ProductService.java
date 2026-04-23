@@ -58,14 +58,27 @@ public class ProductService {
     public ProductResponse createProduct(ProductUpsertRequest request, String actorName) {
         Tenant tenant = tenantContextService.getCurrentTenantOrDefault();
         String catalogSku = normalizeCatalogSku(request.sku());
+        String normalizedName = normalizeRequiredText(request.name(), "Product name", 120);
+        String normalizedCategory = normalizeRequiredText(request.category(), "Product category", 120);
         ensureSkuIsAvailable(tenant.getCode(), catalogSku);
+        Product adoptedProduct = adoptOrphanedProductIfPresent(tenant, catalogSku, normalizedName, normalizedCategory);
+        if (adoptedProduct != null) {
+            recordCatalogChange(
+                tenant.getCode(),
+                actorName,
+                "PRODUCT_CREATED",
+                adoptedProduct.resolveCatalogSku(),
+                "Adopted orphan catalog product " + adoptedProduct.resolveCatalogSku() + " (" + adoptedProduct.getName() + ") into tenant " + tenant.getCode() + "."
+            );
+            return toResponse(adoptedProduct);
+        }
         ensureInternalSkuIsAvailable(tenant.getCode(), catalogSku);
 
         Product product = productRepository.save(Product.builder()
             .tenant(tenant)
             .catalogSku(catalogSku)
-            .name(normalizeRequiredText(request.name(), "Product name", 120))
-            .category(normalizeRequiredText(request.category(), "Product category", 120))
+            .name(normalizedName)
+            .category(normalizedCategory)
             .build());
 
         recordCatalogChange(
@@ -162,19 +175,26 @@ public class ProductService {
 
                     var existingProduct = productRepository
                         .findByTenant_CodeIgnoreCaseAndCatalogSkuIgnoreCase(tenant.getCode(), catalogSku);
-                    boolean wasCreated = existingProduct.isEmpty();
+                    Product adoptedProduct = adoptOrphanedProductIfPresent(tenant, catalogSku, name, category);
+                    boolean wasCreated = existingProduct.isEmpty() && adoptedProduct == null;
                     Product product = existingProduct
                         .map(existing -> {
                             existing.setName(name);
                             existing.setCategory(category);
                             return productRepository.save(existing);
                         })
-                        .orElseGet(() -> productRepository.save(Product.builder()
-                            .tenant(tenant)
-                            .catalogSku(catalogSku)
-                            .name(name)
-                            .category(category)
-                            .build()));
+                        .orElseGet(() -> {
+                            if (adoptedProduct != null) {
+                                return adoptedProduct;
+                            }
+                            ensureInternalSkuIsAvailable(tenant.getCode(), catalogSku);
+                            return productRepository.save(Product.builder()
+                                .tenant(tenant)
+                                .catalogSku(catalogSku)
+                                .name(name)
+                                .category(category)
+                                .build());
+                        });
 
                     if (wasCreated) {
                         created++;
@@ -232,6 +252,20 @@ public class ProductService {
                 throw new ResponseStatusException(HttpStatus.CONFLICT,
                     "Product internal SKU already exists for this tenant context: " + internalSku);
             });
+    }
+
+    private Product adoptOrphanedProductIfPresent(Tenant tenant, String catalogSku, String name, String category) {
+        String internalSku = Product.buildInternalSku(tenant.getCode(), catalogSku);
+        return productRepository.findBySku(internalSku)
+            .filter(existing -> existing.getTenant() == null)
+            .map(existing -> {
+                existing.setTenant(tenant);
+                existing.setCatalogSku(catalogSku);
+                existing.setName(name);
+                existing.setCategory(category);
+                return productRepository.save(existing);
+            })
+            .orElse(null);
     }
 
     private String normalizeCatalogSku(String value) {
