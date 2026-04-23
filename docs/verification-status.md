@@ -48,7 +48,7 @@ Live Render evidence:
 | Replay / recovery | `WORKING` | Failed inbound replay and automated retry lanes are real. |
 | Runtime / incidents / audit | `WORKING` | Runtime diagnostics, incidents, audit traceability, and recovery visibility are real. |
 | Websocket / realtime | `PARTIAL` | Tenant-scoped realtime works, but the live deployment still uses single-node simple-broker mode. |
-| Deployment safety | `PARTIAL` | Production profile is real, but schema evolution still relies on Hibernate `ddl-auto=update`. |
+| Deployment safety | `PARTIAL` | Flyway migration foundation is now present for inventory stock-column evolution, but the production profile still partially relies on Hibernate `ddl-auto=update` until full migration coverage lands. |
 | Hosted authenticated proof | `BROKEN` | Proof tenant and users can be prepared, but live catalog onboarding proof is still blocked by `/api/products` conflict behavior on Render. |
 
 ## Current Hosted Blocker
@@ -66,6 +66,7 @@ The repo now contains:
 - orphan product adoption logic
 - internal SKU visibility in product responses
 - identity-sequence repair
+- classified product-write conflict handling so hosted proof no longer collapses every catalog failure into the same generic 409
 - tighter hosted-proof conflict detection
 
 But the live hosted proof is still not fully proven until the Render-side product create path stops failing.

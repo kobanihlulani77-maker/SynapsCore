@@ -5,6 +5,8 @@ import java.time.Instant;
 public record SystemBackboneSummary(
     String realtimeBrokerMode,
     String realtimeBrokerDetail,
+    boolean realtimeSingleNodeOnly,
+    boolean realtimeExternalBrokerConfigured,
     long pendingDispatchCount,
     long failedDispatchCount,
     Long oldestPendingAgeSeconds,

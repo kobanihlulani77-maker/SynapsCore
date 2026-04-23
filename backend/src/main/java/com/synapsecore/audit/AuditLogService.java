@@ -4,18 +4,23 @@ import com.synapsecore.domain.dto.AuditLogResponse;
 import com.synapsecore.domain.entity.AuditLog;
 import com.synapsecore.domain.entity.AuditStatus;
 import com.synapsecore.domain.repository.AuditLogRepository;
+import com.synapsecore.domain.service.IdentitySequenceMigrationService;
 import com.synapsecore.tenant.TenantContextService;
 import java.util.List;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
 
 @Service
 @RequiredArgsConstructor
+@Slf4j
 public class AuditLogService {
 
     private final AuditLogRepository auditLogRepository;
     private final RequestTraceContext requestTraceContext;
     private final TenantContextService tenantContextService;
+    private final IdentitySequenceMigrationService identitySequenceMigrationService;
 
     public void recordSuccess(String action,
                               String actor,
@@ -82,7 +87,7 @@ public class AuditLogService {
                         String targetRef,
                         AuditStatus status,
                         String details) {
-        auditLogRepository.save(AuditLog.builder()
+        AuditLog logEntry = AuditLog.builder()
             .tenantCode(resolveTenantCode(tenantCode))
             .action(action)
             .actor(actor)
@@ -92,7 +97,14 @@ public class AuditLogService {
             .status(status)
             .details(details)
             .requestId(requestTraceContext.getRequiredRequestId())
-            .build());
+            .build();
+        try {
+            auditLogRepository.save(logEntry);
+        } catch (DataIntegrityViolationException exception) {
+            log.warn("Audit log persistence conflicted; synchronizing core identity sequences and retrying once.");
+            identitySequenceMigrationService.synchronizeCoreIdentitySequences();
+            auditLogRepository.save(logEntry);
+        }
     }
 
     private String resolveTenantCode(String explicitTenantCode) {

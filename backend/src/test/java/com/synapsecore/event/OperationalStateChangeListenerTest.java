@@ -28,7 +28,7 @@ class OperationalStateChangeListenerTest {
         private int processCalls;
 
         private RecordingQueueService() {
-            super(null, null, null, null, null);
+            super(null, null, null, null, null, null);
         }
 
         @Override

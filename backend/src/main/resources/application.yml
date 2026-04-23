@@ -10,6 +10,13 @@ spring:
         format_sql: false
         jdbc:
           time_zone: UTC
+  flyway:
+    enabled: true
+    baseline-on-migrate: true
+    baseline-version: 0
+    validate-on-migrate: true
+    clean-disabled: true
+    locations: classpath:db/migration
   jackson:
     serialization:
       write-dates-as-timestamps: false

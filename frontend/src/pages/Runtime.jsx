@@ -79,6 +79,11 @@ export default function RuntimePage({ context }) {
                   <strong>Realtime broker</strong>
                   <p>{formatCodeLabel(runtime.backbone.realtimeBrokerMode || 'unknown')}</p>
                   <p className="muted-text">{runtime.backbone.realtimeBrokerDetail || 'Tenant-scoped websocket publishing is behind a replaceable broker boundary.'}</p>
+                  <p className="muted-text">
+                    {runtime.backbone.realtimeExternalBrokerConfigured
+                      ? 'External broker relay is active, so realtime can scale beyond a single app node.'
+                      : 'External broker relay is not active. Current realtime delivery is truthful but single-node only.'}
+                  </p>
                 </div>
                 <div className="signal-list-item">
                   <strong>Telemetry window</strong>
@@ -163,6 +168,7 @@ export default function RuntimePage({ context }) {
               <div><span>Queue pending</span><strong>{runtime?.backbone?.pendingDispatchCount ?? 0}</strong></div>
               <div><span>Failed dispatch</span><strong>{runtime?.backbone?.failedDispatchCount ?? 0}</strong></div>
               <div><span>Realtime</span><strong>{formatCodeLabel(runtime?.backbone?.realtimeBrokerMode || 'unknown')}</strong></div>
+              <div><span>Scale mode</span><strong>{runtime?.backbone?.realtimeSingleNodeOnly ? 'Single node' : 'Multi node'}</strong></div>
               <div><span>High severity</span><strong>{systemIncidents.filter((incident) => ['CRITICAL', 'HIGH'].includes(incident.severity)).length}</strong></div>
               <div><span>Oldest queued</span><strong>{runtime?.backbone?.oldestPendingAgeSeconds == null ? 'Clear' : `${runtime.backbone.oldestPendingAgeSeconds}s`}</strong></div>
             </div>

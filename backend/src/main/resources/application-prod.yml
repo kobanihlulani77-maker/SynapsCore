@@ -3,6 +3,8 @@ spring:
     url: ${SPRING_DATASOURCE_URL:${DATABASE_URL:jdbc:postgresql://${DB_HOST}:${DB_PORT:5432}/${DB_NAME}}}
     username: ${SPRING_DATASOURCE_USERNAME:${DB_USER:}}
     password: ${SPRING_DATASOURCE_PASSWORD:${DB_PASSWORD:}}
+  flyway:
+    enabled: ${SPRING_FLYWAY_ENABLED:true}
   jpa:
     hibernate:
       ddl-auto: update

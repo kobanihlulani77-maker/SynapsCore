@@ -33,6 +33,9 @@ export default function IntegrationsPage({ context }) {
   const fallbackEnabledCount = connectorPortfolio.filter((connector) => connector.allowDefaultWarehouseFallback).length
   const disabledConnectorCount = connectorPortfolio.filter((connector) => connector.healthStatus === 'OFFLINE').length
   const degradedConnectorCount = connectorPortfolio.filter((connector) => connector.healthStatus === 'DEGRADED').length
+  const supportedModeLabel = (connector) => (connector?.supportedSyncModes || [])
+    .map((mode) => formatCodeLabel(mode))
+    .join(' | ')
 
   const getConnectorTone = (connector) => {
     if (connector.healthStatus === 'OFFLINE') {
@@ -134,6 +137,9 @@ export default function IntegrationsPage({ context }) {
                   <p>{selectedConnector.healthSummary || selectedConnector.notes || 'No connector notes yet. Use this space to capture support ownership and operating assumptions.'}</p>
                   <p className="muted-text">Source {selectedConnector.sourceSystem} | Owner {selectedConnector.supportOwnerDisplayName || 'Unassigned'} | Pending replay {selectedConnector.pendingReplayCount || 0} | Dead-letter {selectedConnector.deadLetterCount || 0}</p>
                   <p className="muted-text">{selectedConnector.allowDefaultWarehouseFallback ? 'Warehouse fallback is enabled for missing inbound lane data.' : 'Warehouse fallback is off. Payloads must arrive with a valid lane.'}</p>
+                  {selectedConnector.supportBoundary ? (
+                    <p className="muted-text">{selectedConnector.supportBoundary}</p>
+                  ) : null}
                 </div>
                 <div className="signal-list-item">
                   <strong>Connection posture</strong>
@@ -158,6 +164,9 @@ export default function IntegrationsPage({ context }) {
                     {selectedConnector.lastImportStatus ? ` | Last import ${formatCodeLabel(selectedConnector.lastImportStatus)}` : ''}
                     {selectedConnector.lastImportAt ? ` at ${formatTimestamp(selectedConnector.lastImportAt)}` : ''}
                   </p>
+                  {selectedConnector.supportedSyncModes?.length ? (
+                    <p className="muted-text">Supported sync modes {supportedModeLabel(selectedConnector)}</p>
+                  ) : null}
                   {selectedConnector.lastFailureMessage ? (
                     <p className="muted-text">
                       Latest failure {selectedConnector.lastFailureCode ? formatCodeLabel(selectedConnector.lastFailureCode) : 'Unknown'}
@@ -206,7 +215,7 @@ export default function IntegrationsPage({ context }) {
               <div className="signal-list-item">
                 <strong>What companies should feel here</strong>
                 <p>SynapseCore is sitting above the company system estate, showing which lanes are connected, which ones are trusted, and where recovery is needed.</p>
-                <p className="muted-text">Use this page to explain integration confidence, support ownership, and recovery readiness without leaving the operational workspace.</p>
+                <p className="muted-text">Use this page to explain integration confidence, support ownership, supported connector modes, and recovery readiness without leaving the operational workspace.</p>
               </div>
             </div>
           </article>

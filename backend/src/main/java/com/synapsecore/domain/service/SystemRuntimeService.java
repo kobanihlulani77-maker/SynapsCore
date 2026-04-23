@@ -176,9 +176,12 @@ public class SystemRuntimeService {
 
     private SystemBackboneSummary buildBackboneSummary() {
         String tenantCode = tenantContextService.getCurrentTenantCodeOrDefault();
+        RealtimeBrokerMode brokerMode = realtimeService.brokerMode();
         return new SystemBackboneSummary(
-            realtimeService.brokerMode().name(),
-            describeRealtimeBrokerMode(realtimeService.brokerMode()),
+            brokerMode.name(),
+            describeRealtimeBrokerMode(brokerMode),
+            brokerMode != RealtimeBrokerMode.EXTERNAL_BROKER,
+            brokerMode == RealtimeBrokerMode.EXTERNAL_BROKER,
             operationalDispatchWorkItemRepository.countByTenantCodeIgnoreCaseAndStatusIn(
                 tenantCode,
                 List.of(OperationalDispatchStatus.PENDING, OperationalDispatchStatus.PROCESSING)

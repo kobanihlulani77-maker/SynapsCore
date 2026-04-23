@@ -420,6 +420,7 @@ public class IntegrationConnectorService {
             connector.getDisplayName(),
             connector.isEnabled(),
             connector.getSyncMode(),
+            supportedSyncModesFor(connector.getType()),
             connector.getSyncIntervalMinutes(),
             connector.getPullEndpointUrl(),
             connector.getLastPullAttemptAt(),
@@ -438,6 +439,7 @@ public class IntegrationConnectorService {
             connector.getInboundAccessTokenHint(),
             telemetry.healthStatus(),
             telemetry.healthSummary(),
+            supportBoundaryFor(connector.getType()),
             telemetry.lastActivityAt(),
             telemetry.lastSuccessfulActivityAt(),
             telemetry.lastImportStatus(),
@@ -453,6 +455,20 @@ public class IntegrationConnectorService {
             connector.getCreatedAt(),
             connector.getUpdatedAt()
         );
+    }
+
+    private List<IntegrationSyncMode> supportedSyncModesFor(IntegrationConnectorType type) {
+        return switch (type) {
+            case WEBHOOK_ORDER -> List.of(IntegrationSyncMode.REALTIME_PUSH, IntegrationSyncMode.SCHEDULED_PULL);
+            case CSV_ORDER_IMPORT -> List.of(IntegrationSyncMode.BATCH_FILE_DROP);
+        };
+    }
+
+    private String supportBoundaryFor(IntegrationConnectorType type) {
+        return switch (type) {
+            case WEBHOOK_ORDER -> "Webhook order feeds support realtime push and scheduled pull. Scheduled pull is limited to HTTP(S) order endpoints with a minimum 15 minute cadence.";
+            case CSV_ORDER_IMPORT -> "CSV order import is implemented as batch file-drop intake only. Scheduled pull and realtime push are not supported for CSV connectors.";
+        };
     }
 
     private AccessOperator resolveSupportOwner(IntegrationConnector connector) {

@@ -59,6 +59,11 @@ export default function ReleasesPage({ context }) {
                 <strong>Realtime endpoint</strong>
                 <p>{wsUrl}</p>
                 <p className="muted-text">{realtimeTransportLabel}. This must align with the frontend runtime config for live updates and incident lanes.</p>
+                <p className="muted-text">
+                  {runtime?.backbone?.realtimeExternalBrokerConfigured
+                    ? 'External broker relay is active for multi-node realtime delivery.'
+                    : 'Live deployment is still running the in-process broker path, which is tenant-safe but single-node only.'}
+                </p>
               </div>
             </div>
           </article>

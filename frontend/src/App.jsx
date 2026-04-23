@@ -1,6 +1,4 @@
 import { startTransition, useDeferredValue, useEffect, useRef, useState } from 'react'
-import { Client } from '@stomp/stompjs'
-import SockJS from 'sockjs-client'
 import AppShell from './layout/AppShell'
 import Sidebar from './layout/Sidebar'
 import Topbar from './layout/Topbar'
@@ -34,6 +32,8 @@ import SystemConfigPage from './pages/SystemConfig'
 import ReleasesPage from './pages/Releases'
 import PublicExperience from './pages/PublicExperience'
 import useApi from './hooks/useApi'
+import useWorkspaceRealtime from './hooks/useWorkspaceRealtime'
+import useWorkspaceShell from './hooks/useWorkspaceShell'
 import {
   postAuthRedirectStorageKey,
   readStoredJson,
@@ -138,7 +138,6 @@ const getIncidentStatusClassName = (severity) => severity === 'CRITICAL' || seve
 const getFulfillmentStatusClassName = (status) => status === 'DELIVERED' || status === 'DISPATCHED' ? 'status-success' : status === 'DELAYED' || status === 'EXCEPTION' ? 'status-failure' : 'status-partial'
 const scenarioActorRoles = ['REVIEW_OWNER', 'FINAL_APPROVER', 'ESCALATION_OWNER']
 const integrationActorRoles = ['INTEGRATION_ADMIN', 'INTEGRATION_OPERATOR']
-const integrationSyncModes = ['REALTIME_PUSH', 'BATCH_FILE_DROP', 'SCHEDULED_PULL']
 const integrationValidationPolicies = ['STANDARD', 'STRICT', 'RELAXED']
 const integrationTransformationPolicies = ['NONE', 'NORMALIZE_CODES']
 const getScenarioApprovalRole = (scenario) => scenario.approvalPolicy === 'ESCALATED' && scenario.approvalStage === 'PENDING_FINAL_APPROVAL' ? 'FINAL_APPROVER' : 'REVIEW_OWNER'
@@ -427,109 +426,30 @@ export default function App() {
     return { productOptions, lines, requestItems: lines.map((item) => ({ productSku: item.productSku, quantity: item.quantityNumber, unitPrice: item.unitPriceNumber })), inputValid: Boolean(form.warehouseCode) && lines.length > 0 && lines.every((item) => item.valid) }
   }
 
-  useEffect(() => {
-    const handlePopState = () => setCurrentPage(resolvePageFromPath())
-    globalThis.addEventListener?.('popstate', handlePopState)
-    return () => globalThis.removeEventListener?.('popstate', handlePopState)
-  }, [])
+  useWorkspaceShell({
+    resolvePageFromPath,
+    setCurrentPage,
+    setClockTick,
+    searchInputRef,
+    workspaceSearch,
+    setWorkspaceSearch,
+  })
 
-  useEffect(() => {
-    const timer = globalThis.setInterval?.(() => setClockTick(Date.now()), 30000)
-    return () => globalThis.clearInterval?.(timer)
-  }, [])
-
-  useEffect(() => {
-    const handleCommandKeys = (event) => {
-      const target = event.target
-      const isTextInput = target instanceof HTMLElement && (
-        target.tagName === 'INPUT'
-        || target.tagName === 'TEXTAREA'
-        || target.tagName === 'SELECT'
-        || target.isContentEditable
-      )
-
-      if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 'k') {
-        event.preventDefault()
-        searchInputRef.current?.focus()
-        searchInputRef.current?.select?.()
-        return
-      }
-
-      if (event.key === '/' && !isTextInput) {
-        event.preventDefault()
-        searchInputRef.current?.focus()
-        searchInputRef.current?.select?.()
-        return
-      }
-
-      if (event.key === 'Escape') {
-        if (workspaceSearch) {
-          setWorkspaceSearch('')
-        }
-        if (target === searchInputRef.current) {
-          searchInputRef.current?.blur()
-        }
-      }
-    }
-
-    globalThis.addEventListener?.('keydown', handleCommandKeys)
-    return () => globalThis.removeEventListener?.('keydown', handleCommandKeys)
-  }, [workspaceSearch])
-
-  useEffect(() => {
-    let active = true
-    async function loadSnapshot() {
-      if (!authSessionState.session?.tenantCode) {
-        if (active) {
-          setSnapshot(emptySnapshot)
-          setPageState({ loading: false, error: '' })
-          setCatalogState({ loading: false, error: '', success: '', products: [], importResult: null })
-        }
-        return
-      }
-      try { await Promise.all([fetchSnapshot(), fetchCatalogProducts({ quiet: true })]) } catch (error) { if (active) setPageState({ loading: false, error: error.message }) }
-    }
-    loadSnapshot()
-    if (!authSessionState.session?.tenantCode) {
-      setConnectionState('signed-out')
-      return () => { active = false }
-    }
-    if (!sockJsUrl && !websocketBrokerUrl) {
-      setConnectionState('degraded')
-      return () => { active = false }
-    }
-    const topicPrefix = buildTenantTopicPrefix(activeTenantCode)
-    setConnectionState('connecting')
-    const client = new Client({
-      reconnectDelay: 5000,
-      heartbeatIncoming: 10000,
-      heartbeatOutgoing: 10000,
-      brokerURL: /^wss?:/i.test(websocketBrokerUrl) ? websocketBrokerUrl : undefined,
-      webSocketFactory: /^wss?:/i.test(websocketBrokerUrl) ? undefined : () => new SockJS(sockJsUrl),
-      onConnect: () => {
-        setConnectionState('live')
-        client.subscribe(`${topicPrefix}/dashboard.summary`, (message) => mergeSnapshot({ summary: JSON.parse(message.body) }))
-        client.subscribe(`${topicPrefix}/alerts`, (message) => mergeSnapshot({ alerts: JSON.parse(message.body) }))
-        client.subscribe(`${topicPrefix}/recommendations`, (message) => mergeSnapshot({ recommendations: JSON.parse(message.body) }))
-        client.subscribe(`${topicPrefix}/inventory`, (message) => mergeSnapshot({ inventory: JSON.parse(message.body) }))
-        client.subscribe(`${topicPrefix}/fulfillment.overview`, (message) => mergeSnapshot({ fulfillment: JSON.parse(message.body) }))
-        client.subscribe(`${topicPrefix}/orders.recent`, (message) => mergeSnapshot({ recentOrders: JSON.parse(message.body) }))
-        client.subscribe(`${topicPrefix}/events.recent`, (message) => mergeSnapshot({ recentEvents: JSON.parse(message.body) }))
-        client.subscribe(`${topicPrefix}/audit.recent`, (message) => mergeSnapshot({ auditLogs: JSON.parse(message.body) }))
-        client.subscribe(`${topicPrefix}/system.incidents`, (message) => mergeSnapshot({ systemIncidents: JSON.parse(message.body) }))
-        client.subscribe(`${topicPrefix}/integrations.connectors`, (message) => mergeSnapshot({ integrationConnectors: JSON.parse(message.body) }))
-        client.subscribe(`${topicPrefix}/integrations.imports`, (message) => mergeSnapshot({ integrationImportRuns: JSON.parse(message.body) }))
-        client.subscribe(`${topicPrefix}/integrations.replay`, (message) => mergeSnapshot({ integrationReplayQueue: JSON.parse(message.body) }))
-        client.subscribe(`${topicPrefix}/scenarios.notifications`, (message) => mergeSnapshot({ scenarioNotifications: JSON.parse(message.body) }))
-        client.subscribe(`${topicPrefix}/scenarios.escalated`, (message) => mergeSnapshot({ slaEscalations: JSON.parse(message.body) }))
-      },
-      onStompError: () => setConnectionState('degraded'),
-      onWebSocketError: () => setConnectionState('degraded'),
-      onWebSocketClose: () => setConnectionState('reconnecting'),
-    })
-    client.activate()
-    return () => { active = false; client.deactivate() }
-  }, [activeTenantCode, websocketBrokerUrl, sockJsUrl])
+  useWorkspaceRealtime({
+    activeTenantCode,
+    signedInTenantCode: authSessionState.session?.tenantCode,
+    websocketBrokerUrl,
+    sockJsUrl,
+    buildTenantTopicPrefix,
+    fetchSnapshot,
+    fetchCatalogProducts,
+    mergeSnapshot,
+    setSnapshot,
+    setPageState,
+    setCatalogState,
+    setConnectionState,
+    emptySnapshot,
+  })
 
   useEffect(() => {
     let active = true
@@ -2110,7 +2030,7 @@ export default function App() {
             <RuntimePage context={{ isAuthenticated, isRuntimePage, runtime, systemIncidents, selectedRuntimeIncidentKey, setSelectedRuntimeIncidentKey, navigateToPage, formatCodeLabel, formatMetricValue, formatTimestamp, getIncidentStatusClassName, getRuntimeStatusClassName }} />
             <AuditPage context={{ isAuthenticated, isAuditPage, snapshot, systemIncidents, pendingReplayCount, recentBusinessEvents, recentAuditEntries, selectedAuditTrace, setSelectedTraceEntryKey, formatCodeLabel, formatTimestamp, navigateToPage }} />
             <UsersPage context={{ isAuthenticated, isUsersPage, accessAdminOperators, accessAdminUsers, workspaceAdmin, selectedAccessSubject, setSelectedAccessSubjectKey, formatCodeLabel, navigateToPage }} />
-            <SettingsPage context={{ isAuthenticated, isSettingsPage, workspaceAdmin, accessAdminState, canManageTenantAccess, workspaceSettingsForm, setWorkspaceSettingsForm, workspaceSecurityForm, setWorkspaceSecurityForm, saveWorkspaceSettings, saveWorkspaceSecuritySettings, selectedWorkspaceWarehouse, selectedWorkspaceWarehouseDraft, selectedWorkspaceConnector, selectedWorkspaceConnectorDraft, selectedWorkspaceConnectorOwnerOptions, setSelectedWorkspaceWarehouseId, setSelectedWorkspaceConnectorId, setWorkspaceWarehouseDrafts, setWorkspaceConnectorDrafts, saveWorkspaceWarehouse, saveWorkspaceConnectorSupport, formatCodeLabel, integrationSyncModes, integrationValidationPolicies, integrationTransformationPolicies }} />
+            <SettingsPage context={{ isAuthenticated, isSettingsPage, workspaceAdmin, accessAdminState, canManageTenantAccess, workspaceSettingsForm, setWorkspaceSettingsForm, workspaceSecurityForm, setWorkspaceSecurityForm, saveWorkspaceSettings, saveWorkspaceSecuritySettings, selectedWorkspaceWarehouse, selectedWorkspaceWarehouseDraft, selectedWorkspaceConnector, selectedWorkspaceConnectorDraft, selectedWorkspaceConnectorOwnerOptions, setSelectedWorkspaceWarehouseId, setSelectedWorkspaceConnectorId, setWorkspaceWarehouseDrafts, setWorkspaceConnectorDrafts, saveWorkspaceWarehouse, saveWorkspaceConnectorSupport, formatCodeLabel, integrationValidationPolicies, integrationTransformationPolicies }} />
             <ProfilePage context={{ isAuthenticated, isProfilePage, passwordChangeRequired, passwordRotationRequired, activeAlerts, pendingApprovalScenarios, systemIncidents, signedInSession, signedInRoles, signedInWarehouseScopes, signedInSessionExpiresAt, signedInPasswordExpiresAt, formatCodeLabel, formatTimestamp, passwordChangeState, setPasswordChangeState, changeSignedInPassword, signOutOperator, authSessionState, navigateToPage }} />
             <PlatformAdminPage context={{ isAuthenticated, isPlatformPage, runtime, tenantDirectoryState, systemIncidents, pendingReplayCount, selectedTenantPortfolio, setSelectedTenantPortfolioCode, signedInSession, formatBuildValue, formatCodeLabel, formatTimestamp, getIncidentStatusClassName, getRuntimeStatusClassName, navigateToPage }} />
             <TenantsPage context={{ isAuthenticated, isTenantsPage, tenantDirectoryState, signedInSession, signedInRoles, tenantOnboardingState, tenantOnboardingForm, setTenantOnboardingForm, onboardTenant, signInOperator, authSessionState, setAuthSessionState }} />

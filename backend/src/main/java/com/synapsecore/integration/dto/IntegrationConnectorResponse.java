@@ -7,6 +7,7 @@ import com.synapsecore.domain.entity.IntegrationTransformationPolicy;
 import com.synapsecore.domain.entity.IntegrationValidationPolicy;
 import com.synapsecore.integration.IntegrationFailureCode;
 import java.time.Instant;
+import java.util.List;
 
 public record IntegrationConnectorResponse(
     Long id,
@@ -16,6 +17,7 @@ public record IntegrationConnectorResponse(
     String displayName,
     boolean enabled,
     IntegrationSyncMode syncMode,
+    List<IntegrationSyncMode> supportedSyncModes,
     Integer syncIntervalMinutes,
     String pullEndpointUrl,
     Instant lastPullAttemptAt,
@@ -34,6 +36,7 @@ public record IntegrationConnectorResponse(
     String inboundAccessTokenHint,
     IntegrationConnectorHealthStatus healthStatus,
     String healthSummary,
+    String supportBoundary,
     Instant lastActivityAt,
     Instant lastSuccessfulActivityAt,
     IntegrationImportStatus lastImportStatus,

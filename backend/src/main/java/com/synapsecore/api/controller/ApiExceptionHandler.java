@@ -2,6 +2,7 @@ package com.synapsecore.api.controller;
 
 import com.synapsecore.audit.AuditLogService;
 import com.synapsecore.audit.RequestTraceContext;
+import com.synapsecore.domain.service.CatalogWriteConflictResolver;
 import jakarta.servlet.http.HttpServletRequest;
 import java.time.Instant;
 import org.springframework.dao.DataIntegrityViolationException;
@@ -14,16 +15,18 @@ import org.springframework.web.server.ResponseStatusException;
 
 @RestControllerAdvice
 @lombok.RequiredArgsConstructor
+@lombok.extern.slf4j.Slf4j
 public class ApiExceptionHandler {
 
     private final AuditLogService auditLogService;
     private final RequestTraceContext requestTraceContext;
+    private final CatalogWriteConflictResolver catalogWriteConflictResolver;
 
     @ExceptionHandler(ResponseStatusException.class)
     public ResponseEntity<ApiErrorResponse> handleResponseStatus(ResponseStatusException exception,
                                                                 HttpServletRequest request) {
         HttpStatus status = HttpStatus.valueOf(exception.getStatusCode().value());
-        auditFailure(request, status, exception.getReason());
+        auditFailureSafely(request, status, exception.getReason());
         return ResponseEntity.status(status).body(new ApiErrorResponse(
             Instant.now(),
             status.value(),
@@ -40,7 +43,7 @@ public class ApiExceptionHandler {
             .findFirst()
             .map(error -> error.getField() + " " + error.getDefaultMessage())
             .orElse("Validation failed.");
-        auditFailure(request, HttpStatus.BAD_REQUEST, message);
+        auditFailureSafely(request, HttpStatus.BAD_REQUEST, message);
         return ResponseEntity.badRequest().body(new ApiErrorResponse(
             Instant.now(),
             HttpStatus.BAD_REQUEST.value(),
@@ -54,8 +57,10 @@ public class ApiExceptionHandler {
     public ResponseEntity<ApiErrorResponse> handleDataIntegrityViolation(DataIntegrityViolationException exception,
                                                                         HttpServletRequest request) {
         HttpStatus status = HttpStatus.CONFLICT;
-        String message = "The request conflicts with the current SynapseCore operational data.";
-        auditFailure(request, status, message);
+        String message = isProductCatalogRequest(request)
+            ? catalogWriteConflictResolver.describe(exception, null)
+            : "The request conflicts with the current SynapseCore operational data.";
+        auditFailureSafely(request, status, message);
         return ResponseEntity.status(status).body(new ApiErrorResponse(
             Instant.now(),
             status.value(),
@@ -65,14 +70,26 @@ public class ApiExceptionHandler {
         ));
     }
 
-    private void auditFailure(HttpServletRequest request, HttpStatus status, String message) {
-        auditLogService.recordFailure(
-            "REQUEST_REJECTED",
-            "api-client",
-            request.getMethod() + " " + request.getRequestURI(),
-            "ApiRequest",
-            request.getRequestURI(),
-            status.value() + " " + message
-        );
+    private boolean isProductCatalogRequest(HttpServletRequest request) {
+        String requestUri = request == null ? null : request.getRequestURI();
+        return requestUri != null && requestUri.startsWith("/api/products");
+    }
+
+    private void auditFailureSafely(HttpServletRequest request, HttpStatus status, String message) {
+        try {
+            auditLogService.recordFailure(
+                "REQUEST_REJECTED",
+                "api-client",
+                request.getMethod() + " " + request.getRequestURI(),
+                "ApiRequest",
+                request.getRequestURI(),
+                status.value() + " " + message
+            );
+        } catch (RuntimeException exception) {
+            log.warn("Failed to record API rejection audit log for {} {}: {}",
+                request.getMethod(),
+                request.getRequestURI(),
+                exception.getMessage());
+        }
     }
 }

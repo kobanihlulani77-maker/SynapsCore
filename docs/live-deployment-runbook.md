@@ -32,7 +32,7 @@ Key backend truths:
 - `ALLOW_HEADER_FALLBACK=false`
 - `SESSION_COOKIE_SECURE=true`
 - `SYNAPSECORE_REALTIME_BROKER_MODE=SIMPLE_IN_MEMORY` unless external broker relay is actually provisioned
-- `SPRING_JPA_HIBERNATE_DDL_AUTO=update` is still the current posture, but it is not the final target
+- `SPRING_JPA_HIBERNATE_DDL_AUTO=update` is still partially in use, but Flyway foundation is now present and full migration coverage is the next production hardening step
 
 Key frontend truths:
 
@@ -50,6 +50,11 @@ Production tenant creation is intentionally strict:
 ## Hosted Verification Credentials
 
 Hosted browser proof must use real tenant accounts created or reset through production APIs.
+
+If hosted proof catalog preparation fails, treat the returned product-write message as authoritative:
+
+- duplicate or legacy-hidden SKU message: rerunnable proof catalog conflict
+- `business_events` / `audit_logs` / `operational_dispatch_work_items` message: side-effect write path needs repair before proof can continue
 
 Required env values:
 

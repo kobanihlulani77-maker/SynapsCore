@@ -8,6 +8,9 @@ import com.synapsecore.domain.dto.ProductUpsertRequest;
 import com.synapsecore.domain.entity.BusinessEventType;
 import com.synapsecore.domain.entity.Product;
 import com.synapsecore.domain.entity.Tenant;
+import com.synapsecore.domain.repository.AuditLogRepository;
+import com.synapsecore.domain.repository.BusinessEventRepository;
+import com.synapsecore.domain.repository.OperationalDispatchWorkItemRepository;
 import com.synapsecore.domain.repository.ProductRepository;
 import com.synapsecore.event.BusinessEventService;
 import com.synapsecore.event.OperationalStateChangePublisher;
@@ -46,6 +49,10 @@ public class ProductService {
     private final OperationalStateChangePublisher operationalStateChangePublisher;
     private final AuditLogService auditLogService;
     private final IdentitySequenceMigrationService identitySequenceMigrationService;
+    private final BusinessEventRepository businessEventRepository;
+    private final AuditLogRepository auditLogRepository;
+    private final OperationalDispatchWorkItemRepository operationalDispatchWorkItemRepository;
+    private final CatalogWriteConflictResolver catalogWriteConflictResolver;
 
     @Transactional(readOnly = true)
     public List<ProductResponse> getProducts() {
@@ -75,6 +82,7 @@ public class ProductService {
                     adoptedProduct.resolveCatalogSku(),
                     "Adopted orphan catalog product " + adoptedProduct.resolveCatalogSku() + " (" + adoptedProduct.getName() + ") into tenant " + tenant.getCode() + "."
                 );
+                flushCatalogWritePath();
                 return toResponse(adoptedProduct);
             }
             ensureInternalSkuIsAvailable(tenant.getCode(), catalogSku);
@@ -93,9 +101,10 @@ public class ProductService {
                 product.resolveCatalogSku(),
                 "Created catalog product " + product.resolveCatalogSku() + " (" + product.getName() + ")."
             );
+            flushCatalogWritePath();
             return toResponse(product);
         } catch (DataIntegrityViolationException exception) {
-            throw translateCatalogWriteConflict(exception, catalogSku);
+            throw catalogWriteConflictResolver.toResponseStatus(exception, catalogSku);
         }
     }
 
@@ -126,9 +135,10 @@ public class ProductService {
                 savedProduct.resolveCatalogSku(),
                 "Updated catalog product " + savedProduct.resolveCatalogSku() + " (" + savedProduct.getName() + ")."
             );
+            flushCatalogWritePath();
             return toResponse(savedProduct);
         } catch (DataIntegrityViolationException exception) {
-            throw translateCatalogWriteConflict(exception, catalogSku);
+            throw catalogWriteConflictResolver.toResponseStatus(exception, catalogSku);
         }
     }
 
@@ -227,7 +237,7 @@ public class ProductService {
                         rowNumber,
                         rawSku == null ? "" : rawSku.trim(),
                         "FAILED",
-                        translateCatalogWriteConflict(exception, rawSku == null ? "" : rawSku.trim()).getReason(),
+                        catalogWriteConflictResolver.describe(exception, rawSku == null ? "" : rawSku.trim()),
                         null
                     ));
                 } catch (ResponseStatusException exception) {
@@ -397,36 +407,17 @@ public class ProductService {
         );
     }
 
-    private ResponseStatusException translateCatalogWriteConflict(DataIntegrityViolationException exception, String catalogSku) {
-        String normalizedSku = catalogSku == null ? "" : catalogSku.trim().toUpperCase(Locale.ROOT);
-        String rootMessage = exception.getMostSpecificCause() == null
-            ? exception.getMessage()
-            : exception.getMostSpecificCause().getMessage();
-        String normalizedMessage = rootMessage == null ? "" : rootMessage.toLowerCase(Locale.ROOT);
-
-        if (normalizedMessage.contains("products") && (normalizedMessage.contains("sku") || normalizedMessage.contains("catalog_sku"))) {
-            return new ResponseStatusException(HttpStatus.CONFLICT,
-                "Product SKU already exists for this tenant or a hidden legacy catalog row still occupies " + normalizedSku + ".");
-        }
-        if (normalizedMessage.contains("business_events")) {
-            return new ResponseStatusException(HttpStatus.CONFLICT,
-                "Catalog write for " + normalizedSku + " rolled back while recording the business event stream. Repair business_events identity state before hosted proof can continue.");
-        }
-        if (normalizedMessage.contains("audit_logs")) {
-            return new ResponseStatusException(HttpStatus.CONFLICT,
-                "Catalog write for " + normalizedSku + " rolled back while recording the audit trail. Repair audit_logs identity state before hosted proof can continue.");
-        }
-        if (normalizedMessage.contains("operational_dispatch_work_items")) {
-            return new ResponseStatusException(HttpStatus.CONFLICT,
-                "Catalog write for " + normalizedSku + " rolled back while enqueuing operational dispatch work. Repair operational_dispatch_work_items identity state before hosted proof can continue.");
-        }
-        return new ResponseStatusException(HttpStatus.CONFLICT,
-            "Catalog write for " + normalizedSku + " conflicted with current production database state and did not commit.");
+    private void flushCatalogWritePath() {
+        productRepository.flush();
+        businessEventRepository.flush();
+        auditLogRepository.flush();
+        operationalDispatchWorkItemRepository.flush();
     }
 
     private ProductResponse toResponse(Product product) {
         return new ProductResponse(
             product.getId(),
+            product.resolveCatalogSku(),
             product.resolveCatalogSku(),
             product.getSku(),
             product.getName(),

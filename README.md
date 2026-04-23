@@ -24,7 +24,7 @@ What is real today:
 What is still partial:
 
 - hosted authenticated proof is still blocked by a live `/api/products` conflict on Render
-- production schema evolution still relies on Hibernate `ddl-auto=update`
+- production schema evolution now has a Flyway foundation, but full production cutover still partially relies on Hibernate `ddl-auto=update`
 - live realtime is still running in single-node simple-broker mode
 - integrations are real but intentionally narrow
 - the frontend root shell is cleaner now, but more extraction still belongs outside `App.jsx`
@@ -108,6 +108,8 @@ See:
 ## Hosted Proof
 
 Hosted proof must use a real tenant and real accounts created through production APIs. It must not rely on `SYNAPSE-DEMO`, hidden seed users, or manual database edits.
+
+Hosted proof now classifies product-write conflicts more precisely. Duplicate or legacy-hidden catalog rows should surface as specific product conflicts, while failures in `business_events`, `audit_logs`, or `operational_dispatch_work_items` should surface as explicit repair-needed write-path failures instead of the old generic 409.
 
 Prepare a hosted proof tenant with:
 

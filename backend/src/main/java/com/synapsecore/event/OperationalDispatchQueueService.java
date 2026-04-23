@@ -5,6 +5,7 @@ import com.synapsecore.domain.entity.OperationalDispatchStatus;
 import com.synapsecore.domain.entity.OperationalDispatchWorkItem;
 import com.synapsecore.domain.repository.OperationalDispatchWorkItemRepository;
 import com.synapsecore.domain.service.DashboardService;
+import com.synapsecore.domain.service.IdentitySequenceMigrationService;
 import com.synapsecore.observability.OperationalMetricsService;
 import com.synapsecore.realtime.RealtimeService;
 import java.time.Instant;
@@ -16,6 +17,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.slf4j.MDC;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.beans.factory.ObjectProvider;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
@@ -35,6 +37,7 @@ public class OperationalDispatchQueueService {
     private final ObjectProvider<RealtimeService> realtimeServiceProvider;
     private final RequestTraceContext requestTraceContext;
     private final OperationalMetricsService operationalMetricsService;
+    private final IdentitySequenceMigrationService identitySequenceMigrationService;
 
     private final AtomicBoolean draining = new AtomicBoolean(false);
 
@@ -42,14 +45,21 @@ public class OperationalDispatchQueueService {
     private int batchSize;
 
     public void enqueue(OperationalStateChangedEvent event) {
-        operationalDispatchWorkItemRepository.save(OperationalDispatchWorkItem.builder()
+        OperationalDispatchWorkItem workItem = OperationalDispatchWorkItem.builder()
             .tenantCode(event.tenantCode())
             .updateType(event.updateType())
             .source(event.source())
             .requestId(event.requestId())
             .status(OperationalDispatchStatus.PENDING)
             .occurredAt(event.occurredAt())
-            .build());
+            .build();
+        try {
+            operationalDispatchWorkItemRepository.save(workItem);
+        } catch (DataIntegrityViolationException exception) {
+            log.warn("Operational dispatch enqueue conflicted; synchronizing core identity sequences and retrying once.");
+            identitySequenceMigrationService.synchronizeCoreIdentitySequences();
+            operationalDispatchWorkItemRepository.save(workItem);
+        }
         operationalMetricsService.recordDispatchQueued(event.tenantCode(), event.updateType());
     }
 

@@ -27,12 +27,15 @@ export default function SettingsPage({ context }) {
     saveWorkspaceWarehouse,
     saveWorkspaceConnectorSupport,
     formatCodeLabel,
-    integrationSyncModes,
     integrationValidationPolicies,
     integrationTransformationPolicies,
   } = context
 
   if (!isAuthenticated || !isSettingsPage) return null
+
+  const supportedWorkspaceConnectorModes = selectedWorkspaceConnector?.supportedSyncModes?.length
+    ? selectedWorkspaceConnector.supportedSyncModes
+    : ['REALTIME_PUSH']
 
   return (
     <section className="content-grid">
@@ -138,7 +141,7 @@ export default function SettingsPage({ context }) {
                   <label className="field planner-name-field">
                     <span>Sync Mode</span>
                     <select value={selectedWorkspaceConnectorDraft.syncMode} onChange={(event) => setWorkspaceConnectorDrafts((current) => ({ ...current, [selectedWorkspaceConnector.id]: { ...selectedWorkspaceConnectorDraft, syncMode: event.target.value, syncIntervalMinutes: event.target.value === 'SCHEDULED_PULL' ? (selectedWorkspaceConnectorDraft.syncIntervalMinutes || '15') : '' } }))} disabled={accessAdminState.loading || !canManageTenantAccess}>
-                      {integrationSyncModes.map((mode) => <option key={mode} value={mode}>{formatCodeLabel(mode)}</option>)}
+                      {supportedWorkspaceConnectorModes.map((mode) => <option key={mode} value={mode}>{formatCodeLabel(mode)}</option>)}
                     </select>
                   </label>
                   <label className="field planner-name-field">
@@ -173,7 +176,7 @@ export default function SettingsPage({ context }) {
                     <input value={selectedWorkspaceConnectorDraft.pullEndpointUrl} onChange={(event) => setWorkspaceConnectorDrafts((current) => ({ ...current, [selectedWorkspaceConnector.id]: { ...selectedWorkspaceConnectorDraft, pullEndpointUrl: event.target.value } }))} placeholder="https://company.example.com/orders-feed" disabled={accessAdminState.loading || !canManageTenantAccess} />
                   </label>
                 ) : null}
-                <p className="muted-text">Scheduled pull is available for order API feeds with an HTTP(S) JSON endpoint and a 15 minute minimum cadence.</p>
+                <p className="muted-text">{selectedWorkspaceConnector.supportBoundary || 'Connector support boundaries are enforced by the backend and mirrored here so workspace admins only configure real modes.'}</p>
                 <div className="history-action-row">
                   <button className="ghost-button" onClick={() => saveWorkspaceConnectorSupport(selectedWorkspaceConnector.id)} disabled={accessAdminState.loading || !canManageTenantAccess || (selectedWorkspaceConnectorDraft.syncMode === 'SCHEDULED_PULL' && !selectedWorkspaceConnectorDraft.pullEndpointUrl.trim())} type="button">Save Connector Policy</button>
                 </div>
