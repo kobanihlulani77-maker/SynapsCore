@@ -59,6 +59,7 @@ public class ProductService {
         Tenant tenant = tenantContextService.getCurrentTenantOrDefault();
         String catalogSku = normalizeCatalogSku(request.sku());
         ensureSkuIsAvailable(tenant.getCode(), catalogSku);
+        ensureInternalSkuIsAvailable(tenant.getCode(), catalogSku);
 
         Product product = productRepository.save(Product.builder()
             .tenant(tenant)
@@ -224,6 +225,15 @@ public class ProductService {
             });
     }
 
+    private void ensureInternalSkuIsAvailable(String tenantCode, String catalogSku) {
+        String internalSku = Product.buildInternalSku(tenantCode, catalogSku);
+        productRepository.findBySku(internalSku)
+            .ifPresent(existing -> {
+                throw new ResponseStatusException(HttpStatus.CONFLICT,
+                    "Product internal SKU already exists for this tenant context: " + internalSku);
+            });
+    }
+
     private String normalizeCatalogSku(String value) {
         String normalized = normalizeRequiredText(value, "Product SKU", 64).toUpperCase(Locale.ROOT);
         if (!CATALOG_SKU_PATTERN.matcher(normalized).matches()) {
@@ -323,6 +333,7 @@ public class ProductService {
         return new ProductResponse(
             product.getId(),
             product.resolveCatalogSku(),
+            product.getSku(),
             product.getName(),
             product.getCategory(),
             product.getTenant() == null ? null : product.getTenant().getCode()

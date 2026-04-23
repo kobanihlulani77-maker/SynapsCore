@@ -153,11 +153,19 @@ function Invoke-SynapseJson {
         [hashtable]$Headers = @{}
     )
 
+    $resolvedHeaders = @{}
+    foreach ($headerKey in $Headers.Keys) {
+        $resolvedHeaders[$headerKey] = $Headers[$headerKey]
+    }
+    if (-not [string]::IsNullOrWhiteSpace($script:TenantCodeValue) -and -not $resolvedHeaders.ContainsKey("X-Synapse-Tenant")) {
+        $resolvedHeaders["X-Synapse-Tenant"] = $script:TenantCodeValue
+    }
+
     $invokeArgs = @{
         Method          = $Method
         Uri             = $Url
         UseBasicParsing = $true
-        Headers         = $Headers
+        Headers         = $resolvedHeaders
     }
 
     if ($null -ne $Session) {
