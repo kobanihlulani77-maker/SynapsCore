@@ -27,6 +27,7 @@ import com.synapsecore.domain.repository.ProductRepository;
 import com.synapsecore.domain.repository.TenantRepository;
 import com.synapsecore.domain.repository.WarehouseRepository;
 import com.synapsecore.domain.service.DataInitializer;
+import com.synapsecore.domain.service.CatalogTenantOwnershipMigrationService;
 import com.synapsecore.domain.service.SeedService;
 import com.synapsecore.integration.IntegrationConnectorService;
 import com.synapsecore.tenant.TenantContextService;
@@ -39,6 +40,7 @@ import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.mock.web.MockHttpSession;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.test.util.ReflectionTestUtils;
 import org.springframework.web.context.request.RequestContextHolder;
 import org.springframework.web.server.ResponseStatusException;
 
@@ -100,6 +102,9 @@ class ProductionHardeningIntegrationTest {
 
     @Autowired
     private com.synapsecore.domain.service.InventorySchemaMigrationService inventorySchemaMigrationService;
+
+    @Autowired
+    private CatalogTenantOwnershipMigrationService catalogTenantOwnershipMigrationService;
 
     @Test
     void prodProfileDoesNotSeedStarterDataWhenAutoSeedDisabled() {
@@ -202,6 +207,43 @@ class ProductionHardeningIntegrationTest {
         assertThat(seedService.seedIfEmpty()).isFalse();
         assertThat(tenantRepository.count()).isEqualTo(1L);
         assertThat(integrationConnectorRepository.count()).isZero();
+    }
+
+    @Test
+    void catalogOwnershipMigrationAdoptsOrphanProductRowsByInternalSkuTenantPrefix() {
+        Tenant tenant = tenantRepository.save(Tenant.builder()
+            .code("PILOT-TENANT")
+            .name("Pilot Tenant")
+            .active(true)
+            .build());
+
+        jdbcTemplate.update(
+            """
+            insert into products (tenant_id, sku, catalog_sku, name, category, created_at, updated_at)
+            values (?, ?, ?, ?, ?, ?, ?)
+            """,
+            null,
+            "PILOT-TENANT::SKU-PILOT-TENANT-PROOF",
+            null,
+            "Pilot Proof Product",
+            "Verification",
+            Instant.now(),
+            Instant.now()
+        );
+
+        assertThat(productRepository.findAllByTenant_CodeIgnoreCaseOrderByNameAsc("PILOT-TENANT")).isEmpty();
+
+        ReflectionTestUtils.invokeMethod(catalogTenantOwnershipMigrationService, "backfillTenantOwnedCatalog");
+
+        Product migratedProduct = productRepository.findBySku("PILOT-TENANT::SKU-PILOT-TENANT-PROOF")
+            .orElseThrow();
+
+        assertThat(migratedProduct.getTenant()).isNotNull();
+        assertThat(migratedProduct.getTenant().getCode()).isEqualTo("PILOT-TENANT");
+        assertThat(migratedProduct.resolveCatalogSku()).isEqualTo("SKU-PILOT-TENANT-PROOF");
+        assertThat(productRepository.findAllByTenant_CodeIgnoreCaseOrderByNameAsc("PILOT-TENANT"))
+            .extracting(Product::resolveCatalogSku)
+            .contains("SKU-PILOT-TENANT-PROOF");
     }
 
     @Test

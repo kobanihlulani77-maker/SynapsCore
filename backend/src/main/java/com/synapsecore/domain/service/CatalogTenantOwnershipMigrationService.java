@@ -7,6 +7,7 @@ import com.synapsecore.domain.entity.Tenant;
 import com.synapsecore.domain.repository.InventoryRepository;
 import com.synapsecore.domain.repository.OrderItemRepository;
 import com.synapsecore.domain.repository.ProductRepository;
+import com.synapsecore.domain.repository.TenantRepository;
 import jakarta.annotation.PostConstruct;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -24,6 +25,7 @@ import org.springframework.transaction.support.TransactionTemplate;
 public class CatalogTenantOwnershipMigrationService {
 
     private final ProductRepository productRepository;
+    private final TenantRepository tenantRepository;
     private final InventoryRepository inventoryRepository;
     private final OrderItemRepository orderItemRepository;
     private final TransactionTemplate transactionTemplate;
@@ -44,9 +46,16 @@ public class CatalogTenantOwnershipMigrationService {
         Map<String, Product> tenantScopedProducts = new HashMap<>();
         Set<Product> productUpdates = new HashSet<>();
         for (Product product : products) {
-            if (product.getTenant() != null) {
+            Tenant tenant = product.getTenant();
+            if (tenant == null) {
+                tenant = resolveTenantFromInternalSku(product);
+                if (tenant != null) {
+                    product.setTenant(tenant);
+                }
+            }
+            if (tenant != null) {
                 normalizeProduct(product);
-                tenantScopedProducts.put(productKey(product.getTenant().getCode(), product.resolveCatalogSku()), product);
+                tenantScopedProducts.put(productKey(tenant.getCode(), product.resolveCatalogSku()), product);
                 productUpdates.add(product);
             }
         }
@@ -149,6 +158,22 @@ public class CatalogTenantOwnershipMigrationService {
         int separatorIndex = rawSku.indexOf("::");
         String derived = separatorIndex >= 0 ? rawSku.substring(separatorIndex + 2) : rawSku;
         return derived.toUpperCase(Locale.ROOT);
+    }
+
+    private Tenant resolveTenantFromInternalSku(Product product) {
+        if (product.getSku() == null || product.getSku().isBlank()) {
+            return null;
+        }
+        String rawSku = product.getSku().trim();
+        int separatorIndex = rawSku.indexOf("::");
+        if (separatorIndex <= 0) {
+            return null;
+        }
+        String tenantCode = rawSku.substring(0, separatorIndex).trim();
+        if (tenantCode.isEmpty()) {
+            return null;
+        }
+        return tenantRepository.findByCodeIgnoreCase(tenantCode).orElse(null);
     }
 
     private String productKey(String tenantCode, String catalogSku) {
