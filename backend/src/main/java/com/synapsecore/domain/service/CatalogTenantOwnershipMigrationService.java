@@ -30,9 +30,11 @@ public class CatalogTenantOwnershipMigrationService {
     private final OrderItemRepository orderItemRepository;
     private final TransactionTemplate transactionTemplate;
     private final InventorySchemaMigrationService inventorySchemaMigrationService;
+    private final IdentitySequenceMigrationService identitySequenceMigrationService;
 
     @PostConstruct
     void migrateCatalogOwnership() {
+        identitySequenceMigrationService.synchronizeCoreIdentitySequences();
         inventorySchemaMigrationService.migrateInventoryStockColumns();
         transactionTemplate.executeWithoutResult(status -> backfillTenantOwnedCatalog());
     }

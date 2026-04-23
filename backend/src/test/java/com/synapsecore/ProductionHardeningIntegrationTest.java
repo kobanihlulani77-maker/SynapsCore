@@ -29,6 +29,7 @@ import com.synapsecore.domain.repository.WarehouseRepository;
 import com.synapsecore.domain.service.DataInitializer;
 import com.synapsecore.domain.service.CatalogTenantOwnershipMigrationService;
 import com.synapsecore.domain.service.SeedService;
+import com.synapsecore.domain.service.IdentitySequenceMigrationService;
 import com.synapsecore.integration.IntegrationConnectorService;
 import com.synapsecore.tenant.TenantContextService;
 import java.math.BigDecimal;
@@ -105,6 +106,9 @@ class ProductionHardeningIntegrationTest {
 
     @Autowired
     private CatalogTenantOwnershipMigrationService catalogTenantOwnershipMigrationService;
+
+    @Autowired
+    private IdentitySequenceMigrationService identitySequenceMigrationService;
 
     @Test
     void prodProfileDoesNotSeedStarterDataWhenAutoSeedDisabled() {
@@ -188,6 +192,38 @@ class ProductionHardeningIntegrationTest {
             jdbcTemplate.update("delete from warehouses where id = ?", warehouse.getId());
             jdbcTemplate.update("delete from tenants where id = ?", tenant.getId());
         }
+    }
+
+    @Test
+    @Transactional(propagation = org.springframework.transaction.annotation.Propagation.NOT_SUPPORTED)
+    void identitySequenceMigrationRealignsProductsIdentityAfterLegacyReset() {
+        Tenant tenant = tenantRepository.save(Tenant.builder()
+            .code("SEQ-OPS")
+            .name("Sequence Ops")
+            .active(true)
+            .build());
+
+        Product firstProduct = productRepository.save(Product.builder()
+            .tenant(tenant)
+            .catalogSku("SKU-SEQ-001")
+            .name("Sequence Product One")
+            .category("Verification")
+            .build());
+
+        jdbcTemplate.execute("alter table products alter column id restart with 1");
+        identitySequenceMigrationService.synchronizeCoreIdentitySequences();
+
+        Product secondProduct = productRepository.save(Product.builder()
+            .tenant(tenant)
+            .catalogSku("SKU-SEQ-002")
+            .name("Sequence Product Two")
+            .category("Verification")
+            .build());
+
+        assertThat(secondProduct.getId()).isGreaterThan(firstProduct.getId());
+
+        jdbcTemplate.update("delete from products where id in (?, ?)", firstProduct.getId(), secondProduct.getId());
+        jdbcTemplate.update("delete from tenants where id = ?", tenant.getId());
     }
 
     @Test
