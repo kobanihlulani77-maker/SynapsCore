@@ -35,7 +35,7 @@ Recommended target:
 - Ubuntu `24.04`
 - public IPv4 address attached
 
-Recommended starter shape for SynapseCore testing:
+Recommended minimum host shape for SynapseCore testing:
 
 - `1 OCPU / 6 GB RAM` or `2 OCPU / 12 GB RAM`
 

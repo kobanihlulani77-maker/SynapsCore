@@ -57,10 +57,10 @@ The architecture should always preserve this operating loop:
   - fulfillment overview generation for the dashboard
 - `access/`
   - lightweight actor and control-role enforcement for protected operational actions
-  - seeded operator directory lookup so powerful actions map to known active operators
+  - mapped operator directory lookup so powerful actions resolve to known active operators
 - `auth/`
   - lightweight user-account sign-in session mapped onto the operator directory
-  - credential-checked starter users for local and development testing
+  - credential-checked tenant users, with development-only local starter accounts available outside production
   - session-first identity resolution with dev/test-only header fallback for non-UI flows
 - `alert/`
   - alert lifecycle management
@@ -157,7 +157,7 @@ The architecture should always preserve this operating loop:
 ### Local development reseed path
 
 1. the local reseed endpoint is called
-2. starter tenant data is restored for local verification
+2. a development-only local baseline is restored for local verification
 3. all downstream intelligence and realtime paths refresh from the same operational services
 
 ### External integration path
@@ -184,9 +184,9 @@ The architecture should always preserve this operating loop:
 
 ## Developer Reset Flow
 
-- `SeedService` owns the starter data baseline for SynapseCore
-- startup seeding only runs when the catalog is empty
-- `POST /api/dev/reseed` clears local operational data and restores the starter baseline
+- `SeedService` owns the development-only local baseline for SynapseCore
+- startup seeding only runs outside the production profile
+- `POST /api/dev/reseed` clears local operational data and restores the development baseline
 - reseed refreshes the dashboard summary and pushes live updates
 
 ## Test Coverage Shape

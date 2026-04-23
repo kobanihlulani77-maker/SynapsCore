@@ -67,7 +67,7 @@ The MVP is built around one visible reaction cycle:
 ## Local Development Reseed Flow
 
 1. `POST /api/dev/reseed` resets the local development baseline
-2. starter tenant data, starter catalog, warehouses, and inventory are restored
+2. the development-only local tenant baseline, catalog, warehouses, and inventory are restored
 3. dashboard, alerts, recommendations, and business events all refresh from the same operational services
 
 ## Fulfillment Update Flow
@@ -180,14 +180,14 @@ The MVP is built around one visible reaction cycle:
 ## Reseed Flow
 
 1. `POST /api/dev/reseed` clears current local operational data
-2. starter products, warehouses, and inventory are restored
+2. the local development baseline products, warehouses, and inventory are restored
 3. dashboard summary is recalculated
 4. fresh realtime operational updates are pushed to connected clients
 
 ## Control Access Flow
 
 1. users sign in through `POST /api/auth/session/login`
-2. the backend validates the seeded username and password, resolves the mapped operator through the operator directory, and stores the session identity
+2. the backend validates the supplied tenant username and password, resolves the mapped operator through the operator directory, and stores the session identity
 3. sensitive review and integration actions resolve the actor from the signed-in session first
 4. header fallback with `X-Synapse-Actor` and `X-Synapse-Roles` still exists for test and non-UI flows when no session is present, but it is disabled by default in the `prod` profile
 5. backend access control validates that the acting operator and declared role match the requested control action

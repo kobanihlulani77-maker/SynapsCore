@@ -33,86 +33,25 @@ import PlatformAdminPage from './pages/PlatformAdmin'
 import SystemConfigPage from './pages/SystemConfig'
 import ReleasesPage from './pages/Releases'
 import PublicExperience from './pages/PublicExperience'
+import useApi from './hooks/useApi'
+import {
+  postAuthRedirectStorageKey,
+  readStoredJson,
+  removeStoredValue,
+  workspacePreferenceStorageKey,
+  writeStoredJson,
+} from './services/api'
+import {
+  appPages,
+  buildPagePath,
+  navGroups,
+  pageLookup,
+  pageSectionMap,
+  publicPages,
+  resolvePageFromPath,
+} from './config/pageRegistry'
 
-const runtimeConfig = globalThis.__SYNAPSE_RUNTIME_CONFIG__ || {}
-const workspacePreferenceStorageKey = 'synapsecore.workspacePreference'
-const postAuthRedirectStorageKey = 'synapsecore.postAuthRedirect'
-const trimTrailingSlash = (value = '') => value.replace(/\/+$/, '')
-const isLocalHostname = (hostname = '') => ['localhost', '127.0.0.1', '0.0.0.0'].includes((hostname || '').toLowerCase())
-const isExplicitNativeRealtimeUrl = (value = '') => /^wss?:/i.test(String(value).trim())
-const normalizeAbsoluteUrl = (value) => {
-  if (!value || !String(value).trim()) return ''
-  try {
-    return trimTrailingSlash(new URL(String(value).trim(), globalThis.location?.origin || undefined).toString())
-  } catch {
-    return trimTrailingSlash(String(value).trim())
-  }
-}
-const resolveApiBaseUrl = () => {
-  const configuredUrl = runtimeConfig.apiUrl || import.meta.env.VITE_API_URL
-  if (configuredUrl) return normalizeAbsoluteUrl(configuredUrl)
-  const browserOrigin = globalThis.location?.origin || ''
-  return browserOrigin && !isLocalHostname(globalThis.location?.hostname || '') ? trimTrailingSlash(browserOrigin) : 'http://localhost:8080'
-}
-const resolveRealtimeUrl = (configuredUrl, apiBaseUrl, preferredProtocol) => {
-  const rawValue = configuredUrl || (apiBaseUrl ? `${apiBaseUrl}/ws` : '')
-  if (!rawValue || !String(rawValue).trim()) return ''
-  try {
-    const normalizedUrl = new URL(rawValue, globalThis.location?.origin || undefined)
-    if (preferredProtocol === 'ws') {
-      if (normalizedUrl.protocol === 'http:') normalizedUrl.protocol = 'ws:'
-      if (normalizedUrl.protocol === 'https:') normalizedUrl.protocol = 'wss:'
-    } else {
-      if (normalizedUrl.protocol === 'ws:') normalizedUrl.protocol = 'http:'
-      if (normalizedUrl.protocol === 'wss:') normalizedUrl.protocol = 'https:'
-    }
-    return trimTrailingSlash(normalizedUrl.toString())
-  } catch {
-    const nextValue = trimTrailingSlash(String(rawValue).trim())
-    if (preferredProtocol === 'ws') {
-      return nextValue
-        .replace(/^http:/i, 'ws:')
-        .replace(/^https:/i, 'wss:')
-    }
-    return nextValue
-      .replace(/^ws:/i, 'http:')
-      .replace(/^wss:/i, 'https:')
-  }
-}
-const readStoredJson = (storage, key, fallbackValue) => {
-  try {
-    const rawValue = storage?.getItem?.(key)
-    return rawValue ? JSON.parse(rawValue) : fallbackValue
-  } catch {
-    return fallbackValue
-  }
-}
-const writeStoredJson = (storage, key, value) => {
-  try {
-    storage?.setItem?.(key, JSON.stringify(value))
-  } catch {
-    // Storage is optional in embedded or locked-down browsers.
-  }
-}
-const removeStoredValue = (storage, key) => {
-  try {
-    storage?.removeItem?.(key)
-  } catch {
-    // Ignore storage cleanup issues so sign-in flow stays usable.
-  }
-}
 const rememberedWorkspacePreference = readStoredJson(globalThis.localStorage, workspacePreferenceStorageKey, null)
-const configuredRealtimeUrl = runtimeConfig.wsUrl || import.meta.env.VITE_WS_URL || ''
-const apiUrl = resolveApiBaseUrl()
-const websocketBrokerUrl = isExplicitNativeRealtimeUrl(configuredRealtimeUrl)
-  ? resolveRealtimeUrl(configuredRealtimeUrl, apiUrl, 'ws')
-  : ''
-const sockJsUrl = resolveRealtimeUrl(configuredRealtimeUrl, apiUrl, 'http')
-const wsUrl = websocketBrokerUrl || sockJsUrl
-const realtimeTransportLabel = websocketBrokerUrl ? 'Native WebSocket / STOMP' : (sockJsUrl ? 'SockJS / STOMP' : 'Realtime not configured')
-const frontendBuildVersion = runtimeConfig.appBuildVersion || import.meta.env.VITE_APP_BUILD_VERSION || 'local-dev'
-const frontendBuildCommit = runtimeConfig.appBuildCommit || import.meta.env.VITE_APP_BUILD_COMMIT || 'local-dev'
-const frontendBuildTime = runtimeConfig.appBuildTime || import.meta.env.VITE_APP_BUILD_TIME || 'untracked'
 const emptySnapshot = {
   summary: null,
   alerts: { activeAlerts: [], recentAlerts: [] },
@@ -226,280 +165,6 @@ const buildScenarioHistoryPath = (filters) => {
   if (filters.slaEscalatedOnly) params.set('slaEscalatedOnly', 'true')
   return params.size ? `/api/scenarios/history?${params.toString()}` : '/api/scenarios/history'
 }
-const publicPages = [
-  {
-    key: 'landing',
-    path: '/',
-    audience: 'public',
-    label: 'Home',
-    title: 'Turn operations into decisions.',
-    description: 'A real-time operational intelligence platform for inventory, fulfillment, logistics, approvals, and control.',
-    focus: ['Live visibility', 'Prediction', 'Controlled action'],
-  },
-  {
-    key: 'product',
-    path: '/product',
-    audience: 'public',
-    label: 'Product',
-    title: 'One operating picture across orders, stock, logistics, and control.',
-    description: 'See how SynapseCore turns live business activity into a premium command center for decisions and execution.',
-    focus: ['Operational awareness', 'Action guidance', 'Trust layer'],
-  },
-  {
-    key: 'sign-in',
-    path: '/sign-in',
-    audience: 'public',
-    label: 'Sign In',
-    title: 'Access your operational workspace.',
-    description: 'Sign in to the right company workspace and move from visibility to action without leaving the control center.',
-    focus: ['Tenant access', 'Protected actions', 'Operator identity'],
-  },
-  {
-    key: 'contact',
-    path: '/contact',
-    audience: 'public',
-    label: 'Contact',
-    title: 'Tell us what operational pressure you need to solve.',
-    description: 'Capture the business challenge, company context, and scale signals needed to shape a SynapseCore rollout.',
-    focus: ['Business fit', 'Operational challenge', 'Deployment readiness'],
-  },
-]
-
-const appPages = [
-  {
-    key: 'dashboard',
-    path: '/dashboard',
-    audience: 'app',
-    group: 'core',
-    label: 'Dashboard',
-    title: 'Live operational command center',
-    description: 'See what is happening now, what is at risk, and what the business needs to act on next.',
-    focus: ['Act now', 'Live state', 'Trust layer'],
-  },
-  {
-    key: 'alerts',
-    path: '/alerts',
-    audience: 'app',
-    group: 'core',
-    label: 'Alerts',
-    title: 'Operational warning center',
-    description: 'Review what is wrong, where it is happening, why it matters, and what should happen next.',
-    focus: ['Severity', 'Impact', 'Action'],
-  },
-  {
-    key: 'recommendations',
-    path: '/recommendations',
-    audience: 'app',
-    group: 'core',
-    label: 'Recommendations',
-    title: 'Action queue for the operating team',
-    description: 'Move from understanding to action with ranked operational guidance tied to live state.',
-    focus: ['Urgent now', 'Important soon', 'Operational guidance'],
-  },
-  {
-    key: 'orders',
-    path: '/orders',
-    audience: 'app',
-    group: 'core',
-    label: 'Orders',
-    title: 'Live order operations',
-    description: 'Track live order flow, warehouse assignment, and the order stream driving stock and fulfillment pressure.',
-    focus: ['Order flow', 'Warehouse assignment', 'SLA pressure'],
-  },
-  {
-    key: 'inventory',
-    path: '/inventory',
-    audience: 'app',
-    group: 'core',
-    label: 'Inventory',
-    title: 'Inventory intelligence',
-    description: 'Use the inventory brain page to understand thresholds, velocity, stockout windows, and recommended actions.',
-    focus: ['Stock posture', 'Risk level', 'Depletion forecast'],
-  },
-  {
-    key: 'catalog',
-    path: '/catalog',
-    audience: 'app',
-    group: 'core',
-    label: 'Catalog',
-    title: 'Tenant product catalog',
-    description: 'Create, update, and import tenant-owned product SKUs so a company can onboard without manual database work.',
-    focus: ['Product creation', 'CSV import', 'Tenant ownership'],
-  },
-  {
-    key: 'locations',
-    path: '/locations',
-    audience: 'app',
-    group: 'core',
-    label: 'Locations',
-    title: 'Warehouse and site health',
-    description: 'Monitor operational health across locations, from stock posture to backlog and local issues.',
-    focus: ['Location health', 'Pressure by site', 'Drill-down'],
-  },
-  {
-    key: 'fulfillment',
-    path: '/fulfillment',
-    audience: 'app',
-    group: 'core',
-    label: 'Fulfillment',
-    title: 'Fulfillment and logistics pressure',
-    description: 'Operate backlog, dispatch, delayed shipments, and lane-level logistics risk from one page.',
-    focus: ['Backlog', 'Delayed shipments', 'Lane pressure'],
-  },
-  {
-    key: 'scenarios',
-    path: '/scenarios',
-    audience: 'app',
-    group: 'control',
-    label: 'Scenarios',
-    title: 'Decision lab and scenario planning',
-    description: 'Model changes before they go live, compare options, and move the best plan toward approval.',
-    focus: ['What-if planning', 'Compare options', 'Submit for review'],
-  },
-  {
-    key: 'scenario-history',
-    path: '/scenario-history',
-    audience: 'app',
-    group: 'control',
-    label: 'Scenario History',
-    title: 'Scenario history and compare',
-    description: 'Track previous scenarios, reload them into the planner, and compare them against the live operating state.',
-    focus: ['Saved plans', 'Revision flow', 'Compare history'],
-  },
-  {
-    key: 'approvals',
-    path: '/approvals',
-    audience: 'app',
-    group: 'control',
-    label: 'Approvals',
-    title: 'Approvals center',
-    description: 'See what is waiting on review, what is approved, what is rejected, and which actions are overdue.',
-    focus: ['Pending review', 'Final approval', 'Approval path'],
-  },
-  {
-    key: 'escalations',
-    path: '/escalations',
-    audience: 'app',
-    group: 'control',
-    label: 'Escalations',
-    title: 'Operational escalation inbox',
-    description: 'Surface urgent approval bottlenecks, repeated failures, unresolved critical items, and escalation ownership.',
-    focus: ['Urgent items', 'SLA escalation', 'Operational inbox'],
-  },
-  {
-    key: 'integrations',
-    path: '/integrations',
-    audience: 'app',
-    group: 'systems',
-    label: 'Integrations',
-    title: 'Connector management and telemetry',
-    description: 'Operate connected systems, inspect health, and understand recent import and sync behavior.',
-    focus: ['Connector health', 'Import history', 'Support ownership'],
-  },
-  {
-    key: 'replay',
-    path: '/replay-queue',
-    audience: 'app',
-    group: 'systems',
-    label: 'Replay Queue',
-    title: 'Failed inbound recovery',
-    description: 'Inspect failed inbound work, understand why it broke, and replay it safely into the live flow.',
-    focus: ['Failed events', 'Recovery controls', 'Replay history'],
-  },
-  {
-    key: 'runtime',
-    path: '/runtime',
-    audience: 'app',
-    group: 'systems',
-    label: 'Runtime',
-    title: 'Runtime, incidents, and observability',
-    description: 'Use the trust layer to monitor service health, incidents, queue pressure, and deployment fingerprints.',
-    focus: ['Runtime state', 'Incidents', 'Metrics'],
-  },
-  {
-    key: 'audit',
-    path: '/audit-events',
-    audience: 'app',
-    group: 'systems',
-    label: 'Audit & Events',
-    title: 'Audit trail and business events',
-    description: 'Trace what happened, who acted, what changed, and how the live business state evolved.',
-    focus: ['Business timeline', 'Audit trail', 'Recoverability'],
-  },
-  {
-    key: 'users',
-    path: '/users',
-    audience: 'app',
-    group: 'admin',
-    label: 'Users',
-    title: 'Users and access control',
-    description: 'Manage operators, roles, warehouse scopes, passwords, and the tenant access lifecycle.',
-    focus: ['Users', 'Roles', 'Warehouse lanes'],
-  },
-  {
-    key: 'settings',
-    path: '/company-settings',
-    audience: 'app',
-    group: 'admin',
-    label: 'Company Settings',
-    title: 'Tenant and workspace settings',
-    description: 'Configure workspace metadata, security policies, warehouse details, and connector support ownership.',
-    focus: ['Workspace profile', 'Security policy', 'Connector ownership'],
-  },
-  {
-    key: 'profile',
-    path: '/profile',
-    audience: 'app',
-    group: 'admin',
-    label: 'Profile',
-    title: 'Personal profile and session controls',
-    description: 'Review your current identity, password posture, session expiry, and personal account hygiene.',
-    focus: ['Current session', 'Password rotation', 'Personal security'],
-  },
-  {
-    key: 'platform',
-    path: '/platform-admin',
-    audience: 'app',
-    group: 'admin',
-    label: 'Platform Admin',
-    title: 'Platform overview and cross-tenant trust',
-    description: 'Use the platform view to understand global health, cross-tenant posture, and release readiness.',
-    focus: ['Platform health', 'Tenant posture', 'Release state'],
-  },
-  {
-    key: 'tenants',
-    path: '/tenant-management',
-    audience: 'app',
-    group: 'admin',
-    label: 'Tenant Management',
-    title: 'Tenant onboarding and workspace rollout',
-    description: 'Bootstrap new workspaces, inspect tenant setup, and move new companies cleanly into live use.',
-    focus: ['Tenant creation', 'Workspace setup', 'Rollout readiness'],
-  },
-  {
-    key: 'system-config',
-    path: '/system-config',
-    audience: 'app',
-    group: 'admin',
-    label: 'System Config',
-    title: 'System configuration and operational defaults',
-    description: 'Review runtime posture, connector defaults, dispatch intervals, and the system-wide control envelope.',
-    focus: ['System defaults', 'Dispatch posture', 'Operational rules'],
-  },
-  {
-    key: 'releases',
-    path: '/releases',
-    audience: 'app',
-    group: 'admin',
-    label: 'Releases',
-    title: 'Release, deployment, and environment',
-    description: 'Track build fingerprints, runtime versions, deployment health, and environment readiness.',
-    focus: ['Build fingerprint', 'Deployment health', 'Environment posture'],
-  },
-]
-
-const allPages = [...publicPages, ...appPages]
-const pageLookup = Object.fromEntries(allPages.map((page) => [page.key, page]))
 const readPendingPostAuthPage = () => {
   const pageKey = readStoredJson(globalThis.sessionStorage, postAuthRedirectStorageKey, '')
   return pageLookup[pageKey]?.audience === 'app' ? pageKey : ''
@@ -510,109 +175,6 @@ const storePendingPostAuthPage = (pageKey) => {
   }
 }
 const clearPendingPostAuthPage = () => removeStoredValue(globalThis.sessionStorage, postAuthRedirectStorageKey)
-const routeAliases = {
-  '/overview': '/dashboard',
-  '/risk': '/alerts',
-  '/operations': '/orders',
-  '/planning': '/scenarios',
-  '/workspace': '/users',
-}
-const navGroups = [
-  { label: 'Overview', keys: ['dashboard', 'alerts', 'recommendations'] },
-  { label: 'Operations', keys: ['orders', 'inventory', 'catalog', 'locations', 'fulfillment'] },
-  { label: 'Control', keys: ['scenarios', 'scenario-history', 'approvals', 'escalations'] },
-  { label: 'Systems', keys: ['integrations', 'replay', 'runtime', 'audit'] },
-  { label: 'Settings', keys: ['users', 'settings', 'profile', 'platform', 'tenants', 'system-config', 'releases'] },
-]
-const pageSectionMap = {
-  dashboard: [
-    { label: 'Act now', targetId: 'dashboard-act-now' },
-    { label: 'Live state', targetId: 'dashboard-live-state' },
-    { label: 'Trust layer', targetId: 'workspace-trust-rail' },
-  ],
-  alerts: [
-    { label: 'Severity', targetId: 'alerts-feed' },
-    { label: 'Impact', targetId: 'alerts-response' },
-    { label: 'Action', targetId: 'workspace-page-focus' },
-  ],
-  recommendations: [
-    { label: 'Urgent now', targetId: 'recommendations-lanes' },
-    { label: 'Important soon', targetId: 'recommendations-focus' },
-    { label: 'Operational guidance', targetId: 'workspace-page-focus' },
-  ],
-  orders: [
-    { label: 'Order flow', targetId: 'orders-stream' },
-    { label: 'Warehouse assignment', targetId: 'orders-focus' },
-    { label: 'SLA pressure', targetId: 'workspace-page-focus' },
-  ],
-  inventory: [
-    { label: 'Stock posture', targetId: 'inventory-spotlight' },
-    { label: 'Risk level', targetId: 'inventory-focus' },
-    { label: 'Depletion forecast', targetId: 'workspace-page-focus' },
-  ],
-  runtime: [
-    { label: 'Runtime state', targetId: 'runtime-health' },
-    { label: 'Incidents', targetId: 'runtime-incident-lane' },
-    { label: 'Metrics', targetId: 'workspace-page-focus' },
-  ],
-  audit: [
-    { label: 'Business timeline', targetId: 'audit-events' },
-    { label: 'Audit trail', targetId: 'audit-logs' },
-    { label: 'Recoverability', targetId: 'workspace-page-focus' },
-  ],
-  settings: [
-    { label: 'Workspace profile', targetId: 'settings-profile' },
-    { label: 'Security policy', targetId: 'settings-security' },
-    { label: 'Connector ownership', targetId: 'settings-connectors' },
-  ],
-  platform: [
-    { label: 'Platform health', targetId: 'platform-portfolio' },
-    { label: 'Tenant posture', targetId: 'platform-focus' },
-    { label: 'Release state', targetId: 'workspace-page-focus' },
-  ],
-  releases: [
-    { label: 'Build fingerprint', targetId: 'releases-builds' },
-    { label: 'Deployment health', targetId: 'releases-checklist' },
-    { label: 'Environment posture', targetId: 'workspace-page-focus' },
-  ],
-}
-const resolvePageFromPath = (pathname = globalThis.location?.pathname || '/') => {
-  const normalizedPath = pathname.replace(/\/+$/, '') || '/'
-  const routedPath = routeAliases[normalizedPath] || normalizedPath
-  return allPages.find((page) => page.path === routedPath)?.key || 'landing'
-}
-const buildPagePath = (pageKey) => pageLookup[pageKey]?.path || '/'
-const readResponsePayload = async (response) => {
-  const contentType = response.headers.get('content-type') || ''
-  if (contentType.includes('application/json')) {
-    try {
-      return await response.json()
-    } catch {
-      return null
-    }
-  }
-
-  try {
-    const text = await response.text()
-    return text ? { message: text } : null
-  } catch {
-    return null
-  }
-}
-const extractResponseErrorMessage = (response, payload, fallbackMessage) => {
-  if (typeof payload === 'string' && payload.trim()) return payload.trim()
-  if (payload && typeof payload === 'object') {
-    if (typeof payload.message === 'string' && payload.message.trim()) return payload.message.trim()
-    if (typeof payload.detail === 'string' && payload.detail.trim()) return payload.detail.trim()
-    if (typeof payload.error === 'string' && payload.error.trim()) return payload.error.trim()
-    if (typeof payload.title === 'string' && payload.title.trim()) return payload.title.trim()
-  }
-
-  if (response.status === 401) return 'Your session is missing or expired. Sign in again to reopen the workspace.'
-  if (response.status === 403) return 'This operator does not have permission to perform that action.'
-  return fallbackMessage
-}
-
 export default function App() {
   const [snapshot, setSnapshot] = useState(emptySnapshot)
   const [currentPage, setCurrentPage] = useState(() => resolvePageFromPath())
@@ -702,32 +264,21 @@ export default function App() {
     }))
     redirectToPage('sign-in')
   }
-  const fetchApi = (path, init = {}) => {
-    const headers = new Headers(init.headers || {})
-    if (authSessionState.session?.tenantCode) {
-      headers.set('X-Synapse-Tenant', authSessionState.session.tenantCode)
-    }
-    return fetch(`${apiUrl}${path}`, { credentials: 'include', ...init, headers })
-  }
-  const fetchJson = async (path, init = {}, options = {}) => {
-    let response
-    try {
-      response = await fetchApi(path, init)
-    } catch {
-      throw new Error(`Unable to reach the SynapseCore backend at ${apiUrl}. Check the live API URL, CORS policy, and backend availability.`)
-    }
-
-    const payload = await readResponsePayload(response)
-    if (!response.ok) {
-      const message = extractResponseErrorMessage(response, payload, `Request to ${path} failed.`)
-      if (response.status === 401 && !options.ignoreUnauthorized) {
-        handleExpiredSession(message, currentPage)
-      }
-      throw new Error(message)
-    }
-
-    return payload
-  }
+  const {
+    apiUrl,
+    fetchJson,
+    frontendBuildCommit,
+    frontendBuildTime,
+    frontendBuildVersion,
+    realtimeTransportLabel,
+    sockJsUrl,
+    websocketBrokerUrl,
+    wsUrl,
+  } = useApi({
+    authSession: authSessionState.session,
+    currentPage,
+    onUnauthorized: handleExpiredSession,
+  })
   const prefersReducedMotion = globalThis.matchMedia?.('(prefers-reduced-motion: reduce)')?.matches ?? false
   const navigateToPage = (pageKey) => {
     const nextPath = buildPagePath(pageKey)

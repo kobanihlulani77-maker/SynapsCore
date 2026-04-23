@@ -139,7 +139,7 @@ Connector policy behavior:
 
 ## Operator Session And Header Fallback
 
-SynapseCore now uses a lightweight signed-in user session for protected control-center actions. The frontend signs in with a seeded username and password, the backend resolves that user to a mapped operator, and the session cookie is then used on later protected requests.
+SynapseCore uses a lightweight signed-in user session for protected control-center actions. The frontend signs in with a real tenant username and password, the backend resolves that user to a mapped operator, and the session cookie is then used on later protected requests.
 
 Header-based access remains available as a fallback for tests, scripts, and non-UI operational tooling. It is enabled by default in the `dev` profile and disabled by default in the `prod` profile.
 
@@ -167,7 +167,7 @@ The response includes:
 
 ### `POST /api/auth/session/login`
 
-Signs in as a known active user account that is mapped to an operator in the seeded control directory.
+Signs in as a known active user account that is mapped to an operator in the tenant access directory.
 
 Example body:
 
@@ -196,7 +196,7 @@ Example body:
 
 Ends the current signed-in user session.
 
-The starter development environment includes credential-backed user sign-in. Common local accounts are:
+The development environment can include credential-backed local starter accounts for testing. Common local examples are:
 
 - tenant `STARTER-OPS` -> `Starter Operations Workspace`
 - `operations.lead` / `lead-2026` -> `Operations Lead`
@@ -246,7 +246,7 @@ Production access rules:
 - First tenant on an empty production database: send `X-Synapse-Bootstrap-Token`.
 - Later production tenant provisioning: send `X-Synapse-Platform-Admin-Token`.
 - Signed-in tenant-admin sessions are not allowed to create additional tenant workspaces in production.
-- Starter inventory and starter connectors are only seeded when the environment explicitly enables demo onboarding seeding.
+- Starter inventory and starter connectors are only created when the environment explicitly enables development onboarding seeding.
 
 Example body:
 
@@ -1227,7 +1227,7 @@ Current recommendation types include:
 Development-only helper endpoint that:
 
 - clears current orders, alerts, recommendations, and business events
-- restores the starter products, warehouses, and inventory records
+- restores the local development baseline products, warehouses, and inventory records
 - pushes a fresh live snapshot so the dashboard returns to a clean local baseline
 
 ## Realtime

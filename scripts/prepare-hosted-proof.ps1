@@ -384,7 +384,7 @@ function Find-ProofProduct {
 function Test-IsProductConflict {
     param([string]$Message)
 
-    return $Message -match "409|Conflict|Product SKU already exists|already exists for this tenant"
+    return $Message -match "Product SKU already exists|Product internal SKU already exists|hidden legacy catalog row still occupies|Multiple orphan catalog rows exist"
 }
 
 function Upsert-ProofProduct {

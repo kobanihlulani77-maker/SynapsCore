@@ -27,6 +27,7 @@ import java.util.Map;
 import java.util.Set;
 import java.util.regex.Pattern;
 import lombok.RequiredArgsConstructor;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -64,34 +65,38 @@ public class ProductService {
         String normalizedName = normalizeRequiredText(request.name(), "Product name", 120);
         String normalizedCategory = normalizeRequiredText(request.category(), "Product category", 120);
         ensureSkuIsAvailable(tenant.getCode(), catalogSku);
-        Product adoptedProduct = adoptOrphanedProductIfPresent(tenant, catalogSku, normalizedName, normalizedCategory);
-        if (adoptedProduct != null) {
+        try {
+            Product adoptedProduct = adoptOrphanedProductIfPresent(tenant, catalogSku, normalizedName, normalizedCategory);
+            if (adoptedProduct != null) {
+                recordCatalogChange(
+                    tenant.getCode(),
+                    actorName,
+                    "PRODUCT_CREATED",
+                    adoptedProduct.resolveCatalogSku(),
+                    "Adopted orphan catalog product " + adoptedProduct.resolveCatalogSku() + " (" + adoptedProduct.getName() + ") into tenant " + tenant.getCode() + "."
+                );
+                return toResponse(adoptedProduct);
+            }
+            ensureInternalSkuIsAvailable(tenant.getCode(), catalogSku);
+
+            Product product = productRepository.save(Product.builder()
+                .tenant(tenant)
+                .catalogSku(catalogSku)
+                .name(normalizedName)
+                .category(normalizedCategory)
+                .build());
+
             recordCatalogChange(
                 tenant.getCode(),
                 actorName,
                 "PRODUCT_CREATED",
-                adoptedProduct.resolveCatalogSku(),
-                "Adopted orphan catalog product " + adoptedProduct.resolveCatalogSku() + " (" + adoptedProduct.getName() + ") into tenant " + tenant.getCode() + "."
+                product.resolveCatalogSku(),
+                "Created catalog product " + product.resolveCatalogSku() + " (" + product.getName() + ")."
             );
-            return toResponse(adoptedProduct);
+            return toResponse(product);
+        } catch (DataIntegrityViolationException exception) {
+            throw translateCatalogWriteConflict(exception, catalogSku);
         }
-        ensureInternalSkuIsAvailable(tenant.getCode(), catalogSku);
-
-        Product product = productRepository.save(Product.builder()
-            .tenant(tenant)
-            .catalogSku(catalogSku)
-            .name(normalizedName)
-            .category(normalizedCategory)
-            .build());
-
-        recordCatalogChange(
-            tenant.getCode(),
-            actorName,
-            "PRODUCT_CREATED",
-            product.resolveCatalogSku(),
-            "Created catalog product " + product.resolveCatalogSku() + " (" + product.getName() + ")."
-        );
-        return toResponse(product);
     }
 
     @Transactional
@@ -111,16 +116,20 @@ public class ProductService {
         product.setCatalogSku(catalogSku);
         product.setName(normalizeRequiredText(request.name(), "Product name", 120));
         product.setCategory(normalizeRequiredText(request.category(), "Product category", 120));
-        Product savedProduct = productRepository.save(product);
+        try {
+            Product savedProduct = productRepository.save(product);
 
-        recordCatalogChange(
-            tenant.getCode(),
-            actorName,
-            "PRODUCT_UPDATED",
-            savedProduct.resolveCatalogSku(),
-            "Updated catalog product " + savedProduct.resolveCatalogSku() + " (" + savedProduct.getName() + ")."
-        );
-        return toResponse(savedProduct);
+            recordCatalogChange(
+                tenant.getCode(),
+                actorName,
+                "PRODUCT_UPDATED",
+                savedProduct.resolveCatalogSku(),
+                "Updated catalog product " + savedProduct.resolveCatalogSku() + " (" + savedProduct.getName() + ")."
+            );
+            return toResponse(savedProduct);
+        } catch (DataIntegrityViolationException exception) {
+            throw translateCatalogWriteConflict(exception, catalogSku);
+        }
     }
 
     @Transactional
@@ -211,6 +220,15 @@ public class ProductService {
                         wasCreated ? "CREATED" : "UPDATED",
                         wasCreated ? "Product created." : "Existing product updated.",
                         toResponse(product)
+                    ));
+                } catch (DataIntegrityViolationException exception) {
+                    failed++;
+                    rowResults.add(new ProductImportRowResult(
+                        rowNumber,
+                        rawSku == null ? "" : rawSku.trim(),
+                        "FAILED",
+                        translateCatalogWriteConflict(exception, rawSku == null ? "" : rawSku.trim()).getReason(),
+                        null
                     ));
                 } catch (ResponseStatusException exception) {
                     failed++;
@@ -377,6 +395,33 @@ public class ProductService {
             targetRef,
             details
         );
+    }
+
+    private ResponseStatusException translateCatalogWriteConflict(DataIntegrityViolationException exception, String catalogSku) {
+        String normalizedSku = catalogSku == null ? "" : catalogSku.trim().toUpperCase(Locale.ROOT);
+        String rootMessage = exception.getMostSpecificCause() == null
+            ? exception.getMessage()
+            : exception.getMostSpecificCause().getMessage();
+        String normalizedMessage = rootMessage == null ? "" : rootMessage.toLowerCase(Locale.ROOT);
+
+        if (normalizedMessage.contains("products") && (normalizedMessage.contains("sku") || normalizedMessage.contains("catalog_sku"))) {
+            return new ResponseStatusException(HttpStatus.CONFLICT,
+                "Product SKU already exists for this tenant or a hidden legacy catalog row still occupies " + normalizedSku + ".");
+        }
+        if (normalizedMessage.contains("business_events")) {
+            return new ResponseStatusException(HttpStatus.CONFLICT,
+                "Catalog write for " + normalizedSku + " rolled back while recording the business event stream. Repair business_events identity state before hosted proof can continue.");
+        }
+        if (normalizedMessage.contains("audit_logs")) {
+            return new ResponseStatusException(HttpStatus.CONFLICT,
+                "Catalog write for " + normalizedSku + " rolled back while recording the audit trail. Repair audit_logs identity state before hosted proof can continue.");
+        }
+        if (normalizedMessage.contains("operational_dispatch_work_items")) {
+            return new ResponseStatusException(HttpStatus.CONFLICT,
+                "Catalog write for " + normalizedSku + " rolled back while enqueuing operational dispatch work. Repair operational_dispatch_work_items identity state before hosted proof can continue.");
+        }
+        return new ResponseStatusException(HttpStatus.CONFLICT,
+            "Catalog write for " + normalizedSku + " conflicted with current production database state and did not commit.");
     }
 
     private ProductResponse toResponse(Product product) {

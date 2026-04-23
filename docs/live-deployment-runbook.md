@@ -1,227 +1,122 @@
 # Live Deployment Runbook
 
-This runbook is the practical path to deploy SynapseCore onto a single Ubuntu VPS.
+This runbook is the practical operating path for deploying SynapseCore onto a real host.
 
-## Recommended Target
+## Recommended Baseline
 
 - Ubuntu `24.04 LTS`
-- `2 vCPU / 4 GB RAM`
-- public DNS for:
-  - `app.example.com`
-  - `api.example.com`
+- `2 vCPU / 4 GB RAM` minimum for single-node rollout
+- public DNS for separate app and API origins
 
-## 1. Prepare The Host
+## Host Preparation
 
-SSH into the server:
+Install:
 
-```bash
-ssh root@YOUR_SERVER_IP
-```
+- Docker Engine
+- Docker Compose plugin
+- Git
 
-Install Docker Engine and the Compose plugin using Docker's official Ubuntu flow:
+Clone the repo to a stable path such as `/opt/synapsecore/synapsecore`.
 
-```bash
-sudo apt update
-sudo apt install -y ca-certificates curl git
-sudo install -m 0755 -d /etc/apt/keyrings
-sudo curl -fsSL https://download.docker.com/linux/ubuntu/gpg -o /etc/apt/keyrings/docker.asc
-sudo chmod a+r /etc/apt/keyrings/docker.asc
-echo "Types: deb
-URIs: https://download.docker.com/linux/ubuntu
-Suites: $(. /etc/os-release && echo "${UBUNTU_CODENAME:-$VERSION_CODENAME}")
-Components: stable
-Signed-By: /etc/apt/keyrings/docker.asc" | sudo tee /etc/apt/sources.list.d/docker.sources > /dev/null
-sudo apt update
-sudo apt install -y docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
-sudo systemctl enable docker
-sudo systemctl start docker
-sudo docker run hello-world
-```
+## Environment Preparation
 
-## 2. Copy SynapseCore To The Host
-
-Choose a stable location, for example:
-
-```bash
-sudo mkdir -p /opt/synapsecore
-sudo chown "$USER":"$USER" /opt/synapsecore
-cd /opt/synapsecore
-git clone YOUR_REPOSITORY_URL synapsecore
-cd synapsecore
-```
-
-## 3. Prepare Real Prod Env Files
-
-Generate working env targets:
+Generate env targets:
 
 ```bash
 bash scripts/prepare-prod-envs.sh
 ```
 
-This gives you:
+Key backend truths:
 
-- `infrastructure/env/backend.prod.env`
-- `infrastructure/env/frontend.prod.env`
-- `infrastructure/env/edge.prod.env`
+- `SPRING_PROFILES_ACTIVE=prod`
+- `ALLOW_HEADER_FALLBACK=false`
+- `SESSION_COOKIE_SECURE=true`
+- `SYNAPSECORE_REALTIME_BROKER_MODE=SIMPLE_IN_MEMORY` unless external broker relay is actually provisioned
+- `SPRING_JPA_HIBERNATE_DDL_AUTO=update` is still the current posture, but it is not the final target
 
-Update them with real values:
+Key frontend truths:
 
-- backend:
-  - `CORS_ALLOWED_ORIGINS=https://app.example.com`
-  - `SESSION_COOKIE_SECURE=true`
-  - `SYNAPSECORE_BOOTSTRAP_INITIAL_TOKEN=<one-time-secret>` only if this is the first tenant on an empty production database
-  - `SYNAPSECORE_PLATFORM_ADMIN_TOKEN=<rotated-secret>` for ongoing production tenant provisioning after bootstrap
-  - `SYNAPSECORE_BUILD_VERSION`
-  - `SYNAPSECORE_BUILD_COMMIT`
-  - `SYNAPSECORE_BUILD_TIME`
-- frontend:
-  - `VITE_API_URL=https://api.example.com`
-  - `VITE_WS_URL=https://api.example.com/ws`
-  - `VITE_APP_BUILD_VERSION`
-  - `VITE_APP_BUILD_COMMIT`
-  - `VITE_APP_BUILD_TIME`
-- edge:
-  - `SYNAPSECORE_APP_DOMAIN=app.example.com`
-  - `SYNAPSECORE_API_DOMAIN=api.example.com`
-  - `SYNAPSECORE_ACME_EMAIL=ops@example.com`
+- `VITE_API_URL` must point at the real API origin
+- `VITE_WS_URL` must point at the real `/ws` path
 
-For the first self-hosted rollout, Postgres and Redis can stay on the Compose-internal network:
+## Tenant Provisioning Truth
 
-- `DB_HOST=postgres`
-- `SPRING_DATA_REDIS_URL=redis://redis:6379`
+Production tenant creation is intentionally strict:
 
-After the first tenant workspace is created successfully, remove `SYNAPSECORE_BOOTSTRAP_INITIAL_TOKEN` from the backend env and redeploy so the bootstrap lane is closed again.
-Use `SYNAPSECORE_PLATFORM_ADMIN_TOKEN` through the `X-Synapse-Platform-Admin-Token` header for any later production tenant provisioning.
-Do not expect ordinary tenant-admin sessions to create additional tenant workspaces in production after that point. This is intentionally blocked.
+- first tenant on an empty production database: bootstrap token lane
+- later tenant creation: platform-admin token lane
+- signed-in tenant admins do not create new tenant workspaces in production
 
-## Live Verification Credentials
+## Hosted Verification Credentials
 
-Hosted browser proof must use real tenant accounts, not seed assumptions. Create or refresh the proof lane with production APIs only:
+Hosted browser proof must use real tenant accounts created or reset through production APIs.
+
+Required env values:
 
 ```powershell
-$env:PLAYWRIGHT_BASE_URL="https://synapscore-frontend-3.onrender.com"
-$env:PLAYWRIGHT_API_BASE_URL="https://synapscore-3.onrender.com"
-$env:PLAYWRIGHT_TENANT_CODE="<hosted-proof-tenant-code>"
+$env:PLAYWRIGHT_BASE_URL="<frontend-url>"
+$env:PLAYWRIGHT_API_BASE_URL="<backend-url>"
+$env:PLAYWRIGHT_TENANT_CODE="<proof-tenant>"
 $env:PLAYWRIGHT_PROOF_PRODUCT_SKU="<tenant-specific-proof-sku>"
-$env:PLAYWRIGHT_TENANT_ADMIN_USERNAME="<tenant-admin-username>"
+$env:PLAYWRIGHT_TENANT_ADMIN_USERNAME="<tenant-admin-user>"
 $env:PLAYWRIGHT_TENANT_ADMIN_PASSWORD="<tenant-admin-password>"
-$env:PLAYWRIGHT_PLANNER_USERNAME="<planner-operator-username>"
-$env:PLAYWRIGHT_PLANNER_PASSWORD="<planner-operator-password>"
-$env:PLAYWRIGHT_INTEGRATION_ADMIN_USERNAME="<integration-admin-username>"
+$env:PLAYWRIGHT_PLANNER_USERNAME="<planner-user>"
+$env:PLAYWRIGHT_PLANNER_PASSWORD="<planner-password>"
+$env:PLAYWRIGHT_INTEGRATION_ADMIN_USERNAME="<integration-admin-user>"
 $env:PLAYWRIGHT_INTEGRATION_ADMIN_PASSWORD="<integration-admin-password>"
-$env:SYNAPSECORE_PLATFORM_ADMIN_TOKEN="<render-platform-admin-token>"
+```
+
+Preparation command:
+
+```powershell
 powershell -ExecutionPolicy Bypass -File scripts\prepare-hosted-proof.ps1
 ```
 
-Usernames must contain only letters, digits, dots, underscores, and hyphens. Email-style values with `@` are rejected by the production access-user API.
+Current truth:
 
-Credential model:
+- the proof pack is real
+- user provisioning is real
+- the hosted catalog onboarding path is still the main blocker
 
-- tenant admin: tenant code from `PLAYWRIGHT_TENANT_CODE`, username from `PLAYWRIGHT_TENANT_ADMIN_USERNAME`, password from `PLAYWRIGHT_TENANT_ADMIN_PASSWORD`, operator `Operations Lead`, roles `TENANT_ADMIN`, `REVIEW_OWNER`, `ESCALATION_OWNER`, `INTEGRATION_ADMIN`, and `INTEGRATION_OPERATOR`. This account verifies sign-in, tenant admin pages, catalog onboarding, orders, inventory, scenarios, and user management.
-- planner/operator: tenant code from `PLAYWRIGHT_TENANT_CODE`, username from `PLAYWRIGHT_PLANNER_USERNAME`, password from `PLAYWRIGHT_PLANNER_PASSWORD`, operator `Operations Planner`, no tenant-admin roles. This account verifies protected-route access and non-admin access boundaries.
-- integration admin: tenant code from `PLAYWRIGHT_TENANT_CODE`, username from `PLAYWRIGHT_INTEGRATION_ADMIN_USERNAME`, password from `PLAYWRIGHT_INTEGRATION_ADMIN_PASSWORD`, operator `Integration Lead`, roles `INTEGRATION_ADMIN` and `INTEGRATION_OPERATOR`. This account verifies connectors, CSV ingestion, replay, and recovery flows.
+## Realtime Truth
 
-Create/reset path:
+Current single-node truth:
 
-- If the proof tenant does not exist, `scripts/prepare-hosted-proof.ps1` creates it through `POST /api/access/tenants`. Use `SYNAPSECORE_BOOTSTRAP_INITIAL_TOKEN` with `X-Synapse-Bootstrap-Token` for the first tenant, or `SYNAPSECORE_PLATFORM_ADMIN_TOKEN` with `X-Synapse-Platform-Admin-Token` for later tenant provisioning.
-- If the proof tenant exists, the script signs in as the tenant admin, upserts proof operators through `/api/access/admin/operators`, creates or remaps users through `/api/access/admin/users`, resets passwords through `/api/access/admin/users/{userId}/reset-password`, then clears forced password-change flags by logging in and changing from a temporary password to the supplied proof password.
-- If the tenant exists but the tenant-admin password is unknown, use another active tenant admin to reset it or create a fresh verification tenant code. Platform admin tokens intentionally do not bypass tenant user administration.
+- `SIMPLE_IN_MEMORY` broker mode is acceptable for one backend instance
+- it is not the final scale-out topology
 
-After preparation, run:
+Later production hardening:
 
-```powershell
-cd frontend
-npm.cmd run test:e2e:prod
-```
+- deploy external broker relay infrastructure
+- switch to `EXTERNAL_BROKER`
+- re-run browser and runtime verification after the change
 
-Rotate or disable verification credentials after the proof run when required by the customer environment.
+## Schema Migration Truth
 
-## 4. Run Release Readiness
+Current rollout posture still depends on Hibernate auto-update.
 
-Before rollout:
+That is a temporary SaaS-foundation compromise, not final deployment discipline.
 
-```bash
-BACKEND_ENV_FILE=./env/backend.prod.env FRONTEND_ENV_FILE=./env/frontend.prod.env bash scripts/release-readiness.sh
-```
+Before company-grade rollout, SynapseCore should move to explicit versioned migrations. See:
 
-That confirms:
+- [schema-migration-roadmap.md](schema-migration-roadmap.md)
 
-- prod config safety
-- compose validity
-- release fingerprint values
-- rollout command set
+## Verification Order
 
-## 5. Start The Stack
+1. verify backend health and readiness
+2. verify frontend loads and deep links work
+3. verify sign-in and protected routes
+4. verify dashboard, catalog, integrations, runtime, and audit pages
+5. run hosted proof preparation
+6. run browser proof
+7. verify replay and runtime trust surfaces
 
-From the repo root:
+## Bottom Line
 
-```bash
-BACKEND_ENV_FILE=./env/backend.prod.env FRONTEND_ENV_FILE=./env/frontend.prod.env bash scripts/start-prod.sh
-```
+Use this runbook as a real operational deployment guide, not a demo walkthrough.
 
-For a real public rollout with HTTPS and separate app/api domains:
+If a capability is still partial, keep it labeled as partial in rollout discussions:
 
-```bash
-BACKEND_ENV_FILE=./env/backend.prod.env FRONTEND_ENV_FILE=./env/frontend.prod.env EDGE_ENV_FILE=./env/edge.prod.env bash scripts/start-public-prod.sh
-```
-
-## 6. Verify The Deployment
-
-Run:
-
-```bash
-FRONTEND_URL=https://app.example.com BACKEND_URL=https://api.example.com bash scripts/verify-deployment.sh
-```
-
-Then do a manual live pass:
-
-- sign in
-- load dashboard summary
-- inspect system runtime
-- inspect system incidents
-- run the browser proof from `frontend` with `npm.cmd run test:e2e:prod` on Windows or `npm run test:e2e:prod` where supported
-- create a test order
-- confirm inventory, alerts, and recommendations update
-
-## 7. Protect The Host
-
-Minimum host hygiene:
-
-- keep SSH key-based access only
-- disable password SSH auth if possible
-- keep the OS patched
-- keep a recent Postgres backup
-
-Backup and restore helpers:
-
-```bash
-bash scripts/backup-postgres.sh
-bash scripts/restore-postgres.sh --file backups/<backup>.sql --yes
-```
-
-On Windows PowerShell:
-
-```powershell
-powershell -ExecutionPolicy Bypass -File scripts\backup-postgres.ps1
-powershell -ExecutionPolicy Bypass -File scripts\restore-postgres.ps1 -BackupFile backups\<backup>.sql -Yes
-powershell -ExecutionPolicy Bypass -File scripts\verify-restore-drill.ps1
-```
-
-## 8. DNS / HTTPS Note
-
-SynapseCore now includes a built-in public edge option through:
-
-- `infrastructure/docker-compose.public.yml`
-- `infrastructure/Caddyfile`
-
-Point your DNS records at the VPS:
-
-- `app.example.com` -> server public IP
-- `api.example.com` -> server public IP
-
-Then launch the public compose with `edge.prod.env` filled in.
-
-Keep:
-
-- `SESSION_COOKIE_SECURE=true`
-- `CORS_ALLOWED_ORIGINS` narrowed to the real frontend origin
+- hosted product onboarding proof
+- explicit schema migration discipline
+- external-broker realtime rollout

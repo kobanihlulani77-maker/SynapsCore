@@ -1,36 +1,25 @@
 # Render Deployment Guide
 
-This guide reflects the current live Render setup for SynapsCore.
+This guide reflects the current live Render setup for SynapseCore.
 
 ## Live Render Topology
 
-The repo blueprint in `render.yaml` defines:
+Defined in `render.yaml`:
 
-- `synapscore-3` as the backend Docker web service
-- `synapscore-frontend-3` as the frontend static site
-- `synapscore-postgres` as the managed Postgres database
-- `synapscore-redis` as the managed Redis service
+- backend web service: `synapscore-3`
+- frontend static site: `synapscore-frontend-3`
+- managed Postgres: `synapscore-postgres`
+- managed Redis: `synapscore-redis`
 
-## Exact Live Public URLs
+Live URLs:
 
-- Frontend: `https://synapscore-frontend-3.onrender.com`
-- Backend: `https://synapscore-3.onrender.com`
-- Backend health: `https://synapscore-3.onrender.com/actuator/health`
+- frontend: `https://synapscore-frontend-3.onrender.com`
+- backend: `https://synapscore-3.onrender.com`
+- backend health: `https://synapscore-3.onrender.com/actuator/health`
 
-## Backend Service
+## Backend Render Environment
 
-Render builds the backend from:
-
-- Root Directory: `backend`
-- Dockerfile Path: `Dockerfile`
-- Docker Environment: `docker`
-- Health Check Path: `/actuator/health`
-
-Render injects `PORT`. Do not hardcode it in the Render service.
-
-### Exact backend env keys
-
-Use these backend env vars on Render:
+Required keys:
 
 ```text
 SPRING_PROFILES_ACTIVE=prod
@@ -48,49 +37,29 @@ SYNAPSECORE_INTEGRATION_PULL_WORKER_BATCH_SIZE=10
 SPRING_JPA_HIBERNATE_DDL_AUTO=update
 PUBLIC_APP_URL=https://synapscore-frontend-3.onrender.com
 PUBLIC_API_URL=https://synapscore-3.onrender.com
-SYNAPSECORE_BUILD_VERSION=0.0.1
-SYNAPSECORE_BUILD_COMMIT=render-deploy
-SYNAPSECORE_BUILD_TIME=2026-04-10T00:00:00Z
+SYNAPSECORE_BUILD_VERSION=<release-version>
+SYNAPSECORE_BUILD_COMMIT=<git-sha>
+SYNAPSECORE_BUILD_TIME=<utc-timestamp>
 ```
 
-Optional for a brand-new empty production database only:
+Optional:
 
 ```text
-SYNAPSECORE_BOOTSTRAP_INITIAL_TOKEN=<one-time-bootstrap-secret>
-SYNAPSECORE_PLATFORM_ADMIN_TOKEN=<rotated-platform-admin-secret>
+SYNAPSECORE_BOOTSTRAP_INITIAL_TOKEN=<one-time bootstrap token>
+SYNAPSECORE_PLATFORM_ADMIN_TOKEN=<production tenant provisioning token>
 ```
 
-### Keys to remove
-
-Do not use these old keys for the Render backend:
+## Frontend Render Environment
 
 ```text
-REDIS_URL
-REDIS_HOST
-REDIS_PORT
-JPA_DDL_AUTO
+VITE_API_URL=https://synapscore-3.onrender.com
+VITE_WS_URL=https://synapscore-3.onrender.com/ws
+VITE_APP_BUILD_VERSION=<release-version>
+VITE_APP_BUILD_COMMIT=<git-sha>
+VITE_APP_BUILD_TIME=<utc-timestamp>
 ```
 
-Notes:
-
-- `DATABASE_URL` is supported because the backend normalizes Render `postgres://` / `postgresql://` connection strings into JDBC at startup.
-- `SPRING_DATA_REDIS_URL` must point at the internal Render Redis URL and must not be blank in production.
-- `SPRING_JPA_HIBERNATE_DDL_AUTO=update` is the first-deploy default for a fresh Render database.
-- `SYNAPSECORE_BOOTSTRAP_INITIAL_TOKEN` is only for the first tenant creation on an empty production environment. Remove it after the first workspace is created.
-- `SYNAPSECORE_PLATFORM_ADMIN_TOKEN` is the dedicated production tenant-provisioning lane after bootstrap. Use it through the `X-Synapse-Platform-Admin-Token` header and rotate it like any other privileged secret.
-- Signed-in tenant admins still cannot create additional tenant workspaces in production.
-- `SYNAPSECORE_REALTIME_BROKER_MODE=SIMPLE_IN_MEMORY` is correct for the current single-node Render backend. Switch it to `EXTERNAL_BROKER` only after provisioning an external STOMP broker and setting the relay host, port, login, and passcode env vars.
-- `SYNAPSECORE_INTEGRATION_PULL_WORKER_ENABLED=true` enables real scheduled order API pulls for connectors configured with `syncMode=SCHEDULED_PULL` and `pullEndpointUrl`.
-
-## Frontend Service
-
-Render builds the frontend from:
-
-- Root Directory: `frontend`
-- Build Command: `npm ci && npm run build`
-- Publish Directory: `dist`
-
-The static service must keep the SPA rewrite:
+The frontend service must keep SPA rewrite routing:
 
 ```yaml
 routes:
@@ -99,42 +68,38 @@ routes:
     destination: /index.html
 ```
 
-### Exact frontend env keys
+## Current Partial Areas On Render
 
-```text
-VITE_API_URL=https://synapscore-3.onrender.com
-VITE_WS_URL=https://synapscore-3.onrender.com/ws
-VITE_APP_BUILD_VERSION=0.0.1
-VITE_APP_BUILD_COMMIT=render-deploy
-VITE_APP_BUILD_TIME=2026-04-10T00:00:00Z
-```
+These are truthful current Render limitations:
 
-`VITE_WS_URL` uses the public `/ws` endpoint. The frontend normalizes it for both native WebSocket and SockJS transport usage.
+- realtime is still single-node because broker mode is `SIMPLE_IN_MEMORY`
+- schema evolution still relies on Hibernate `ddl-auto=update`
+- hosted authenticated proof is still blocked by the live `/api/products` conflict path
 
-## Final Render Setup Summary
+## Supported Integration Breadth On Render
 
-Backend:
+Render deployment currently supports the implemented lanes only:
 
-- service name: `synapscore-3`
-- root directory: `backend`
-- dockerfile path: `Dockerfile`
-- health check: `/actuator/health`
-- required envs: the backend list above
+- webhook order ingestion
+- CSV order import
+- scheduled pull order ingestion
 
-Frontend:
-
-- service name: `synapscore-frontend-3`
-- root directory: `frontend`
-- build command: `npm ci && npm run build`
-- static publish path: `dist`
-- SPA rewrite: `/* -> /index.html`
-- required envs: the frontend list above
+Do not describe the platform on Render as having broad connector coverage beyond those lanes.
 
 ## Post-Deploy Checks
 
-1. Open `https://synapscore-frontend-3.onrender.com`
-2. Verify direct deep links like `/sign-in` and `/dashboard` resolve through the SPA rewrite
-3. Verify `https://synapscore-3.onrender.com/actuator/health`
-4. Verify sign-in loads tenant directory successfully
-5. Verify login sets a secure session cookie and redirects into `/dashboard`
-6. Verify dashboard, integrations, runtime, and audit pages load without API or CORS failures
+1. Open the frontend URL.
+2. Verify deep links such as `/sign-in` and `/dashboard`.
+3. Verify backend health and readiness.
+4. Verify sign-in loads tenant directory correctly.
+5. Verify session cookies and redirect behavior.
+6. Verify dashboard, integrations, runtime, and audit load without CORS failures.
+7. Verify realtime works with the current simple-broker limitation in mind.
+8. Run hosted proof preparation and browser proof once the live catalog blocker is resolved.
+
+## Related Docs
+
+- [deployment.md](deployment.md)
+- [live-deployment-runbook.md](live-deployment-runbook.md)
+- [schema-migration-roadmap.md](schema-migration-roadmap.md)
+- [verification-status.md](verification-status.md)
