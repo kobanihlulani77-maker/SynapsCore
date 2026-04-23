@@ -44,6 +44,7 @@ public class ProductService {
     private final BusinessEventService businessEventService;
     private final OperationalStateChangePublisher operationalStateChangePublisher;
     private final AuditLogService auditLogService;
+    private final IdentitySequenceMigrationService identitySequenceMigrationService;
 
     @Transactional(readOnly = true)
     public List<ProductResponse> getProducts() {
@@ -57,6 +58,7 @@ public class ProductService {
 
     @Transactional
     public ProductResponse createProduct(ProductUpsertRequest request, String actorName) {
+        identitySequenceMigrationService.synchronizeCoreIdentitySequences();
         Tenant tenant = tenantContextService.getCurrentTenantOrDefault();
         String catalogSku = normalizeCatalogSku(request.sku());
         String normalizedName = normalizeRequiredText(request.name(), "Product name", 120);
@@ -127,6 +129,7 @@ public class ProductService {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "A non-empty product CSV file is required.");
         }
 
+        identitySequenceMigrationService.synchronizeCoreIdentitySequences();
         Tenant tenant = tenantContextService.getCurrentTenantOrDefault();
         List<ProductImportRowResult> rowResults = new ArrayList<>();
         Set<String> seenSkus = new HashSet<>();

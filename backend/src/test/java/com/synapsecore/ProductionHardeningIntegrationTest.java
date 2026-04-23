@@ -423,6 +423,78 @@ class ProductionHardeningIntegrationTest {
     }
 
     @Test
+    @Transactional(propagation = org.springframework.transaction.annotation.Propagation.NOT_SUPPORTED)
+    void productCreateRealignsCoreIdentitySequencesBeforePersisting() throws Exception {
+        try {
+            mockMvc.perform(post("/api/access/tenants")
+                    .header(BootstrapAccessService.BOOTSTRAP_TOKEN_HEADER, "bootstrap-secret")
+                    .contentType(APPLICATION_JSON)
+                    .content("""
+                        {
+                          "tenantCode": "SEQ-CREATE",
+                          "tenantName": "Sequence Create Tenant",
+                          "description": "Sequence repair proof tenant",
+                          "adminFullName": "Sequence Admin",
+                          "adminUsername": "sequence.admin",
+                          "adminPassword": "Admin@123",
+                          "primaryLocation": "Johannesburg",
+                          "secondaryLocation": "Cape Town"
+                        }
+                        """))
+                .andExpect(status().isOk());
+
+            MockHttpSession session = (MockHttpSession) mockMvc.perform(post("/api/auth/session/login")
+                    .contentType(APPLICATION_JSON)
+                    .content("""
+                        {
+                          "tenantCode": "SEQ-CREATE",
+                          "username": "sequence.admin",
+                          "password": "Admin@123"
+                        }
+                        """))
+                .andExpect(status().isOk())
+                .andReturn()
+                .getRequest()
+                .getSession(false);
+
+            mockMvc.perform(post("/api/products")
+                    .session(session)
+                    .header("X-Synapse-Tenant", "SEQ-CREATE")
+                    .contentType(APPLICATION_JSON)
+                    .content("""
+                        {
+                          "sku": "SKU-SEQ-CREATE-001",
+                          "name": "Sequence Baseline Product",
+                          "category": "Verification"
+                        }
+                        """))
+                .andExpect(status().isCreated());
+
+            jdbcTemplate.execute("alter table products alter column id restart with 1");
+            jdbcTemplate.execute("alter table business_events alter column id restart with 1");
+            jdbcTemplate.execute("alter table audit_logs alter column id restart with 1");
+            jdbcTemplate.execute("alter table operational_dispatch_work_items alter column id restart with 1");
+
+            mockMvc.perform(post("/api/products")
+                    .session(session)
+                    .header("X-Synapse-Tenant", "SEQ-CREATE")
+                    .contentType(APPLICATION_JSON)
+                    .content("""
+                        {
+                          "sku": "SKU-SEQ-CREATE-002",
+                          "name": "Sequence Repaired Product",
+                          "category": "Verification"
+                        }
+                        """))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.sku").value("SKU-SEQ-CREATE-002"))
+                .andExpect(jsonPath("$.tenantCode").value("SEQ-CREATE"));
+        } finally {
+            cleanupTenantWorkspace("SEQ-CREATE");
+        }
+    }
+
+    @Test
     void prodProfileStarterConnectorSeedingIsDisabled() {
         Tenant tenant = tenantRepository.save(Tenant.builder()
             .code("REAL-OPS")
@@ -841,5 +913,37 @@ class ProductionHardeningIntegrationTest {
                 .build()))
             .hasRootCauseInstanceOf(IllegalStateException.class)
             .hasMessageContaining("warehouse tenant BRAVO");
+    }
+
+    private void cleanupTenantWorkspace(String tenantCode) {
+        jdbcTemplate.update("delete from operational_dispatch_work_items where upper(tenant_code) = upper(?)", tenantCode);
+        jdbcTemplate.update("delete from audit_logs where upper(tenant_code) = upper(?)", tenantCode);
+        jdbcTemplate.update("delete from business_events where upper(tenant_code) = upper(?)", tenantCode);
+        jdbcTemplate.update("delete from inventory where tenant_id in (select id from tenants where upper(code) = upper(?))", tenantCode);
+        jdbcTemplate.update("delete from order_items where tenant_id in (select id from tenants where upper(code) = upper(?))", tenantCode);
+        jdbcTemplate.update("delete from customer_orders where tenant_id in (select id from tenants where upper(code) = upper(?))", tenantCode);
+        jdbcTemplate.update("delete from products where tenant_id in (select id from tenants where upper(code) = upper(?))", tenantCode);
+        jdbcTemplate.update("delete from warehouses where tenant_id in (select id from tenants where upper(code) = upper(?))", tenantCode);
+        jdbcTemplate.update(
+            """
+            delete from access_operator_roles
+            where access_operator_id in (
+                select id from access_operators where tenant_id in (select id from tenants where upper(code) = upper(?))
+            )
+            """,
+            tenantCode
+        );
+        jdbcTemplate.update(
+            """
+            delete from access_operator_warehouse_scopes
+            where access_operator_id in (
+                select id from access_operators where tenant_id in (select id from tenants where upper(code) = upper(?))
+            )
+            """,
+            tenantCode
+        );
+        jdbcTemplate.update("delete from access_users where tenant_id in (select id from tenants where upper(code) = upper(?))", tenantCode);
+        jdbcTemplate.update("delete from access_operators where tenant_id in (select id from tenants where upper(code) = upper(?))", tenantCode);
+        jdbcTemplate.update("delete from tenants where upper(code) = upper(?)", tenantCode);
     }
 }
