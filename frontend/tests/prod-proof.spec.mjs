@@ -99,6 +99,7 @@ async function loginViaUi(page, credentials) {
   await page.goto('/sign-in')
   await expect(page.getByRole('heading', { name: 'Access your operational workspace.' })).toBeVisible()
   const signInCard = page.locator('.public-signin-card')
+  await waitForSignInReady(signInCard)
   await fillSignInForm(signInCard, credentials, credentials.password)
   await signInCard.getByRole('button', { name: 'Enter Platform' }).click()
   await expect(page).toHaveURL(/\/dashboard$/)
@@ -138,6 +139,17 @@ async function fillSignInForm(signInCard, credentials, password) {
   }
 
   throw lastError
+}
+
+async function waitForSignInReady(signInCard) {
+  const loadingWorkspaceDirectory = signInCard.getByText('Loading available workspaces...')
+  if (await loadingWorkspaceDirectory.isVisible().catch(() => false)) {
+    await expect(loadingWorkspaceDirectory).toBeHidden({ timeout: 60_000 })
+  }
+
+  await expect(signInCard.getByRole('combobox', { name: 'Tenant workspace', exact: true })).toBeEnabled()
+  await expect(signInCard.getByRole('textbox', { name: 'Username', exact: true })).toBeEnabled()
+  await expect(signInCard.getByLabel('Password', { exact: true })).toBeEnabled()
 }
 
 async function navigateWithinApp(page, route) {
@@ -277,11 +289,14 @@ test('auth flow and the full authenticated page system render cleanly in a brows
   await page.goto('/dashboard')
   await expect(page.getByRole('heading', { name: 'Access your operational workspace.' })).toBeVisible()
   const signInCard = page.locator('.public-signin-card')
+  await waitForSignInReady(signInCard)
 
   await fillSignInForm(signInCard, users.operationsLead, 'wrong-code')
   await signInCard.getByRole('button', { name: 'Enter Platform' }).click()
-  await expect(page.getByText('Invalid operator credentials.')).toBeVisible()
+  await expect(signInCard.getByRole('button', { name: 'Enter Platform' })).toBeEnabled({ timeout: 60_000 })
+  await expect(signInCard.getByText('Invalid operator credentials.')).toBeVisible({ timeout: 15_000 })
 
+  await waitForSignInReady(signInCard)
   await fillSignInForm(signInCard, users.operationsLead, users.operationsLead.password)
   await signInCard.getByRole('button', { name: 'Enter Platform' }).click()
   await expect(page).toHaveURL(/\/dashboard$/)
@@ -360,36 +375,44 @@ test('@realtime dashboard summary updates live without a browser refresh', async
 
   const api = await createApiContext(users.operationsLead)
   let candidate = null
+  let revertQuantity = null
+  let revertThreshold = null
 
   try {
     const inventory = await readJson(await api.get('/api/inventory'))
-    candidate = inventory.find((item) => item.lowStock && Number.isFinite(item.quantityAvailable) && Number.isFinite(item.reorderThreshold))
+    candidate = inventory.find((item) => item.productSku === proofProductSku && item.warehouseCode === 'WH-NORTH')
+      || inventory.find((item) => Number.isFinite(item.quantityAvailable) && Number.isFinite(item.reorderThreshold))
     expect(candidate).toBeTruthy()
 
-    const beforeLowStock = await waitForNumericSummaryCard(page, 'Risk')
-    const nextQuantity = candidate.reorderThreshold + 5
+    revertQuantity = candidate.quantityAvailable
+    revertThreshold = candidate.reorderThreshold
+
+    const beforeRisk = await waitForNumericSummaryCard(page, 'Risk')
+    const threshold = Number.isFinite(candidate.reorderThreshold) ? candidate.reorderThreshold : 5
+    const forceLowQuantity = Math.max(0, threshold - 1)
+    const safeQuantity = threshold + 5
 
     await readJson(await api.post('/api/inventory/update', {
       data: {
         productSku: candidate.productSku,
         warehouseCode: candidate.warehouseCode,
-        quantityAvailable: nextQuantity,
-        reorderThreshold: candidate.reorderThreshold,
+        quantityAvailable: candidate.lowStock ? safeQuantity : forceLowQuantity,
+        reorderThreshold: threshold,
       },
     }))
 
     await expect.poll(async () => summaryCardValue(page, 'Risk'), {
       timeout: 30_000,
       message: 'Expected the dashboard low-stock summary to change through the live websocket path.',
-    }).toBeLessThan(beforeLowStock)
+    })[candidate.lowStock ? 'toBeLessThan' : 'toBeGreaterThan'](beforeRisk)
   } finally {
-    if (candidate) {
+    if (candidate && revertQuantity != null && revertThreshold != null) {
       await readJson(await api.post('/api/inventory/update', {
         data: {
           productSku: candidate.productSku,
           warehouseCode: candidate.warehouseCode,
-          quantityAvailable: candidate.quantityAvailable,
-          reorderThreshold: candidate.reorderThreshold,
+          quantityAvailable: revertQuantity,
+          reorderThreshold: revertThreshold,
         },
       }))
     }
