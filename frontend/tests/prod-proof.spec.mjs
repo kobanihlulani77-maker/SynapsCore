@@ -98,10 +98,11 @@ async function readJson(response) {
 async function loginViaUi(page, credentials) {
   await page.goto('/sign-in')
   await expect(page.getByRole('heading', { name: 'Access your operational workspace.' })).toBeVisible()
-  await page.getByLabel('Tenant workspace').fill(credentials.tenantCode)
-  await page.getByLabel('Username').fill(credentials.username)
-  await page.getByLabel('Password').fill(credentials.password)
-  await page.locator('.public-signin-card').getByRole('button', { name: 'Enter Platform' }).click()
+  const signInCard = page.locator('.public-signin-card')
+  await signInCard.getByRole('textbox', { name: 'Tenant workspace', exact: true }).fill(credentials.tenantCode)
+  await signInCard.getByRole('textbox', { name: 'Username', exact: true }).fill(credentials.username)
+  await signInCard.getByLabel('Password', { exact: true }).fill(credentials.password)
+  await signInCard.getByRole('button', { name: 'Enter Platform' }).click()
   await expect(page).toHaveURL(/\/dashboard$/)
   await expect(page.getByRole('heading', { level: 1, name: 'Live operational command center' })).toBeVisible()
 }
@@ -250,15 +251,16 @@ async function createScenarioFixture() {
 test('auth flow and the full authenticated page system render cleanly in a browser', async ({ page }) => {
   await page.goto('/dashboard')
   await expect(page.getByRole('heading', { name: 'Access your operational workspace.' })).toBeVisible()
+  const signInCard = page.locator('.public-signin-card')
 
-  await page.getByLabel('Tenant workspace').fill(users.operationsLead.tenantCode)
-  await page.getByLabel('Username').fill(users.operationsLead.username)
-  await page.getByLabel('Password').fill('wrong-code')
-  await page.locator('.public-signin-card').getByRole('button', { name: 'Enter Platform' }).click()
+  await signInCard.getByRole('textbox', { name: 'Tenant workspace', exact: true }).fill(users.operationsLead.tenantCode)
+  await signInCard.getByRole('textbox', { name: 'Username', exact: true }).fill(users.operationsLead.username)
+  await signInCard.getByLabel('Password', { exact: true }).fill('wrong-code')
+  await signInCard.getByRole('button', { name: 'Enter Platform' }).click()
   await expect(page.getByText('Invalid operator credentials.')).toBeVisible()
 
-  await page.getByLabel('Password').fill(users.operationsLead.password)
-  await page.locator('.public-signin-card').getByRole('button', { name: 'Enter Platform' }).click()
+  await signInCard.getByLabel('Password', { exact: true }).fill(users.operationsLead.password)
+  await signInCard.getByRole('button', { name: 'Enter Platform' }).click()
   await expect(page).toHaveURL(/\/dashboard$/)
 
   for (const [route, title] of appPages) {
