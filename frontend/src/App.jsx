@@ -591,7 +591,7 @@ export default function App() {
             session: session.signedIn ? session : null,
             tenantCode: session.signedIn ? session.tenantCode : (current.tenantCode || defaultSignInTenantCode),
             username: session.signedIn ? session.username : current.username,
-            password: '',
+            password: session.signedIn ? '' : current.password,
           }))
           setPasswordChangeState((current) => ({
             ...current,
@@ -609,7 +609,7 @@ export default function App() {
             error: error.message,
             action: '',
             session: null,
-            password: '',
+            password: current.password,
           }))
           setPasswordChangeState((current) => ({ ...current, loading: false, error: '', form: createDefaultPasswordChangeForm() }))
         }

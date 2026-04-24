@@ -99,9 +99,7 @@ async function loginViaUi(page, credentials) {
   await page.goto('/sign-in')
   await expect(page.getByRole('heading', { name: 'Access your operational workspace.' })).toBeVisible()
   const signInCard = page.locator('.public-signin-card')
-  await signInCard.getByRole('textbox', { name: 'Tenant workspace', exact: true }).fill(credentials.tenantCode)
-  await signInCard.getByRole('textbox', { name: 'Username', exact: true }).fill(credentials.username)
-  await signInCard.getByLabel('Password', { exact: true }).fill(credentials.password)
+  await fillSignInForm(signInCard, credentials, credentials.password)
   await signInCard.getByRole('button', { name: 'Enter Platform' }).click()
   await expect(page).toHaveURL(/\/dashboard$/)
   await expect(page.getByRole('heading', { level: 1, name: 'Live operational command center' })).toBeVisible()
@@ -113,6 +111,33 @@ async function signOutViaUi(page) {
     await signOutButton.click()
     await expect(page.getByRole('heading', { name: 'Access your operational workspace.' })).toBeVisible()
   }
+}
+
+async function fillSignInForm(signInCard, credentials, password) {
+  const tenantField = signInCard.getByRole('combobox', { name: 'Tenant workspace', exact: true })
+  const usernameField = signInCard.getByRole('textbox', { name: 'Username', exact: true })
+  const passwordField = signInCard.getByLabel('Password', { exact: true })
+  const submitButton = signInCard.getByRole('button', { name: 'Enter Platform' })
+
+  let lastError = null
+  for (let attempt = 0; attempt < 3; attempt += 1) {
+    try {
+      await tenantField.fill(credentials.tenantCode)
+      await expect(tenantField).toHaveValue(credentials.tenantCode)
+
+      await usernameField.fill(credentials.username)
+      await expect(usernameField).toHaveValue(credentials.username)
+
+      await passwordField.fill(password)
+      await expect(passwordField).toHaveValue(password)
+      await expect(submitButton).toBeEnabled()
+      return
+    } catch (error) {
+      lastError = error
+    }
+  }
+
+  throw lastError
 }
 
 async function navigateWithinApp(page, route) {
@@ -253,13 +278,11 @@ test('auth flow and the full authenticated page system render cleanly in a brows
   await expect(page.getByRole('heading', { name: 'Access your operational workspace.' })).toBeVisible()
   const signInCard = page.locator('.public-signin-card')
 
-  await signInCard.getByRole('textbox', { name: 'Tenant workspace', exact: true }).fill(users.operationsLead.tenantCode)
-  await signInCard.getByRole('textbox', { name: 'Username', exact: true }).fill(users.operationsLead.username)
-  await signInCard.getByLabel('Password', { exact: true }).fill('wrong-code')
+  await fillSignInForm(signInCard, users.operationsLead, 'wrong-code')
   await signInCard.getByRole('button', { name: 'Enter Platform' }).click()
   await expect(page.getByText('Invalid operator credentials.')).toBeVisible()
 
-  await signInCard.getByLabel('Password', { exact: true }).fill(users.operationsLead.password)
+  await fillSignInForm(signInCard, users.operationsLead, users.operationsLead.password)
   await signInCard.getByRole('button', { name: 'Enter Platform' }).click()
   await expect(page).toHaveURL(/\/dashboard$/)
 
@@ -332,7 +355,8 @@ test('product catalog onboarding works through tenant-scoped API and browser sur
 
 test('@realtime dashboard summary updates live without a browser refresh', async ({ page }) => {
   await loginViaUi(page, users.operationsLead)
-  await expect(page.getByText('Live system')).toBeVisible()
+  await expect(page.getByRole('heading', { level: 1, name: 'Live operational command center' })).toBeVisible()
+  await expect(page.getByText('Realtime state')).toBeVisible()
 
   const api = await createApiContext(users.operationsLead)
   let candidate = null
@@ -342,7 +366,7 @@ test('@realtime dashboard summary updates live without a browser refresh', async
     candidate = inventory.find((item) => item.lowStock && Number.isFinite(item.quantityAvailable) && Number.isFinite(item.reorderThreshold))
     expect(candidate).toBeTruthy()
 
-    const beforeLowStock = await waitForNumericSummaryCard(page, 'Low Stock Items')
+    const beforeLowStock = await waitForNumericSummaryCard(page, 'Risk')
     const nextQuantity = candidate.reorderThreshold + 5
 
     await readJson(await api.post('/api/inventory/update', {
@@ -354,7 +378,7 @@ test('@realtime dashboard summary updates live without a browser refresh', async
       },
     }))
 
-    await expect.poll(async () => summaryCardValue(page, 'Low Stock Items'), {
+    await expect.poll(async () => summaryCardValue(page, 'Risk'), {
       timeout: 30_000,
       message: 'Expected the dashboard low-stock summary to change through the live websocket path.',
     }).toBeLessThan(beforeLowStock)
@@ -423,5 +447,6 @@ test('replay recovery, scenario approval, execution, and browser role gating wor
   await loginViaUi(page, users.operationsPlanner)
   await navigateWithinApp(page, '/users')
   await expect(page.getByRole('heading', { level: 1, name: 'Users and access control' })).toBeVisible()
-  await expect(page.getByText('Sign in as a tenant admin to manage operators, warehouse scopes, and tenant user accounts.')).toBeVisible()
+  await expect(page.getByText('Tenant admin access required')).toBeVisible()
+  await expect(page.getByText('Operators', { exact: true }).first()).toBeVisible()
 })
