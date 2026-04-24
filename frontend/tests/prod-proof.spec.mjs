@@ -142,11 +142,6 @@ async function fillSignInForm(signInCard, credentials, password) {
 }
 
 async function waitForSignInReady(signInCard) {
-  const loadingWorkspaceDirectory = signInCard.getByText('Loading available workspaces...')
-  if (await loadingWorkspaceDirectory.isVisible().catch(() => false)) {
-    await expect(loadingWorkspaceDirectory).toBeHidden({ timeout: 60_000 })
-  }
-
   await expect(signInCard.getByRole('combobox', { name: 'Tenant workspace', exact: true })).toBeEnabled()
   await expect(signInCard.getByRole('textbox', { name: 'Username', exact: true })).toBeEnabled()
   await expect(signInCard.getByLabel('Password', { exact: true })).toBeEnabled()
