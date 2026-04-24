@@ -143,6 +143,23 @@ function Get-ErrorStatusCode {
     return $null
 }
 
+function Get-ErrorHeaderValue {
+    param(
+        [object]$ErrorRecord,
+        [string]$HeaderName
+    )
+
+    try {
+        if ($null -ne $ErrorRecord.Exception.Response -and $null -ne $ErrorRecord.Exception.Response.Headers) {
+            return $ErrorRecord.Exception.Response.Headers[$HeaderName]
+        }
+    } catch {
+        return $null
+    }
+
+    return $null
+}
+
 function Invoke-SynapseJson {
     param(
         [ValidateSet("GET", "POST", "PUT", "DELETE")]
@@ -182,10 +199,19 @@ function Invoke-SynapseJson {
     } catch {
         $body = Get-ErrorBody -ErrorRecord $_
         $statusCode = Get-ErrorStatusCode -ErrorRecord $_
-        if ($null -ne $statusCode) {
-            throw "$Method $Url failed with HTTP $statusCode. $body"
+        $requestId = Get-ErrorHeaderValue -ErrorRecord $_ -HeaderName "x-request-id"
+        $renderRequestId = Get-ErrorHeaderValue -ErrorRecord $_ -HeaderName "rndr-id"
+        $requestSuffix = ""
+        if (-not [string]::IsNullOrWhiteSpace($requestId)) {
+            $requestSuffix += " requestId=$requestId"
         }
-        throw "$Method $Url failed. $body"
+        if (-not [string]::IsNullOrWhiteSpace($renderRequestId)) {
+            $requestSuffix += " renderRequestId=$renderRequestId"
+        }
+        if ($null -ne $statusCode) {
+            throw "$Method $Url failed with HTTP $statusCode.$requestSuffix $body"
+        }
+        throw "$Method $Url failed.$requestSuffix $body"
     }
 }
 

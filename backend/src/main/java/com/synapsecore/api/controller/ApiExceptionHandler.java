@@ -70,6 +70,30 @@ public class ApiExceptionHandler {
         ));
     }
 
+    @ExceptionHandler(Throwable.class)
+    public ResponseEntity<ApiErrorResponse> handleUnexpected(Throwable exception,
+                                                             HttpServletRequest request) {
+        HttpStatus status = HttpStatus.INTERNAL_SERVER_ERROR;
+        String message = isProductCatalogRequest(request)
+            ? catalogWriteConflictResolver.describe(exception, null)
+            : "The request failed due to an unexpected SynapseCore server error.";
+        String requestId = requestTraceContext.getRequiredRequestId();
+        log.error("Unhandled API failure for {} {} [{}]: {}",
+            request.getMethod(),
+            request.getRequestURI(),
+            requestId,
+            exception.getMessage(),
+            exception);
+        auditFailureSafely(request, status, message);
+        return ResponseEntity.status(status).body(new ApiErrorResponse(
+            Instant.now(),
+            status.value(),
+            status.getReasonPhrase(),
+            message,
+            requestId
+        ));
+    }
+
     private boolean isProductCatalogRequest(HttpServletRequest request) {
         String requestUri = request == null ? null : request.getRequestURI();
         return requestUri != null && requestUri.startsWith("/api/products");
