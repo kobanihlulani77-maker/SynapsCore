@@ -47,9 +47,9 @@ Call Log:
           - button "Alerts 1" [ref=e21] [cursor=pointer]:
             - generic [ref=e22]: Alerts
             - strong [ref=e23]: "1"
-          - button "Recommendations 4" [ref=e24] [cursor=pointer]:
+          - button "Recommendations 5" [ref=e24] [cursor=pointer]:
             - generic [ref=e25]: Recommendations
-            - strong [ref=e26]: "4"
+            - strong [ref=e26]: "5"
       - generic [ref=e27]:
         - paragraph [ref=e28]: Operations
         - generic [ref=e29]:
@@ -59,9 +59,9 @@ Call Log:
           - button "Inventory 1" [ref=e33] [cursor=pointer]:
             - generic [ref=e34]: Inventory
             - strong [ref=e35]: "1"
-          - button "Catalog 11" [ref=e36] [cursor=pointer]:
+          - button "Catalog 13" [ref=e36] [cursor=pointer]:
             - generic [ref=e37]: Catalog
-            - strong [ref=e38]: "11"
+            - strong [ref=e38]: "13"
           - button "Locations 2" [ref=e39] [cursor=pointer]:
             - generic [ref=e40]: Locations
             - strong [ref=e41]: "2"
@@ -80,9 +80,9 @@ Call Log:
           - button "Approvals 0" [ref=e54] [cursor=pointer]:
             - generic [ref=e55]: Approvals
             - strong [ref=e56]: "0"
-          - button "Escalations 8" [ref=e57] [cursor=pointer]:
+          - button "Escalations 6" [ref=e57] [cursor=pointer]:
             - generic [ref=e58]: Escalations
-            - strong [ref=e59]: "8"
+            - strong [ref=e59]: "6"
       - generic [ref=e60]:
         - paragraph [ref=e61]: Systems
         - generic [ref=e62]:
@@ -92,9 +92,9 @@ Call Log:
           - button "Replay Queue 0" [ref=e66] [cursor=pointer]:
             - generic [ref=e67]: Replay Queue
             - strong [ref=e68]: "0"
-          - button "Runtime 8" [ref=e69] [cursor=pointer]:
+          - button "Runtime 6" [ref=e69] [cursor=pointer]:
             - generic [ref=e70]: Runtime
-            - strong [ref=e71]: "8"
+            - strong [ref=e71]: "6"
           - button "Audit & Events 20" [ref=e72] [cursor=pointer]:
             - generic [ref=e73]: Audit & Events
             - strong [ref=e74]: "20"
@@ -110,9 +110,9 @@ Call Log:
           - button "Profile 1" [ref=e84] [cursor=pointer]:
             - generic [ref=e85]: Profile
             - strong [ref=e86]: "1"
-          - button "Platform Admin 8" [ref=e87] [cursor=pointer]:
+          - button "Platform Admin 6" [ref=e87] [cursor=pointer]:
             - generic [ref=e88]: Platform Admin
-            - strong [ref=e89]: "8"
+            - strong [ref=e89]: "6"
           - button "Tenant Management 3" [ref=e90] [cursor=pointer]:
             - generic [ref=e91]: Tenant Management
             - strong [ref=e92]: "3"
@@ -141,9 +141,9 @@ Call Log:
           - button "Live state" [ref=e117] [cursor=pointer]
           - button "Trust layer" [ref=e118] [cursor=pointer]
         - generic [ref=e119]:
-          - generic [ref=e120]: 2026/04/24, 13:46:35
+          - generic [ref=e120]: 2026/04/24, 13:50:00
           - generic [ref=e121]: Reconnecting
-          - button "Notifications 9" [ref=e122] [cursor=pointer]
+          - button "Notifications 7" [ref=e122] [cursor=pointer]
         - generic [ref=e123]:
           - button "Open alerts" [ref=e124] [cursor=pointer]
           - button "Open approvals" [ref=e125] [cursor=pointer]
@@ -164,7 +164,7 @@ Call Log:
                 - paragraph [ref=e140]: Hosted Verification Tenant Admin is operating as Operations Lead.
               - article [ref=e141]:
                 - generic [ref=e142]: Decision Pressure
-                - strong [ref=e143]: 5 open signals
+                - strong [ref=e143]: 6 open signals
                 - paragraph [ref=e144]: Alerts and recommendations are live across the tenant decision layer.
               - article [ref=e145]:
                 - generic [ref=e146]: Operational Throughput
@@ -173,7 +173,7 @@ Call Log:
           - article [ref=e150]:
             - paragraph [ref=e151]: Workspace pulse
             - heading "Attention needed" [level=3] [ref=e152]
-            - paragraph [ref=e153]: Updated 2026/04/24, 13:45:59
+            - paragraph [ref=e153]: Updated 2026/04/24, 13:49:22
             - generic [ref=e154]:
               - generic [ref=e155]:
                 - generic [ref=e156]: Pages
@@ -217,21 +217,21 @@ Call Log:
                   - strong [ref=e194]: Fulfillment backlog building in WH-NORTH
                   - generic [ref=e195]: High
                 - paragraph [ref=e196]: Dispatch backlog is building in PILOT-TENANT Hosted Verification North Hub with 3 open fulfillment tasks and roughly 6.0 hours to clear at the current pace. Pull warehouse labor forward or rebalance the lane now.
-              - button "Reorder stock for SKU SKU-PILOT-TENANT-PROOF at WH-NORTH Medium Plan replenishment for PILOT-TENANT Hosted Verification North Hub. Current quantity is 8 units versus a threshold of 12." [ref=e197] [cursor=pointer]:
+              - button "Urgent reorder for SKU SKU-PILOT-TENANT-PROOF at WH-NORTH Critical Reorder immediately for PILOT-TENANT Hosted Verification North Hub. Estimated stockout window is 2.2 hours at the current demand rate." [ref=e197] [cursor=pointer]:
                 - generic [ref=e198]:
-                  - strong [ref=e199]: Reorder stock for SKU SKU-PILOT-TENANT-PROOF at WH-NORTH
-                  - generic [ref=e200]: Medium
-                - paragraph [ref=e201]: Plan replenishment for PILOT-TENANT Hosted Verification North Hub. Current quantity is 8 units versus a threshold of 12.
-              - button "Prioritize fulfillment backlog for WH-NORTH Medium Dispatch backlog is building in PILOT-TENANT Hosted Verification North Hub with 3 open fulfillment tasks and roughly 6.0 hours to clear at the current pace. Pull warehouse labor forward or rebalance the lane now." [ref=e202] [cursor=pointer]:
+                  - strong [ref=e199]: Urgent reorder for SKU SKU-PILOT-TENANT-PROOF at WH-NORTH
+                  - generic [ref=e200]: Critical
+                - paragraph [ref=e201]: Reorder immediately for PILOT-TENANT Hosted Verification North Hub. Estimated stockout window is 2.2 hours at the current demand rate.
+              - button "Reorder stock for SKU SKU-PILOT-TENANT-PROOF at WH-NORTH Medium Plan replenishment for PILOT-TENANT Hosted Verification North Hub. Current quantity is 8 units versus a threshold of 12." [ref=e202] [cursor=pointer]:
                 - generic [ref=e203]:
-                  - strong [ref=e204]: Prioritize fulfillment backlog for WH-NORTH
+                  - strong [ref=e204]: Reorder stock for SKU SKU-PILOT-TENANT-PROOF at WH-NORTH
                   - generic [ref=e205]: Medium
-                - paragraph [ref=e206]: Dispatch backlog is building in PILOT-TENANT Hosted Verification North Hub with 3 open fulfillment tasks and roughly 6.0 hours to clear at the current pace. Pull warehouse labor forward or rebalance the lane now.
-              - button "Prioritize fulfillment backlog for WH-NORTH Medium Dispatch backlog is building in PILOT-TENANT Hosted Verification North Hub with 2 open fulfillment tasks and roughly 6.0 hours to clear at the current pace. Pull warehouse labor forward or rebalance the lane now." [ref=e207] [cursor=pointer]:
+                - paragraph [ref=e206]: Plan replenishment for PILOT-TENANT Hosted Verification North Hub. Current quantity is 8 units versus a threshold of 12.
+              - button "Prioritize fulfillment backlog for WH-NORTH Medium Dispatch backlog is building in PILOT-TENANT Hosted Verification North Hub with 3 open fulfillment tasks and roughly 6.0 hours to clear at the current pace. Pull warehouse labor forward or rebalance the lane now." [ref=e207] [cursor=pointer]:
                 - generic [ref=e208]:
                   - strong [ref=e209]: Prioritize fulfillment backlog for WH-NORTH
                   - generic [ref=e210]: Medium
-                - paragraph [ref=e211]: Dispatch backlog is building in PILOT-TENANT Hosted Verification North Hub with 2 open fulfillment tasks and roughly 6.0 hours to clear at the current pace. Pull warehouse labor forward or rebalance the lane now.
+                - paragraph [ref=e211]: Dispatch backlog is building in PILOT-TENANT Hosted Verification North Hub with 3 open fulfillment tasks and roughly 6.0 hours to clear at the current pace. Pull warehouse labor forward or rebalance the lane now.
           - article [ref=e212]:
             - generic [ref=e213]:
               - generic [ref=e214]:
@@ -267,36 +267,36 @@ Call Log:
                 - strong [ref=e247]: Recommendation queue
                 - button "Open Recommendations" [ref=e248] [cursor=pointer]
               - generic [ref=e249]:
-                - button "Reorder stock for SKU SKU-PILOT-TENANT-PROOF at WH-NORTH MEDIUM Plan replenishment for PILOT-TENANT Hosted Verification North Hub. Current quantity is 8 units versus a threshold of 12. Tenant-wide | 2026/04/24, 12:45:29" [ref=e250] [cursor=pointer]:
+                - button "Urgent reorder for SKU SKU-PILOT-TENANT-PROOF at WH-NORTH CRITICAL Reorder immediately for PILOT-TENANT Hosted Verification North Hub. Estimated stockout window is 2.2 hours at the current demand rate. Tenant-wide | 2026/04/24, 13:46:13" [ref=e250] [cursor=pointer]:
                   - generic [ref=e251]:
-                    - strong [ref=e252]: Reorder stock for SKU SKU-PILOT-TENANT-PROOF at WH-NORTH
-                    - generic [ref=e253]: MEDIUM
-                  - paragraph [ref=e254]: Plan replenishment for PILOT-TENANT Hosted Verification North Hub. Current quantity is 8 units versus a threshold of 12.
-                  - paragraph [ref=e255]: Tenant-wide | 2026/04/24, 12:45:29
-                - button "Prioritize fulfillment backlog for WH-NORTH MEDIUM Dispatch backlog is building in PILOT-TENANT Hosted Verification North Hub with 3 open fulfillment tasks and roughly 6.0 hours to clear at the current pace. Pull warehouse labor forward or rebalance the lane now. Tenant-wide | 2026/04/24, 13:21:10" [ref=e256] [cursor=pointer]:
+                    - strong [ref=e252]: Urgent reorder for SKU SKU-PILOT-TENANT-PROOF at WH-NORTH
+                    - generic [ref=e253]: CRITICAL
+                  - paragraph [ref=e254]: Reorder immediately for PILOT-TENANT Hosted Verification North Hub. Estimated stockout window is 2.2 hours at the current demand rate.
+                  - paragraph [ref=e255]: Tenant-wide | 2026/04/24, 13:46:13
+                - button "Reorder stock for SKU SKU-PILOT-TENANT-PROOF at WH-NORTH MEDIUM Plan replenishment for PILOT-TENANT Hosted Verification North Hub. Current quantity is 8 units versus a threshold of 12. Tenant-wide | 2026/04/24, 12:45:29" [ref=e256] [cursor=pointer]:
                   - generic [ref=e257]:
-                    - strong [ref=e258]: Prioritize fulfillment backlog for WH-NORTH
+                    - strong [ref=e258]: Reorder stock for SKU SKU-PILOT-TENANT-PROOF at WH-NORTH
                     - generic [ref=e259]: MEDIUM
-                  - paragraph [ref=e260]: Dispatch backlog is building in PILOT-TENANT Hosted Verification North Hub with 3 open fulfillment tasks and roughly 6.0 hours to clear at the current pace. Pull warehouse labor forward or rebalance the lane now.
-                  - paragraph [ref=e261]: Tenant-wide | 2026/04/24, 13:21:10
-                - button "Prioritize fulfillment backlog for WH-NORTH MEDIUM Dispatch backlog is building in PILOT-TENANT Hosted Verification North Hub with 2 open fulfillment tasks and roughly 6.0 hours to clear at the current pace. Pull warehouse labor forward or rebalance the lane now. Tenant-wide | 2026/04/24, 13:14:36" [ref=e262] [cursor=pointer]:
+                  - paragraph [ref=e260]: Plan replenishment for PILOT-TENANT Hosted Verification North Hub. Current quantity is 8 units versus a threshold of 12.
+                  - paragraph [ref=e261]: Tenant-wide | 2026/04/24, 12:45:29
+                - button "Prioritize fulfillment backlog for WH-NORTH MEDIUM Dispatch backlog is building in PILOT-TENANT Hosted Verification North Hub with 3 open fulfillment tasks and roughly 6.0 hours to clear at the current pace. Pull warehouse labor forward or rebalance the lane now. Tenant-wide | 2026/04/24, 13:21:10" [ref=e262] [cursor=pointer]:
                   - generic [ref=e263]:
                     - strong [ref=e264]: Prioritize fulfillment backlog for WH-NORTH
                     - generic [ref=e265]: MEDIUM
-                  - paragraph [ref=e266]: Dispatch backlog is building in PILOT-TENANT Hosted Verification North Hub with 2 open fulfillment tasks and roughly 6.0 hours to clear at the current pace. Pull warehouse labor forward or rebalance the lane now.
-                  - paragraph [ref=e267]: Tenant-wide | 2026/04/24, 13:14:36
-                - button "Prioritize fulfillment backlog for WH-NORTH MEDIUM Dispatch backlog is building in PILOT-TENANT Hosted Verification North Hub with 1 open fulfillment tasks and roughly 6.0 hours to clear at the current pace. Pull warehouse labor forward or rebalance the lane now. Tenant-wide | 2026/04/24, 13:14:07" [ref=e268] [cursor=pointer]:
+                  - paragraph [ref=e266]: Dispatch backlog is building in PILOT-TENANT Hosted Verification North Hub with 3 open fulfillment tasks and roughly 6.0 hours to clear at the current pace. Pull warehouse labor forward or rebalance the lane now.
+                  - paragraph [ref=e267]: Tenant-wide | 2026/04/24, 13:21:10
+                - button "Prioritize fulfillment backlog for WH-NORTH MEDIUM Dispatch backlog is building in PILOT-TENANT Hosted Verification North Hub with 2 open fulfillment tasks and roughly 6.0 hours to clear at the current pace. Pull warehouse labor forward or rebalance the lane now. Tenant-wide | 2026/04/24, 13:14:36" [ref=e268] [cursor=pointer]:
                   - generic [ref=e269]:
                     - strong [ref=e270]: Prioritize fulfillment backlog for WH-NORTH
                     - generic [ref=e271]: MEDIUM
-                  - paragraph [ref=e272]: Dispatch backlog is building in PILOT-TENANT Hosted Verification North Hub with 1 open fulfillment tasks and roughly 6.0 hours to clear at the current pace. Pull warehouse labor forward or rebalance the lane now.
-                  - paragraph [ref=e273]: Tenant-wide | 2026/04/24, 13:14:07
+                  - paragraph [ref=e272]: Dispatch backlog is building in PILOT-TENANT Hosted Verification North Hub with 2 open fulfillment tasks and roughly 6.0 hours to clear at the current pace. Pull warehouse labor forward or rebalance the lane now.
+                  - paragraph [ref=e273]: Tenant-wide | 2026/04/24, 13:14:36
         - article [ref=e275]:
           - generic [ref=e276]:
             - generic [ref=e277]:
               - paragraph [ref=e278]: What changed recently
               - heading "Activity, approvals, and system health overview" [level=2] [ref=e279]
-            - generic [ref=e280]: "14"
+            - generic [ref=e280]: "12"
           - generic [ref=e281]:
             - article [ref=e282]:
               - generic [ref=e283]:
@@ -308,19 +308,19 @@ Call Log:
                 - generic [ref=e289]:
                   - strong [ref=e290]: Request Rejected
                   - paragraph [ref=e291]: High incident
-                  - paragraph [ref=e292]: 2026/04/24, 13:46:06
+                  - paragraph [ref=e292]: 2026/04/24, 13:49:29
                 - generic [ref=e293]:
                   - strong [ref=e294]: Request Rejected
                   - paragraph [ref=e295]: High incident
-                  - paragraph [ref=e296]: 2026/04/24, 13:44:20
+                  - paragraph [ref=e296]: 2026/04/24, 13:46:06
                 - generic [ref=e297]:
                   - strong [ref=e298]: Product Catalog Updated
                   - paragraph [ref=e299]: "Imported product catalog rows: created 1, updated 1, failed 1."
-                  - paragraph [ref=e300]: 2026/04/24, 13:45:55
+                  - paragraph [ref=e300]: 2026/04/24, 13:49:16
                 - generic [ref=e301]:
                   - strong [ref=e302]: Product Catalog Updated
-                  - paragraph [ref=e303]: Updated catalog product SKU-UI-30770150 (UI Catalog 30770150 Updated).
-                  - paragraph [ref=e304]: 2026/04/24, 13:45:53
+                  - paragraph [ref=e303]: Updated catalog product SKU-UI-CBFE0691 (UI Catalog CBFE0691 Updated).
+                  - paragraph [ref=e304]: 2026/04/24, 13:49:11
             - article [ref=e305]:
               - generic [ref=e306]:
                 - strong [ref=e307]: Approval attention
@@ -340,8 +340,8 @@ Call Log:
                 - generic [ref=e322]:
                   - generic [ref=e323]:
                     - strong [ref=e324]: Incident pressure
-                    - generic [ref=e325]: 8 active
-                  - paragraph [ref=e326]: 7 high-severity incidents and 0 replay items are currently affecting trust.
+                    - generic [ref=e325]: 6 active
+                  - paragraph [ref=e326]: 4 high-severity incidents and 0 replay items are currently affecting trust.
                   - paragraph [ref=e327]: 2/2 connectors enabled across the tenant integration surface.
       - complementary [ref=e328]:
         - article [ref=e329]:
@@ -349,26 +349,26 @@ Call Log:
             - paragraph [ref=e331]: Realtime state
             - generic [ref=e332]: Reconnecting
           - strong [ref=e333]: Monitoring live operating state
-          - paragraph [ref=e334]: Snapshot 2026/04/24, 13:46:13
+          - paragraph [ref=e334]: Snapshot 2026/04/24, 13:49:34
           - generic [ref=e335]:
             - generic [ref=e336]:
               - generic [ref=e337]: Alerts
               - strong [ref=e338]: "1"
             - generic [ref=e339]:
               - generic [ref=e340]: Actions
-              - strong [ref=e341]: "4"
+              - strong [ref=e341]: "5"
             - generic [ref=e342]:
               - generic [ref=e343]: Replay
               - strong [ref=e344]: "0"
             - generic [ref=e345]:
               - generic [ref=e346]: Incidents
-              - strong [ref=e347]: "8"
+              - strong [ref=e347]: "6"
         - article [ref=e348]:
           - generic [ref=e349]:
             - paragraph [ref=e350]: Page focus
             - generic [ref=e351]: Dashboard
           - strong [ref=e352]: Live operational command center
-          - paragraph [ref=e353]: Updated 2026/04/24, 13:45:59
+          - paragraph [ref=e353]: Updated 2026/04/24, 13:49:22
           - generic [ref=e354]:
             - generic [ref=e355]:
               - generic [ref=e356]: Focus 1
@@ -391,18 +391,18 @@ Call Log:
               - generic [ref=e373]: High
               - strong [ref=e374]: Fulfillment backlog building in WH-NORTH
               - paragraph [ref=e375]: Dispatch backlog is building in PILOT-TENANT Hosted Verification North Hub with 3 open fulfillment tasks and roughly 6.0 hours to clear at the current pace. Pull warehouse labor forward or rebalance the lane now.
-            - button "Medium Reorder stock for SKU SKU-PILOT-TENANT-PROOF at WH-NORTH Plan replenishment for PILOT-TENANT Hosted Verification North Hub. Current quantity is 8 units versus a threshold of 12." [ref=e376] [cursor=pointer]:
-              - generic [ref=e377]: Medium
-              - strong [ref=e378]: Reorder stock for SKU SKU-PILOT-TENANT-PROOF at WH-NORTH
-              - paragraph [ref=e379]: Plan replenishment for PILOT-TENANT Hosted Verification North Hub. Current quantity is 8 units versus a threshold of 12.
-            - button "Medium Prioritize fulfillment backlog for WH-NORTH Dispatch backlog is building in PILOT-TENANT Hosted Verification North Hub with 3 open fulfillment tasks and roughly 6.0 hours to clear at the current pace. Pull warehouse labor forward or rebalance the lane now." [ref=e380] [cursor=pointer]:
+            - button "Critical Urgent reorder for SKU SKU-PILOT-TENANT-PROOF at WH-NORTH Reorder immediately for PILOT-TENANT Hosted Verification North Hub. Estimated stockout window is 2.2 hours at the current demand rate." [ref=e376] [cursor=pointer]:
+              - generic [ref=e377]: Critical
+              - strong [ref=e378]: Urgent reorder for SKU SKU-PILOT-TENANT-PROOF at WH-NORTH
+              - paragraph [ref=e379]: Reorder immediately for PILOT-TENANT Hosted Verification North Hub. Estimated stockout window is 2.2 hours at the current demand rate.
+            - button "Medium Reorder stock for SKU SKU-PILOT-TENANT-PROOF at WH-NORTH Plan replenishment for PILOT-TENANT Hosted Verification North Hub. Current quantity is 8 units versus a threshold of 12." [ref=e380] [cursor=pointer]:
               - generic [ref=e381]: Medium
-              - strong [ref=e382]: Prioritize fulfillment backlog for WH-NORTH
-              - paragraph [ref=e383]: Dispatch backlog is building in PILOT-TENANT Hosted Verification North Hub with 3 open fulfillment tasks and roughly 6.0 hours to clear at the current pace. Pull warehouse labor forward or rebalance the lane now.
-            - button "Medium Prioritize fulfillment backlog for WH-NORTH Dispatch backlog is building in PILOT-TENANT Hosted Verification North Hub with 2 open fulfillment tasks and roughly 6.0 hours to clear at the current pace. Pull warehouse labor forward or rebalance the lane now." [ref=e384] [cursor=pointer]:
+              - strong [ref=e382]: Reorder stock for SKU SKU-PILOT-TENANT-PROOF at WH-NORTH
+              - paragraph [ref=e383]: Plan replenishment for PILOT-TENANT Hosted Verification North Hub. Current quantity is 8 units versus a threshold of 12.
+            - button "Medium Prioritize fulfillment backlog for WH-NORTH Dispatch backlog is building in PILOT-TENANT Hosted Verification North Hub with 3 open fulfillment tasks and roughly 6.0 hours to clear at the current pace. Pull warehouse labor forward or rebalance the lane now." [ref=e384] [cursor=pointer]:
               - generic [ref=e385]: Medium
               - strong [ref=e386]: Prioritize fulfillment backlog for WH-NORTH
-              - paragraph [ref=e387]: Dispatch backlog is building in PILOT-TENANT Hosted Verification North Hub with 2 open fulfillment tasks and roughly 6.0 hours to clear at the current pace. Pull warehouse labor forward or rebalance the lane now.
+              - paragraph [ref=e387]: Dispatch backlog is building in PILOT-TENANT Hosted Verification North Hub with 3 open fulfillment tasks and roughly 6.0 hours to clear at the current pace. Pull warehouse labor forward or rebalance the lane now.
         - article [ref=e388]:
           - generic [ref=e389]:
             - paragraph [ref=e390]: Activity stream
@@ -411,27 +411,27 @@ Call Log:
             - generic [ref=e393]:
               - strong [ref=e394]: Request Rejected
               - paragraph [ref=e395]: High incident
-              - generic [ref=e396]: 2026/04/24, 13:46:06
+              - generic [ref=e396]: 2026/04/24, 13:49:29
             - generic [ref=e397]:
               - strong [ref=e398]: Request Rejected
               - paragraph [ref=e399]: High incident
-              - generic [ref=e400]: 2026/04/24, 13:44:20
+              - generic [ref=e400]: 2026/04/24, 13:46:06
             - generic [ref=e401]:
               - strong [ref=e402]: Product Catalog Updated
               - paragraph [ref=e403]: "Imported product catalog rows: created 1, updated 1, failed 1."
-              - generic [ref=e404]: 2026/04/24, 13:45:55
+              - generic [ref=e404]: 2026/04/24, 13:49:16
             - generic [ref=e405]:
               - strong [ref=e406]: Product Catalog Updated
-              - paragraph [ref=e407]: Updated catalog product SKU-UI-30770150 (UI Catalog 30770150 Updated).
-              - generic [ref=e408]: 2026/04/24, 13:45:53
+              - paragraph [ref=e407]: Updated catalog product SKU-UI-CBFE0691 (UI Catalog CBFE0691 Updated).
+              - generic [ref=e408]: 2026/04/24, 13:49:11
             - generic [ref=e409]:
               - strong [ref=e410]: Request Rejected
               - paragraph [ref=e411]: ApiRequest | /api/dashboard/snapshot
-              - generic [ref=e412]: 2026/04/24, 13:46:06
+              - generic [ref=e412]: 2026/04/24, 13:49:29
             - generic [ref=e413]:
               - strong [ref=e414]: Product Import
               - paragraph [ref=e415]: Product | products.csv
-              - generic [ref=e416]: 2026/04/24, 13:45:55
+              - generic [ref=e416]: 2026/04/24, 13:49:16
         - article [ref=e417]:
           - generic [ref=e418]:
             - paragraph [ref=e419]: Operator

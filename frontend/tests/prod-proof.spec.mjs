@@ -246,6 +246,29 @@ async function createReplayFixture() {
       },
     }))
 
+    await expect.poll(async () => {
+      const connectors = await readJson(await api.get('/api/integrations/orders/connectors'))
+      return connectors.find((connector) => connector.sourceSystem === sourceSystem && connector.type === 'CSV_ORDER_IMPORT')?.enabled ?? false
+    }, {
+      timeout: 30_000,
+      message: `Expected replay verification connector ${sourceSystem} to become enabled before UI replay proof.`,
+    }).toBe(true)
+
+    await expect.poll(async () => {
+      const replayQueue = await readJson(await api.get('/api/integrations/orders/replay-queue'))
+      const replayRecord = replayQueue.find((record) => record.externalOrderId === externalOrderId)
+      if (!replayRecord) {
+        return 'missing'
+      }
+      if (replayRecord.nextEligibleAt && Date.parse(replayRecord.nextEligibleAt) > Date.now()) {
+        return 'waiting'
+      }
+      return replayRecord.status
+    }, {
+      timeout: 30_000,
+      message: `Expected replay verification record ${externalOrderId} to be present and eligible before UI replay proof.`,
+    }).toBe('PENDING')
+
     return { api, sourceSystem, externalOrderId }
   } catch (error) {
     await api.dispose()
@@ -431,6 +454,7 @@ test('replay recovery, scenario approval, execution, and browser role gating wor
     const replayPanel = page.locator('article.panel').filter({ hasText: replayFixture.externalOrderId }).first()
     const replayButton = replayPanel.getByRole('button', { name: 'Replay Into Live Flow' }).first()
     await expect(replayButton).toBeVisible()
+    await expect(replayButton).toBeEnabled()
     await replayButton.click()
     await expect(page.locator('.success-text, .muted-text').filter({ hasText: `Replayed ${replayFixture.externalOrderId} into the live order flow.` }).first()).toBeVisible()
   } finally {

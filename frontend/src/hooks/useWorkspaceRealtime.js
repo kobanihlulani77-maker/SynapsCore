@@ -19,6 +19,8 @@ export default function useWorkspaceRealtime({
 }) {
   useEffect(() => {
     let active = true
+    let connectionMode = 'connecting'
+    let fallbackIntervalId = null
 
     async function loadSnapshot() {
       if (!signedInTenantCode) {
@@ -39,24 +41,44 @@ export default function useWorkspaceRealtime({
       }
     }
 
+    function updateConnectionState(nextState) {
+      connectionMode = nextState
+      setConnectionState(nextState)
+    }
+
+    async function refreshWhileDegraded() {
+      if (!active || connectionMode === 'live' || !signedInTenantCode) {
+        return
+      }
+
+      try {
+        await loadSnapshot()
+      } catch {
+        // Keep the current degraded connection state visible; snapshot errors are already surfaced by loadSnapshot.
+      }
+    }
+
     loadSnapshot()
 
     if (!signedInTenantCode) {
-      setConnectionState('signed-out')
+      updateConnectionState('signed-out')
       return () => {
         active = false
       }
     }
 
     if (!sockJsUrl && !websocketBrokerUrl) {
-      setConnectionState('degraded')
+      updateConnectionState('degraded')
       return () => {
         active = false
       }
     }
 
     const topicPrefix = buildTenantTopicPrefix(activeTenantCode)
-    setConnectionState('connecting')
+    updateConnectionState('connecting')
+    fallbackIntervalId = globalThis.setInterval(() => {
+      void refreshWhileDegraded()
+    }, 5000)
 
     const client = new Client({
       reconnectDelay: 5000,
@@ -65,7 +87,7 @@ export default function useWorkspaceRealtime({
       brokerURL: /^wss?:/i.test(websocketBrokerUrl) ? websocketBrokerUrl : undefined,
       webSocketFactory: /^wss?:/i.test(websocketBrokerUrl) ? undefined : () => new SockJS(sockJsUrl),
       onConnect: () => {
-        setConnectionState('live')
+        updateConnectionState('live')
         client.subscribe(`${topicPrefix}/dashboard.summary`, (message) => mergeSnapshot({ summary: JSON.parse(message.body) }))
         client.subscribe(`${topicPrefix}/alerts`, (message) => mergeSnapshot({ alerts: JSON.parse(message.body) }))
         client.subscribe(`${topicPrefix}/recommendations`, (message) => mergeSnapshot({ recommendations: JSON.parse(message.body) }))
@@ -81,15 +103,27 @@ export default function useWorkspaceRealtime({
         client.subscribe(`${topicPrefix}/scenarios.notifications`, (message) => mergeSnapshot({ scenarioNotifications: JSON.parse(message.body) }))
         client.subscribe(`${topicPrefix}/scenarios.escalated`, (message) => mergeSnapshot({ slaEscalations: JSON.parse(message.body) }))
       },
-      onStompError: () => setConnectionState('degraded'),
-      onWebSocketError: () => setConnectionState('degraded'),
-      onWebSocketClose: () => setConnectionState('reconnecting'),
+      onStompError: () => {
+        updateConnectionState('degraded')
+        void refreshWhileDegraded()
+      },
+      onWebSocketError: () => {
+        updateConnectionState('degraded')
+        void refreshWhileDegraded()
+      },
+      onWebSocketClose: () => {
+        updateConnectionState('reconnecting')
+        void refreshWhileDegraded()
+      },
     })
 
     client.activate()
 
     return () => {
       active = false
+      if (fallbackIntervalId !== null) {
+        globalThis.clearInterval(fallbackIntervalId)
+      }
       client.deactivate()
     }
   }, [activeTenantCode, signedInTenantCode, websocketBrokerUrl, sockJsUrl])

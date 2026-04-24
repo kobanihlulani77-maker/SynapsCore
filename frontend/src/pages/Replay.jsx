@@ -30,6 +30,20 @@ export default function ReplayPage({ context }) {
   const selectedRecord = queuedRecords.find((record) => record.id === selectedReplayRecordId)
     || queuedRecords.find((record) => record.status === 'PENDING')
     || queuedRecords[0]
+  const selectedConnector = selectedRecord
+    ? snapshot.integrationConnectors.find((connector) => connector.sourceSystem === selectedRecord.sourceSystem && connector.type === selectedRecord.connectorType)
+    : null
+  const replayBlockedByEligibility = Boolean(
+    selectedRecord?.nextEligibleAt
+      && Number.isFinite(Date.parse(selectedRecord.nextEligibleAt))
+      && Date.parse(selectedRecord.nextEligibleAt) > Date.now()
+  )
+  const replayBlockedByConnector = selectedConnector ? !selectedConnector.enabled : false
+  const replayBlockedMessage = replayBlockedByConnector
+    ? `Connector ${selectedRecord?.sourceSystem || 'unknown'} is disabled. Re-enable it before replaying failed inbound work.`
+    : replayBlockedByEligibility
+      ? `This replay record is gated until ${formatTimestamp(selectedRecord?.nextEligibleAt)}.`
+      : ''
   const failedCount = queuedRecords.filter((record) => record.status === 'REPLAY_FAILED').length
   const recoveredCount = queuedRecords.filter((record) => record.status === 'REPLAYED').length
 
@@ -96,13 +110,14 @@ export default function ReplayPage({ context }) {
                   <button
                     className="secondary-button"
                     onClick={() => replayFailedIntegration(selectedRecord.id)}
-                    disabled={integrationReplayState.loadingId === selectedRecord.id || !signedInSession || !signedInRoles.some((role) => role === 'INTEGRATION_OPERATOR' || role === 'INTEGRATION_ADMIN') || !hasWarehouseScope(signedInWarehouseScopes, selectedRecord.warehouseCode)}
+                    disabled={integrationReplayState.loadingId === selectedRecord.id || !signedInSession || !signedInRoles.some((role) => role === 'INTEGRATION_OPERATOR' || role === 'INTEGRATION_ADMIN') || !hasWarehouseScope(signedInWarehouseScopes, selectedRecord.warehouseCode) || replayBlockedByEligibility || replayBlockedByConnector}
                     type="button"
                   >
                     {integrationReplayState.loadingId === selectedRecord.id ? 'Replaying...' : 'Replay Into Live Flow'}
                   </button>
                   <button className="ghost-button" onClick={() => navigateToPage('integrations')} type="button">View Connector Health</button>
                 </div>
+                {replayBlockedMessage ? <p className="muted-text">{replayBlockedMessage}</p> : null}
                 <p className="muted-text">Recovery keeps failed inbound activity visible, actionable, and auditable instead of hidden inside scripts or operator guesswork.</p>
               </div>
             ) : <EmptyState>Select a replay record to inspect failure reason, attempts, and recovery posture.</EmptyState>}
