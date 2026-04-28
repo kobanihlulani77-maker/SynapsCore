@@ -45,7 +45,7 @@ public class WebSocketConfig implements WebSocketMessageBrokerConfigurer {
 
     @Override
     public void configureMessageBroker(MessageBrokerRegistry registry) {
-        if (realtimeProperties.externalBrokerEnabled()) {
+        if (realtimeProperties.stompRelayEnabled()) {
             var relay = registry.enableStompBrokerRelay("/topic")
                 .setRelayHost(realtimeProperties.getRelayHost())
                 .setRelayPort(realtimeProperties.getRelayPort())

@@ -30,11 +30,11 @@ CORS_ALLOWED_ORIGINS=https://synapscore-frontend-3.onrender.com
 SESSION_COOKIE_SECURE=true
 SESSION_COOKIE_SAME_SITE=None
 ALLOW_HEADER_FALLBACK=false
-SYNAPSECORE_REALTIME_BROKER_MODE=SIMPLE_IN_MEMORY
+SYNAPSECORE_REALTIME_BROKER_MODE=REDIS_PUBSUB
 SYNAPSECORE_INTEGRATION_PULL_WORKER_ENABLED=true
 SYNAPSECORE_INTEGRATION_PULL_WORKER_INTERVAL_MS=60000
 SYNAPSECORE_INTEGRATION_PULL_WORKER_BATCH_SIZE=10
-SPRING_JPA_HIBERNATE_DDL_AUTO=update
+SPRING_JPA_HIBERNATE_DDL_AUTO=validate
 PUBLIC_APP_URL=https://synapscore-frontend-3.onrender.com
 PUBLIC_API_URL=https://synapscore-3.onrender.com
 SYNAPSECORE_BUILD_VERSION=<release-version>
@@ -68,13 +68,13 @@ routes:
     destination: /index.html
 ```
 
-## Current Partial Areas On Render
+## Current Render Scope
 
-These are truthful current Render limitations:
+These are truthful current Render boundaries:
 
-- realtime is still single-node because broker mode is `SIMPLE_IN_MEMORY`
-- schema evolution still relies on Hibernate `ddl-auto=update`
-- hosted authenticated proof is still blocked by the live `/api/products` conflict path
+- schema startup is validate-only with Flyway-backed baseline coverage
+- realtime is broker-backed through `REDIS_PUBSUB`
+- integration breadth is intentionally narrow
 
 ## Supported Integration Breadth On Render
 
@@ -94,8 +94,8 @@ Do not describe the platform on Render as having broad connector coverage beyond
 4. Verify sign-in loads tenant directory correctly.
 5. Verify session cookies and redirect behavior.
 6. Verify dashboard, integrations, runtime, and audit load without CORS failures.
-7. Verify realtime works with the current simple-broker limitation in mind.
-8. Run hosted proof preparation and browser proof once the live catalog blocker is resolved.
+7. Verify realtime works with the current Redis pub/sub posture in mind.
+8. Run hosted proof preparation and browser proof and expect the Render proof pack to pass.
 
 ## Related Docs
 

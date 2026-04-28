@@ -6,6 +6,8 @@ import com.synapsecore.domain.entity.FulfillmentStatus;
 import com.synapsecore.domain.entity.IntegrationImportStatus;
 import com.synapsecore.domain.entity.IntegrationReplayStatus;
 import com.synapsecore.domain.entity.OperationalDispatchStatus;
+import com.synapsecore.realtime.RealtimeBrokerMode;
+import com.synapsecore.config.SynapseRealtimeProperties;
 import com.synapsecore.domain.repository.AlertRepository;
 import com.synapsecore.domain.repository.FulfillmentTaskRepository;
 import com.synapsecore.domain.repository.IntegrationReplayRecordRepository;
@@ -33,6 +35,7 @@ public class OperationalMetricsService {
     private final MeterRegistry meterRegistry;
 
     public OperationalMetricsService(MeterRegistry meterRegistry,
+                                     SynapseRealtimeProperties realtimeProperties,
                                      AlertRepository alertRepository,
                                      FulfillmentTaskRepository fulfillmentTaskRepository,
                                      IntegrationReplayRecordRepository integrationReplayRecordRepository,
@@ -81,6 +84,87 @@ public class OperationalMetricsService {
             )
             .description("Current failed operational dispatch work items awaiting investigation.")
             .register(meterRegistry);
+        Gauge.builder("synapsecore.realtime.distributed.enabled", realtimeProperties,
+                properties -> properties.distributedBrokerEnabled() ? 1 : 0)
+            .description("Whether SynapseCore realtime is running with a distributed broker mode.")
+            .register(meterRegistry);
+        for (RealtimeBrokerMode brokerMode : RealtimeBrokerMode.values()) {
+            Gauge.builder("synapsecore.realtime.broker.mode", realtimeProperties,
+                    properties -> properties.getBrokerMode() == brokerMode ? 1 : 0)
+                .description("Active realtime broker mode. Exactly one tagged mode should report 1.")
+                .tag("mode", brokerMode.name())
+                .register(meterRegistry);
+        }
+    }
+
+    public void recordAuthAttempt(String tenantCode, boolean success) {
+        meterRegistry.counter(
+                "synapsecore.auth.session.attempts",
+                "tenant",
+                normalizeTenantCode(tenantCode),
+                "outcome",
+                success ? "SUCCESS" : "FAILURE"
+            )
+            .increment();
+    }
+
+    public void recordTenantOperation(String tenantCode, String operation, boolean success) {
+        meterRegistry.counter(
+                "synapsecore.tenant.operations",
+                "tenant",
+                normalizeTenantCode(tenantCode),
+                "operation",
+                normalizeTag(operation),
+                "outcome",
+                success ? "SUCCESS" : "FAILURE"
+            )
+            .increment();
+    }
+
+    public void recordCatalogWrite(String tenantCode, String action, boolean success) {
+        meterRegistry.counter(
+                "synapsecore.catalog.writes",
+                "tenant",
+                normalizeTenantCode(tenantCode),
+                "action",
+                normalizeTag(action),
+                "outcome",
+                success ? "SUCCESS" : "FAILURE"
+            )
+            .increment();
+    }
+
+    public void recordInventoryLockConflict(String tenantCode, String source) {
+        meterRegistry.counter(
+                "synapsecore.inventory.lock.conflicts",
+                "tenant",
+                normalizeTenantCode(tenantCode),
+                "source",
+                normalizeTag(source)
+            )
+            .increment();
+    }
+
+    public void recordRealtimePublish(String tenantCode, RealtimeBrokerMode brokerMode, String deliveryMode) {
+        meterRegistry.counter(
+                "synapsecore.realtime.publishes",
+                "tenant",
+                normalizeTenantCode(tenantCode),
+                "brokerMode",
+                brokerMode == null ? "UNKNOWN" : brokerMode.name(),
+                "deliveryMode",
+                normalizeTag(deliveryMode)
+            )
+            .increment();
+    }
+
+    public void recordRateLimitRejection(String bucketName) {
+        meterRegistry.counter(
+                "synapsecore.security.rate_limit.rejections",
+                "bucket",
+                normalizeTag(bucketName)
+            )
+            .increment();
     }
 
     public void recordOrderIngested(String tenantCode, String source) {
@@ -197,6 +281,12 @@ public class OperationalMetricsService {
             countForTenant("synapsecore.fulfillment.updates", normalizedTenantCode),
             countForTenant("synapsecore.integration.import.runs", normalizedTenantCode),
             countForTenant("synapsecore.integration.replay.attempts", normalizedTenantCode),
+            countForTenantWithOutcome("synapsecore.auth.session.attempts", normalizedTenantCode, "FAILURE"),
+            countForTenant("synapsecore.tenant.operations", normalizedTenantCode),
+            countForTenant("synapsecore.catalog.writes", normalizedTenantCode),
+            countForTenant("synapsecore.inventory.lock.conflicts", normalizedTenantCode),
+            countForTenant("synapsecore.realtime.publishes", normalizedTenantCode),
+            countWithoutTenant("synapsecore.security.rate_limit.rejections"),
             countForTenant("synapsecore.dispatch.queued", normalizedTenantCode),
             countForTenant("synapsecore.dispatch.processed", normalizedTenantCode),
             countForTenant("synapsecore.dispatch.failed", normalizedTenantCode),
@@ -204,6 +294,14 @@ public class OperationalMetricsService {
             countForTenantWithOutcome("synapsecore.http.requests", normalizedTenantCode, "FAILURE"),
             averageTimerDurationMsForTenant("synapsecore.http.request.duration", normalizedTenantCode)
         );
+    }
+
+    private double countWithoutTenant(String metricName) {
+        return meterRegistry.find(metricName)
+            .counters()
+            .stream()
+            .mapToDouble(Counter::count)
+            .sum();
     }
 
     private double countForTenant(String metricName, String tenantCode) {

@@ -60,9 +60,11 @@ export default function ReleasesPage({ context }) {
                 <p>{wsUrl}</p>
                 <p className="muted-text">{realtimeTransportLabel}. This must align with the frontend runtime config for live updates and incident lanes.</p>
                 <p className="muted-text">
-                  {runtime?.backbone?.realtimeExternalBrokerConfigured
-                    ? 'External broker relay is active for multi-node realtime delivery.'
-                    : 'Live deployment is still running the in-process broker path, which is tenant-safe but single-node only.'}
+                  {runtime?.backbone?.realtimeStompRelayConfigured
+                    ? 'STOMP relay mode is active for multi-node realtime delivery.'
+                    : runtime?.backbone?.realtimeRedisPubSubConfigured
+                      ? 'Redis pub/sub mode is active for cross-node realtime fanout.'
+                      : 'Live deployment is still running the in-process broker path, which is tenant-safe but single-node only.'}
                 </p>
               </div>
             </div>

@@ -7,7 +7,7 @@ spring:
     enabled: ${SPRING_FLYWAY_ENABLED:true}
   jpa:
     hibernate:
-      ddl-auto: update
+      ddl-auto: validate
   data:
     redis:
       url: ${SPRING_DATA_REDIS_URL:}
@@ -25,7 +25,7 @@ synapsecore:
   access:
     allow-header-fallback: ${ALLOW_HEADER_FALLBACK:false}
   realtime:
-    broker-mode: ${SYNAPSECORE_REALTIME_BROKER_MODE:SIMPLE_IN_MEMORY}
+    broker-mode: ${SYNAPSECORE_REALTIME_BROKER_MODE:REDIS_PUBSUB}
   starter:
     auto-seed-on-empty: ${SYNAPSECORE_STARTER_AUTO_SEED_ON_EMPTY:false}
     allow-default-tenant-fallback: ${SYNAPSECORE_STARTER_ALLOW_DEFAULT_TENANT_FALLBACK:false}

@@ -3,9 +3,15 @@ package com.synapsecore.api.controller;
 import com.synapsecore.audit.AuditLogService;
 import com.synapsecore.audit.RequestTraceContext;
 import com.synapsecore.domain.service.CatalogWriteConflictResolver;
+import com.synapsecore.observability.OperationalMetricsService;
 import jakarta.servlet.http.HttpServletRequest;
+import jakarta.persistence.LockTimeoutException;
+import jakarta.persistence.PessimisticLockException;
 import java.time.Instant;
+import org.springframework.dao.CannotAcquireLockException;
 import org.springframework.dao.DataIntegrityViolationException;
+import org.springframework.dao.DeadlockLoserDataAccessException;
+import org.springframework.dao.PessimisticLockingFailureException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.MethodArgumentNotValidException;
@@ -21,6 +27,7 @@ public class ApiExceptionHandler {
     private final AuditLogService auditLogService;
     private final RequestTraceContext requestTraceContext;
     private final CatalogWriteConflictResolver catalogWriteConflictResolver;
+    private final OperationalMetricsService operationalMetricsService;
 
     @ExceptionHandler(ResponseStatusException.class)
     public ResponseEntity<ApiErrorResponse> handleResponseStatus(ResponseStatusException exception,
@@ -48,6 +55,28 @@ public class ApiExceptionHandler {
             Instant.now(),
             HttpStatus.BAD_REQUEST.value(),
             HttpStatus.BAD_REQUEST.getReasonPhrase(),
+            message,
+            requestTraceContext.getRequiredRequestId()
+        ));
+    }
+
+    @ExceptionHandler({
+        CannotAcquireLockException.class,
+        PessimisticLockingFailureException.class,
+        DeadlockLoserDataAccessException.class,
+        LockTimeoutException.class,
+        PessimisticLockException.class
+    })
+    public ResponseEntity<ApiErrorResponse> handleContention(RuntimeException exception,
+                                                             HttpServletRequest request) {
+        HttpStatus status = HttpStatus.CONFLICT;
+        String message = "Another SynapseCore write is already updating the same operational record. Retry the request.";
+        operationalMetricsService.recordInventoryLockConflict(requestTraceContext.getCurrentTenantOrDefault(), request.getRequestURI());
+        auditFailureSafely(request, status, message);
+        return ResponseEntity.status(status).body(new ApiErrorResponse(
+            Instant.now(),
+            status.value(),
+            status.getReasonPhrase(),
             message,
             requestTraceContext.getRequiredRequestId()
         ));
@@ -100,6 +129,9 @@ public class ApiExceptionHandler {
     }
 
     private void auditFailureSafely(HttpServletRequest request, HttpStatus status, String message) {
+        if (shouldSkipFailureAudit(request, status)) {
+            return;
+        }
         try {
             auditLogService.recordFailure(
                 "REQUEST_REJECTED",
@@ -115,5 +147,14 @@ public class ApiExceptionHandler {
                 request.getRequestURI(),
                 exception.getMessage());
         }
+    }
+
+    private boolean shouldSkipFailureAudit(HttpServletRequest request, HttpStatus status) {
+        if (request == null || status == null) {
+            return false;
+        }
+        return status == HttpStatus.UNAUTHORIZED
+            && "POST".equalsIgnoreCase(request.getMethod())
+            && "/api/auth/session/login".equals(request.getRequestURI());
     }
 }

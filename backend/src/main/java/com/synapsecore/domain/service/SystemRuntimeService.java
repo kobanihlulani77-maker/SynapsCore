@@ -177,11 +177,17 @@ public class SystemRuntimeService {
     private SystemBackboneSummary buildBackboneSummary() {
         String tenantCode = tenantContextService.getCurrentTenantCodeOrDefault();
         RealtimeBrokerMode brokerMode = realtimeService.brokerMode();
+        boolean singleNodeOnly = brokerMode == RealtimeBrokerMode.SIMPLE_IN_MEMORY;
+        boolean stompRelayConfigured = brokerMode == RealtimeBrokerMode.STOMP_RELAY;
+        boolean redisPubSubConfigured = brokerMode == RealtimeBrokerMode.REDIS_PUBSUB;
         return new SystemBackboneSummary(
             brokerMode.name(),
             describeRealtimeBrokerMode(brokerMode),
-            brokerMode != RealtimeBrokerMode.EXTERNAL_BROKER,
-            brokerMode == RealtimeBrokerMode.EXTERNAL_BROKER,
+            singleNodeOnly,
+            stompRelayConfigured,
+            !singleNodeOnly,
+            redisPubSubConfigured,
+            stompRelayConfigured,
             operationalDispatchWorkItemRepository.countByTenantCodeIgnoreCaseAndStatusIn(
                 tenantCode,
                 List.of(OperationalDispatchStatus.PENDING, OperationalDispatchStatus.PROCESSING)
@@ -203,9 +209,11 @@ public class SystemRuntimeService {
     }
 
     private String describeRealtimeBrokerMode(RealtimeBrokerMode brokerMode) {
-        return brokerMode == RealtimeBrokerMode.EXTERNAL_BROKER
-            ? "Realtime is routed through the configured external STOMP broker relay for multi-node delivery."
-            : "Realtime is using the in-process simple broker. This is tenant-scoped but single-node only; set SYNAPSECORE_REALTIME_BROKER_MODE=EXTERNAL_BROKER and broker relay settings before horizontal scaling.";
+        return switch (brokerMode) {
+            case SIMPLE_IN_MEMORY -> "Realtime is using the in-process simple broker. This is tenant-scoped but single-node only; switch to REDIS_PUBSUB or STOMP_RELAY before horizontal scaling.";
+            case REDIS_PUBSUB -> "Realtime is using tenant-scoped websocket topics with Redis pub/sub fanout so updates propagate across app nodes.";
+            case STOMP_RELAY -> "Realtime is routed through the configured external STOMP broker relay for multi-node delivery.";
+        };
     }
 
     private SystemMetricsSummary buildMetricsSummary() {

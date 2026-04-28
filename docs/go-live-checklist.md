@@ -57,6 +57,7 @@ powershell -ExecutionPolicy Bypass -File scripts\verify-deployment.ps1 -Frontend
 - one test order succeeds
 - inventory changes
 - alerts and recommendations react
+- realtime runtime summary reports the intended broker mode (`REDIS_PUBSUB` for current pilot rollout)
 
 ## Trust And Operations Checks
 
@@ -64,6 +65,11 @@ powershell -ExecutionPolicy Bypass -File scripts\verify-deployment.ps1 -Frontend
 - allowed origins are correct
 - secure cookies are enabled on HTTPS
 - header fallback is disabled in prod
+- auth and sensitive-endpoint rate limiting is enabled
+- Hibernate startup mode is `ddl-auto=validate`
+- Flyway validation passes before rollout
+- realtime runtime summary reports `REDIS_PUBSUB` when Redis fanout is intended
+- Prometheus exposes auth, catalog, replay, realtime, dispatch, and inventory conflict metrics
 - no unexpected replay backlog exists
 - no disabled connector is accidental
 - no critical system incident is unexplained
@@ -77,6 +83,13 @@ bash scripts/backup-postgres.sh
 ```
 
 Or on Windows PowerShell:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File scripts\backup-postgres.ps1
+```
+
+- rollback path is documented and rehearsed in [pilot-operations-runbook.md](pilot-operations-runbook.md)
+- bootstrap token and platform-admin token are stored outside the repo and only injected at deploy time
 
 ```powershell
 powershell -ExecutionPolicy Bypass -File scripts\backup-postgres.ps1

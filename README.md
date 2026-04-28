@@ -6,7 +6,7 @@ It is not a demo dashboard anymore. The repo is now aligned around a real produc
 
 ## Current Product Label
 
-SynapseCore is currently an **early real SaaS platform**.
+SynapseCore is currently a **production-ready SaaS foundation candidate for its supported operational scope**.
 
 What is real today:
 
@@ -21,13 +21,11 @@ What is real today:
 - runtime, incidents, audit, metrics, and tenant-scoped realtime
 - a modular frontend with real product pages for dashboard, catalog, integrations, runtime, replay, approvals, audit, and admin surfaces
 
-What is still partial:
+What is bounded today:
 
-- hosted authenticated proof is still blocked by a live `/api/products` conflict on Render
-- production schema evolution now has a Flyway foundation, but full production cutover still partially relies on Hibernate `ddl-auto=update`
-- live realtime is still running in single-node simple-broker mode
 - integrations are real but intentionally narrow
-- the frontend root shell is cleaner now, but more extraction still belongs outside `App.jsx`
+- webhook, CSV, and scheduled pull are the supported ingestion lanes
+- Redis pub/sub is the current distributed realtime posture; STOMP relay remains an optional later topology, not a missing requirement
 
 ## Product Shape
 
@@ -95,14 +93,15 @@ Important current production truths:
 
 - `SPRING_PROFILES_ACTIVE=prod`
 - `ALLOW_HEADER_FALLBACK=false`
-- `SYNAPSECORE_REALTIME_BROKER_MODE=SIMPLE_IN_MEMORY`
-- `SPRING_JPA_HIBERNATE_DDL_AUTO=update`
+- `SYNAPSECORE_REALTIME_BROKER_MODE=REDIS_PUBSUB`
+- `SPRING_JPA_HIBERNATE_DDL_AUTO=validate`
 
 See:
 
 - [docs/deployment.md](docs/deployment.md)
 - [docs/render-deployment.md](docs/render-deployment.md)
 - [docs/live-deployment-runbook.md](docs/live-deployment-runbook.md)
+- [docs/pilot-operations-runbook.md](docs/pilot-operations-runbook.md)
 - [docs/schema-migration-roadmap.md](docs/schema-migration-roadmap.md)
 
 ## Hosted Proof
@@ -128,7 +127,8 @@ Current hosted-proof status:
 
 - proof pack exists
 - tenant/user preparation works
-- live product onboarding proof is still blocked by the Render product-create conflict described in [docs/verification-status.md](docs/verification-status.md)
+- live hosted proof passed end to end on Render
+- the latest hardening pass added one more auth-failure-path fix locally and that deployment still needs a final live rerun
 
 ## Supported Integration Surface
 
@@ -142,12 +142,13 @@ SynapseCore does not currently claim broad ERP coverage or arbitrary connector b
 
 ## Realtime Truth
 
-Realtime is tenant-scoped and architecturally ready for an external broker mode, but the live Render deployment is still running in single-node simple-broker mode.
+Realtime is tenant-scoped and supports distributed fanout through Redis pub/sub.
 
 Current mode:
 
-- development and current Render: simple in-memory STOMP broker
-- prepared but not yet deployed: external broker relay mode
+- development: simple in-memory STOMP broker
+- current Render: Redis pub/sub backed fanout
+- available for later rollout if infrastructure demands it: STOMP relay mode
 
 ## Verification And Status
 
@@ -159,8 +160,8 @@ That document now distinguishes:
 
 - what is locally proven
 - what is live and working
-- what is still partial
-- what still blocks clean pilot proof
+- what is supported in production today
+- what is intentionally out of current scope
 
 ## Architecture References
 
@@ -172,10 +173,8 @@ That document now distinguishes:
 
 SynapseCore is no longer presenting itself like a cleaned-up demo. It is a real multi-tenant SaaS foundation with operational logic, control surfaces, tenant administration, and recovery mechanics already in place.
 
-The remaining work is not about inventing the product. It is about closing the last hardening seams:
+The remaining work is no longer about core platform safety. It is about later scope expansion and scale choices:
 
-- hosted product onboarding proof
-- explicit migration discipline
-- external-broker realtime rollout
-- broader integration coverage
-- final frontend root-shell cleanup
+- broader connector breadth beyond the current supported ingestion lanes
+- optional STOMP relay rollout if Redis pub/sub is no longer the preferred topology
+- larger-volume deployment tuning once real company load characteristics are known

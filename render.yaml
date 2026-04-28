@@ -29,7 +29,7 @@ services:
       - key: ALLOW_HEADER_FALLBACK
         value: "false"
       - key: SYNAPSECORE_REALTIME_BROKER_MODE
-        value: SIMPLE_IN_MEMORY
+        value: REDIS_PUBSUB
       - key: SYNAPSECORE_INTEGRATION_PULL_WORKER_ENABLED
         value: "true"
       - key: SYNAPSECORE_INTEGRATION_PULL_WORKER_INTERVAL_MS
@@ -37,7 +37,7 @@ services:
       - key: SYNAPSECORE_INTEGRATION_PULL_WORKER_BATCH_SIZE
         value: "10"
       - key: SPRING_JPA_HIBERNATE_DDL_AUTO
-        value: update
+        value: validate
       - key: PUBLIC_APP_URL
         value: https://synapscore-frontend-3.onrender.com
       - key: PUBLIC_API_URL

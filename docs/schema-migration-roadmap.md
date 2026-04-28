@@ -1,6 +1,6 @@
-# Schema Migration Roadmap
+# Schema Migration Workflow
 
-This document is the strict migration-discipline plan for SynapseCore.
+This document is the strict migration-discipline workflow for SynapseCore.
 
 ## Current State
 
@@ -8,57 +8,56 @@ Current production posture:
 
 - profile: `prod`
 - database: PostgreSQL
-- current schema evolution mechanism: Hibernate `ddl-auto=update`
+- current startup validation mechanism: Hibernate `ddl-auto=validate`
+- Flyway is active with versioned Java migrations and baseline coverage for the current managed schema
+- production-hardening tests run with migration-backed schema validation
 
-That posture is acceptable for early SaaS iteration, but it is not the target production standard for company-grade change control.
+## Production Standard
 
-## Target State
-
-SynapseCore should move to:
+SynapseCore now uses:
 
 - explicit versioned migrations
-- application startup validating schema instead of mutating it implicitly
-- repeatable rollout behavior across local, staging, and production
+- application startup that validates schema instead of mutating it implicitly
+- repeatable rollout behavior across local, staging, and production-style validation
 
-The recommended target is **Flyway**.
+## Why This Matters
 
-## Why This Still Matters
-
-`ddl-auto=update` hides risk:
+Implicit schema mutation hides risk:
 
 - not all schema changes are safe on populated tables
 - change ordering is implicit instead of reviewable
 - rollback behavior is unclear
 - hosted failures can appear only after deployment
 
-The recent inventory-column migration issue is the clearest example of why SynapseCore now needs explicit migration discipline.
+The earlier inventory-column and catalog-write failures are the clearest examples of why SynapseCore now keeps schema evolution explicit and reviewable.
 
-## Recommended Migration Path
+## Version-Controlled Migration Workflow
 
-### Phase 1: Introduce Flyway without changing prod behavior yet
+### Baseline
 
-- add Flyway dependency
-- create `db/migration/` baseline structure
-- capture the current schema as a known baseline for fresh environments
-- keep current production env on `ddl-auto=update` only until the baseline is validated
+- the current managed schema is represented by:
+  - versioned corrective migrations `V1` through `V4`
+  - full baseline coverage in `V5__full_schema_baseline`
+- fresh environments bootstrap through Flyway, not Hibernate DDL mutation
 
-### Phase 2: Move non-destructive changes into versioned migrations
+### Runtime
 
-- add all new column/index/constraint changes as versioned SQL migrations
-- perform backfill-first migrations for populated tables
-- remove dependence on Hibernate for structural mutation
+- production starts with `ddl-auto=validate`
+- schema mismatch fails startup
+- Flyway runs before JPA validation on startup
 
-### Phase 3: Switch runtime posture
+### Change Process
 
-- change production to `ddl-auto=validate`
-- fail startup if the schema is not at the expected migration version
-- make Flyway execution part of deploy readiness
+1. add the next versioned migration for every schema change
+2. run `scripts/validate-flyway.ps1`
+3. run backend tests on validation posture
+4. deploy only when Flyway validation and tests are green
 
-### Phase 4: Harden rollout operations
+### Release Safety
 
-- add migration verification to release scripts
-- document backup-before-migration and restore drill expectations
-- verify staging-to-production ordering for every schema change
+- backup-before-migration remains mandatory for production rollout
+- restore drill expectations remain part of the live operations runbook
+- staging-to-production ordering must preserve migration version order
 
 ## Exact Repo Areas Involved
 
@@ -69,12 +68,8 @@ The recent inventory-column migration issue is the clearest example of why Synap
 - future `backend/src/main/resources/db/migration/`
 - release and deployment scripts under `scripts/`
 
-## What Is Not Done Yet
+## Exact Working Practice
 
-This roadmap is documented, but the repo has **not** completed the Flyway cutover yet.
-
-Until that work lands:
-
-- production schema evolution is still partial
-- hosted rollout safety is still partial
-- SynapseCore should not claim final production migration discipline
+- use `scripts/export-flyway-baseline.ps1` only when intentionally regenerating the managed baseline from the validated backend model
+- use `scripts/validate-flyway.ps1` before deployment changes
+- do not reintroduce `ddl-auto=update` in production profiles or production-hardening tests

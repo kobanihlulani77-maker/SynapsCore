@@ -1,0 +1,33 @@
+spring:
+  main:
+    web-application-type: none
+  datasource:
+    url: jdbc:h2:mem:schema-export;MODE=PostgreSQL;DATABASE_TO_LOWER=TRUE;DB_CLOSE_DELAY=-1
+    driver-class-name: org.h2.Driver
+    username: sa
+    password:
+  flyway:
+    enabled: false
+  jpa:
+    hibernate:
+      ddl-auto: none
+    properties:
+      hibernate:
+        dialect: org.hibernate.dialect.PostgreSQLDialect
+      jakarta.persistence.schema-generation.database.action: none
+      jakarta.persistence.schema-generation.create-source: metadata
+      jakarta.persistence.schema-generation.scripts.action: create
+      jakarta.persistence.schema-generation.scripts.create-target: target/flyway-baseline.sql
+
+synapsecore:
+  starter:
+    auto-seed-on-empty: false
+    allow-default-tenant-fallback: false
+    seed-starter-inventory-on-tenant-onboarding: false
+    seed-starter-connectors-on-tenant-onboarding: false
+    allow-tenant-admin-tenant-onboarding: false
+  dashboard:
+    cache-enabled: false
+  integration:
+    pull-worker:
+      enabled: false

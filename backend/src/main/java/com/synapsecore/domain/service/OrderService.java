@@ -30,7 +30,12 @@ import java.util.List;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.ObjectProvider;
+import org.springframework.dao.CannotAcquireLockException;
+import org.springframework.dao.DeadlockLoserDataAccessException;
+import org.springframework.dao.PessimisticLockingFailureException;
 import org.springframework.http.HttpStatus;
+import org.springframework.retry.annotation.Backoff;
+import org.springframework.retry.annotation.Retryable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
@@ -52,16 +57,43 @@ public class OrderService {
     private final RequestTraceContext requestTraceContext;
 
     @Transactional
+    @Retryable(
+        retryFor = {
+            CannotAcquireLockException.class,
+            PessimisticLockingFailureException.class,
+            DeadlockLoserDataAccessException.class
+        },
+        maxAttemptsExpression = "${synapsecore.inventory.contention.retry.max-attempts:3}",
+        backoff = @Backoff(delayExpression = "${synapsecore.inventory.contention.retry.delay-ms:150}")
+    )
     public OrderResponse createOrder(OrderCreateRequest request) {
         return createOrder(request, "order-api");
     }
 
     @Transactional
+    @Retryable(
+        retryFor = {
+            CannotAcquireLockException.class,
+            PessimisticLockingFailureException.class,
+            DeadlockLoserDataAccessException.class
+        },
+        maxAttemptsExpression = "${synapsecore.inventory.contention.retry.max-attempts:3}",
+        backoff = @Backoff(delayExpression = "${synapsecore.inventory.contention.retry.delay-ms:150}")
+    )
     public OrderResponse createOrder(OrderCreateRequest request, String source) {
         return createOrderForTenant(tenantContextService.getCurrentTenantCodeOrDefault(), request, source);
     }
 
     @Transactional
+    @Retryable(
+        retryFor = {
+            CannotAcquireLockException.class,
+            PessimisticLockingFailureException.class,
+            DeadlockLoserDataAccessException.class
+        },
+        maxAttemptsExpression = "${synapsecore.inventory.contention.retry.max-attempts:3}",
+        backoff = @Backoff(delayExpression = "${synapsecore.inventory.contention.retry.delay-ms:150}")
+    )
     public OrderResponse createOrderForTenant(String tenantCode, OrderCreateRequest request, String source) {
         Warehouse warehouse = inventoryService.requireWarehouse(tenantCode, request.warehouseCode(), "order creation");
         String externalOrderId = resolveExternalOrderId(request.externalOrderId());

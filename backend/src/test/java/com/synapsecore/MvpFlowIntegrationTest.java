@@ -10,6 +10,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.synapsecore.domain.entity.AlertStatus;
 import com.synapsecore.domain.entity.AlertType;
 import com.synapsecore.domain.entity.AuditStatus;
@@ -42,6 +43,7 @@ import com.synapsecore.domain.service.SeedService;
 import com.synapsecore.event.OperationalUpdateType;
 import java.nio.charset.StandardCharsets;
 import java.time.Instant;
+import java.time.Duration;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
@@ -64,6 +66,9 @@ class MvpFlowIntegrationTest {
 
     @Autowired
     private MockMvc mockMvc;
+
+    @Autowired
+    private ObjectMapper objectMapper;
 
     @Autowired
     private ProductRepository productRepository;
@@ -4143,12 +4148,20 @@ class MvpFlowIntegrationTest {
             .andExpect(jsonPath("$.metrics.fulfillmentUpdates").value(org.hamcrest.Matchers.greaterThanOrEqualTo(0.0)))
             .andExpect(jsonPath("$.metrics.integrationImportRuns").value(org.hamcrest.Matchers.greaterThanOrEqualTo(0.0)))
             .andExpect(jsonPath("$.metrics.replayAttempts").value(org.hamcrest.Matchers.greaterThanOrEqualTo(0.0)))
+            .andExpect(jsonPath("$.metrics.authFailures").value(org.hamcrest.Matchers.greaterThanOrEqualTo(0.0)))
+            .andExpect(jsonPath("$.metrics.tenantOperations").value(org.hamcrest.Matchers.greaterThanOrEqualTo(0.0)))
+            .andExpect(jsonPath("$.metrics.catalogWrites").value(org.hamcrest.Matchers.greaterThanOrEqualTo(0.0)))
+            .andExpect(jsonPath("$.metrics.inventoryLockConflicts").value(org.hamcrest.Matchers.greaterThanOrEqualTo(0.0)))
+            .andExpect(jsonPath("$.metrics.realtimePublishes").value(org.hamcrest.Matchers.greaterThanOrEqualTo(0.0)))
+            .andExpect(jsonPath("$.metrics.rateLimitRejections").value(org.hamcrest.Matchers.greaterThanOrEqualTo(0.0)))
             .andExpect(jsonPath("$.metrics.dispatchQueued").value(org.hamcrest.Matchers.greaterThanOrEqualTo(0.0)))
             .andExpect(jsonPath("$.metrics.dispatchProcessed").value(org.hamcrest.Matchers.greaterThanOrEqualTo(0.0)))
             .andExpect(jsonPath("$.metrics.dispatchFailures").value(org.hamcrest.Matchers.greaterThanOrEqualTo(0.0)))
             .andExpect(jsonPath("$.metrics.httpRequests").value(org.hamcrest.Matchers.greaterThanOrEqualTo(0.0)))
             .andExpect(jsonPath("$.metrics.failedHttpRequests").value(org.hamcrest.Matchers.greaterThanOrEqualTo(0.0)))
             .andExpect(jsonPath("$.metrics.averageHttpRequestLatencyMs").value(org.hamcrest.Matchers.greaterThanOrEqualTo(0.0)))
+            .andExpect(jsonPath("$.backbone.realtimeBrokerMode").value("SIMPLE_IN_MEMORY"))
+            .andExpect(jsonPath("$.backbone.realtimeDistributedMode").value(false))
             .andExpect(jsonPath("$.diagnostics.windowHours").value(24))
             .andExpect(jsonPath("$.diagnostics.activeIncidentCount").value(0))
             .andExpect(jsonPath("$.allowedOrigins.length()").value(org.hamcrest.Matchers.greaterThanOrEqualTo(1)));
@@ -4314,6 +4327,8 @@ class MvpFlowIntegrationTest {
                     """))
             .andExpect(status().isCreated());
 
+        awaitDispatchProcessedMetricAtLeast(1.0, Duration.ofSeconds(5));
+
         mockMvc.perform(get("/api/system/runtime"))
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.telemetry.dispatchQueueDepth").value(org.hamcrest.Matchers.greaterThanOrEqualTo(0)))
@@ -4327,7 +4342,33 @@ class MvpFlowIntegrationTest {
             .andExpect(content().string(org.hamcrest.Matchers.containsString("synapsecore_http_requests_total")))
             .andExpect(content().string(org.hamcrest.Matchers.containsString("synapsecore_http_request_duration_seconds")))
             .andExpect(content().string(org.hamcrest.Matchers.containsString("synapsecore_orders_ingested_total")))
-            .andExpect(content().string(org.hamcrest.Matchers.containsString("synapsecore_fulfillment_backlog")));
+            .andExpect(content().string(org.hamcrest.Matchers.containsString("synapsecore_fulfillment_backlog")))
+            .andExpect(content().string(org.hamcrest.Matchers.containsString("synapsecore_realtime_broker_mode")))
+            .andExpect(content().string(org.hamcrest.Matchers.containsString("synapsecore_realtime_distributed_enabled")));
+    }
+
+    private void awaitDispatchProcessedMetricAtLeast(double minimum, Duration timeout) throws Exception {
+        long deadline = System.nanoTime() + timeout.toNanos();
+        double currentValue = Double.NEGATIVE_INFINITY;
+        while (System.nanoTime() < deadline) {
+            String responseBody = mockMvc.perform(get("/api/system/runtime"))
+                .andExpect(status().isOk())
+                .andReturn()
+                .getResponse()
+                .getContentAsString();
+            currentValue = objectMapper.readTree(responseBody)
+                .path("metrics")
+                .path("dispatchProcessed")
+                .asDouble(Double.NEGATIVE_INFINITY);
+            if (currentValue >= minimum) {
+                return;
+            }
+            Thread.sleep(200);
+        }
+        throw new AssertionError(
+            "Expected dispatchProcessed metric to reach at least " + minimum + " within " + timeout.toSeconds()
+                + "s, but observed " + currentValue + '.'
+        );
     }
 
     private Inventory loadInventory(String sku, String warehouseCode) {

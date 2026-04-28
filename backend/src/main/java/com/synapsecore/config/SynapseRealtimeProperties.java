@@ -12,6 +12,8 @@ public class SynapseRealtimeProperties {
 
     private RealtimeBrokerMode brokerMode = RealtimeBrokerMode.SIMPLE_IN_MEMORY;
 
+    private String redisChannel = "synapsecore:realtime";
+
     private String relayHost = "localhost";
 
     private int relayPort = 61613;
@@ -30,7 +32,16 @@ public class SynapseRealtimeProperties {
 
     private long relaySystemHeartbeatReceiveMs = 10000L;
 
-    public boolean externalBrokerEnabled() {
-        return brokerMode == RealtimeBrokerMode.EXTERNAL_BROKER;
+    public boolean redisPubSubEnabled() {
+        return brokerMode == RealtimeBrokerMode.REDIS_PUBSUB;
+    }
+
+    public boolean stompRelayEnabled() {
+        return brokerMode == RealtimeBrokerMode.STOMP_RELAY;
+    }
+
+    public boolean distributedBrokerEnabled() {
+        return brokerMode == RealtimeBrokerMode.REDIS_PUBSUB
+            || brokerMode == RealtimeBrokerMode.STOMP_RELAY;
     }
 }

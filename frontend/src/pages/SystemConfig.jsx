@@ -23,6 +23,8 @@ export default function SystemConfigPage({ context }) {
           <SummaryCard label="Batch size" value={runtime?.backbone?.batchSize ?? 0} accent="teal" />
           <SummaryCard label="Average request latency" value={runtime ? `${formatMetricValue(runtime.metrics.averageHttpRequestLatencyMs)} ms` : '...'} accent="amber" />
           <SummaryCard label="Allowed origins" value={runtime?.allowedOrigins?.length ?? 0} accent="rose" />
+          <SummaryCard label="Auth failures" value={formatMetricValue(runtime?.metrics?.authFailures)} accent="rose" />
+          <SummaryCard label="Rate-limit rejections" value={formatMetricValue(runtime?.metrics?.rateLimitRejections)} accent="amber" />
         </div>
         <div className="approval-board">
           <div className="stack-card">
@@ -44,6 +46,11 @@ export default function SystemConfigPage({ context }) {
                 <strong>Average request latency</strong>
                 <p>{runtime ? `${formatMetricValue(runtime.metrics.averageHttpRequestLatencyMs)} ms` : '...'}</p>
                 <p className="muted-text">Tracks the average response time across live workspace traffic for this tenant scope.</p>
+              </div>
+              <div className="signal-list-item">
+                <strong>Access pressure</strong>
+                <p>{formatMetricValue(runtime?.metrics?.authFailures)} auth failures | {formatMetricValue(runtime?.metrics?.rateLimitRejections)} rate-limit rejections</p>
+                <p className="muted-text">This surface helps operators distinguish normal traffic from sign-in abuse or bootstrap endpoint pressure.</p>
               </div>
               <div className="signal-list-item">
                 <strong>Tenant resolution</strong>
@@ -69,6 +76,11 @@ export default function SystemConfigPage({ context }) {
                 <strong>Processed total</strong>
                 <p>{formatMetricValue(runtime?.metrics?.dispatchProcessed)}</p>
                 <p className="muted-text">Use together with failures and oldest age to decide when to intervene operationally.</p>
+              </div>
+              <div className="signal-list-item">
+                <strong>Realtime and contention</strong>
+                <p>{formatMetricValue(runtime?.metrics?.realtimePublishes)} realtime publishes | {formatMetricValue(runtime?.metrics?.inventoryLockConflicts)} inventory lock conflicts</p>
+                <p className="muted-text">Distributed fanout volume and inventory contention are visible here before they turn into user-facing instability.</p>
               </div>
             </div>
           </article>

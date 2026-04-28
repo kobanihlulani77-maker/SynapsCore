@@ -17,6 +17,7 @@ import com.synapsecore.domain.repository.ProductRepository;
 import com.synapsecore.domain.repository.TenantRepository;
 import com.synapsecore.domain.repository.WarehouseRepository;
 import com.synapsecore.integration.IntegrationConnectorService;
+import com.synapsecore.observability.OperationalMetricsService;
 import java.time.Instant;
 import java.util.EnumSet;
 import java.util.List;
@@ -43,6 +44,7 @@ public class TenantOnboardingService {
     private final IntegrationConnectorService integrationConnectorService;
     private final AuditLogService auditLogService;
     private final SynapseStarterProperties starterProperties;
+    private final OperationalMetricsService operationalMetricsService;
 
     @Transactional
     public TenantOnboardingResponse onboardTenant(TenantOnboardingRequest request, String actorName) {
@@ -52,10 +54,12 @@ public class TenantOnboardingService {
         String secondaryLocation = normalizeOptional(request.secondaryLocation());
 
         if (tenantRepository.findByCodeIgnoreCase(tenantCode).isPresent()) {
+            operationalMetricsService.recordTenantOperation(tenantCode, "TENANT_ONBOARDING", false);
             throw new ResponseStatusException(HttpStatus.CONFLICT,
                 "Tenant code already exists: " + tenantCode);
         }
         if (accessUserRepository.findByTenant_CodeIgnoreCaseAndUsernameIgnoreCaseAndActiveTrue(tenantCode, adminUsername).isPresent()) {
+            operationalMetricsService.recordTenantOperation(tenantCode, "TENANT_ONBOARDING", false);
             throw new ResponseStatusException(HttpStatus.CONFLICT,
                 "Admin username already exists in tenant " + tenantCode + ": " + adminUsername);
         }
@@ -152,6 +156,7 @@ public class TenantOnboardingService {
             tenant.getCode(),
             "Created tenant " + tenant.getName() + " with bootstrap admin " + adminUser.getUsername() + "."
         );
+        operationalMetricsService.recordTenantOperation(tenant.getCode(), "TENANT_ONBOARDING", true);
 
         return new TenantOnboardingResponse(
             tenant.getId(),

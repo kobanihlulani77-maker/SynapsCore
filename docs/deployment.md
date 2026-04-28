@@ -10,13 +10,10 @@ Production posture today:
 - session cookies: secure by default
 - header fallback: disabled by default
 - tenant provisioning after first bootstrap: platform-admin token only
-- realtime mode on current live Render: `SIMPLE_IN_MEMORY`
-- schema evolution on current live Render: Hibernate `ddl-auto=update`
+- realtime mode on current live Render: `REDIS_PUBSUB`
+- schema validation on current live Render: Hibernate `ddl-auto=validate`
 
-That means SynapseCore is running as a real SaaS platform, but production hardening is still partial in two important areas:
-
-- explicit migration discipline is not finished yet
-- external-broker realtime is not deployed yet
+That means SynapseCore is running as a real SaaS platform with validate-only schema startup and distributed Redis-backed realtime.
 
 ## Backend Environment
 
@@ -31,8 +28,8 @@ Important production variables:
 - `SESSION_COOKIE_SECURE=true`
 - `SESSION_COOKIE_SAME_SITE=None` when frontend and backend are on different hosted origins
 - `ALLOW_HEADER_FALLBACK=false`
-- `SYNAPSECORE_REALTIME_BROKER_MODE=SIMPLE_IN_MEMORY` for the current single-node posture
-- `SPRING_JPA_HIBERNATE_DDL_AUTO=update`
+- `SYNAPSECORE_REALTIME_BROKER_MODE=REDIS_PUBSUB`
+- `SPRING_JPA_HIBERNATE_DDL_AUTO=validate`
 - `SYNAPSECORE_BOOTSTRAP_INITIAL_TOKEN` only for first-tenant bootstrap on an empty production database
 - `SYNAPSECORE_PLATFORM_ADMIN_TOKEN` for later production tenant provisioning
 - `PUBLIC_APP_URL`
@@ -58,19 +55,20 @@ Important variables:
 Supported realtime modes:
 
 - `SIMPLE_IN_MEMORY`
-- `EXTERNAL_BROKER`
+- `REDIS_PUBSUB`
+- `STOMP_RELAY`
 
 Current live truth:
 
-- Render is running `SIMPLE_IN_MEMORY`
-- this is tenant-safe and valid for a single backend instance
-- it is not the final horizontally scaled posture
+- Render is running `REDIS_PUBSUB`
+- this provides distributed fanout beyond single-node simple-broker mode
+- distributed publisher fanout is covered by automated proof in the backend suite
 
-Required later for scale-out:
+Optional later for different scale-out topology:
 
-- external broker relay infrastructure
-- `SYNAPSECORE_REALTIME_BROKER_MODE=EXTERNAL_BROKER`
-- relay host, port, login, and passcode configuration
+- multi-node deployment proof with Redis pub/sub or STOMP relay
+- optional `SYNAPSECORE_REALTIME_BROKER_MODE=STOMP_RELAY`
+- relay host, port, login, and passcode configuration when using relay mode
 
 ## Integration Truth
 
@@ -86,12 +84,10 @@ Deployment docs should not imply broader connector support than that.
 
 Current state:
 
-- production still relies on `SPRING_JPA_HIBERNATE_DDL_AUTO=update`
-
-Target state:
-
-- versioned schema migrations
-- production startup validating schema instead of mutating it
+- production now starts with `SPRING_JPA_HIBERNATE_DDL_AUTO=validate`
+- Flyway is active at startup
+- baseline coverage exists for the current managed schema
+- production-hardening tests run on validation posture
 
 Read the exact migration path in:
 
@@ -109,7 +105,7 @@ Read the exact migration path in:
 8. Use `SYNAPSECORE_PLATFORM_ADMIN_TOKEN` for later tenant provisioning.
 9. Verify `/actuator/health` and `/actuator/health/readiness`.
 10. Verify dashboard REST and realtime connections from the deployed frontend.
-11. Treat `ddl-auto=update` as temporary production posture, not final migration discipline.
+11. Treat `ddl-auto=validate` plus Flyway validation as required production posture.
 
 ## Hosted Proof
 
@@ -141,7 +137,8 @@ npm.cmd run test:e2e:prod
 Current hosted-proof truth:
 
 - tenant/user setup is real
-- the catalog onboarding proof path is still blocked by the live Render `/api/products` conflict issue
+- the hosted proof passed end to end on Render
+- remaining work is scope expansion and scale tuning, not proof-path repair
 
 ## Related Docs
 

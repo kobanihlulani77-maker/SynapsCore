@@ -80,9 +80,11 @@ export default function RuntimePage({ context }) {
                   <p>{formatCodeLabel(runtime.backbone.realtimeBrokerMode || 'unknown')}</p>
                   <p className="muted-text">{runtime.backbone.realtimeBrokerDetail || 'Tenant-scoped websocket publishing is behind a replaceable broker boundary.'}</p>
                   <p className="muted-text">
-                    {runtime.backbone.realtimeExternalBrokerConfigured
-                      ? 'External broker relay is active, so realtime can scale beyond a single app node.'
-                      : 'External broker relay is not active. Current realtime delivery is truthful but single-node only.'}
+                    {runtime.backbone.realtimeStompRelayConfigured
+                      ? 'STOMP relay mode is active, so realtime is using the external broker path.'
+                      : runtime.backbone.realtimeRedisPubSubConfigured
+                        ? 'Redis pub/sub is active, so realtime fanout can propagate across multiple app nodes.'
+                        : 'Realtime is not in distributed mode yet. Current delivery remains tenant-safe but single-node only.'}
                   </p>
                 </div>
                 <div className="signal-list-item">
@@ -93,6 +95,8 @@ export default function RuntimePage({ context }) {
                 <div className="signal-list-item">
                   <strong>Metrics surface</strong>
                   <p>Orders {formatMetricValue(runtime.metrics.ordersIngested)} | Fulfillment {formatMetricValue(runtime.metrics.fulfillmentUpdates)} | Dispatch processed {formatMetricValue(runtime.metrics.dispatchProcessed)}</p>
+                  <p className="muted-text">Auth failures {formatMetricValue(runtime.metrics.authFailures)} | Tenant ops {formatMetricValue(runtime.metrics.tenantOperations)} | Catalog writes {formatMetricValue(runtime.metrics.catalogWrites)}</p>
+                  <p className="muted-text">Realtime publishes {formatMetricValue(runtime.metrics.realtimePublishes)} | Inventory lock conflicts {formatMetricValue(runtime.metrics.inventoryLockConflicts)} | Rate-limit rejections {formatMetricValue(runtime.metrics.rateLimitRejections)}</p>
                   <p className="muted-text">Prometheus metrics are exposed for production scraping at <code>/actuator/prometheus</code>.</p>
                 </div>
                 <div className="signal-list-item">
@@ -168,7 +172,7 @@ export default function RuntimePage({ context }) {
               <div><span>Queue pending</span><strong>{runtime?.backbone?.pendingDispatchCount ?? 0}</strong></div>
               <div><span>Failed dispatch</span><strong>{runtime?.backbone?.failedDispatchCount ?? 0}</strong></div>
               <div><span>Realtime</span><strong>{formatCodeLabel(runtime?.backbone?.realtimeBrokerMode || 'unknown')}</strong></div>
-              <div><span>Scale mode</span><strong>{runtime?.backbone?.realtimeSingleNodeOnly ? 'Single node' : 'Multi node'}</strong></div>
+              <div><span>Scale mode</span><strong>{runtime?.backbone?.realtimeDistributedMode ? 'Multi node' : 'Single node'}</strong></div>
               <div><span>High severity</span><strong>{systemIncidents.filter((incident) => ['CRITICAL', 'HIGH'].includes(incident.severity)).length}</strong></div>
               <div><span>Oldest queued</span><strong>{runtime?.backbone?.oldestPendingAgeSeconds == null ? 'Clear' : `${runtime.backbone.oldestPendingAgeSeconds}s`}</strong></div>
             </div>

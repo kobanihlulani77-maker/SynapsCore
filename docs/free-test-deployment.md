@@ -154,7 +154,17 @@ Then manually verify:
 - do not rotate that password casually after the first database initialization
 - keep `SESSION_COOKIE_SECURE=true`
 - keep `ALLOW_HEADER_FALLBACK=false`
+- keep `SPRING_JPA_HIBERNATE_DDL_AUTO=validate` when using the prod profile
+- run Flyway validation before rollout
+- prefer `SYNAPSECORE_REALTIME_BROKER_MODE=REDIS_PUBSUB` when the public test lane uses Redis
 - use this deployment as a **public test lane**, not your final company production home
+
+Before calling a public test lane pilot-ready, also run:
+
+- `powershell -ExecutionPolicy Bypass -File scripts\prepare-hosted-proof.ps1`
+- `npm.cmd run test:e2e:prod`
+
+That keeps the public test lane tied to the same hosted proof contract as the real Render deployment.
 
 ## Best Short Description
 

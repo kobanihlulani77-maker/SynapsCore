@@ -50,10 +50,13 @@ import org.springframework.web.server.ResponseStatusException;
     "spring.datasource.url=jdbc:h2:mem:prodhardening;MODE=PostgreSQL;DB_CLOSE_DELAY=-1;DB_CLOSE_ON_EXIT=FALSE",
     "spring.datasource.username=sa",
     "spring.datasource.password=",
-    "spring.jpa.hibernate.ddl-auto=create-drop",
+    "spring.jpa.hibernate.ddl-auto=validate",
     "spring.data.redis.url=redis://localhost:6379",
+    "management.health.redis.enabled=false",
+    "synapsecore.realtime.broker-mode=SIMPLE_IN_MEMORY",
     "synapsecore.bootstrap.initial-token=bootstrap-secret",
-    "synapsecore.bootstrap.platform-admin-token=platform-admin-secret"
+    "synapsecore.bootstrap.platform-admin-token=platform-admin-secret",
+    "synapsecore.security.rate-limit.enabled=false"
 })
 @AutoConfigureMockMvc
 @Transactional

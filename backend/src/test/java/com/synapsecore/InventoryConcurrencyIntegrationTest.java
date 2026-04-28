@@ -118,7 +118,7 @@ class InventoryConcurrencyIntegrationTest {
 
         assertThat(statuses).contains(201);
         assertThat(statuses.stream().filter(status -> status == 201)).hasSize(1);
-        assertThat(statuses.stream().filter(status -> status == 400)).hasSize(1);
+        assertThat(statuses.stream().filter(status -> status == 409)).hasSize(1);
 
         Inventory finalInventory = transactionTemplate.execute(status -> {
             var warehouse = warehouseRepository.findByCode("WH-NORTH").orElseThrow();

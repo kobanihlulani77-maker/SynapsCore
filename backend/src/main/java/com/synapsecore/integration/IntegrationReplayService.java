@@ -26,6 +26,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.http.HttpStatus;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.dao.PessimisticLockingFailureException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
@@ -287,6 +288,48 @@ public class IntegrationReplayService {
             operationalMetricsService.recordReplayAttempt(tenantCode, false);
             operationalStateChangePublisher.publish(OperationalUpdateType.INTEGRATION_STATE, "integration-replay");
             throw exception;
+        } catch (PessimisticLockingFailureException exception) {
+            ResponseStatusException contention = IntegrationFailureCodes.status(
+                HttpStatus.CONFLICT,
+                IntegrationFailureCode.UNKNOWN,
+                "Inventory is currently under conflicting reservation pressure. Retry once the active order write completes."
+            );
+            var failure = IntegrationFailureCodes.extract(contention);
+            int nextAttemptCount = record.getReplayAttemptCount() + 1;
+            record.setReplayAttemptCount(nextAttemptCount);
+            record.setLastAttemptedAt(attemptedAt);
+            record.setFailureCode(failure.failureCode());
+            boolean exhausted = nextAttemptCount >= Math.max(maxReplayAttempts, 1);
+            if (exhausted) {
+                record.setStatus(IntegrationReplayStatus.DEAD_LETTERED);
+                record.setDeadLetteredAt(attemptedAt);
+                record.setNextEligibleAt(null);
+                record.setLastReplayMessage(limit(failure.failureMessage() + " Dead-lettered after " + nextAttemptCount + " attempts."));
+            } else {
+                record.setStatus(IntegrationReplayStatus.REPLAY_FAILED);
+                record.setNextEligibleAt(nextEligibleAt(attemptedAt, nextAttemptCount));
+                record.setLastReplayMessage(limit(failure.failureMessage()));
+            }
+            record = integrationReplayRecordRepository.save(record);
+
+            businessEventService.record(
+                BusinessEventType.INTEGRATION_REPLAY_FAILED,
+                "integration-replay",
+                "Replay failed for " + record.getExternalOrderId() + " from " + record.getSourceSystem()
+                    + " by " + actorName + ". Reason: " + failure.failureMessage()
+            );
+            auditLogService.recordFailure(
+                "INTEGRATION_REPLAY_FAILED",
+                actorName,
+                "integration-replay",
+                "IntegrationReplayRecord",
+                String.valueOf(record.getId()),
+                "Replay failed for inbound order " + record.getExternalOrderId() + ". Reason: "
+                    + failure.failureMessage()
+            );
+            operationalMetricsService.recordReplayAttempt(tenantCode, false);
+            operationalStateChangePublisher.publish(OperationalUpdateType.INTEGRATION_STATE, "integration-replay");
+            throw contention;
         }
     }
 

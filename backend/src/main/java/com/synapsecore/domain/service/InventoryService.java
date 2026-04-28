@@ -189,7 +189,7 @@ public class InventoryService {
                 "No inventory found for SKU " + product.resolveCatalogSku() + " in warehouse " + warehouse.getCode()));
         tenantScopeGuard.requireInventoryForTenant(inventory, warehouse, tenantCode, "inventory reservation");
         if (inventory.getQuantityAvailable() < quantity) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+            throw new ResponseStatusException(HttpStatus.CONFLICT,
                 "Insufficient inventory for SKU " + product.resolveCatalogSku() + " in warehouse " + warehouse.getCode());
         }
 

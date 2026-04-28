@@ -46,6 +46,7 @@ synapsecore:
     allow-header-fallback: ${ALLOW_HEADER_FALLBACK:false}
   realtime:
     broker-mode: ${SYNAPSECORE_REALTIME_BROKER_MODE:SIMPLE_IN_MEMORY}
+    redis-channel: ${SYNAPSECORE_REALTIME_REDIS_CHANNEL:synapsecore:realtime}
     relay-host: ${SYNAPSECORE_REALTIME_RELAY_HOST:localhost}
     relay-port: ${SYNAPSECORE_REALTIME_RELAY_PORT:61613}
     relay-client-login: ${SYNAPSECORE_REALTIME_RELAY_CLIENT_LOGIN:guest}
@@ -79,6 +80,23 @@ synapsecore:
   queue:
     dispatch-interval-ms: ${DISPATCH_INTERVAL_MS:1500}
     batch-size: ${DISPATCH_BATCH_SIZE:16}
+  inventory:
+    contention:
+      retry:
+        max-attempts: ${SYNAPSECORE_INVENTORY_RETRY_MAX_ATTEMPTS:3}
+        delay-ms: ${SYNAPSECORE_INVENTORY_RETRY_DELAY_MS:150}
+  security:
+    rate-limit:
+      enabled: ${SYNAPSECORE_RATE_LIMIT_ENABLED:true}
+      auth-login:
+        max-attempts: ${SYNAPSECORE_RATE_LIMIT_AUTH_LOGIN_MAX_ATTEMPTS:30}
+        window-seconds: ${SYNAPSECORE_RATE_LIMIT_AUTH_LOGIN_WINDOW_SECONDS:60}
+      auth-password:
+        max-attempts: ${SYNAPSECORE_RATE_LIMIT_AUTH_PASSWORD_MAX_ATTEMPTS:12}
+        window-seconds: ${SYNAPSECORE_RATE_LIMIT_AUTH_PASSWORD_WINDOW_SECONDS:300}
+      tenant-onboarding:
+        max-attempts: ${SYNAPSECORE_RATE_LIMIT_TENANT_ONBOARDING_MAX_ATTEMPTS:8}
+        window-seconds: ${SYNAPSECORE_RATE_LIMIT_TENANT_ONBOARDING_WINDOW_SECONDS:300}
 
 management:
   prometheus:

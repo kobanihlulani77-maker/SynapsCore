@@ -1,38 +1,13 @@
-import { startTransition, useDeferredValue, useEffect, useRef, useState } from 'react'
-import AppShell from './layout/AppShell'
-import Sidebar from './layout/Sidebar'
-import Topbar from './layout/Topbar'
-import WorkspaceUtilityRail from './layout/WorkspaceUtilityRail'
-import WorkspacePageHeader from './layout/WorkspacePageHeader'
-import WorkspaceNotices from './components/WorkspaceNotices'
-import DashboardPage from './pages/Dashboard'
-import AlertsPage from './pages/Alerts'
-import RecommendationsPage from './pages/Recommendations'
-import OrdersPage from './pages/Orders'
-import InventoryPage from './pages/Inventory'
-import CatalogPage from './pages/Catalog'
-import IntegrationsPage from './pages/Integrations'
-import LocationsPage from './pages/Locations'
-import ReplayPage from './pages/Replay'
-import RuntimePage from './pages/Runtime'
-import SettingsPage from './pages/Settings'
-import ProfilePage from './pages/Profile'
+import { startTransition, useRef, useState } from 'react'
+import WorkspaceAuthenticatedApp from './components/WorkspaceAuthenticatedApp'
 import SignInPage from './pages/SignIn'
-import ApprovalsPage from './pages/Approvals'
-import AuditPage from './pages/Audit'
-import TenantsPage from './pages/Tenants'
-import ScenarioControlPage from './pages/ScenarioControl'
-import ScenarioPlannerPage from './pages/ScenarioPlanner'
-import ScenarioHistoryPage from './pages/ScenarioHistory'
-import FulfillmentPage from './pages/Fulfillment'
-import EscalationsPage from './pages/Escalations'
-import UsersPage from './pages/Users'
-import PlatformAdminPage from './pages/PlatformAdmin'
-import SystemConfigPage from './pages/SystemConfig'
-import ReleasesPage from './pages/Releases'
 import PublicExperience from './pages/PublicExperience'
 import useApi from './hooks/useApi'
+import useAuth from './hooks/useAuth'
+import useWorkspaceBootstrap from './hooks/useWorkspaceBootstrap'
+import useWorkspaceChrome from './hooks/useWorkspaceChrome'
 import useWorkspaceRealtime from './hooks/useWorkspaceRealtime'
+import useWorkspaceSessionActions from './hooks/useWorkspaceSessionActions'
 import useWorkspaceShell from './hooks/useWorkspaceShell'
 import {
   postAuthRedirectStorageKey,
@@ -42,128 +17,64 @@ import {
   writeStoredJson,
 } from './services/api'
 import {
-  appPages,
   buildPagePath,
   navGroups,
   pageLookup,
-  pageSectionMap,
   publicPages,
   resolvePageFromPath,
 } from './config/pageRegistry'
+import {
+  buildAccessOperatorForm,
+  buildAccessOperatorsPath,
+  buildAccessUserForm,
+  buildProductOptions,
+  buildRevisionTitle,
+  buildScenarioHistoryPath,
+  buildTenantTopicPrefix,
+  buildWarehouseOptions,
+  buildWorkspaceConnectorDrafts,
+  buildWorkspaceWarehouseDrafts,
+  createDefaultAccessOperatorForm,
+  createDefaultAccessUserForm,
+  createDefaultCatalogForm,
+  createDefaultPasswordChangeForm,
+  createDefaultWorkspaceSecurityForm,
+  createDefaultWorkspaceSettingsForm,
+  createScenarioForm,
+  createScenarioLine,
+  currency,
+  defaultScenarioHistoryFilters,
+  defaultScenarioRequester,
+  defaultScenarioReviewOwner,
+  defaultTenantOnboardingForm,
+  emptyRequestState,
+  emptySnapshot,
+  formatBuildValue,
+  formatCodeLabel,
+  formatMetricValue,
+  formatRelativeHours,
+  formatTimestamp,
+  getFulfillmentStatusClassName,
+  getImportStatusClassName,
+  getIncidentStatusClassName,
+  getReplayStatusClassName,
+  getRuntimeStatusClassName,
+  getScenarioApprovalRole,
+  getScenarioRejectionRole,
+  hasActiveScenarioHistoryFilters,
+  hasWarehouseScope,
+  integrationActorRoles,
+  integrationTransformationPolicies,
+  integrationValidationPolicies,
+  parseCsvValues,
+  resolvePreferredOperatorName,
+  scenarioActorRoles,
+  summarizeImpact,
+} from './config/workspaceModel'
 
 const rememberedWorkspacePreference = readStoredJson(globalThis.localStorage, workspacePreferenceStorageKey, null)
-const emptySnapshot = {
-  summary: null,
-  alerts: { activeAlerts: [], recentAlerts: [] },
-  recommendations: [],
-  inventory: [],
-  fulfillment: { backlogCount: 0, overdueDispatchCount: 0, delayedShipmentCount: 0, atRiskCount: 0, activeFulfillments: [], generatedAt: null },
-  recentOrders: [],
-  recentEvents: [],
-  auditLogs: [],
-  systemIncidents: [],
-  integrationConnectors: [],
-  integrationImportRuns: [],
-  integrationReplayQueue: [],
-  scenarioNotifications: [],
-  slaEscalations: [],
-  recentScenarios: [],
-  generatedAt: null,
-}
-const emptyRequestState = { loading: false, error: '', result: null }
-const defaultScenarioHistoryFilters = { type: 'ALL', approvalStatus: 'ALL', approvalPolicy: 'ALL', approvalStage: 'ALL', warehouseCode: 'ALL', requestedBy: '', reviewOwner: '', finalApprovalOwner: '', minimumReviewPriority: 'ALL', overdueOnly: false, slaEscalatedOnly: false }
-const currency = new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 })
 const defaultSignInTenantCode = rememberedWorkspacePreference?.remember ? (rememberedWorkspacePreference.tenantCode || '') : ''
 const defaultSignInUsername = rememberedWorkspacePreference?.remember ? (rememberedWorkspacePreference.username || '') : ''
-const defaultScenarioRequester = 'Operations Planner'
-const defaultScenarioReviewOwner = 'Operations Lead'
-const defaultTenantOnboardingForm = { tenantCode: '', tenantName: '', description: '', adminFullName: '', adminUsername: '', adminPassword: '', primaryLocation: '', secondaryLocation: '' }
-const createDefaultWorkspaceSettingsForm = () => ({ tenantName: '', description: '' })
-const createDefaultWorkspaceSecurityForm = () => ({ passwordRotationDays: '90', sessionTimeoutMinutes: '480', invalidateOtherSessions: false })
-const createDefaultAccessOperatorForm = () => ({ id: null, actorName: '', displayName: '', description: '', rolesText: 'REVIEW_OWNER', warehouseScopesText: '', active: true })
-const createDefaultAccessUserForm = () => ({ id: null, username: '', fullName: '', password: '', operatorActorName: '', active: true })
-const createDefaultPasswordChangeForm = () => ({ currentPassword: '', newPassword: '', confirmPassword: '' })
-const createDefaultCatalogForm = () => ({ id: null, sku: '', name: '', category: '' })
-const buildWorkspaceWarehouseDrafts = (workspace) => Object.fromEntries((workspace?.warehouses || []).map((warehouse) => [warehouse.id, { name: warehouse.name, location: warehouse.location }]))
-const buildWorkspaceConnectorDrafts = (workspace) => Object.fromEntries((workspace?.connectors || []).map((connector) => [connector.id, {
-  supportOwnerActorName: connector.supportOwnerActorName || '',
-  syncMode: connector.syncMode || 'REALTIME_PUSH',
-  syncIntervalMinutes: connector.syncIntervalMinutes == null ? '' : String(connector.syncIntervalMinutes),
-  pullEndpointUrl: connector.pullEndpointUrl || '',
-  validationPolicy: connector.validationPolicy || 'STANDARD',
-  transformationPolicy: connector.transformationPolicy || 'NONE',
-  allowDefaultWarehouseFallback: Boolean(connector.allowDefaultWarehouseFallback),
-  notes: connector.notes || '',
-}]))
-const buildAccessOperatorForm = (operator) => ({
-  ...createDefaultAccessOperatorForm(),
-  id: operator.id,
-  actorName: operator.actorName,
-  displayName: operator.displayName,
-  description: operator.description || '',
-  rolesText: operator.roles.join(','),
-  warehouseScopesText: operator.warehouseScopes.join(','),
-  active: operator.active,
-})
-const buildAccessUserForm = (user) => ({
-  ...createDefaultAccessUserForm(),
-  id: user.id,
-  username: user.username,
-  fullName: user.fullName,
-  operatorActorName: user.operatorActorName,
-  active: user.active,
-})
-const createScenarioLine = (productSku = '') => ({ id: `${Date.now()}-${Math.random().toString(16).slice(2)}`, productSku, quantity: '1', unitPrice: '95.00' })
-const createScenarioForm = (productSku = '') => ({ warehouseCode: '', items: [createScenarioLine(productSku)] })
-const buildWarehouseOptions = (inventory) => [...new Map(inventory.map((item) => [item.warehouseCode, { code: item.warehouseCode, name: item.warehouseName }])).values()]
-const buildProductOptions = (inventory, warehouseCode) => [...new Map(inventory.filter((item) => item.warehouseCode === warehouseCode).map((item) => [item.productSku, { sku: item.productSku, name: item.productName, quantityAvailable: item.quantityAvailable, reorderThreshold: item.reorderThreshold }])).values()]
-const formatRelativeHours = (hours) => {
-  if (hours == null) return 'Monitoring'
-  if (hours < 0) {
-    const overdueHours = Math.abs(hours)
-    return overdueHours < 1 ? `${Math.max(overdueHours * 60, 1).toFixed(0)} min overdue` : `${overdueHours.toFixed(1)} hrs overdue`
-  }
-  return hours < 1 ? `${Math.max(hours * 60, 1).toFixed(0)} min` : `${hours.toFixed(1)} hrs`
-}
-const formatTimestamp = (value) => value ? new Date(value).toLocaleString() : 'Monitoring'
-const formatMetricValue = (value) => Number.isFinite(value) ? Math.round(value) : 0
-const formatBuildValue = (value) => value || 'untracked'
-const formatCodeLabel = (value) => !value ? 'Unknown' : value.toLowerCase().split('_').map((part) => part.charAt(0).toUpperCase() + part.slice(1)).join(' ')
-const parseCsvValues = (value) => value.split(',').map((part) => part.trim()).filter(Boolean)
-const buildTenantTopicPrefix = (tenantCode) => tenantCode ? `/topic/tenant/${tenantCode.trim().toUpperCase()}` : ''
-const getImportStatusClassName = (status) => status === 'SUCCESS' ? 'status-success' : status === 'PARTIAL_SUCCESS' ? 'status-partial' : 'status-failure'
-const getReplayStatusClassName = (status) => status === 'PENDING' ? 'status-partial' : status === 'REPLAY_FAILED' ? 'status-failure' : 'status-success'
-const getRuntimeStatusClassName = (status) => ['UP', 'CORRECT', 'ACCEPTING_TRAFFIC'].includes(status) ? 'status-success' : status === 'UNKNOWN' ? 'status-partial' : 'status-failure'
-const getIncidentStatusClassName = (severity) => severity === 'CRITICAL' || severity === 'HIGH' ? 'status-failure' : 'status-partial'
-const getFulfillmentStatusClassName = (status) => status === 'DELIVERED' || status === 'DISPATCHED' ? 'status-success' : status === 'DELAYED' || status === 'EXCEPTION' ? 'status-failure' : 'status-partial'
-const scenarioActorRoles = ['REVIEW_OWNER', 'FINAL_APPROVER', 'ESCALATION_OWNER']
-const integrationActorRoles = ['INTEGRATION_ADMIN', 'INTEGRATION_OPERATOR']
-const integrationValidationPolicies = ['STANDARD', 'STRICT', 'RELAXED']
-const integrationTransformationPolicies = ['NONE', 'NORMALIZE_CODES']
-const getScenarioApprovalRole = (scenario) => scenario.approvalPolicy === 'ESCALATED' && scenario.approvalStage === 'PENDING_FINAL_APPROVAL' ? 'FINAL_APPROVER' : 'REVIEW_OWNER'
-const getScenarioRejectionRole = (scenario) => scenario.approvalStage === 'PENDING_FINAL_APPROVAL' ? 'FINAL_APPROVER' : 'REVIEW_OWNER'
-const summarizeImpact = (impact) => ({ lowStockItems: impact.projectedInventory.filter((item) => item.lowStock).length, criticalItems: impact.projectedInventory.filter((item) => item.riskLevel === 'critical').length, highRiskItems: impact.projectedInventory.filter((item) => item.riskLevel === 'high').length, alertCount: impact.projectedAlerts.length, recommendationCount: impact.projectedRecommendations.length })
-const buildRevisionTitle = (title, revisionNumber) => `${title} Rev ${revisionNumber}`
-const hasActiveScenarioHistoryFilters = (filters) => filters.type !== 'ALL' || filters.approvalStatus !== 'ALL' || filters.approvalPolicy !== 'ALL' || filters.approvalStage !== 'ALL' || filters.warehouseCode !== 'ALL' || Boolean(filters.requestedBy.trim()) || Boolean(filters.reviewOwner.trim()) || Boolean(filters.finalApprovalOwner.trim()) || filters.minimumReviewPriority !== 'ALL' || filters.overdueOnly || filters.slaEscalatedOnly
-const resolvePreferredOperatorName = (operators, preferredName) => operators.find((operator) => operator.actorName === preferredName)?.actorName || operators[0]?.actorName || ''
-const hasWarehouseScope = (warehouseScopes, warehouseCode) => !warehouseCode || !(warehouseScopes?.length) || warehouseScopes.some((scope) => scope === warehouseCode.toUpperCase())
-const dedupeById = (items) => Array.from(new Map(items.filter(Boolean).map((item) => [item.id, item])).values())
-const buildAccessOperatorsPath = (tenantCode) => tenantCode ? `/api/access/operators?tenantCode=${encodeURIComponent(tenantCode)}` : '/api/access/operators'
-const buildScenarioHistoryPath = (filters) => {
-  const params = new URLSearchParams()
-  if (filters.type !== 'ALL') params.set('type', filters.type)
-  if (filters.approvalStatus !== 'ALL') params.set('approvalStatus', filters.approvalStatus)
-  if (filters.approvalPolicy !== 'ALL') params.set('approvalPolicy', filters.approvalPolicy)
-  if (filters.approvalStage !== 'ALL') params.set('approvalStage', filters.approvalStage)
-  if (filters.warehouseCode !== 'ALL') params.set('warehouseCode', filters.warehouseCode)
-  if (filters.requestedBy.trim()) params.set('requestedBy', filters.requestedBy.trim())
-  if (filters.reviewOwner.trim()) params.set('reviewOwner', filters.reviewOwner.trim())
-  if (filters.finalApprovalOwner.trim()) params.set('finalApprovalOwner', filters.finalApprovalOwner.trim())
-  if (filters.minimumReviewPriority !== 'ALL') params.set('minimumReviewPriority', filters.minimumReviewPriority)
-  if (filters.overdueOnly) params.set('overdueOnly', 'true')
-  if (filters.slaEscalatedOnly) params.set('slaEscalatedOnly', 'true')
-  return params.size ? `/api/scenarios/history?${params.toString()}` : '/api/scenarios/history'
-}
 const readPendingPostAuthPage = () => {
   const pageKey = readStoredJson(globalThis.sessionStorage, postAuthRedirectStorageKey, '')
   return pageLookup[pageKey]?.audience === 'app' ? pageKey : ''
@@ -178,7 +89,6 @@ export default function App() {
   const [snapshot, setSnapshot] = useState(emptySnapshot)
   const [currentPage, setCurrentPage] = useState(() => resolvePageFromPath())
   const [workspaceSearch, setWorkspaceSearch] = useState('')
-  const [rememberWorkspace, setRememberWorkspace] = useState(() => rememberedWorkspacePreference?.remember ?? true)
   const [clockTick, setClockTick] = useState(() => Date.now())
   const [selectedAlertId, setSelectedAlertId] = useState(null)
   const [selectedRecommendationId, setSelectedRecommendationId] = useState(null)
@@ -198,7 +108,6 @@ export default function App() {
   const [pageState, setPageState] = useState({ loading: true, error: '' })
   const [actionState, setActionState] = useState({ loading: false, error: '' })
   const [systemRuntimeState, setSystemRuntimeState] = useState({ loading: true, error: '', runtime: null })
-  const [authSessionState, setAuthSessionState] = useState({ loading: true, error: '', session: null, tenantCode: defaultSignInTenantCode, username: defaultSignInUsername, password: '', action: '' })
   const [tenantDirectoryState, setTenantDirectoryState] = useState({ loading: true, error: '', items: [] })
   const [tenantOnboardingForm, setTenantOnboardingForm] = useState(defaultTenantOnboardingForm)
   const [tenantOnboardingState, setTenantOnboardingState] = useState({ loading: false, error: '', success: '', result: null })
@@ -209,7 +118,6 @@ export default function App() {
   const [workspaceConnectorDrafts, setWorkspaceConnectorDrafts] = useState({})
   const [accessOperatorForm, setAccessOperatorForm] = useState(createDefaultAccessOperatorForm)
   const [accessUserForm, setAccessUserForm] = useState(createDefaultAccessUserForm)
-  const [passwordChangeState, setPasswordChangeState] = useState({ loading: false, error: '', success: '', form: createDefaultPasswordChangeForm() })
   const [catalogState, setCatalogState] = useState({ loading: true, error: '', success: '', products: [], importResult: null })
   const [catalogForm, setCatalogForm] = useState(createDefaultCatalogForm)
   const [operatorDirectoryState, setOperatorDirectoryState] = useState({ loading: true, error: '', items: [] })
@@ -235,6 +143,19 @@ export default function App() {
   const [scenarioHistoryFilters, setScenarioHistoryFilters] = useState(defaultScenarioHistoryFilters)
   const [scenarioHistoryState, setScenarioHistoryState] = useState({ loading: true, error: '', items: [] })
   const searchInputRef = useRef(null)
+  const {
+    rememberWorkspace,
+    setRememberWorkspace,
+    authSessionState,
+    setAuthSessionState,
+    passwordChangeState,
+    setPasswordChangeState,
+  } = useAuth({
+    defaultTenantCode: defaultSignInTenantCode,
+    defaultUsername: defaultSignInUsername,
+    rememberedWorkspacePreference,
+    createDefaultPasswordChangeForm,
+  })
 
   const mergeSnapshot = (partial) => setSnapshot((current) => ({ ...current, ...partial, generatedAt: new Date().toISOString() }))
   const activeTenantCode = authSessionState.session?.tenantCode || ''
@@ -305,101 +226,6 @@ export default function App() {
     target?.scrollIntoView?.({ behavior: prefersReducedMotion ? 'auto' : 'smooth', block: 'start' })
   }
 
-  async function fetchAccessAdminData() {
-    const [workspace, operators, users] = await Promise.all([
-      fetchJson('/api/access/admin/workspace'),
-      fetchJson('/api/access/admin/operators'),
-      fetchJson('/api/access/admin/users'),
-    ])
-    const defaultOperatorActorName = operators.find((operator) => operator.active)?.actorName || operators[0]?.actorName || ''
-    setAccessAdminState((current) => ({ ...current, loading: false, error: '', workspace, operators, users }))
-    setWorkspaceSettingsForm({
-      tenantName: workspace.tenantName || '',
-      description: workspace.description || '',
-    })
-    setWorkspaceSecurityForm({
-      passwordRotationDays: String(workspace.securitySettings?.passwordRotationDays || 90),
-      sessionTimeoutMinutes: String(workspace.securitySettings?.sessionTimeoutMinutes || 480),
-      invalidateOtherSessions: false,
-    })
-    setWorkspaceWarehouseDrafts(buildWorkspaceWarehouseDrafts(workspace))
-    setWorkspaceConnectorDrafts(buildWorkspaceConnectorDrafts(workspace))
-    setAccessUserForm((current) => ({
-      ...current,
-      operatorActorName: operators.some((operator) => operator.actorName === current.operatorActorName)
-        ? current.operatorActorName
-        : defaultOperatorActorName,
-    }))
-  }
-
-  async function fetchSnapshot() {
-    const nextSnapshot = await fetchJson('/api/dashboard/snapshot')
-    setSnapshot({
-      ...emptySnapshot,
-      ...nextSnapshot,
-      recentEvents: nextSnapshot.recentEvents ?? [],
-      auditLogs: nextSnapshot.auditLogs ?? [],
-      systemIncidents: nextSnapshot.systemIncidents ?? [],
-      integrationConnectors: nextSnapshot.integrationConnectors ?? [],
-      integrationImportRuns: nextSnapshot.integrationImportRuns ?? [],
-      integrationReplayQueue: nextSnapshot.integrationReplayQueue ?? [],
-      scenarioNotifications: nextSnapshot.scenarioNotifications ?? [],
-      slaEscalations: nextSnapshot.slaEscalations ?? [],
-      recentScenarios: nextSnapshot.recentScenarios ?? [],
-      generatedAt: nextSnapshot.generatedAt ?? new Date().toISOString(),
-    })
-    setPageState({ loading: false, error: '' })
-  }
-
-  async function fetchCatalogProducts(options = {}) {
-    if (!options.quiet) {
-      setCatalogState((current) => ({ ...current, loading: true, error: '', success: '' }))
-    }
-    try {
-      const products = await fetchJson('/api/products')
-      setCatalogState((current) => ({ ...current, loading: false, error: '', products, success: options.success || current.success }))
-      setSelectedCatalogProductId((currentId) => (products.some((product) => product.id === currentId) ? currentId : products[0]?.id || null))
-      return products
-    } catch (error) {
-      setCatalogState((current) => ({ ...current, loading: false, error: error.message }))
-      if (!options.quiet) throw error
-      return []
-    }
-  }
-
-  async function refreshSnapshotQuietly() {
-    try {
-      await Promise.all([fetchSnapshot(), fetchCatalogProducts({ quiet: true })])
-      await refreshSystemRuntimeQuietly()
-    } catch {
-      // Keep planning feedback visible even if the secondary snapshot refresh misses.
-    }
-  }
-
-  async function fetchSystemRuntime() {
-    const runtime = await fetchJson('/api/system/runtime')
-    setSystemRuntimeState({ loading: false, error: '', runtime })
-  }
-
-  async function refreshSystemRuntimeQuietly() {
-    try {
-      await fetchSystemRuntime()
-    } catch {
-      // Keep runtime feedback visible even if the secondary refresh misses.
-    }
-  }
-
-  async function refreshScenarioHistoryQuietly(filters = scenarioHistoryFilters) {
-    try {
-      const history = await fetchJson(buildScenarioHistoryPath(filters))
-      setScenarioHistoryState({ loading: false, error: '', items: history })
-    } catch (error) {
-      setScenarioHistoryState((current) => current.items.length
-        ? { ...current, loading: false }
-        : { loading: false, error: error.message, items: [] })
-    }
-  }
-
   function normalizeScenarioForm(currentForm, inventory) {
     if (!inventory.length) return currentForm
     const warehouseOptions = buildWarehouseOptions(inventory)
@@ -435,6 +261,83 @@ export default function App() {
     setWorkspaceSearch,
   })
 
+  const {
+    fetchAccessAdminData,
+    fetchSnapshot,
+    fetchCatalogProducts,
+    fetchSystemRuntime,
+    refreshScenarioHistoryQuietly,
+    refreshSnapshotQuietly,
+  } = useWorkspaceBootstrap({
+    activeTenantCode,
+    authSessionState,
+    currentPage,
+    rememberWorkspace,
+    fetchJson,
+    navigateToPage,
+    redirectToPage,
+    buildAccessOperatorsPath,
+    buildScenarioHistoryPath,
+    createDefaultAccessOperatorForm,
+    createDefaultAccessUserForm,
+    createDefaultCatalogForm,
+    createDefaultPasswordChangeForm,
+    createDefaultWorkspaceSecurityForm,
+    createDefaultWorkspaceSettingsForm,
+    defaultScenarioRequester,
+    defaultScenarioReviewOwner,
+    defaultSignInTenantCode,
+    emptySnapshot,
+    handleExpiredSession,
+    activePageRequiresAuth: (pageMeta) => pageMeta.audience === 'app',
+    pageLookup,
+    readPendingPostAuthPage,
+    clearPendingPostAuthPage,
+    storePendingPostAuthPage,
+    workspacePreferenceStorageKey,
+    writeStoredJson,
+    removeStoredValue,
+    buildWorkspaceWarehouseDrafts,
+    buildWorkspaceConnectorDrafts,
+    hasActiveScenarioHistoryFilters,
+    resolvePreferredOperatorName,
+    hasWarehouseScope,
+    operatorDirectoryState,
+    accessAdminStateSetter: setAccessAdminState,
+    accessUserFormSetter: setAccessUserForm,
+    workspaceSettingsFormSetter: setWorkspaceSettingsForm,
+    workspaceSecurityFormSetter: setWorkspaceSecurityForm,
+    workspaceWarehouseDraftsSetter: setWorkspaceWarehouseDrafts,
+    workspaceConnectorDraftsSetter: setWorkspaceConnectorDrafts,
+    accessOperatorFormSetter: setAccessOperatorForm,
+    catalogStateSetter: setCatalogState,
+    selectedCatalogProductIdSetter: setSelectedCatalogProductId,
+    snapshotSetter: setSnapshot,
+    pageStateSetter: setPageState,
+    systemRuntimeStateSetter: setSystemRuntimeState,
+    tenantDirectoryStateSetter: setTenantDirectoryState,
+    authSessionStateSetter: setAuthSessionState,
+    passwordChangeStateSetter: setPasswordChangeState,
+    operatorDirectoryStateSetter: setOperatorDirectoryState,
+    scenarioHistoryStateSetter: setScenarioHistoryState,
+    scenarioForm,
+    scenarioRequestedBy,
+    scenarioRequestedBySetter: setScenarioRequestedBy,
+    scenarioReviewOwner,
+    scenarioReviewOwnerSetter: setScenarioReviewOwner,
+    scenarioActorRole,
+    scenarioActorRoleSetter: setScenarioActorRole,
+    scenarioActorRoles,
+    integrationActorRole,
+    integrationActorRoleSetter: setIntegrationActorRole,
+    integrationActorRoles,
+    snapshotInventory: snapshot.inventory,
+    setScenarioForm,
+    setComparisonForm,
+    normalizeScenarioForm,
+    scenarioHistoryFilters,
+  })
+
   useWorkspaceRealtime({
     activeTenantCode,
     signedInTenantCode: authSessionState.session?.tenantCode,
@@ -450,273 +353,6 @@ export default function App() {
     setConnectionState,
     emptySnapshot,
   })
-
-  useEffect(() => {
-    let active = true
-    async function loadTenants() {
-      try {
-        const tenants = await fetchJson('/api/access/tenants')
-        if (active) {
-          setTenantDirectoryState({ loading: false, error: '', items: tenants })
-          setAuthSessionState((current) => ({
-            ...current,
-            tenantCode: current.session?.tenantCode || current.tenantCode || tenants[0]?.code || '',
-          }))
-        }
-      } catch (error) {
-        if (active) {
-          setTenantDirectoryState({ loading: false, error: error.message, items: [] })
-        }
-      }
-    }
-    loadTenants()
-    return () => { active = false }
-  }, [activeTenantCode])
-
-  useEffect(() => {
-    let active = true
-    async function loadOperators() {
-      if (!authSessionState.session?.tenantCode) {
-        if (active) {
-          setOperatorDirectoryState({ loading: false, error: '', items: [] })
-        }
-        return
-      }
-      try {
-        const operators = await fetchJson(buildAccessOperatorsPath(activeTenantCode))
-        if (active) {
-          setOperatorDirectoryState({ loading: false, error: '', items: operators })
-        }
-      } catch (error) {
-        if (active) {
-          setOperatorDirectoryState({ loading: false, error: error.message, items: [] })
-        }
-      }
-    }
-    loadOperators()
-    return () => { active = false }
-  }, [activeTenantCode])
-
-  useEffect(() => {
-    let active = true
-    async function loadAccessAdminData() {
-      if (!(authSessionState.session?.roles || []).includes('TENANT_ADMIN')) {
-        if (active) {
-          setAccessAdminState({ loading: false, error: '', success: '', workspace: null, operators: [], users: [] })
-          setWorkspaceSettingsForm(createDefaultWorkspaceSettingsForm())
-          setWorkspaceSecurityForm(createDefaultWorkspaceSecurityForm())
-          setWorkspaceWarehouseDrafts({})
-          setWorkspaceConnectorDrafts({})
-          setAccessOperatorForm(createDefaultAccessOperatorForm())
-          setAccessUserForm(createDefaultAccessUserForm())
-        }
-        return
-      }
-
-      if (active) {
-        setAccessAdminState((current) => ({ ...current, loading: true, error: '' }))
-      }
-      try {
-        const [workspace, operators, users] = await Promise.all([
-          fetchJson('/api/access/admin/workspace'),
-          fetchJson('/api/access/admin/operators'),
-          fetchJson('/api/access/admin/users'),
-        ])
-        if (active) {
-          const defaultOperatorActorName = operators.find((operator) => operator.active)?.actorName || operators[0]?.actorName || ''
-          setAccessAdminState((current) => ({ ...current, loading: false, error: '', workspace, operators, users }))
-          setWorkspaceSettingsForm({
-            tenantName: workspace.tenantName || '',
-            description: workspace.description || '',
-          })
-          setWorkspaceSecurityForm({
-            passwordRotationDays: String(workspace.securitySettings?.passwordRotationDays || 90),
-            sessionTimeoutMinutes: String(workspace.securitySettings?.sessionTimeoutMinutes || 480),
-            invalidateOtherSessions: false,
-          })
-          setWorkspaceWarehouseDrafts(buildWorkspaceWarehouseDrafts(workspace))
-          setWorkspaceConnectorDrafts(buildWorkspaceConnectorDrafts(workspace))
-          setAccessUserForm((current) => ({
-            ...current,
-            operatorActorName: operators.some((operator) => operator.actorName === current.operatorActorName)
-              ? current.operatorActorName
-              : defaultOperatorActorName,
-          }))
-        }
-      } catch (error) {
-        if (active) {
-          setAccessAdminState((current) => ({ ...current, loading: false, error: error.message, workspace: null, operators: [], users: [] }))
-        }
-      }
-    }
-    loadAccessAdminData()
-    return () => { active = false }
-  }, [authSessionState.session, activeTenantCode])
-
-  useEffect(() => {
-    let active = true
-    async function loadSystemRuntime() {
-      if (!authSessionState.session?.tenantCode) {
-        if (active) {
-          setSystemRuntimeState({ loading: false, error: '', runtime: null })
-        }
-        return
-      }
-      try {
-        const runtime = await fetchJson('/api/system/runtime')
-        if (active) {
-          setSystemRuntimeState({ loading: false, error: '', runtime })
-        }
-      } catch (error) {
-        if (active) {
-          setSystemRuntimeState({ loading: false, error: error.message, runtime: null })
-        }
-      }
-    }
-    loadSystemRuntime()
-    return () => { active = false }
-  }, [authSessionState.session])
-
-  useEffect(() => {
-    let active = true
-    async function loadAuthSession() {
-      try {
-        const session = await fetchJson('/api/auth/session')
-        if (active) {
-          setAuthSessionState((current) => ({
-            ...current,
-            loading: false,
-            error: '',
-            action: '',
-            session: session.signedIn ? session : null,
-            tenantCode: session.signedIn ? session.tenantCode : (current.tenantCode || defaultSignInTenantCode),
-            username: session.signedIn ? session.username : current.username,
-            password: session.signedIn ? '' : current.password,
-          }))
-          setPasswordChangeState((current) => ({
-            ...current,
-            loading: false,
-            error: '',
-            success: session.signedIn ? current.success : '',
-            form: session.signedIn ? current.form : createDefaultPasswordChangeForm(),
-          }))
-        }
-      } catch (error) {
-        if (active) {
-          setAuthSessionState((current) => ({
-            ...current,
-            loading: false,
-            error: error.message,
-            action: '',
-            session: null,
-            password: current.password,
-          }))
-          setPasswordChangeState((current) => ({ ...current, loading: false, error: '', form: createDefaultPasswordChangeForm() }))
-        }
-      }
-    }
-    loadAuthSession()
-    return () => { active = false }
-  }, [])
-
-  useEffect(() => {
-    if (!rememberWorkspace) {
-      removeStoredValue(globalThis.localStorage, workspacePreferenceStorageKey)
-      return
-    }
-
-    writeStoredJson(globalThis.localStorage, workspacePreferenceStorageKey, {
-      remember: true,
-      tenantCode: authSessionState.tenantCode.trim(),
-      username: authSessionState.username.trim(),
-    })
-  }, [rememberWorkspace, authSessionState.tenantCode, authSessionState.username])
-
-  useEffect(() => {
-    if (authSessionState.loading) return
-    const currentMeta = pageLookup[currentPage] || pageLookup.landing
-    if (!authSessionState.session && currentMeta.audience === 'app') {
-      storePendingPostAuthPage(currentPage)
-      redirectToPage('sign-in')
-    }
-  }, [authSessionState.loading, authSessionState.session, currentPage])
-
-  useEffect(() => {
-    if (authSessionState.loading || !authSessionState.session || currentPage !== 'sign-in') return
-    const nextPage = readPendingPostAuthPage() || 'dashboard'
-    clearPendingPostAuthPage()
-    navigateToPage(nextPage)
-  }, [authSessionState.loading, authSessionState.session, currentPage])
-
-  useEffect(() => {
-    if (!snapshot.inventory.length) return
-    setScenarioForm((current) => normalizeScenarioForm(current, snapshot.inventory))
-    setComparisonForm((current) => normalizeScenarioForm(current, snapshot.inventory))
-  }, [snapshot.inventory])
-
-  useEffect(() => {
-    if (!operatorDirectoryState.items.length) return
-
-    const availableOperators = operatorDirectoryState.items.filter((operator) => hasWarehouseScope(operator.warehouseScopes, scenarioForm.warehouseCode))
-    const reviewOwnerOptions = availableOperators.filter((operator) => operator.roles.includes('REVIEW_OWNER'))
-
-    if (!availableOperators.some((operator) => operator.actorName === scenarioRequestedBy)) {
-      setScenarioRequestedBy(resolvePreferredOperatorName(availableOperators, defaultScenarioRequester))
-    }
-    if (!reviewOwnerOptions.some((operator) => operator.actorName === scenarioReviewOwner)) {
-      setScenarioReviewOwner(resolvePreferredOperatorName(reviewOwnerOptions, defaultScenarioReviewOwner))
-    }
-  }, [
-    operatorDirectoryState.items,
-    scenarioForm.warehouseCode,
-    scenarioRequestedBy,
-    scenarioReviewOwner,
-  ])
-
-  useEffect(() => {
-    if (!authSessionState.session) return
-
-    const sessionRoles = authSessionState.session.roles ?? []
-    setScenarioRequestedBy(authSessionState.session.actorName)
-
-    if (!sessionRoles.includes(scenarioActorRole)) {
-      const fallbackScenarioRole = scenarioActorRoles.find((role) => sessionRoles.includes(role))
-      if (fallbackScenarioRole) {
-        setScenarioActorRole(fallbackScenarioRole)
-      }
-    }
-    if (!sessionRoles.includes(integrationActorRole)) {
-      const fallbackIntegrationRole = integrationActorRoles.find((role) => sessionRoles.includes(role))
-      if (fallbackIntegrationRole) {
-        setIntegrationActorRole(fallbackIntegrationRole)
-      }
-    }
-  }, [authSessionState.session, integrationActorRole, scenarioActorRole])
-
-  useEffect(() => {
-    let active = true
-    async function loadScenarioHistory() {
-      if (!authSessionState.session?.tenantCode) {
-        if (active) {
-          setScenarioHistoryState({ loading: false, error: '', items: [] })
-        }
-        return
-      }
-      setScenarioHistoryState((current) => ({ ...current, loading: true, error: '' }))
-      try {
-        const history = await fetchJson(buildScenarioHistoryPath(scenarioHistoryFilters))
-        if (active) {
-          setScenarioHistoryState({ loading: false, error: '', items: history })
-        }
-      } catch (error) {
-        if (active) {
-          setScenarioHistoryState({ loading: false, error: error.message, items: [] })
-        }
-      }
-    }
-    loadScenarioHistory()
-    return () => { active = false }
-  }, [scenarioHistoryFilters, activeTenantCode])
 
   function resetCatalogForm() {
     setCatalogForm(createDefaultCatalogForm())
@@ -920,323 +556,95 @@ export default function App() {
   const isTenantsPage = currentPage === 'tenants'
   const isSystemConfigPage = currentPage === 'system-config'
   const isReleasesPage = currentPage === 'releases'
-  const pageBadgeMap = {
-    dashboard: summary?.totalOrders ?? 0,
-    alerts: summary?.activeAlerts ?? snapshot.alerts.activeAlerts.length,
-    recommendations: summary?.recommendationsCount ?? snapshot.recommendations.length,
-    orders: summary?.recentOrderCount ?? snapshot.recentOrders.length,
-    inventory: summary?.inventoryRecordsCount ?? snapshot.inventory.length,
-    catalog: catalogState.products.length,
-    locations: summary?.totalWarehouses ?? warehouseOptions.length,
-    fulfillment: fulfillmentOverview.backlogCount + fulfillmentOverview.delayedShipmentCount,
-    scenarios: pendingReviewCount,
-    'scenario-history': scenarioHistoryItems.length,
-    approvals: pendingReviewCount,
-    escalations: snapshot.slaEscalations.length || systemIncidents.length,
-    integrations: snapshot.integrationConnectors.length,
-    replay: pendingReplayCount,
-    runtime: systemIncidents.length,
-    audit: snapshot.auditLogs.length,
-    users: accessAdminUsers.length,
-    settings: canManageTenantAccess ? (workspaceAdmin?.warehouses?.length || 0) : 0,
-    profile: signedInSession ? 1 : 0,
-    platform: systemIncidents.length,
-    tenants: tenantDirectoryState.items.length,
-    'system-config': runtime?.backbone?.pendingDispatchCount ?? 0,
-    releases: runtime?.build?.version ? 1 : 0,
-    landing: 0,
-    product: 0,
-    'sign-in': 0,
-    contact: 0,
-  }
-  const pageStatusMap = {
-    dashboard: isAuthenticated ? (summary?.lastUpdatedAt ? `Updated ${formatTimestamp(summary.lastUpdatedAt)}` : 'Waiting for live summary') : 'Sign in to unlock the control center',
-    alerts: isAuthenticated ? (snapshot.alerts.activeAlerts.length ? `${snapshot.alerts.activeAlerts.length} active operational alert${snapshot.alerts.activeAlerts.length === 1 ? '' : 's'}` : 'No active alert pressure') : 'Protected by workspace sign-in',
-    recommendations: isAuthenticated ? (snapshot.recommendations.length ? `${snapshot.recommendations.length} recommendation${snapshot.recommendations.length === 1 ? '' : 's'} waiting for review` : 'No immediate recommendation pressure') : 'Protected by workspace sign-in',
-    orders: isAuthenticated ? (summary?.recentOrderCount ? `${summary.recentOrderCount} order${summary.recentOrderCount === 1 ? '' : 's'} moved recently` : 'Order flow is currently quiet') : 'Protected by workspace sign-in',
-    inventory: isAuthenticated ? (summary?.lowStockItems ? `${summary.lowStockItems} low-stock item${summary.lowStockItems === 1 ? '' : 's'}` : 'Inventory posture is stable') : 'Protected by workspace sign-in',
-    catalog: isAuthenticated ? `${catalogState.products.length} tenant product${catalogState.products.length === 1 ? '' : 's'} available` : 'Protected by workspace sign-in',
-    locations: isAuthenticated ? `${warehouseOptions.length} operational location${warehouseOptions.length === 1 ? '' : 's'} tracked` : 'Protected by workspace sign-in',
-    fulfillment: isAuthenticated ? (fulfillmentOverview.backlogCount ? `${fulfillmentOverview.backlogCount} backlog item${fulfillmentOverview.backlogCount === 1 ? '' : 's'} active` : 'Fulfillment lanes are clear') : 'Protected by workspace sign-in',
-    scenarios: isAuthenticated ? 'Model operational changes before they touch live flow' : 'Protected by workspace sign-in',
-    'scenario-history': isAuthenticated ? `${scenarioHistoryItems.length} scenario run${scenarioHistoryItems.length === 1 ? '' : 's'} in view` : 'Protected by workspace sign-in',
-    approvals: isAuthenticated ? (pendingReviewCount ? `${pendingReviewCount} plan${pendingReviewCount === 1 ? '' : 's'} need approval` : 'Approval queues are clear') : 'Protected by workspace sign-in',
-    escalations: isAuthenticated ? (snapshot.slaEscalations.length ? `${snapshot.slaEscalations.length} escalation${snapshot.slaEscalations.length === 1 ? '' : 's'} require ownership` : 'Escalation inbox is clear') : 'Protected by workspace sign-in',
-    integrations: isAuthenticated ? `${enabledConnectorCount}/${snapshot.integrationConnectors.length || 0} connectors enabled` : 'Protected by workspace sign-in',
-    replay: isAuthenticated ? (pendingReplayCount ? `${pendingReplayCount} replay item${pendingReplayCount === 1 ? '' : 's'} waiting` : 'Replay queue is clear') : 'Protected by workspace sign-in',
-    runtime: isAuthenticated ? (runtime?.overallStatus ? `Runtime ${runtime.overallStatus}` : 'Loading trust signals') : 'Protected by workspace sign-in',
-    audit: isAuthenticated ? (snapshot.auditLogs.length ? `${snapshot.auditLogs.length} recent audit entr${snapshot.auditLogs.length === 1 ? 'y' : 'ies'}` : 'Traceability feed is quiet') : 'Protected by workspace sign-in',
-    users: isAuthenticated ? (canManageTenantAccess ? `${accessAdminUsers.length} tenant user${accessAdminUsers.length === 1 ? '' : 's'} managed` : 'Tenant admin access required') : 'Sign in with an admin workspace account',
-    settings: isAuthenticated ? (canManageTenantAccess ? 'Workspace controls ready for tenant configuration' : 'Tenant admin access required') : 'Sign in with an admin workspace account',
-    profile: isAuthenticated ? (passwordChangeRequired || passwordRotationRequired ? 'Password hygiene needs attention' : 'Personal access posture is healthy') : 'Sign in to access profile controls',
-    platform: isAuthenticated ? 'Cross-tenant and release trust view' : 'Protected by workspace sign-in',
-    tenants: isAuthenticated ? `${tenantDirectoryState.items.length} tenant workspace${tenantDirectoryState.items.length === 1 ? '' : 's'} visible` : 'Sign in to view tenant posture',
-    'system-config': isAuthenticated ? 'Inspect dispatch, runtime, and policy defaults' : 'Protected by workspace sign-in',
-    releases: isAuthenticated ? `Backend ${formatBuildValue(runtime?.build?.version)}` : 'Protected by workspace sign-in',
-    landing: 'See what SynapseCore becomes at launch',
-    product: 'Explore the full operating model',
-    'sign-in': 'Access the live operational workspace',
-    contact: 'Capture the business challenge and rollout context',
-  }
-  const selectedTenantOption = tenantDirectoryState.items.find((tenant) => tenant.code === authSessionState.tenantCode.trim())
-  const signInWorkspaceHint = tenantDirectoryState.error
-    ? 'Workspace directory lookup is unavailable. Enter the tenant code manually and continue with a valid operator account.'
-    : tenantDirectoryState.loading
-      ? 'Loading the active workspace directory so operators can sign in against the live tenant list.'
-      : selectedTenantOption
-        ? `Signing into ${selectedTenantOption.name}.`
-        : 'Enter the tenant code exactly as it exists in SynapseCore, or pick it from the live directory suggestions.'
-  const signInConfigHint = `API ${apiUrl || 'missing'} | Realtime ${wsUrl || 'missing'} | Transport ${realtimeTransportLabel}`
-  const metrics = [
-    { label: 'Total Orders', value: summary ? summary.totalOrders : pageState.loading ? 'Loading' : 'No data', accent: 'amber' },
-    { label: 'Active Alerts', value: summary ? summary.activeAlerts : pageState.loading ? 'Loading' : 'No data', accent: 'rose' },
-    { label: 'Low Stock Items', value: summary ? summary.lowStockItems : pageState.loading ? 'Loading' : 'No data', accent: 'orange' },
-    { label: 'Recommendations', value: summary ? summary.recommendationsCount : pageState.loading ? 'Loading' : 'No data', accent: 'teal' },
-    { label: 'Fulfillment Backlog', value: summary ? summary.fulfillmentBacklogCount : pageState.loading ? 'Loading' : 'No data', accent: 'slate' },
-    { label: 'Delayed Shipments', value: summary ? summary.delayedShipmentCount : pageState.loading ? 'Loading' : 'No data', accent: 'rose' },
-    { label: 'Products', value: summary ? summary.totalProducts : pageState.loading ? 'Loading' : 'No data', accent: 'blue' },
-    { label: 'Warehouses', value: summary ? summary.totalWarehouses : pageState.loading ? 'Loading' : 'No data', accent: 'slate' },
-  ]
-  const controlHighlights = [
-    {
-      label: 'Workspace Session',
-      value: signedInSession ? signedInSession.tenantName || signedInSession.tenantCode : 'No Active Session',
-      note: signedInSession ? `${signedInSession.displayName} is operating as ${signedInSession.actorName}.` : 'Sign in with a workspace account before taking protected actions.',
-      tone: signedInSession ? 'success' : 'warning',
-    },
-    {
-      label: 'Decision Pressure',
-      value: activeDecisionCount ? `${activeDecisionCount} open signals` : 'Stable',
-      note: activeDecisionCount ? 'Alerts and recommendations are live across the tenant decision layer.' : 'No active alert or recommendation pressure right now.',
-      tone: activeDecisionCount ? 'danger' : 'success',
-    },
-    {
-      label: 'Operational Throughput',
-      value: summary?.recentOrderCount ? `${summary.recentOrderCount} recent orders` : 'Monitoring',
-      note: fulfillmentOverview.backlogCount
-        ? `${fulfillmentOverview.backlogCount} backlog item${fulfillmentOverview.backlogCount === 1 ? '' : 's'} and ${fulfillmentOverview.delayedShipmentCount} delayed shipment${fulfillmentOverview.delayedShipmentCount === 1 ? '' : 's'} are active.`
-        : `${enabledConnectorCount}/${snapshot.integrationConnectors.length || 0} connectors are enabled with no fulfillment backlog right now.`,
-      tone: fulfillmentOverview.backlogCount || pendingReplayCount ? 'warning' : 'neutral',
-    },
-  ]
-  const showDashboardHero = isDashboardPage
-  const showSummaryMetrics = isDashboardPage
-  const showScenarioPlanner = isScenariosPage
-  const showScenarioHistory = isScenariosPage || isScenarioHistoryPage
-  const showScenarioNotifications = isScenariosPage
-  const showEscalationInbox = isScenariosPage
-  const showRiskAlertsPanel = false
-  const showRiskRecommendationsPanel = false
-  const showInventoryPanel = false
-  const showFulfillmentPanel = false
-  const showOrdersPanel = false
-  const showRuntimePanel = isRuntimePage
-  const showIncidentPanel = isRuntimePage
-  const showBusinessEventsPanel = isAuditPage
-  const showAuditPanel = isAuditPage
-  const showIntegrationConnectorsPanel = false
-  const showIntegrationImportsPanel = false
-  const showReplayQueuePanel = false
-  const showAccessAdminPanel = false
-  const showTenantManagementPanel = isTenantsPage
-  const showLocationsExperience = isLocationsPage
-  const appPageCount = appPages.length
-  const urgentActions = [
-    ...snapshot.alerts.activeAlerts.slice(0, 3).map((alert) => ({
-      id: `alert-${alert.id}`,
-      kicker: formatCodeLabel(alert.severity),
-      title: alert.title,
-      note: alert.recommendedAction || alert.impactSummary,
-      target: 'alerts',
-    })),
-    ...snapshot.recommendations.slice(0, 3).map((recommendation) => ({
-      id: `recommendation-${recommendation.id}`,
-      kicker: formatCodeLabel(recommendation.priority),
-      title: recommendation.title,
-      note: recommendation.description,
-      target: 'recommendations',
-    })),
-  ].slice(0, 5)
-  const activeAlerts = snapshot.alerts.activeAlerts
-  const lowStockInventory = snapshot.inventory.filter((item) => item.lowStock)
-  const highRiskInventory = snapshot.inventory.filter((item) => item.riskLevel === 'critical' || item.riskLevel === 'high')
-  const fastMovingInventory = [...snapshot.inventory].sort((left, right) => (right.unitsPerHour || 0) - (left.unitsPerHour || 0)).slice(0, 5)
-  const delayedFulfillments = fulfillmentOverview.activeFulfillments.filter((task) => task.fulfillmentStatus === 'DELAYED' || task.riskLevel === 'critical' || task.riskLevel === 'high')
-  const pendingApprovalScenarios = scenarioHistoryItems.filter((scenario) => scenario.approvalStatus === 'PENDING_APPROVAL')
-  const approvedScenarios = scenarioHistoryItems.filter((scenario) => scenario.approvalStatus === 'APPROVED')
-  const rejectedScenarios = scenarioHistoryItems.filter((scenario) => scenario.approvalStatus === 'REJECTED')
-  const overdueScenarios = scenarioHistoryItems.filter((scenario) => scenario.overdue)
-  const escalatedScenarios = snapshot.slaEscalations
-  const approvalBoard = pendingApprovalScenarios.slice(0, 6)
-  const approvalQueueScenarios = dedupeById([...pendingApprovalScenarios, ...overdueScenarios, ...approvedScenarios, ...rejectedScenarios])
-  const selectedHistoryScenario = scenarioHistoryItems.find((scenario) => scenario.id === selectedScenarioId) || scenarioHistoryItems[0]
-  const selectedApprovalScenario = approvalQueueScenarios.find((scenario) => scenario.id === selectedScenarioId)
-    || pendingApprovalScenarios[0]
-    || overdueScenarios[0]
-    || approvalQueueScenarios[0]
-  const selectedEscalationScenario = escalatedScenarios.find((scenario) => scenario.id === selectedScenarioId) || escalatedScenarios[0]
-  const recommendationNow = snapshot.recommendations.filter((recommendation) => ['CRITICAL', 'HIGH'].includes(recommendation.priority))
-  const recommendationSoon = snapshot.recommendations.filter((recommendation) => recommendation.priority === 'MEDIUM')
-  const recommendationWatch = snapshot.recommendations.filter((recommendation) => !['CRITICAL', 'HIGH', 'MEDIUM'].includes(recommendation.priority))
-  const globalNotificationCount = activeAlerts.length + pendingReplayCount + pendingApprovalScenarios.length + systemIncidents.length
-  const liveClockLabel = new Date(clockTick).toLocaleString()
-  const deferredWorkspaceSearch = useDeferredValue(workspaceSearch.trim().toLowerCase())
-  const hasWorkspaceSearch = Boolean(deferredWorkspaceSearch)
-  const workspaceSearchSections = hasWorkspaceSearch
-    ? [
-        {
-          key: 'pages',
-          label: 'Pages',
-          items: appPages
-            .filter((page) => page.label.toLowerCase().includes(deferredWorkspaceSearch) || page.title.toLowerCase().includes(deferredWorkspaceSearch))
-            .map((page) => ({
-              id: `page-${page.key}`,
-              title: page.label,
-              meta: page.description,
-              target: page.key,
-            })),
-        },
-        {
-          key: 'orders',
-          label: 'Orders',
-          items: snapshot.recentOrders
-            .filter((order) => order.externalOrderId.toLowerCase().includes(deferredWorkspaceSearch))
-            .slice(0, 3)
-            .map((order) => ({
-              id: `order-${order.id}`,
-              title: order.externalOrderId,
-              meta: `${order.warehouseName} | ${currency.format(order.totalAmount)}`,
-              target: 'orders',
-            })),
-        },
-        {
-          key: 'alerts',
-          label: 'Alerts',
-          items: activeAlerts
-            .filter((alert) => alert.title.toLowerCase().includes(deferredWorkspaceSearch))
-            .slice(0, 3)
-            .map((alert) => ({
-              id: `alert-search-${alert.id}`,
-              title: alert.title,
-              meta: alert.impactSummary,
-              target: 'alerts',
-            })),
-        },
-        {
-          key: 'incidents',
-          label: 'Incidents',
-          items: systemIncidents
-            .filter((incident) => incident.title.toLowerCase().includes(deferredWorkspaceSearch) || incident.detail.toLowerCase().includes(deferredWorkspaceSearch))
-            .slice(0, 3)
-            .map((incident) => ({
-              id: `incident-search-${incident.incidentKey}`,
-              title: incident.title,
-              meta: `${formatCodeLabel(incident.severity)} | ${incident.context}`,
-              target: 'runtime',
-            })),
-        },
-      ]
-        .map((section) => ({ ...section, items: section.items.slice(0, 3) }))
-        .filter((section) => section.items.length)
-        .slice(0, 4)
-    : []
-  const workspaceSearchMatchCount = workspaceSearchSections.reduce((total, section) => total + section.items.length, 0)
-  const firstWorkspaceSearchResult = workspaceSearchSections[0]?.items?.[0] || null
-  const pageSectionActions = pageSectionMap[currentPage] || []
-  const topbarQuickActions = (() => {
-    switch (currentPage) {
-      case 'dashboard':
-        return [
-          { label: 'Open alerts', target: 'alerts' },
-          { label: 'Open approvals', target: 'approvals' },
-        ]
-      case 'alerts':
-        return [
-          { label: 'Open recommendations', target: 'recommendations' },
-          { label: 'Open runtime', target: 'runtime' },
-        ]
-      case 'recommendations':
-        return [
-          { label: 'Open alerts', target: 'alerts' },
-          { label: 'Open orders', target: 'orders' },
-        ]
-      case 'orders':
-        return [
-          { label: 'Open fulfillment', target: 'fulfillment' },
-          { label: 'Open inventory', target: 'inventory' },
-        ]
-      case 'inventory':
-        return [
-          { label: 'Open locations', target: 'locations' },
-          { label: 'Open recommendations', target: 'recommendations' },
-        ]
-      case 'scenario-history':
-        return [
-          { label: 'Open scenarios', target: 'scenarios' },
-          { label: 'Open approvals', target: 'approvals' },
-        ]
-      case 'approvals':
-        return [
-          { label: 'Open escalations', target: 'escalations' },
-          { label: 'Open scenario history', target: 'scenario-history' },
-        ]
-      case 'runtime':
-        return [
-          { label: 'Open audit', target: 'audit' },
-          { label: 'Open releases', target: 'releases' },
-        ]
-      case 'audit':
-        return [
-          { label: 'Open replay', target: 'replay' },
-          { label: 'Open runtime', target: 'runtime' },
-        ]
-      case 'users':
-        return [
-          { label: 'Open settings', target: 'settings' },
-          { label: 'Open profile', target: 'profile' },
-        ]
-      case 'settings':
-        return [
-          { label: 'Open users', target: 'users' },
-          { label: 'Open platform', target: 'platform' },
-        ]
-      case 'platform':
-        return [
-          { label: 'Open releases', target: 'releases' },
-          { label: 'Open tenants', target: 'tenants' },
-        ]
-      case 'releases':
-        return [
-          { label: 'Open runtime', target: 'runtime' },
-          { label: 'Open platform', target: 'platform' },
-        ]
-      default:
-        return [
-          { label: 'Open alerts', target: 'alerts' },
-          { label: 'Open approvals', target: 'approvals' },
-        ]
-    }
-  })()
-  const utilityTimeline = [
-    ...systemIncidents.slice(0, 2).map((incident) => ({
-      id: `incident-${incident.incidentKey}`,
-      title: incident.title,
-      meta: `${formatCodeLabel(incident.severity)} incident`,
-      timestamp: incident.createdAt,
-    })),
-    ...snapshot.recentEvents.slice(0, 2).map((event) => ({
-      id: `event-${event.id}`,
-      title: formatCodeLabel(event.eventType),
-      meta: event.payloadSummary,
-      timestamp: event.createdAt,
-    })),
-    ...snapshot.auditLogs.slice(0, 2).map((log) => ({
-      id: `audit-${log.id}`,
-      title: formatCodeLabel(log.action),
-      meta: `${log.targetType} | ${log.targetRef}`,
-      timestamp: log.createdAt,
-    })),
-  ].slice(0, 6)
+  const {
+    selectedTenantOption,
+    pageBadgeMap,
+    pageStatusMap,
+    signInWorkspaceHint,
+    signInConfigHint,
+    metrics,
+    controlHighlights,
+    urgentActions,
+    activeAlerts,
+    lowStockInventory,
+    highRiskInventory,
+    fastMovingInventory,
+    delayedFulfillments,
+    pendingApprovalScenarios,
+    approvedScenarios,
+    rejectedScenarios,
+    overdueScenarios,
+    escalatedScenarios,
+    approvalBoard,
+    approvalQueueScenarios,
+    selectedHistoryScenario,
+    selectedApprovalScenario,
+    selectedEscalationScenario,
+    recommendationNow,
+    recommendationSoon,
+    recommendationWatch,
+    globalNotificationCount,
+    liveClockLabel,
+    workspaceSearchSections,
+    workspaceSearchMatchCount,
+    firstWorkspaceSearchResult,
+    pageSectionActions,
+    topbarQuickActions,
+    utilityTimeline,
+    showDashboardHero,
+    showSummaryMetrics,
+    showScenarioPlanner,
+    showScenarioHistory,
+    showScenarioNotifications,
+    showEscalationInbox,
+    showRiskAlertsPanel,
+    showRiskRecommendationsPanel,
+    showInventoryPanel,
+    showFulfillmentPanel,
+    showOrdersPanel,
+    showRuntimePanel,
+    showIncidentPanel,
+    showBusinessEventsPanel,
+    showAuditPanel,
+    showIntegrationConnectorsPanel,
+    showIntegrationImportsPanel,
+    showReplayQueuePanel,
+    showAccessAdminPanel,
+    showTenantManagementPanel,
+    showLocationsExperience,
+    appPageCount,
+  } = useWorkspaceChrome({
+    currentPage,
+    isAuthenticated,
+    summary,
+    snapshot,
+    catalogState,
+    warehouseOptions,
+    fulfillmentOverview,
+    pendingReviewCount,
+    scenarioHistoryItems,
+    systemIncidents,
+    runtime,
+    tenantDirectoryState,
+    authSessionState,
+    apiUrl,
+    wsUrl,
+    realtimeTransportLabel,
+    signedInSession,
+    activeDecisionCount,
+    enabledConnectorCount,
+    pendingReplayCount,
+    canManageTenantAccess,
+    accessAdminUsers,
+    passwordChangeRequired,
+    passwordRotationRequired,
+    clockTick,
+    workspaceSearch,
+    selectedScenarioId,
+    formatTimestamp,
+    formatBuildValue,
+    formatCodeLabel,
+  })
 
   function resolveDefaultManagedOperator(preferredActorName = '') {
     if (preferredActorName && accessAdminOperators.some((operator) => operator.actorName === preferredActorName)) {
@@ -1380,6 +788,33 @@ export default function App() {
   }
   const comparisonPrimarySummary = comparisonState.result ? summarizeImpact(comparisonState.result.primary) : null
   const comparisonAlternativeSummary = comparisonState.result ? summarizeImpact(comparisonState.result.alternative) : null
+  const {
+    handleSignInSubmit,
+    signInOperator,
+    signOutOperator,
+    changeSignedInPassword,
+    onboardTenant,
+  } = useWorkspaceSessionActions({
+    authSessionState,
+    setAuthSessionState,
+    passwordChangeState,
+    setPasswordChangeState,
+    tenantOnboardingForm,
+    setTenantOnboardingForm,
+    setTenantOnboardingState,
+    setTenantDirectoryState,
+    rememberWorkspace,
+    fetchJson,
+    navigateToPage,
+    resetSignedInWorkspace,
+    defaultTenantOnboardingForm,
+    createDefaultPasswordChangeForm,
+    workspacePreferenceStorageKey,
+    writeStoredJson,
+    removeStoredValue,
+    readPendingPostAuthPage,
+    clearPendingPostAuthPage,
+  })
 
   async function analyzeScenario() {
     setScenarioState({ loading: true, error: '', result: null })
@@ -1550,142 +985,6 @@ export default function App() {
       await Promise.all([fetchSnapshot(), refreshScenarioHistoryQuietly()])
     } catch (error) {
       setScenarioEscalationAckState({ loadingId: null, error: error.message, success: '' })
-    }
-  }
-
-  function handleSignInSubmit(event) {
-    event.preventDefault()
-    const signInBusy = authSessionState.loading && authSessionState.action === 'signin'
-    if (!signInBusy && authSessionState.tenantCode.trim() && authSessionState.username.trim() && authSessionState.password.trim()) {
-      signInOperator()
-    }
-  }
-
-  async function signInOperator() {
-    setAuthSessionState((current) => ({ ...current, loading: true, error: '', action: 'signin' }))
-    setPasswordChangeState((current) => ({ ...current, error: '', success: '' }))
-    try {
-      const payload = await fetchJson('/api/auth/session/login', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          tenantCode: authSessionState.tenantCode.trim(),
-          username: authSessionState.username.trim(),
-          password: authSessionState.password,
-        }),
-      }, { ignoreUnauthorized: true })
-
-      if (rememberWorkspace) {
-        writeStoredJson(globalThis.localStorage, workspacePreferenceStorageKey, {
-          remember: true,
-          tenantCode: payload.tenantCode || authSessionState.tenantCode.trim(),
-          username: payload.username || authSessionState.username.trim(),
-        })
-      } else {
-        removeStoredValue(globalThis.localStorage, workspacePreferenceStorageKey)
-      }
-
-      setAuthSessionState((current) => ({
-        ...current,
-        loading: false,
-        error: '',
-        action: '',
-        session: payload,
-        tenantCode: payload.tenantCode || current.tenantCode,
-        username: payload.username,
-        password: '',
-      }))
-      setPasswordChangeState({ loading: false, error: '', success: '', form: createDefaultPasswordChangeForm() })
-      const nextPage = readPendingPostAuthPage() || 'dashboard'
-      clearPendingPostAuthPage()
-      navigateToPage(nextPage)
-    } catch (error) {
-      setAuthSessionState((current) => ({ ...current, loading: false, error: error.message, action: '' }))
-    }
-  }
-
-  async function signOutOperator() {
-    setAuthSessionState((current) => ({ ...current, loading: true, error: '', action: 'signout' }))
-    setPasswordChangeState((current) => ({ ...current, loading: false, error: '', success: '', form: createDefaultPasswordChangeForm() }))
-    try {
-      const payload = await fetchJson('/api/auth/session/logout', { method: 'POST' })
-      setAuthSessionState((current) => ({
-        ...current,
-        loading: false,
-        error: '',
-        action: '',
-        session: payload.signedIn ? payload : null,
-        tenantCode: payload.signedIn ? payload.tenantCode || current.tenantCode : '',
-        username: payload.signedIn ? current.username : '',
-        password: '',
-      }))
-      resetSignedInWorkspace()
-      clearPendingPostAuthPage()
-      navigateToPage('sign-in')
-    } catch (error) {
-      setAuthSessionState((current) => ({ ...current, loading: false, error: error.message, action: '' }))
-    }
-  }
-
-  async function changeSignedInPassword() {
-    setPasswordChangeState((current) => ({ ...current, loading: true, error: '', success: '' }))
-    try {
-      const payload = await fetchJson('/api/auth/session/password', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          currentPassword: passwordChangeState.form.currentPassword,
-          newPassword: passwordChangeState.form.newPassword,
-        }),
-      })
-
-      setAuthSessionState((current) => ({ ...current, session: payload, password: '' }))
-      setPasswordChangeState({
-        loading: false,
-        error: '',
-        success: `Password updated for ${payload.username}.`,
-        form: createDefaultPasswordChangeForm(),
-      })
-    } catch (error) {
-      setPasswordChangeState((current) => ({ ...current, loading: false, error: error.message, success: '' }))
-    }
-  }
-
-  async function onboardTenant() {
-    setTenantOnboardingState({ loading: true, error: '', success: '', result: null })
-    try {
-      const payload = await fetchJson('/api/access/tenants', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          tenantCode: tenantOnboardingForm.tenantCode.trim(),
-          tenantName: tenantOnboardingForm.tenantName.trim(),
-          description: tenantOnboardingForm.description.trim(),
-          adminFullName: tenantOnboardingForm.adminFullName.trim(),
-          adminUsername: tenantOnboardingForm.adminUsername.trim(),
-          adminPassword: tenantOnboardingForm.adminPassword,
-          primaryLocation: tenantOnboardingForm.primaryLocation.trim(),
-          secondaryLocation: tenantOnboardingForm.secondaryLocation.trim(),
-        }),
-      })
-
-      const tenants = await fetchJson('/api/access/tenants')
-      setTenantDirectoryState({ loading: false, error: '', items: tenants })
-      setTenantOnboardingState({
-        loading: false,
-        error: '',
-        success: `${payload.tenantName} is ready. Bootstrap admin ${payload.adminUsername} and executive approver ${payload.executiveUsername} were created. Reset the executive password from Users before first use.`,
-        result: payload,
-      })
-      setAuthSessionState((current) => ({
-        ...current,
-        tenantCode: payload.tenantCode,
-        username: payload.adminUsername,
-        password: tenantOnboardingForm.adminPassword,
-      }))
-      setTenantOnboardingForm(defaultTenantOnboardingForm)
-    } catch (error) {
-      setTenantOnboardingState({ loading: false, error: error.message, success: '', result: null })
     }
   }
 
@@ -1893,149 +1192,127 @@ export default function App() {
   }
 
   return (
-    <AppShell
+    <WorkspaceAuthenticatedApp
       currentPage={currentPage}
-      pageGroup={effectivePageMeta.group || 'workspace'}
-      sidebar={(
-        <Sidebar
-          signedInSession={signedInSession}
-          navigateToPage={navigateToPage}
-          navGroups={navGroups}
-          pageLookup={pageLookup}
-          currentPage={currentPage}
-          pageBadgeMap={pageBadgeMap}
-          connectionState={connectionState}
-          formatCodeLabel={formatCodeLabel}
-        />
-      )}
-      topbar={(
-        <Topbar
-          effectivePageMeta={effectivePageMeta}
-          workspaceSearch={workspaceSearch}
-          setWorkspaceSearch={setWorkspaceSearch}
-          searchInputRef={searchInputRef}
-          firstWorkspaceSearchResult={firstWorkspaceSearchResult}
-          navigateToPage={navigateToPage}
-          hasWorkspaceSearch={hasWorkspaceSearch}
-          workspaceSearchMatchCount={workspaceSearchMatchCount}
-          workspaceSearchSections={workspaceSearchSections}
-          pageSectionActions={pageSectionActions}
-          jumpToPageSection={jumpToPageSection}
-          liveClockLabel={liveClockLabel}
-          connectionState={connectionState}
-          formatCodeLabel={formatCodeLabel}
-          globalNotificationCount={globalNotificationCount}
-          topbarQuickActions={topbarQuickActions}
-          pageState={{ ...pageState, onRefresh: fetchSnapshot }}
-          actionState={actionState}
-          systemRuntimeState={{ ...systemRuntimeState, onRefresh: fetchSystemRuntime }}
-          signedInSession={signedInSession}
-          signOutOperator={signOutOperator}
-          authSessionState={authSessionState}
-        />
-      )}
-      utilityRail={(
-        <WorkspaceUtilityRail
-          context={{
-            isAuthenticated,
-            recommendationNow,
-            recommendationSoon,
-            recommendationWatch,
-            activeAlerts,
-            selectedAlertId,
-            selectedRecommendationId,
-            selectedOrderId,
-            selectedInventoryId,
-            currentPage,
-            snapshot,
-            formatCodeLabel,
-            currency,
-            formatRelativeHours,
-            lowStockInventory,
-            highRiskInventory,
-            fastMovingInventory,
-            warehouseOptions,
-            fulfillmentOverview,
-            selectedRuntimeIncident,
-            runtime,
-            formatTimestamp,
-            formatMetricValue,
-            systemIncidents,
-            pendingReplayCount,
-            selectedAuditTrace,
-            accessAdminOperators,
-            accessAdminUsers,
-            workspaceAdmin,
-            selectedAccessSubject,
-            selectedTenantPortfolio,
-            tenantDirectoryState,
-            frontendBuildVersion,
-            apiUrl,
-            wsUrl,
-            realtimeTransportLabel,
-            effectivePageMeta,
-            pageStatusMap,
-            navigateToPage,
-            connectionState,
-            urgentActions,
-            utilityTimeline,
-            passwordChangeRequired,
-            passwordRotationRequired,
-            signedInSession,
-            signedInRoles,
-            signedInWarehouseScopes,
-            enabledConnectorCount,
-            scenarioHistoryItems,
-            selectedHistoryScenario,
-            pendingApprovalScenarios,
-            overdueScenarios,
-            approvedScenarios,
-            rejectedScenarios,
-            selectedApprovalScenario,
-            escalatedScenarios,
-            selectedEscalationScenario,
-          }}
-        />
-      )}
-    >
-            <WorkspacePageHeader
-              showDashboardHero={showDashboardHero}
-              controlHighlights={controlHighlights}
-              pendingReviewCount={pendingReviewCount}
-              pendingReplayCount={pendingReplayCount}
-              systemIncidents={systemIncidents}
-              pageStatusMap={pageStatusMap}
-              appPageCount={appPageCount}
-              enabledConnectorCount={enabledConnectorCount}
-              snapshot={snapshot}
-              effectivePageMeta={effectivePageMeta}
-              currentPage={currentPage}
-            />
-            <WorkspaceNotices pageError={pageState.error} actionError={actionState.error} authError={authSessionState.error} />
-            <DashboardPage context={{ isAuthenticated, isDashboardPage, warehouseOptions, snapshot, fulfillmentOverview, activeAlerts, urgentActions, navigateToPage, setSelectedAlertId, setSelectedRecommendationId, setSelectedScenarioId, pendingApprovalScenarios, runtime, systemIncidents, utilityTimeline, formatCodeLabel, formatTimestamp, formatBuildValue, getRuntimeStatusClassName, enabledConnectorCount, pendingReplayCount, pageLoading: pageState.loading }} />
-            <AlertsPage context={{ isAuthenticated, isAlertsPage, activeAlerts, selectedAlertId, setSelectedAlertId, formatTimestamp }} />
-            <RecommendationsPage context={{ isAuthenticated, isRecommendationsPage, snapshot, recommendationNow, recommendationSoon, recommendationWatch, selectedRecommendationId, setSelectedRecommendationId, formatTimestamp }} />
-            <OrdersPage context={{ isAuthenticated, isOrdersPage, snapshot, fulfillmentOverview, selectedOrderId, setSelectedOrderId, summary, warehouseOptions, currency, formatCodeLabel, formatRelativeHours, formatTimestamp }} />
-            <InventoryPage context={{ isAuthenticated, isInventoryPage, snapshot, selectedInventoryId, setSelectedInventoryId, lowStockInventory, highRiskInventory, fastMovingInventory, warehouseOptions, formatCodeLabel, formatRelativeHours }} />
-            <CatalogPage context={{ isAuthenticated, isCatalogPage, catalogState, catalogForm, setCatalogForm, selectedCatalogProductId, setSelectedCatalogProductId, saveCatalogProduct, importCatalogProducts, resetCatalogForm, canManageTenantAccess }} />
-            <LocationsPage context={{ isAuthenticated, isLocationsPage, warehouseOptions, snapshot, fulfillmentOverview, activeAlerts, formatCodeLabel }} />
-            <FulfillmentPage context={{ isAuthenticated, isFulfillmentPage, delayedFulfillments, fulfillmentOverview, warehouseOptions, formatCodeLabel, formatRelativeHours, getFulfillmentStatusClassName, enabledConnectorCount, snapshot, pendingReplayCount }} />
-            <ScenarioControlPage context={{ isAuthenticated, isScenariosPage, isScenarioHistoryPage, isApprovalsPage, isEscalationsPage, scenarioHistoryItems, pendingApprovalScenarios, approvedScenarios, rejectedScenarios, overdueScenarios, approvalBoard, formatCodeLabel }} />
-            <ScenarioPlannerPage context={scenarioPlannerContext} />
-            <ScenarioHistoryPage context={{ isAuthenticated, isScenarioHistoryPage, scenarioHistoryItems, selectedHistoryScenario, setSelectedScenarioId, formatCodeLabel, formatTimestamp, scenarioDecisionContext }} />
-            <ApprovalsPage context={{ isAuthenticated, isApprovalsPage, pendingApprovalScenarios, approvedScenarios, rejectedScenarios, overdueScenarios, selectedApprovalScenario, setSelectedScenarioId, formatCodeLabel, formatTimestamp, snapshot, scenarioDecisionContext }} />
-            <EscalationsPage context={{ isAuthenticated, isEscalationsPage, snapshot, systemIncidents, escalatedScenarios, selectedEscalationScenario, setSelectedScenarioId, formatCodeLabel, formatTimestamp, getIncidentStatusClassName, scenarioDecisionContext }} />
-            <IntegrationsPage context={{ isAuthenticated, isIntegrationsPage, snapshot, selectedIntegrationConnectorId, setSelectedIntegrationConnectorId, enabledConnectorCount, pendingReplayCount, systemIncidents, navigateToPage, formatCodeLabel, formatTimestamp, getImportStatusClassName }} />
-            <ReplayPage context={{ isAuthenticated, isReplayPage, snapshot, selectedReplayRecordId, setSelectedReplayRecordId, pendingReplayCount, integrationReplayState, replayFailedIntegration, signedInSession, signedInRoles, signedInWarehouseScopes, hasWarehouseScope, navigateToPage, formatCodeLabel, formatTimestamp, getReplayStatusClassName }} />
-            <RuntimePage context={{ isAuthenticated, isRuntimePage, runtime, systemIncidents, selectedRuntimeIncidentKey, setSelectedRuntimeIncidentKey, navigateToPage, formatCodeLabel, formatMetricValue, formatTimestamp, getIncidentStatusClassName, getRuntimeStatusClassName }} />
-            <AuditPage context={{ isAuthenticated, isAuditPage, snapshot, systemIncidents, pendingReplayCount, recentBusinessEvents, recentAuditEntries, selectedAuditTrace, setSelectedTraceEntryKey, formatCodeLabel, formatTimestamp, navigateToPage }} />
-            <UsersPage context={{ isAuthenticated, isUsersPage, accessAdminOperators, accessAdminUsers, workspaceAdmin, selectedAccessSubject, setSelectedAccessSubjectKey, formatCodeLabel, navigateToPage }} />
-            <SettingsPage context={{ isAuthenticated, isSettingsPage, workspaceAdmin, accessAdminState, canManageTenantAccess, workspaceSettingsForm, setWorkspaceSettingsForm, workspaceSecurityForm, setWorkspaceSecurityForm, saveWorkspaceSettings, saveWorkspaceSecuritySettings, selectedWorkspaceWarehouse, selectedWorkspaceWarehouseDraft, selectedWorkspaceConnector, selectedWorkspaceConnectorDraft, selectedWorkspaceConnectorOwnerOptions, setSelectedWorkspaceWarehouseId, setSelectedWorkspaceConnectorId, setWorkspaceWarehouseDrafts, setWorkspaceConnectorDrafts, saveWorkspaceWarehouse, saveWorkspaceConnectorSupport, formatCodeLabel, integrationValidationPolicies, integrationTransformationPolicies }} />
-            <ProfilePage context={{ isAuthenticated, isProfilePage, passwordChangeRequired, passwordRotationRequired, activeAlerts, pendingApprovalScenarios, systemIncidents, signedInSession, signedInRoles, signedInWarehouseScopes, signedInSessionExpiresAt, signedInPasswordExpiresAt, formatCodeLabel, formatTimestamp, passwordChangeState, setPasswordChangeState, changeSignedInPassword, signOutOperator, authSessionState, navigateToPage }} />
-            <PlatformAdminPage context={{ isAuthenticated, isPlatformPage, runtime, tenantDirectoryState, systemIncidents, pendingReplayCount, selectedTenantPortfolio, setSelectedTenantPortfolioCode, signedInSession, formatBuildValue, formatCodeLabel, formatTimestamp, getIncidentStatusClassName, getRuntimeStatusClassName, navigateToPage }} />
-            <TenantsPage context={{ isAuthenticated, isTenantsPage, tenantDirectoryState, signedInSession, signedInRoles, tenantOnboardingState, tenantOnboardingForm, setTenantOnboardingForm, onboardTenant, signInOperator, authSessionState, setAuthSessionState }} />
-            <SystemConfigPage context={{ isAuthenticated, isSystemConfigPage, runtime, formatMetricValue }} />
-            <ReleasesPage context={{ isAuthenticated, isReleasesPage, runtime, formatBuildValue, formatCodeLabel, formatTimestamp, frontendBuildVersion, frontendBuildCommit, frontendBuildTime, apiUrl, wsUrl, realtimeTransportLabel, getRuntimeStatusClassName }} />
-    </AppShell>
+      effectivePageMeta={effectivePageMeta}
+      navGroups={navGroups}
+      pageLookup={pageLookup}
+      pageBadgeMap={pageBadgeMap}
+      connectionState={connectionState}
+      formatCodeLabel={formatCodeLabel}
+      workspaceSearch={workspaceSearch}
+      setWorkspaceSearch={setWorkspaceSearch}
+      searchInputRef={searchInputRef}
+      firstWorkspaceSearchResult={firstWorkspaceSearchResult}
+      navigateToPage={navigateToPage}
+      hasWorkspaceSearch={hasWorkspaceSearch}
+      workspaceSearchMatchCount={workspaceSearchMatchCount}
+      workspaceSearchSections={workspaceSearchSections}
+      pageSectionActions={pageSectionActions}
+      jumpToPageSection={jumpToPageSection}
+      liveClockLabel={liveClockLabel}
+      globalNotificationCount={globalNotificationCount}
+      topbarQuickActions={topbarQuickActions}
+      pageState={pageState}
+      fetchSnapshot={fetchSnapshot}
+      actionState={actionState}
+      systemRuntimeState={systemRuntimeState}
+      fetchSystemRuntime={fetchSystemRuntime}
+      signedInSession={signedInSession}
+      signOutOperator={signOutOperator}
+      authSessionState={authSessionState}
+      utilityRailContext={{
+        isAuthenticated,
+        recommendationNow,
+        recommendationSoon,
+        recommendationWatch,
+        activeAlerts,
+        selectedAlertId,
+        selectedRecommendationId,
+        selectedOrderId,
+        selectedInventoryId,
+        currentPage,
+        snapshot,
+        formatCodeLabel,
+        currency,
+        formatRelativeHours,
+        lowStockInventory,
+        highRiskInventory,
+        fastMovingInventory,
+        warehouseOptions,
+        fulfillmentOverview,
+        selectedRuntimeIncident,
+        runtime,
+        formatTimestamp,
+        formatMetricValue,
+        systemIncidents,
+        pendingReplayCount,
+        selectedAuditTrace,
+        accessAdminOperators,
+        accessAdminUsers,
+        workspaceAdmin,
+        selectedAccessSubject,
+        selectedTenantPortfolio,
+        tenantDirectoryState,
+        frontendBuildVersion,
+        apiUrl,
+        wsUrl,
+        realtimeTransportLabel,
+        effectivePageMeta,
+        pageStatusMap,
+        navigateToPage,
+        connectionState,
+        urgentActions,
+        utilityTimeline,
+        passwordChangeRequired,
+        passwordRotationRequired,
+        signedInSession,
+        signedInRoles,
+        signedInWarehouseScopes,
+        enabledConnectorCount,
+        scenarioHistoryItems,
+        selectedHistoryScenario,
+        pendingApprovalScenarios,
+        overdueScenarios,
+        approvedScenarios,
+        rejectedScenarios,
+        selectedApprovalScenario,
+        escalatedScenarios,
+        selectedEscalationScenario,
+      }}
+      showDashboardHero={showDashboardHero}
+      controlHighlights={controlHighlights}
+      pendingReviewCount={pendingReviewCount}
+      pendingReplayCount={pendingReplayCount}
+      systemIncidents={systemIncidents}
+      pageStatusMap={pageStatusMap}
+      appPageCount={appPageCount}
+      enabledConnectorCount={enabledConnectorCount}
+      snapshot={snapshot}
+      dashboardContext={{ isAuthenticated, isDashboardPage, warehouseOptions, snapshot, fulfillmentOverview, activeAlerts, urgentActions, navigateToPage, setSelectedAlertId, setSelectedRecommendationId, setSelectedScenarioId, pendingApprovalScenarios, runtime, systemIncidents, utilityTimeline, formatCodeLabel, formatTimestamp, formatBuildValue, getRuntimeStatusClassName, enabledConnectorCount, pendingReplayCount, pageLoading: pageState.loading }}
+      alertsContext={{ isAuthenticated, isAlertsPage, activeAlerts, selectedAlertId, setSelectedAlertId, formatTimestamp }}
+      recommendationsContext={{ isAuthenticated, isRecommendationsPage, snapshot, recommendationNow, recommendationSoon, recommendationWatch, selectedRecommendationId, setSelectedRecommendationId, formatTimestamp }}
+      ordersContext={{ isAuthenticated, isOrdersPage, snapshot, fulfillmentOverview, selectedOrderId, setSelectedOrderId, summary, warehouseOptions, currency, formatCodeLabel, formatRelativeHours, formatTimestamp }}
+      inventoryContext={{ isAuthenticated, isInventoryPage, snapshot, selectedInventoryId, setSelectedInventoryId, lowStockInventory, highRiskInventory, fastMovingInventory, warehouseOptions, formatCodeLabel, formatRelativeHours }}
+      catalogContext={{ isAuthenticated, isCatalogPage, catalogState, catalogForm, setCatalogForm, selectedCatalogProductId, setSelectedCatalogProductId, saveCatalogProduct, importCatalogProducts, resetCatalogForm, canManageTenantAccess }}
+      locationsContext={{ isAuthenticated, isLocationsPage, warehouseOptions, snapshot, fulfillmentOverview, activeAlerts, formatCodeLabel }}
+      fulfillmentContext={{ isAuthenticated, isFulfillmentPage, delayedFulfillments, fulfillmentOverview, warehouseOptions, formatCodeLabel, formatRelativeHours, getFulfillmentStatusClassName, enabledConnectorCount, snapshot, pendingReplayCount }}
+      scenarioControlContext={{ isAuthenticated, isScenariosPage, isScenarioHistoryPage, isApprovalsPage, isEscalationsPage, scenarioHistoryItems, pendingApprovalScenarios, approvedScenarios, rejectedScenarios, overdueScenarios, approvalBoard, formatCodeLabel }}
+      scenarioPlannerContext={scenarioPlannerContext}
+      scenarioHistoryContext={{ isAuthenticated, isScenarioHistoryPage, scenarioHistoryItems, selectedHistoryScenario, setSelectedScenarioId, formatCodeLabel, formatTimestamp, scenarioDecisionContext }}
+      approvalsContext={{ isAuthenticated, isApprovalsPage, pendingApprovalScenarios, approvedScenarios, rejectedScenarios, overdueScenarios, selectedApprovalScenario, setSelectedScenarioId, formatCodeLabel, formatTimestamp, snapshot, scenarioDecisionContext }}
+      escalationsContext={{ isAuthenticated, isEscalationsPage, snapshot, systemIncidents, escalatedScenarios, selectedEscalationScenario, setSelectedScenarioId, formatCodeLabel, formatTimestamp, getIncidentStatusClassName, scenarioDecisionContext }}
+      integrationsContext={{ isAuthenticated, isIntegrationsPage, snapshot, selectedIntegrationConnectorId, setSelectedIntegrationConnectorId, enabledConnectorCount, pendingReplayCount, systemIncidents, navigateToPage, formatCodeLabel, formatTimestamp, getImportStatusClassName }}
+      replayContext={{ isAuthenticated, isReplayPage, snapshot, selectedReplayRecordId, setSelectedReplayRecordId, pendingReplayCount, integrationReplayState, replayFailedIntegration, signedInSession, signedInRoles, signedInWarehouseScopes, hasWarehouseScope, navigateToPage, formatCodeLabel, formatTimestamp, getReplayStatusClassName }}
+      runtimeContext={{ isAuthenticated, isRuntimePage, runtime, systemIncidents, selectedRuntimeIncidentKey, setSelectedRuntimeIncidentKey, navigateToPage, formatCodeLabel, formatMetricValue, formatTimestamp, getIncidentStatusClassName, getRuntimeStatusClassName }}
+      auditContext={{ isAuthenticated, isAuditPage, snapshot, systemIncidents, pendingReplayCount, recentBusinessEvents, recentAuditEntries, selectedAuditTrace, setSelectedTraceEntryKey, formatCodeLabel, formatTimestamp, navigateToPage }}
+      usersContext={{ isAuthenticated, isUsersPage, accessAdminOperators, accessAdminUsers, workspaceAdmin, selectedAccessSubject, setSelectedAccessSubjectKey, formatCodeLabel, navigateToPage }}
+      settingsContext={{ isAuthenticated, isSettingsPage, workspaceAdmin, accessAdminState, canManageTenantAccess, workspaceSettingsForm, setWorkspaceSettingsForm, workspaceSecurityForm, setWorkspaceSecurityForm, saveWorkspaceSettings, saveWorkspaceSecuritySettings, selectedWorkspaceWarehouse, selectedWorkspaceWarehouseDraft, selectedWorkspaceConnector, selectedWorkspaceConnectorDraft, selectedWorkspaceConnectorOwnerOptions, setSelectedWorkspaceWarehouseId, setSelectedWorkspaceConnectorId, setWorkspaceWarehouseDrafts, setWorkspaceConnectorDrafts, saveWorkspaceWarehouse, saveWorkspaceConnectorSupport, formatCodeLabel, integrationValidationPolicies, integrationTransformationPolicies }}
+      profileContext={{ isAuthenticated, isProfilePage, passwordChangeRequired, passwordRotationRequired, activeAlerts, pendingApprovalScenarios, systemIncidents, signedInSession, signedInRoles, signedInWarehouseScopes, signedInSessionExpiresAt, signedInPasswordExpiresAt, formatCodeLabel, formatTimestamp, passwordChangeState, setPasswordChangeState, changeSignedInPassword, signOutOperator, authSessionState, navigateToPage }}
+      platformAdminContext={{ isAuthenticated, isPlatformPage, runtime, tenantDirectoryState, systemIncidents, pendingReplayCount, selectedTenantPortfolio, setSelectedTenantPortfolioCode, signedInSession, formatBuildValue, formatCodeLabel, formatTimestamp, getIncidentStatusClassName, getRuntimeStatusClassName, navigateToPage }}
+      tenantsContext={{ isAuthenticated, isTenantsPage, tenantDirectoryState, signedInSession, signedInRoles, tenantOnboardingState, tenantOnboardingForm, setTenantOnboardingForm, onboardTenant, signInOperator, authSessionState, setAuthSessionState }}
+      systemConfigContext={{ isAuthenticated, isSystemConfigPage, runtime, formatMetricValue }}
+      releasesContext={{ isAuthenticated, isReleasesPage, runtime, formatBuildValue, formatCodeLabel, formatTimestamp, frontendBuildVersion, frontendBuildCommit, frontendBuildTime, apiUrl, wsUrl, realtimeTransportLabel, getRuntimeStatusClassName }}
+    />
   )
 }

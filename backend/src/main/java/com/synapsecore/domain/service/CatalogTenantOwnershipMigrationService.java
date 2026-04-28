@@ -17,6 +17,7 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
 import lombok.RequiredArgsConstructor;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.support.TransactionTemplate;
 
@@ -31,12 +32,28 @@ public class CatalogTenantOwnershipMigrationService {
     private final TransactionTemplate transactionTemplate;
     private final InventorySchemaMigrationService inventorySchemaMigrationService;
     private final IdentitySequenceMigrationService identitySequenceMigrationService;
+    private final JdbcTemplate jdbcTemplate;
 
     @PostConstruct
     void migrateCatalogOwnership() {
+        if (!productsTableExists()) {
+            return;
+        }
         identitySequenceMigrationService.synchronizeCoreIdentitySequences();
         inventorySchemaMigrationService.migrateInventoryStockColumns();
         transactionTemplate.executeWithoutResult(status -> backfillTenantOwnedCatalog());
+    }
+
+    private boolean productsTableExists() {
+        Long count = jdbcTemplate.queryForObject(
+            """
+            select count(*)
+            from information_schema.tables
+            where lower(table_name) = 'products'
+            """,
+            Long.class
+        );
+        return count != null && count > 0;
     }
 
     private void backfillTenantOwnedCatalog() {

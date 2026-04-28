@@ -36,12 +36,14 @@ import com.synapsecore.integration.dto.IntegrationConnectorHealthStatus;
 import com.synapsecore.integration.dto.IntegrationConnectorResponse;
 import com.synapsecore.integration.dto.IntegrationImportRunResponse;
 import com.synapsecore.integration.dto.IntegrationReplayRecordResponse;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import java.math.BigDecimal;
 import java.time.Instant;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import org.junit.jupiter.api.Test;
+import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.messaging.Message;
 import org.springframework.messaging.MessageChannel;
 import org.springframework.messaging.simp.SimpMessageHeaderAccessor;
@@ -226,9 +228,59 @@ class RealtimeServiceTest {
         assertThat(channel.payloadFor("/topic/tenant/STARTER-OPS/integrations.replay")).isEqualTo(integrationReplayQueue);
     }
 
+    @Test
+    void redisPubSubFanoutDeliversAcrossSeparateRealtimePublishersWithoutLoopback() {
+        RecordingMessageChannel originChannel = new RecordingMessageChannel();
+        RecordingMessageChannel followerChannel = new RecordingMessageChannel();
+        com.synapsecore.config.SynapseRealtimeProperties realtimeProperties = new com.synapsecore.config.SynapseRealtimeProperties();
+        realtimeProperties.setBrokerMode(RealtimeBrokerMode.REDIS_PUBSUB);
+
+        final String[] envelopeHolder = new String[1];
+        RedisTemplate<String, String> redisTemplate = new RedisTemplate<>() {
+            @Override
+            public Long convertAndSend(String channel, Object message) {
+                envelopeHolder[0] = message == null ? null : String.valueOf(message);
+                return 1L;
+            }
+        };
+
+        StompRealtimePublisher originPublisher = new StompRealtimePublisher(
+            new SimpMessagingTemplate(originChannel),
+            realtimeProperties,
+            redisTemplate,
+            new ObjectMapper().findAndRegisterModules(),
+            null
+        );
+        StompRealtimePublisher followerPublisher = new StompRealtimePublisher(
+            new SimpMessagingTemplate(followerChannel),
+            realtimeProperties,
+            redisTemplate,
+            new ObjectMapper().findAndRegisterModules(),
+            null
+        );
+
+        DashboardSummaryResponse summary = new DashboardSummaryResponse(4, 1, 1, 1, 1, 1, 1, 4, 2, 1, 8, Instant.now());
+        String destination = "/topic/tenant/STARTER-OPS/dashboard.summary";
+
+        originPublisher.publish(destination, summary);
+
+        assertThat(originChannel.countFor(destination)).isEqualTo(1);
+        assertThat(originChannel.payloadFor(destination)).isEqualTo(summary);
+        assertThat(envelopeHolder[0]).isNotBlank();
+
+        byte[] redisPayload = envelopeHolder[0].getBytes(java.nio.charset.StandardCharsets.UTF_8);
+        originPublisher.acceptRedisMessage(redisPayload);
+        followerPublisher.acceptRedisMessage(redisPayload);
+
+        assertThat(originChannel.countFor(destination)).isEqualTo(1);
+        assertThat(followerChannel.countFor(destination)).isEqualTo(1);
+        assertThat(followerChannel.payloadFor(destination).toString()).contains("\"totalOrders\":4");
+    }
+
     private static final class RecordingMessageChannel implements MessageChannel {
 
         private final Map<String, Object> messagesByDestination = new LinkedHashMap<>();
+        private final Map<String, Integer> sendCountsByDestination = new LinkedHashMap<>();
 
         @Override
         public boolean send(Message<?> message) {
@@ -241,7 +293,9 @@ class RealtimeServiceTest {
         }
 
         private boolean record(Message<?> message) {
-            messagesByDestination.put(SimpMessageHeaderAccessor.getDestination(message.getHeaders()), message.getPayload());
+            String destination = SimpMessageHeaderAccessor.getDestination(message.getHeaders());
+            messagesByDestination.put(destination, message.getPayload());
+            sendCountsByDestination.merge(destination, 1, Integer::sum);
             return true;
         }
 
@@ -251,6 +305,10 @@ class RealtimeServiceTest {
 
         private Object payloadFor(String destination) {
             return messagesByDestination.get(destination);
+        }
+
+        private int countFor(String destination) {
+            return sendCountsByDestination.getOrDefault(destination, 0);
         }
     }
 

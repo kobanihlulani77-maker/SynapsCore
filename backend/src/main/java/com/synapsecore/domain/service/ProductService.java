@@ -15,6 +15,7 @@ import com.synapsecore.domain.repository.ProductRepository;
 import com.synapsecore.event.BusinessEventService;
 import com.synapsecore.event.OperationalStateChangePublisher;
 import com.synapsecore.event.OperationalUpdateType;
+import com.synapsecore.observability.OperationalMetricsService;
 import com.synapsecore.tenant.TenantContextService;
 import java.io.BufferedReader;
 import java.io.IOException;
@@ -53,6 +54,7 @@ public class ProductService {
     private final AuditLogRepository auditLogRepository;
     private final OperationalDispatchWorkItemRepository operationalDispatchWorkItemRepository;
     private final CatalogWriteConflictResolver catalogWriteConflictResolver;
+    private final OperationalMetricsService operationalMetricsService;
 
     @Transactional(readOnly = true)
     public List<ProductResponse> getProducts() {
@@ -83,6 +85,7 @@ public class ProductService {
                     "Adopted orphan catalog product " + adoptedProduct.resolveCatalogSku() + " (" + adoptedProduct.getName() + ") into tenant " + tenant.getCode() + "."
                 );
                 flushCatalogWritePath();
+                operationalMetricsService.recordCatalogWrite(tenant.getCode(), "PRODUCT_CREATED", true);
                 return toResponse(adoptedProduct);
             }
             ensureInternalSkuIsAvailable(tenant.getCode(), catalogSku);
@@ -102,8 +105,10 @@ public class ProductService {
                 "Created catalog product " + product.resolveCatalogSku() + " (" + product.getName() + ")."
             );
             flushCatalogWritePath();
+            operationalMetricsService.recordCatalogWrite(tenant.getCode(), "PRODUCT_CREATED", true);
             return toResponse(product);
         } catch (DataIntegrityViolationException exception) {
+            operationalMetricsService.recordCatalogWrite(tenant.getCode(), "PRODUCT_CREATED", false);
             throw catalogWriteConflictResolver.toResponseStatus(exception, catalogSku);
         }
     }
@@ -136,8 +141,10 @@ public class ProductService {
                 "Updated catalog product " + savedProduct.resolveCatalogSku() + " (" + savedProduct.getName() + ")."
             );
             flushCatalogWritePath();
+            operationalMetricsService.recordCatalogWrite(tenant.getCode(), "PRODUCT_UPDATED", true);
             return toResponse(savedProduct);
         } catch (DataIntegrityViolationException exception) {
+            operationalMetricsService.recordCatalogWrite(tenant.getCode(), "PRODUCT_UPDATED", false);
             throw catalogWriteConflictResolver.toResponseStatus(exception, catalogSku);
         }
     }
@@ -266,6 +273,7 @@ public class ProductService {
             file.getOriginalFilename() == null ? "catalog-import" : file.getOriginalFilename(),
             "Imported product catalog rows: created " + created + ", updated " + updated + ", failed " + failed + "."
         );
+        operationalMetricsService.recordCatalogWrite(tenant.getCode(), "PRODUCT_IMPORT", failed == 0);
         return new ProductImportResponse(totalRows, created, updated, failed, rowResults);
     }
 

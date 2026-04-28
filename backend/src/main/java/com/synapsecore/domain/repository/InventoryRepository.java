@@ -2,12 +2,14 @@ package com.synapsecore.domain.repository;
 
 import com.synapsecore.domain.entity.Inventory;
 import jakarta.persistence.LockModeType;
+import jakarta.persistence.QueryHint;
 import java.util.List;
 import java.util.Optional;
 import org.springframework.data.jpa.repository.EntityGraph;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Lock;
 import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.jpa.repository.QueryHints;
 import org.springframework.data.repository.query.Param;
 
 public interface InventoryRepository extends JpaRepository<Inventory, Long> {
@@ -29,11 +31,13 @@ public interface InventoryRepository extends JpaRepository<Inventory, Long> {
     Optional<Inventory> findByProductIdAndWarehouseId(Long productId, Long warehouseId);
 
     @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @QueryHints(@QueryHint(name = "jakarta.persistence.lock.timeout", value = "1000"))
     @EntityGraph(attributePaths = {"product", "warehouse", "warehouse.tenant", "product.tenant"})
     @Query("select i from Inventory i where i.id = :id")
     Optional<Inventory> findByIdForUpdate(@Param("id") Long id);
 
     @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @QueryHints(@QueryHint(name = "jakarta.persistence.lock.timeout", value = "1000"))
     @EntityGraph(attributePaths = {"product", "warehouse", "warehouse.tenant", "product.tenant"})
     @Query("select i from Inventory i where i.product.id = :productId and i.warehouse.id = :warehouseId")
     Optional<Inventory> findByProductIdAndWarehouseIdForUpdate(@Param("productId") Long productId,

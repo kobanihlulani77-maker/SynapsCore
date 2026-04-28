@@ -31,8 +31,8 @@ Key backend truths:
 - `SPRING_PROFILES_ACTIVE=prod`
 - `ALLOW_HEADER_FALLBACK=false`
 - `SESSION_COOKIE_SECURE=true`
-- `SYNAPSECORE_REALTIME_BROKER_MODE=SIMPLE_IN_MEMORY` unless external broker relay is actually provisioned
-- `SPRING_JPA_HIBERNATE_DDL_AUTO=update` is still partially in use, but Flyway foundation is now present and full migration coverage is the next production hardening step
+- `SYNAPSECORE_REALTIME_BROKER_MODE=REDIS_PUBSUB`
+- `SPRING_JPA_HIBERNATE_DDL_AUTO=validate`; Flyway baseline coverage is active and startup fails on schema mismatch
 
 Key frontend truths:
 
@@ -81,28 +81,25 @@ Current truth:
 
 - the proof pack is real
 - user provisioning is real
-- the hosted catalog onboarding path is still the main blocker
+- the hosted proof passed end to end on Render
 
 ## Realtime Truth
 
-Current single-node truth:
+Current broker truth:
 
-- `SIMPLE_IN_MEMORY` broker mode is acceptable for one backend instance
-- it is not the final scale-out topology
+- development can still use `SIMPLE_IN_MEMORY`
+- current Render rollout uses `REDIS_PUBSUB`
+- distributed publisher fanout is covered by automated proof
 
-Later production hardening:
+Optional later topology shift:
 
-- deploy external broker relay infrastructure
-- switch to `EXTERNAL_BROKER`
+- validate Redis pub/sub or deploy STOMP relay across multiple backend nodes
+- switch to `STOMP_RELAY` if relay infrastructure is chosen
 - re-run browser and runtime verification after the change
 
 ## Schema Migration Truth
 
-Current rollout posture still depends on Hibernate auto-update.
-
-That is a temporary SaaS-foundation compromise, not final deployment discipline.
-
-Before company-grade rollout, SynapseCore should move to explicit versioned migrations. See:
+Current rollout posture no longer mutates schema implicitly at startup. It relies on explicit Flyway migrations plus JPA validation. See:
 
 - [schema-migration-roadmap.md](schema-migration-roadmap.md)
 
@@ -120,8 +117,6 @@ Before company-grade rollout, SynapseCore should move to explicit versioned migr
 
 Use this runbook as a real operational deployment guide, not a demo walkthrough.
 
-If a capability is still partial, keep it labeled as partial in rollout discussions:
+For exact pilot operating, rollback, recovery, and security handling, use:
 
-- hosted product onboarding proof
-- explicit schema migration discipline
-- external-broker realtime rollout
+- [pilot-operations-runbook.md](pilot-operations-runbook.md)

@@ -18,6 +18,7 @@ import org.slf4j.MDC;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.dao.DataIntegrityViolationException;
+import org.springframework.orm.ObjectOptimisticLockingFailureException;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
@@ -129,7 +130,13 @@ public class OperationalDispatchQueueService {
         } catch (RuntimeException exception) {
             workItem.setStatus(OperationalDispatchStatus.FAILED);
             workItem.setLastError(limit(exception.getMessage()));
-            operationalDispatchWorkItemRepository.save(workItem);
+            try {
+                operationalDispatchWorkItemRepository.save(workItem);
+            } catch (ObjectOptimisticLockingFailureException lockingFailureException) {
+                log.debug("Operational dispatch work item {} was already updated by another worker while recording failure.",
+                    workItem.getId());
+                return 0;
+            }
             operationalMetricsService.recordDispatchFailure(workItem.getTenantCode(), workItem.getUpdateType());
             log.warn("Operational dispatch queue failed {} for tenant {} request {}: {}",
                 workItem.getUpdateType(), workItem.getTenantCode(), workItem.getRequestId(), exception.getMessage());

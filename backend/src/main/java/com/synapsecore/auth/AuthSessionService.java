@@ -8,6 +8,7 @@ import com.synapsecore.domain.entity.AccessOperator;
 import com.synapsecore.domain.entity.AccessUser;
 import com.synapsecore.domain.entity.Tenant;
 import com.synapsecore.domain.repository.AuditLogRepository;
+import com.synapsecore.observability.OperationalMetricsService;
 import com.synapsecore.domain.repository.AccessUserRepository;
 import java.time.Duration;
 import java.time.Instant;
@@ -36,6 +37,7 @@ public class AuthSessionService {
     private final PasswordEncoder passwordEncoder;
     private final AuditLogRepository auditLogRepository;
     private final RequestTraceContext requestTraceContext;
+    private final OperationalMetricsService operationalMetricsService;
 
     @Transactional
     public AuthSessionResponse signIn(jakarta.servlet.http.HttpSession session,
@@ -43,28 +45,31 @@ public class AuthSessionService {
                                       String username,
                                       String password) {
         if (tenantCode == null || tenantCode.isBlank()) {
+            operationalMetricsService.recordAuthAttempt(null, false);
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
                 "tenantCode is required for sign-in.");
         }
         AccessUser user = resolveUser(tenantCode, username)
-            .orElseThrow(() -> new ResponseStatusException(HttpStatus.UNAUTHORIZED,
-                "Invalid operator credentials."));
+            .orElseThrow(() -> invalidCredentials(tenantCode));
         if (!passwordEncoder.matches(password, user.getPasswordHash())) {
-            throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Invalid operator credentials.");
+            throw invalidCredentials(tenantCode);
         }
 
         AccessOperator operator = user.getOperator();
         if (operator == null || !operator.isActive()) {
+            operationalMetricsService.recordAuthAttempt(tenantCode, false);
             throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Signed-in operator is no longer active.");
         }
 
         Tenant tenant = resolveTenant(user, operator);
         if (tenant == null || !tenant.isActive()) {
+            operationalMetricsService.recordAuthAttempt(tenantCode, false);
             throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Signed-in tenant is no longer active.");
         }
 
         Instant authenticatedAt = Instant.now();
         writeSession(session, user, operator, tenant, authenticatedAt);
+        operationalMetricsService.recordAuthAttempt(tenant.getCode(), true);
         return toResponse(buildSessionState(user, operator, tenant, authenticatedAt));
     }
 
@@ -373,5 +378,10 @@ public class AuthSessionService {
             null,
             null
         );
+    }
+
+    private ResponseStatusException invalidCredentials(String tenantCode) {
+        operationalMetricsService.recordAuthAttempt(tenantCode, false);
+        return new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Invalid operator credentials.");
     }
 }

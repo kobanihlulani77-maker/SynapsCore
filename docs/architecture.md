@@ -171,8 +171,9 @@ The architecture should always preserve this operating loop:
 
 - PostgreSQL stores the operational record of truth
 - PostgreSQL also stores audit logs for traceability of critical actions
-- Redis caches the dashboard summary; realtime transport is tenant-scoped STOMP with a configurable external broker relay path
+- Redis backs distributed dashboard fanout in the current Render rollout through `REDIS_PUBSUB`
 - WebSockets push focused tenant-scoped operational topics to connected clients
+- request tracing, runtime metrics, and incident surfacing are part of the core operating path, not add-on diagnostics
 
 ## Scale Preparation
 
@@ -180,7 +181,11 @@ The architecture should always preserve this operating loop:
 - each state-change event is also stored as an `OperationalDispatchWorkItem`
 - a scheduled queue worker drains dispatch work in batches and records failed fan-out attempts for support visibility
 - Micrometer counters and gauges expose alert, fulfillment, replay, and dispatch health through `GET /actuator/prometheus`
-- realtime defaults to the simple in-process broker for single-node deployments and can be switched to `EXTERNAL_BROKER` with STOMP relay settings before horizontal scaling
+- Redis-backed realtime publisher proof verifies fanout across separate publisher instances without loopback duplication
+- realtime supports three explicit modes:
+  - `SIMPLE_IN_MEMORY` for local single-node development
+  - `REDIS_PUBSUB` for the current distributed production posture
+  - `STOMP_RELAY` for external broker relay rollouts
 
 ## Developer Reset Flow
 
