@@ -25,6 +25,15 @@ public class V5__full_schema_baseline extends BaseJavaMigration {
     private static final Pattern CREATE_TABLE_PATTERN = Pattern.compile("^create table if not exists\\s+([a-zA-Z0-9_]+)\\s*\\(", Pattern.CASE_INSENSITIVE);
     private static final Pattern CREATE_INDEX_PATTERN = Pattern.compile("^create index if not exists\\s+([a-zA-Z0-9_]+)\\s+on\\s+([a-zA-Z0-9_]+)\\s*\\(", Pattern.CASE_INSENSITIVE);
     private static final Pattern ADD_CONSTRAINT_PATTERN = Pattern.compile("^alter table if exists\\s+([a-zA-Z0-9_]+)\\s+add constraint\\s+([a-zA-Z0-9_]+)\\s+", Pattern.CASE_INSENSITIVE);
+    private static final String POSTGRES_INDEX_EXISTS_SQL = """
+        select exists (
+            select 1
+            from pg_indexes
+            where lower(schemaname) = lower(current_schema())
+              and lower(tablename) = lower(?)
+              and lower(indexname) = lower(?)
+        )
+        """;
 
     @Override
     public void migrate(Context context) throws Exception {
@@ -47,7 +56,8 @@ public class V5__full_schema_baseline extends BaseJavaMigration {
         Matcher createIndexMatcher = CREATE_INDEX_PATTERN.matcher(statement);
         if (createIndexMatcher.find()) {
             String indexName = createIndexMatcher.group(1);
-            if (!indexExists(connection, indexName)) {
+            String tableName = createIndexMatcher.group(2);
+            if (!indexExists(connection, tableName, indexName)) {
                 execute(connection, statement);
             }
             return;
@@ -85,17 +95,23 @@ public class V5__full_schema_baseline extends BaseJavaMigration {
         return false;
     }
 
-    private boolean indexExists(Connection connection, String indexName) throws SQLException {
-        String sql = """
-            select count(*)
-            from information_schema.indexes
-            where lower(index_name) = lower(?)
-            """;
-        try (PreparedStatement statement = connection.prepareStatement(sql)) {
-            statement.setString(1, indexName);
-            try (ResultSet resultSet = statement.executeQuery()) {
-                if (resultSet.next()) {
-                    return resultSet.getLong(1) > 0;
+    boolean indexExists(Connection connection, String tableName, String indexName) throws SQLException {
+        String databaseProduct = connection.getMetaData().getDatabaseProductName().toLowerCase(Locale.ROOT);
+        if (databaseProduct.contains("postgresql")) {
+            try (PreparedStatement statement = connection.prepareStatement(POSTGRES_INDEX_EXISTS_SQL)) {
+                statement.setString(1, tableName);
+                statement.setString(2, indexName);
+                try (ResultSet resultSet = statement.executeQuery()) {
+                    return resultSet.next() && resultSet.getBoolean(1);
+                }
+            }
+        }
+
+        try (ResultSet indexes = connection.getMetaData().getIndexInfo(null, null, tableName, false, false)) {
+            while (indexes.next()) {
+                String existingIndexName = indexes.getString("INDEX_NAME");
+                if (existingIndexName != null && existingIndexName.equalsIgnoreCase(indexName)) {
+                    return true;
                 }
             }
         }
