@@ -230,6 +230,13 @@ class ProductionHardeningIntegrationTest {
     }
 
     @Test
+    void prodProfileSchemaKeepsPayloadColumnsTextCompatibleAfterFlywayMigrations() {
+        assertThat(loadColumnDataType("integration_inbound_records", "request_payload")).startsWith("character");
+        assertThat(loadColumnDataType("integration_replay_records", "request_payload")).startsWith("character");
+        assertThat(loadColumnDataType("scenario_runs", "request_payload")).startsWith("character");
+    }
+
+    @Test
     void prodProfileSeedServiceDoesNotBackfillWhenDemoSeedingIsDisabled() {
         Tenant tenant = tenantRepository.save(Tenant.builder()
             .code("CATALOG-OPS")
@@ -948,5 +955,19 @@ class ProductionHardeningIntegrationTest {
         jdbcTemplate.update("delete from access_users where tenant_id in (select id from tenants where upper(code) = upper(?))", tenantCode);
         jdbcTemplate.update("delete from access_operators where tenant_id in (select id from tenants where upper(code) = upper(?))", tenantCode);
         jdbcTemplate.update("delete from tenants where upper(code) = upper(?)", tenantCode);
+    }
+
+    private String loadColumnDataType(String tableName, String columnName) {
+        return jdbcTemplate.queryForObject(
+            """
+            select lower(data_type)
+            from information_schema.columns
+            where upper(table_name) = upper(?)
+              and upper(column_name) = upper(?)
+            """,
+            String.class,
+            tableName,
+            columnName
+        );
     }
 }
