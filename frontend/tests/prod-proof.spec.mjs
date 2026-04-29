@@ -920,7 +920,7 @@ test('alerts, recommendations, orders, inventory, integrations, users, profile, 
     await page.getByRole('button', { name: 'Manage Policies' }).click()
 
     await expect(page.getByRole('heading', { level: 1, name: 'Tenant and workspace settings' })).toBeVisible()
-    await expect(page.getByDisplayValue(workspace.tenantName)).toBeVisible()
+    await expect(page.getByLabel('Tenant Name').first()).toHaveValue(workspace.tenantName)
     if (workspace.connectors?.length) {
       await expect(page.getByText(workspace.connectors[0].displayName).first()).toBeVisible()
     }
