@@ -184,7 +184,7 @@ async function readReplayOutcome(api, externalOrderId) {
   const replayQueue = await readJson(await api.get('/api/integrations/orders/replay-queue'))
   const replayRecord = replayQueue.find((record) => record.externalOrderId === externalOrderId)
   if (replayRecord) {
-    return { state: 'queued', record: replayRecord }
+    return { state: 'queued', status: replayRecord.status, record: replayRecord }
   }
 
   const recentOrders = await readJson(await api.get('/api/orders/recent'))
@@ -619,24 +619,53 @@ test('replay recovery, scenario approval, execution, and browser role gating wor
     const initialReplayOutcome = await readReplayOutcome(replayFixture.api, replayFixture.externalOrderId)
     if (initialReplayOutcome.state === 'queued') {
       const replayQueueRecord = page.locator('.signal-list-item').filter({ hasText: replayFixture.externalOrderId }).first()
-      if (await replayQueueRecord.isVisible().catch(() => false)) {
-        await replayQueueRecord.click()
+      await expect(replayQueueRecord).toBeVisible()
+      await replayQueueRecord.click()
+
+      const replayDetail = page.locator('.section-card').filter({ hasText: 'Recovery detail' }).first()
+      await expect(replayDetail.getByText(replayFixture.externalOrderId).first()).toBeVisible()
+
+      const replayButton = replayDetail.getByRole('button', { name: 'Replay Into Live Flow' })
+      await expect(replayButton).toBeVisible()
+      await expect(replayButton).toBeEnabled()
+
+      const replayResponsePromise = page.waitForResponse((response) => (
+        response.request().method() === 'POST'
+          && /\/api\/integrations\/orders\/replay\/\d+$/i.test(response.url())
+      ), { timeout: 20_000 })
+
+      let replayResponse = null
+      try {
+        await replayButton.scrollIntoViewIfNeeded()
+        ;[replayResponse] = await Promise.all([
+          replayResponsePromise,
+          replayButton.click(),
+        ])
+      } catch (error) {
+        const currentReplayOutcome = await readReplayOutcome(replayFixture.api, replayFixture.externalOrderId)
+        if (currentReplayOutcome.state !== 'replayed') {
+          throw error
+        }
       }
 
-      const replayButton = page.getByRole('button', { name: 'Replay Into Live Flow' }).first()
-      if (await replayButton.isVisible().catch(() => false) && await replayButton.isEnabled().catch(() => false)) {
-        try {
-          await replayButton.click({ timeout: 10_000 })
-        } catch (error) {
-          const message = error instanceof Error ? error.message : String(error)
-          if (!/detached|timeout/i.test(message)) {
-            throw error
-          }
+      if (replayResponse) {
+        const replayPayload = await replayResponse.json().catch(() => null)
+        if (!replayResponse.ok()) {
+          throw new Error(
+            replayPayload?.message
+              || `Replay request failed with status ${replayResponse.status()} for ${replayFixture.externalOrderId}.`,
+          )
         }
+        await expect(page.locator('.success-text').filter({
+          hasText: `Replayed ${replayFixture.externalOrderId} into the live order flow.`,
+        }).first()).toBeVisible()
       }
     }
 
-    await expect.poll(async () => (await readReplayOutcome(replayFixture.api, replayFixture.externalOrderId)).state, {
+    await expect.poll(async () => {
+      const replayOutcome = await readReplayOutcome(replayFixture.api, replayFixture.externalOrderId)
+      return replayOutcome.state === 'queued' ? `${replayOutcome.state}:${replayOutcome.status}` : replayOutcome.state
+    }, {
       timeout: 60_000,
       message: `Expected ${replayFixture.externalOrderId} to reach a replayed state through manual or automated recovery.`,
     }).toBe('replayed')
