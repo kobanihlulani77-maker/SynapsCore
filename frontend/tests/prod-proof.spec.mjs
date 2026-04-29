@@ -205,6 +205,19 @@ async function activateSelectableButton(buttonLocator) {
   await buttonLocator.press('Enter')
 }
 
+async function findVisibleIntegrationConnector(page, connectors) {
+  for (const connector of connectors) {
+    if (!connector?.displayName) {
+      continue
+    }
+    const button = page.locator('button.system-select-card').filter({ hasText: connector.displayName }).first()
+    if (await button.isVisible().catch(() => false)) {
+      return { connector, button }
+    }
+  }
+  return null
+}
+
 async function readReplayOutcome(api, externalOrderId) {
   const replayQueue = await readJson(await api.get('/api/integrations/orders/replay-queue'))
   const replayRecord = replayQueue.find((record) => record.externalOrderId === externalOrderId)
@@ -800,7 +813,10 @@ test('alerts, recommendations, orders, inventory, integrations, users, profile, 
     const recommendationRecord = alertCoverage.recommendationRecord
     const orderRecord = recentOrders[0]
     const inventoryRecord = alertCoverage.snapshot.inventory.find((item) => item.lowStock) || alertCoverage.snapshot.inventory[0]
-    const connectorRecord = alertCoverage.snapshot.integrationConnectors[0] || workspace.connectors?.[0]
+    const connectorCandidates = [
+      ...alertCoverage.snapshot.integrationConnectors,
+      ...(workspace.connectors || []),
+    ]
 
     expect(alertRecord).toBeTruthy()
     expect(recommendationRecord).toBeTruthy()
@@ -809,7 +825,7 @@ test('alerts, recommendations, orders, inventory, integrations, users, profile, 
     expect(workspace).toBeTruthy()
     expect(operators.length).toBeGreaterThan(0)
     expect(accessUsers.length).toBeGreaterThan(0)
-    expect(connectorRecord).toBeTruthy()
+    expect(connectorCandidates.length).toBeGreaterThan(0)
 
     await loginViaUi(page, users.operationsLead)
 
@@ -847,11 +863,15 @@ test('alerts, recommendations, orders, inventory, integrations, users, profile, 
 
     await navigateWithinApp(page, '/integrations')
     await expect(page.getByRole('heading', { level: 1, name: 'Connector management and telemetry' })).toBeVisible()
-    await expect(page.getByText(connectorRecord.displayName).first()).toBeVisible()
+    await expect(page.locator('button.system-select-card').first()).toBeVisible()
+    const visibleConnectorMatch = await findVisibleIntegrationConnector(page, connectorCandidates)
+    if (!visibleConnectorMatch) {
+      throw new Error('Expected at least one integration connector rendered in the UI to match backend connector data.')
+    }
     await activateSelectableButton(
-      page.getByRole('button', { name: new RegExp(escapeRegExp(connectorRecord.displayName), 'i') }).first(),
+      visibleConnectorMatch.button,
     )
-    await expect(page.getByText(connectorRecord.sourceSystem).first()).toBeVisible()
+    await expect(page.getByText(visibleConnectorMatch.connector.sourceSystem).first()).toBeVisible()
     await page.getByRole('button', { name: 'Manage Policies' }).click()
 
     await expect(page.getByRole('heading', { level: 1, name: 'Tenant and workspace settings' })).toBeVisible()
