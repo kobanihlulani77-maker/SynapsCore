@@ -47,6 +47,13 @@ Optional:
 ```text
 SYNAPSECORE_BOOTSTRAP_INITIAL_TOKEN=<one-time bootstrap token>
 SYNAPSECORE_PLATFORM_ADMIN_TOKEN=<production tenant provisioning token>
+SYNAPSECORE_ALERT_HOOK_ENABLED=<true|false>
+SYNAPSECORE_ALERT_HOOK_WEBHOOK_URL=<operator webhook endpoint>
+SYNAPSECORE_RATE_LIMIT_AUTH_LOGIN_MAX_ATTEMPTS=<count per window>
+SYNAPSECORE_RATE_LIMIT_AUTH_PASSWORD_MAX_ATTEMPTS=<count per window>
+SYNAPSECORE_RATE_LIMIT_TENANT_ONBOARDING_MAX_ATTEMPTS=<count per window>
+SYNAPSECORE_RATE_LIMIT_ACCESS_ADMIN_MUTATION_MAX_ATTEMPTS=<count per window>
+SYNAPSECORE_RATE_LIMIT_INTEGRATION_MUTATION_MAX_ATTEMPTS=<count per window>
 ```
 
 ## Frontend Render Environment
@@ -95,7 +102,8 @@ Do not describe the platform on Render as having broad connector coverage beyond
 5. Verify session cookies and redirect behavior.
 6. Verify dashboard, integrations, runtime, and audit load without CORS failures.
 7. Verify realtime works with the current Redis pub/sub posture in mind.
-8. Run hosted proof preparation and browser proof and expect the Render proof pack to pass.
+8. Verify a wrong-password `POST /api/auth/session/login` returns a fast `401`.
+9. Run hosted proof preparation and browser proof and expect the Render proof pack to pass.
 
 ## Related Docs
 

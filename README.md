@@ -95,6 +95,8 @@ Important current production truths:
 - `ALLOW_HEADER_FALLBACK=false`
 - `SYNAPSECORE_REALTIME_BROKER_MODE=REDIS_PUBSUB`
 - `SPRING_JPA_HIBERNATE_DDL_AUTO=validate`
+- `SYNAPSECORE_RATE_LIMIT_ENABLED=true`
+- `SYNAPSECORE_ALERT_HOOK_ENABLED` controls whether operational failures emit to an external webhook
 
 See:
 
@@ -128,7 +130,8 @@ Current hosted-proof status:
 - proof pack exists
 - tenant/user preparation works
 - live hosted proof passed end to end on Render
-- the latest hardening pass added one more auth-failure-path fix locally and that deployment still needs a final live rerun
+- wrong-password sign-in now returns a fast structured `401` on the deployed backend
+- rerun the full browser proof after any future auth/security deploy before calling the deployment finally signed off
 
 ## Supported Integration Surface
 

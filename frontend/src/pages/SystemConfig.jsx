@@ -25,12 +25,15 @@ export default function SystemConfigPage({ context }) {
           <SummaryCard label="Allowed origins" value={runtime?.allowedOrigins?.length ?? 0} accent="rose" />
           <SummaryCard label="Auth failures" value={formatMetricValue(runtime?.metrics?.authFailures)} accent="rose" />
           <SummaryCard label="Rate-limit rejections" value={formatMetricValue(runtime?.metrics?.rateLimitRejections)} accent="amber" />
+          <SummaryCard label="Integration failures" value={formatMetricValue(runtime?.metrics?.integrationFailures)} accent="blue" />
+          <SummaryCard label="Replay failures" value={formatMetricValue(runtime?.metrics?.replayFailures)} accent="rose" />
         </div>
         <div className="approval-board">
           <div className="stack-card">
             <div className="stack-title-row"><strong>Realtime and queue backbone</strong><span className="status-tag status-success">Configured</span></div>
             <p>Dispatch queue drains every {runtime?.backbone?.dispatchIntervalMs ?? '...'} ms in batches of {runtime?.backbone?.batchSize ?? '...'}.</p>
             <p className="muted-text">Oldest queued work {runtime?.backbone?.oldestPendingAgeSeconds == null ? 'clear' : `${runtime.backbone.oldestPendingAgeSeconds}s`} | Failed dispatch {runtime?.backbone?.failedDispatchCount ?? 0}</p>
+            <p className="muted-text">Alert hook {runtime?.backbone?.alertHookConfigured ? 'configured' : 'not configured'} | Broker {runtime?.backbone?.realtimeBrokerMode || 'unknown'}</p>
           </div>
           <div className="stack-card">
             <div className="stack-title-row"><strong>Session and origin posture</strong><span className={`status-tag ${runtime?.secureSessionCookies ? 'status-success' : 'status-partial'}`}>{runtime?.secureSessionCookies ? 'Secure' : 'Local HTTP'}</span></div>
@@ -51,6 +54,11 @@ export default function SystemConfigPage({ context }) {
                 <strong>Access pressure</strong>
                 <p>{formatMetricValue(runtime?.metrics?.authFailures)} auth failures | {formatMetricValue(runtime?.metrics?.rateLimitRejections)} rate-limit rejections</p>
                 <p className="muted-text">This surface helps operators distinguish normal traffic from sign-in abuse or bootstrap endpoint pressure.</p>
+              </div>
+              <div className="signal-list-item">
+                <strong>Integration pressure</strong>
+                <p>{formatMetricValue(runtime?.metrics?.integrationFailures)} integration failures | {formatMetricValue(runtime?.metrics?.replayFailures)} replay failures</p>
+                <p className="muted-text">Use this alongside replay backlog and connector diagnostics to decide when inbound lanes need intervention.</p>
               </div>
               <div className="signal-list-item">
                 <strong>Tenant resolution</strong>
@@ -79,7 +87,7 @@ export default function SystemConfigPage({ context }) {
               </div>
               <div className="signal-list-item">
                 <strong>Realtime and contention</strong>
-                <p>{formatMetricValue(runtime?.metrics?.realtimePublishes)} realtime publishes | {formatMetricValue(runtime?.metrics?.inventoryLockConflicts)} inventory lock conflicts</p>
+                <p>{formatMetricValue(runtime?.metrics?.realtimePublishes)} realtime publishes | {formatMetricValue(runtime?.metrics?.realtimePublishFailures)} publish failures | {formatMetricValue(runtime?.metrics?.inventoryLockConflicts)} inventory lock conflicts</p>
                 <p className="muted-text">Distributed fanout volume and inventory contention are visible here before they turn into user-facing instability.</p>
               </div>
             </div>

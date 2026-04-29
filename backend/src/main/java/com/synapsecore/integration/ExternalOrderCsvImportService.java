@@ -12,6 +12,7 @@ import com.synapsecore.event.BusinessEventService;
 import com.synapsecore.integration.dto.ExternalOrderCsvImportFailure;
 import com.synapsecore.integration.dto.ExternalOrderCsvImportOrderResult;
 import com.synapsecore.integration.dto.ExternalOrderCsvImportResponse;
+import com.synapsecore.observability.OperationalMetricsService;
 import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStreamReader;
@@ -26,6 +27,7 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.regex.Pattern;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
@@ -33,6 +35,7 @@ import org.springframework.web.server.ResponseStatusException;
 
 @Service
 @RequiredArgsConstructor
+@Slf4j
 public class ExternalOrderCsvImportService {
 
     private static final Pattern SOURCE_SYSTEM_PATTERN = Pattern.compile("^[A-Za-z0-9_-]+$");
@@ -46,6 +49,7 @@ public class ExternalOrderCsvImportService {
     private final IntegrationReplayService integrationReplayService;
     private final IntegrationInboundRecordService integrationInboundRecordService;
     private final RequestTraceContext requestTraceContext;
+    private final OperationalMetricsService operationalMetricsService;
 
     public ExternalOrderCsvImportResponse ingest(MultipartFile file, String sourceSystemDefault) {
         return ingest(file, sourceSystemDefault, null);
@@ -131,6 +135,12 @@ public class ExternalOrderCsvImportService {
                 ));
             } catch (ResponseStatusException exception) {
                 var failure = IntegrationFailureCodes.extract(exception);
+                operationalMetricsService.recordIntegrationFailure(tenantCode, key.sourceSystem(), failure.failureCode().name());
+                log.warn("CSV ingestion failed for source {} tenant {} externalOrderId {}: {}",
+                    key.sourceSystem(),
+                    tenantCode,
+                    key.externalOrderId(),
+                    failure.failureMessage());
                 integrationInboundRecordService.markRejected(inboundRecordId, failure.failureCode(), failure.failureMessage());
                 failedOrders.add(new ExternalOrderCsvImportFailure(
                     key.sourceSystem(),

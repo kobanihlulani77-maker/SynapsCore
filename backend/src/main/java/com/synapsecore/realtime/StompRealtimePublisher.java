@@ -4,6 +4,7 @@ import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.synapsecore.config.SynapseRealtimeProperties;
+import com.synapsecore.observability.OperationalAlertHookService;
 import com.synapsecore.observability.OperationalMetricsService;
 import java.nio.charset.StandardCharsets;
 import java.util.Locale;
@@ -23,6 +24,7 @@ public class StompRealtimePublisher implements RealtimePublisher {
     private final RedisTemplate<String, String> redisTemplate;
     private final ObjectMapper objectMapper;
     private final OperationalMetricsService operationalMetricsService;
+    private final OperationalAlertHookService operationalAlertHookService;
     private final String nodeId = UUID.randomUUID().toString();
 
     @Autowired
@@ -30,35 +32,41 @@ public class StompRealtimePublisher implements RealtimePublisher {
                                   SynapseRealtimeProperties realtimeProperties,
                                   RedisTemplate<String, String> redisTemplate,
                                   ObjectMapper objectMapper,
-                                  OperationalMetricsService operationalMetricsService) {
+                                  OperationalMetricsService operationalMetricsService,
+                                  OperationalAlertHookService operationalAlertHookService) {
         this.messagingTemplate = messagingTemplate;
         this.realtimeProperties = realtimeProperties;
         this.redisTemplate = redisTemplate;
         this.objectMapper = objectMapper;
         this.operationalMetricsService = operationalMetricsService;
+        this.operationalAlertHookService = operationalAlertHookService;
     }
 
     public StompRealtimePublisher(SimpMessagingTemplate messagingTemplate,
                                   SynapseRealtimeProperties realtimeProperties) {
-        this(messagingTemplate, realtimeProperties, null, new ObjectMapper().findAndRegisterModules(), null);
+        this(messagingTemplate, realtimeProperties, null, new ObjectMapper().findAndRegisterModules(), null, null);
     }
 
     @Override
     public void publish(String destination, Object payload) {
-        publishLocally(destination, payload);
-        recordRealtimePublish(destination, "LOCAL");
-        if (!realtimeProperties.redisPubSubEnabled()) {
-            return;
-        }
-        if (redisTemplate == null) {
-            throw new IllegalStateException("Redis-backed realtime is enabled, but no RedisTemplate is available.");
-        }
         try {
+            publishLocally(destination, payload);
+            recordRealtimePublish(destination, "LOCAL");
+            if (!realtimeProperties.redisPubSubEnabled()) {
+                return;
+            }
+            if (redisTemplate == null) {
+                throw new IllegalStateException("Redis-backed realtime is enabled, but no RedisTemplate is available.");
+            }
             String payloadJson = objectMapper.writeValueAsString(payload);
             String envelopeJson = objectMapper.writeValueAsString(new RedisRealtimeEnvelope(nodeId, destination, payloadJson));
             redisTemplate.convertAndSend(realtimeProperties.getRedisChannel(), envelopeJson);
         } catch (JsonProcessingException exception) {
+            recordRealtimeFailure(destination, "SERIALIZATION");
             throw new IllegalStateException("Realtime payload could not be serialized for Redis fanout.", exception);
+        } catch (RuntimeException exception) {
+            recordRealtimeFailure(destination, "PUBLISH");
+            throw exception;
         }
     }
 
@@ -76,6 +84,15 @@ public class StompRealtimePublisher implements RealtimePublisher {
             recordRealtimePublish(envelope.destination(), "DISTRIBUTED_FANOUT");
         } catch (Exception exception) {
             String preview = new String(body, StandardCharsets.UTF_8);
+            recordRealtimeFailure(null, "REDIS_ENVELOPE");
+            if (operationalAlertHookService != null) {
+                operationalAlertHookService.emit(
+                    "REALTIME_FANOUT_FAILURE",
+                    "HIGH",
+                    "Realtime Redis fanout rejected a malformed envelope.",
+                    "Preview: " + preview
+                );
+            }
             log.warn("Ignoring malformed Redis realtime envelope: {}", preview, exception);
         }
     }
@@ -94,6 +111,20 @@ public class StompRealtimePublisher implements RealtimePublisher {
             return;
         }
         operationalMetricsService.recordRealtimePublish(resolveTenantCode(destination), brokerMode(), deliveryMode);
+    }
+
+    private void recordRealtimeFailure(String destination, String failureStage) {
+        if (operationalMetricsService != null) {
+            operationalMetricsService.recordRealtimePublishFailure(resolveTenantCode(destination), brokerMode(), failureStage);
+        }
+        if (operationalAlertHookService != null) {
+            operationalAlertHookService.emit(
+                "REALTIME_PUBLISH_FAILURE",
+                "HIGH",
+                "Realtime publish failed during " + failureStage + ".",
+                "Broker mode " + brokerMode().name() + " could not publish destination " + (destination == null ? "UNKNOWN" : destination) + "."
+            );
+        }
     }
 
     private String resolveTenantCode(String destination) {

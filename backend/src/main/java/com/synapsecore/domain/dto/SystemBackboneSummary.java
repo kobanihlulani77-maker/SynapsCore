@@ -10,6 +10,7 @@ public record SystemBackboneSummary(
     boolean realtimeDistributedMode,
     boolean realtimeRedisPubSubConfigured,
     boolean realtimeStompRelayConfigured,
+    boolean alertHookConfigured,
     long pendingDispatchCount,
     long failedDispatchCount,
     Long oldestPendingAgeSeconds,

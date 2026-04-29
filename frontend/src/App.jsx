@@ -5,8 +5,12 @@ import PublicExperience from './pages/PublicExperience'
 import useApi from './hooks/useApi'
 import useAuth from './hooks/useAuth'
 import useWorkspaceBootstrap from './hooks/useWorkspaceBootstrap'
+import useCatalogActions from './hooks/useCatalogActions'
 import useWorkspaceChrome from './hooks/useWorkspaceChrome'
+import useIntegrationActions from './hooks/useIntegrationActions'
 import useWorkspaceRealtime from './hooks/useWorkspaceRealtime'
+import useScenarioActions from './hooks/useScenarioActions'
+import useWorkspaceAdminActions from './hooks/useWorkspaceAdminActions'
 import useWorkspaceSessionActions from './hooks/useWorkspaceSessionActions'
 import useWorkspaceShell from './hooks/useWorkspaceShell'
 import {
@@ -24,9 +28,7 @@ import {
   resolvePageFromPath,
 } from './config/pageRegistry'
 import {
-  buildAccessOperatorForm,
   buildAccessOperatorsPath,
-  buildAccessUserForm,
   buildProductOptions,
   buildRevisionTitle,
   buildScenarioHistoryPath,
@@ -354,109 +356,6 @@ export default function App() {
     emptySnapshot,
   })
 
-  function resetCatalogForm() {
-    setCatalogForm(createDefaultCatalogForm())
-    setSelectedCatalogProductId(null)
-    setCatalogState((current) => ({ ...current, error: '', success: '' }))
-  }
-
-  async function saveCatalogProduct() {
-    if (!canManageTenantAccess) {
-      setCatalogState((current) => ({ ...current, error: 'Tenant admin access is required to manage the product catalog.', success: '' }))
-      return
-    }
-    const payload = {
-      sku: catalogForm.sku.trim(),
-      name: catalogForm.name.trim(),
-      category: catalogForm.category.trim(),
-    }
-    setCatalogState((current) => ({ ...current, loading: true, error: '', success: '' }))
-    try {
-      const product = await fetchJson(catalogForm.id ? `/api/products/${catalogForm.id}` : '/api/products', {
-        method: catalogForm.id ? 'PUT' : 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload),
-      })
-      await fetchCatalogProducts({ quiet: true })
-      setSelectedCatalogProductId(product.id)
-      setCatalogForm({ id: product.id, sku: product.sku, name: product.name, category: product.category })
-      setCatalogState((current) => ({ ...current, loading: false, error: '', success: `${product.sku} saved to the tenant catalog.` }))
-    } catch (error) {
-      setCatalogState((current) => ({ ...current, loading: false, error: error.message, success: '' }))
-    }
-  }
-
-  async function importCatalogProducts(file) {
-    if (!canManageTenantAccess) {
-      setCatalogState((current) => ({ ...current, error: 'Tenant admin access is required to import products.', success: '' }))
-      return
-    }
-    const formData = new FormData()
-    formData.append('file', file)
-    setCatalogState((current) => ({ ...current, loading: true, error: '', success: '', importResult: null }))
-    try {
-      const importResult = await fetchJson('/api/products/import', { method: 'POST', body: formData })
-      await fetchCatalogProducts({ quiet: true })
-      setCatalogState((current) => ({
-        ...current,
-        loading: false,
-        error: '',
-        success: `Imported ${importResult.totalRows} rows: ${importResult.created} created, ${importResult.updated} updated, ${importResult.failed} failed.`,
-        importResult,
-      }))
-    } catch (error) {
-      setCatalogState((current) => ({ ...current, loading: false, error: error.message, success: '' }))
-    }
-  }
-
-  async function toggleConnector(connector) {
-    const loadingKey = `${connector.sourceSystem}:${connector.type}`
-    setIntegrationConnectorState({ loadingKey, error: '', success: '' })
-    try {
-      const payload = await fetchJson('/api/integrations/orders/connectors', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          sourceSystem: connector.sourceSystem,
-          type: connector.type,
-          displayName: connector.displayName,
-          enabled: !connector.enabled,
-          syncMode: connector.syncMode,
-          syncIntervalMinutes: connector.syncIntervalMinutes,
-          pullEndpointUrl: connector.pullEndpointUrl,
-          validationPolicy: connector.validationPolicy,
-          transformationPolicy: connector.transformationPolicy,
-          allowDefaultWarehouseFallback: connector.allowDefaultWarehouseFallback,
-          defaultWarehouseCode: connector.defaultWarehouseCode,
-          notes: connector.notes,
-        }),
-      })
-      setIntegrationConnectorState({
-        loadingKey: null,
-        error: '',
-        success: `${payload.displayName} ${payload.enabled ? 'enabled' : 'disabled'}.`,
-      })
-      await refreshSnapshotQuietly()
-    } catch (error) {
-      setIntegrationConnectorState({ loadingKey: null, error: error.message, success: '' })
-    }
-  }
-
-  async function replayFailedIntegration(recordId) {
-    setIntegrationReplayState({ loadingId: recordId, error: '', success: '' })
-    try {
-      const payload = await fetchJson(`/api/integrations/orders/replay/${recordId}`, { method: 'POST' })
-      setIntegrationReplayState({
-        loadingId: null,
-        error: '',
-        success: `Replayed ${payload.order.externalOrderId} into the live order flow.`,
-      })
-      await refreshSnapshotQuietly()
-    } catch (error) {
-      setIntegrationReplayState({ loadingId: null, error: error.message, success: '' })
-    }
-  }
-
   const updateScenarioField = (setter, field, value) => setter((current) => field === 'warehouseCode' ? normalizeScenarioForm({ ...current, warehouseCode: value }, snapshot.inventory) : { ...current, [field]: value })
   const updateScenarioLine = (setter, lineId, field, value) => setter((current) => ({ ...current, items: current.items.map((item) => item.id === lineId ? { ...item, [field]: value } : item) }))
   const addScenarioLine = (setter, warehouseCode) => {
@@ -646,145 +545,8 @@ export default function App() {
     formatCodeLabel,
   })
 
-  function resolveDefaultManagedOperator(preferredActorName = '') {
-    if (preferredActorName && accessAdminOperators.some((operator) => operator.actorName === preferredActorName)) {
-      return preferredActorName
-    }
-    return accessAdminOperators.find((operator) => operator.active)?.actorName || accessAdminOperators[0]?.actorName || ''
-  }
-
-  function resetAccessOperatorEditor() {
-    setAccessOperatorForm(createDefaultAccessOperatorForm())
-  }
-
-  function resetAccessUserEditor(preferredActorName = '') {
-    setAccessUserForm({
-      ...createDefaultAccessUserForm(),
-      operatorActorName: resolveDefaultManagedOperator(preferredActorName),
-    })
-  }
-
-  function editTenantOperator(operator) {
-    setAccessOperatorForm(buildAccessOperatorForm(operator))
-    setAccessAdminState((current) => ({ ...current, error: '', success: '' }))
-  }
-
-  function editTenantUser(user) {
-    setAccessUserForm(buildAccessUserForm(user))
-    setAccessAdminState((current) => ({ ...current, error: '', success: '' }))
-  }
-
   function operatorCanOwnConnector(operator, connector) {
     return !connector.defaultWarehouseCode || !operator.warehouseScopes.length || operator.warehouseScopes.includes(connector.defaultWarehouseCode)
-  }
-
-  async function saveWorkspaceSettings() {
-    setAccessAdminState((current) => ({ ...current, loading: true, error: '', success: '' }))
-    try {
-      const payload = await fetchJson('/api/access/admin/workspace', {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          tenantName: workspaceSettingsForm.tenantName.trim(),
-          description: workspaceSettingsForm.description.trim(),
-        }),
-      })
-
-      await fetchAccessAdminData()
-      setAccessAdminState((current) => ({
-        ...current,
-        loading: false,
-        error: '',
-        success: `${payload.tenantName} workspace settings were updated.`,
-      }))
-    } catch (error) {
-      setAccessAdminState((current) => ({ ...current, loading: false, error: error.message, success: '' }))
-    }
-  }
-
-  async function saveWorkspaceSecuritySettings() {
-    setAccessAdminState((current) => ({ ...current, loading: true, error: '', success: '' }))
-    try {
-      const payload = await fetchJson('/api/access/admin/workspace/security', {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          passwordRotationDays: Number.parseInt(workspaceSecurityForm.passwordRotationDays, 10),
-          sessionTimeoutMinutes: Number.parseInt(workspaceSecurityForm.sessionTimeoutMinutes, 10),
-          invalidateOtherSessions: workspaceSecurityForm.invalidateOtherSessions,
-        }),
-      })
-
-      await fetchAccessAdminData()
-      setAccessAdminState((current) => ({
-        ...current,
-        loading: false,
-        error: '',
-        success: workspaceSecurityForm.invalidateOtherSessions
-          ? `Security settings updated. Other active ${payload.tenantCode} sessions must sign in again.`
-          : `Security settings updated for ${payload.tenantName}.`,
-      }))
-    } catch (error) {
-      setAccessAdminState((current) => ({ ...current, loading: false, error: error.message, success: '' }))
-    }
-  }
-
-  async function saveWorkspaceWarehouse(warehouseId) {
-    const draft = workspaceWarehouseDrafts[warehouseId]
-    if (!draft) return
-    setAccessAdminState((current) => ({ ...current, loading: true, error: '', success: '' }))
-    try {
-      const payload = await fetchJson(`/api/access/admin/workspace/warehouses/${warehouseId}`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          name: draft.name.trim(),
-          location: draft.location.trim(),
-        }),
-      })
-
-      await fetchAccessAdminData()
-      setAccessAdminState((current) => ({
-        ...current,
-        loading: false,
-        error: '',
-        success: `${payload.code} workspace settings were updated.`,
-      }))
-    } catch (error) {
-      setAccessAdminState((current) => ({ ...current, loading: false, error: error.message, success: '' }))
-    }
-  }
-
-  async function saveWorkspaceConnectorSupport(connectorId) {
-    const draft = workspaceConnectorDrafts[connectorId]
-    if (!draft) return
-    setAccessAdminState((current) => ({ ...current, loading: true, error: '', success: '' }))
-    try {
-      const payload = await fetchJson(`/api/access/admin/workspace/connectors/${connectorId}`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          supportOwnerActorName: draft.supportOwnerActorName,
-          syncMode: draft.syncMode,
-          syncIntervalMinutes: draft.syncMode === 'SCHEDULED_PULL' ? Number(draft.syncIntervalMinutes || 15) : null,
-          pullEndpointUrl: draft.syncMode === 'SCHEDULED_PULL' ? draft.pullEndpointUrl.trim() : null,
-          validationPolicy: draft.validationPolicy,
-          transformationPolicy: draft.transformationPolicy,
-          allowDefaultWarehouseFallback: draft.allowDefaultWarehouseFallback,
-          notes: draft.notes,
-        }),
-      })
-
-      await fetchAccessAdminData()
-      setAccessAdminState((current) => ({
-        ...current,
-        loading: false,
-        error: '',
-        success: `${payload.displayName} connector policy was updated.`,
-      }))
-    } catch (error) {
-      setAccessAdminState((current) => ({ ...current, loading: false, error: error.message, success: '' }))
-    }
   }
   const comparisonPrimarySummary = comparisonState.result ? summarizeImpact(comparisonState.result.primary) : null
   const comparisonAlternativeSummary = comparisonState.result ? summarizeImpact(comparisonState.result.alternative) : null
@@ -815,278 +577,104 @@ export default function App() {
     readPendingPostAuthPage,
     clearPendingPostAuthPage,
   })
-
-  async function analyzeScenario() {
-    setScenarioState({ loading: true, error: '', result: null })
-    try {
-      const payload = await fetchJson('/api/scenarios/order-impact', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ warehouseCode: scenarioForm.warehouseCode, items: primaryContext.requestItems }) })
-      setScenarioState({ loading: false, error: '', result: payload })
-      await Promise.all([refreshSnapshotQuietly(), refreshScenarioHistoryQuietly()])
-    } catch (error) {
-      setScenarioState({ loading: false, error: error.message, result: null })
-    }
-  }
-
-  async function compareScenarios() {
-    setComparisonState({ loading: true, error: '', result: null })
-    try {
-      const payload = await fetchJson('/api/scenarios/order-impact/compare', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          primaryLabel: 'Scenario A',
-          primary: { warehouseCode: scenarioForm.warehouseCode, items: primaryContext.requestItems },
-          alternativeLabel: 'Scenario B',
-          alternative: { warehouseCode: comparisonForm.warehouseCode, items: alternativeContext.requestItems },
-        }),
-      })
-      setComparisonState({ loading: false, error: '', result: payload })
-      await Promise.all([refreshSnapshotQuietly(), refreshScenarioHistoryQuietly()])
-    } catch (error) {
-      setComparisonState({ loading: false, error: error.message, result: null })
-    }
-  }
-
-  async function executeScenario(scenarioId) {
-    setScenarioExecutionState({ loadingId: scenarioId, error: '', success: '' })
-    try {
-      const payload = await fetchJson(`/api/scenarios/${scenarioId}/execute`, { method: 'POST' })
-      setScenarioExecutionState({
-        loadingId: null,
-        error: '',
-        success: `Executed ${payload.scenarioTitle} as live order ${payload.order.externalOrderId}.`,
-      })
-      await Promise.all([fetchSnapshot(), refreshScenarioHistoryQuietly()])
-    } catch (error) {
-      setScenarioExecutionState({ loadingId: null, error: error.message, success: '' })
-    }
-  }
-
-  async function loadScenarioIntoPlanner(scenarioId) {
-    setScenarioLoadState({ loadingId: scenarioId, error: '', success: '' })
-    try {
-      const payload = await fetchJson(`/api/scenarios/${scenarioId}/request`)
-      const sourceScenario = scenarioHistoryItems.find((scenario) => scenario.id === scenarioId)
-      setScenarioForm({
-        warehouseCode: payload.request.warehouseCode,
-        items: payload.request.items.map((item) => ({
-          id: `${Date.now()}-${Math.random().toString(16).slice(2)}`,
-          productSku: item.productSku,
-          quantity: String(item.quantity),
-          unitPrice: String(item.unitPrice),
-        })),
-      })
-      if (sourceScenario?.type === 'SAVED_PLAN' && sourceScenario.approvalStatus === 'REJECTED') {
-        const nextRevisionNumber = (sourceScenario.revisionNumber ?? 1) + 1
-        setScenarioRevisionSource({
-          id: sourceScenario.id,
-          title: sourceScenario.title,
-          revisionNumber: nextRevisionNumber,
-        })
-        setScenarioPlanName(buildRevisionTitle(payload.scenarioTitle, nextRevisionNumber))
-      } else {
-        setScenarioRevisionSource(null)
-        setScenarioPlanName(payload.scenarioTitle)
-      }
-      setScenarioRequestedBy(sourceScenario?.requestedBy || defaultScenarioRequester)
-      setScenarioReviewOwner(sourceScenario?.reviewOwner || defaultScenarioReviewOwner)
-      setScenarioState(emptyRequestState)
-      setScenarioLoadState({
-        loadingId: null,
-        error: '',
-        success: `Loaded ${payload.scenarioTitle} into Scenario A.`,
-      })
-    } catch (error) {
-      setScenarioLoadState({ loadingId: null, error: error.message, success: '' })
-    }
-  }
-
-  async function saveScenarioPlan() {
-    setScenarioSaveState({ loading: true, error: '', success: '' })
-    try {
-      const payload = await fetchJson('/api/scenarios/save', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          title: scenarioPlanName.trim(),
-          requestedBy: authSessionState.session?.actorName || scenarioRequestedBy.trim(),
-          reviewOwner: scenarioReviewOwner.trim(),
-          revisionOfScenarioRunId: scenarioRevisionSource?.id ?? null,
-          request: { warehouseCode: scenarioForm.warehouseCode, items: primaryContext.requestItems },
-        }),
-      })
-      setScenarioSaveState({
-        loading: false,
-        error: '',
-        success: payload.revisionNumber > 1
-          ? `Saved revision ${payload.revisionNumber} of ${payload.title} for ${payload.warehouseCode} as ${formatCodeLabel(payload.reviewPriority)} priority with ${formatCodeLabel(payload.approvalPolicy)} approval (score ${payload.riskScore}). Due ${formatTimestamp(payload.approvalDueAt)}.`
-          : `Saved plan ${payload.title} for ${payload.warehouseCode} as ${formatCodeLabel(payload.reviewPriority)} priority with ${formatCodeLabel(payload.approvalPolicy)} approval (score ${payload.riskScore}). Due ${formatTimestamp(payload.approvalDueAt)}.`,
-      })
-      setScenarioRevisionSource(null)
-      await Promise.all([fetchSnapshot(), refreshScenarioHistoryQuietly()])
-    } catch (error) {
-      setScenarioSaveState({ loading: false, error: error.message, success: '' })
-    }
-  }
-
-  async function approveScenarioPlan(scenarioId) {
-    setScenarioApprovalState({ loadingId: scenarioId, error: '', success: '' })
-    try {
-      const payload = await fetchJson(`/api/scenarios/${scenarioId}/approve`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ actorRole: scenarioActorRole, approverName: signedInActorName, approvalNote: scenarioReviewNote.trim() || null }),
-      })
-      setScenarioApprovalState({
-        loadingId: null,
-        error: '',
-        success: payload.executionReady
-          ? `Approved ${payload.title} for execution under ${formatCodeLabel(payload.approvalPolicy)} approval.`
-          : `Recorded owner review for ${payload.title}. Final approval is still required by ${payload.finalApprovalOwner || 'the assigned final approver'} before ${formatTimestamp(payload.approvalDueAt)}.`,
-      })
-      await Promise.all([fetchSnapshot(), refreshScenarioHistoryQuietly()])
-    } catch (error) {
-      setScenarioApprovalState({ loadingId: null, error: error.message, success: '' })
-    }
-  }
-
-  async function rejectScenarioPlan(scenarioId) {
-    setScenarioRejectionState({ loadingId: scenarioId, error: '', success: '' })
-    try {
-      const payload = await fetchJson(`/api/scenarios/${scenarioId}/reject`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ actorRole: scenarioActorRole, reviewerName: signedInActorName, reason: scenarioReviewNote.trim() }),
-      })
-      setScenarioRejectionState({
-        loadingId: null,
-        error: '',
-        success: `Rejected ${payload.title} by ${payload.rejectedBy}.`,
-      })
-      await Promise.all([fetchSnapshot(), refreshScenarioHistoryQuietly()])
-    } catch (error) {
-      setScenarioRejectionState({ loadingId: null, error: error.message, success: '' })
-    }
-  }
-
-  async function acknowledgeScenarioEscalation(scenarioId) {
-    setScenarioEscalationAckState({ loadingId: scenarioId, error: '', success: '' })
-    try {
-      const payload = await fetchJson(`/api/scenarios/${scenarioId}/acknowledge-escalation`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ actorRole: scenarioActorRole, acknowledgedBy: signedInActorName, note: scenarioReviewNote.trim() }),
-      })
-      setScenarioEscalationAckState({
-        loadingId: null,
-        error: '',
-        success: `Acknowledged escalated plan ${payload.title} as ${payload.slaAcknowledgedBy}.`,
-      })
-      await Promise.all([fetchSnapshot(), refreshScenarioHistoryQuietly()])
-    } catch (error) {
-      setScenarioEscalationAckState({ loadingId: null, error: error.message, success: '' })
-    }
-  }
-
-  async function saveTenantOperator() {
-    setAccessAdminState((current) => ({ ...current, loading: true, error: '', success: '' }))
-    try {
-      const editing = Boolean(accessOperatorForm.id)
-      const payload = await fetchJson(editing ? `/api/access/admin/operators/${accessOperatorForm.id}` : '/api/access/admin/operators', {
-        method: editing ? 'PUT' : 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          actorName: accessOperatorForm.actorName.trim(),
-          displayName: accessOperatorForm.displayName.trim(),
-          description: accessOperatorForm.description.trim(),
-          active: accessOperatorForm.active,
-          roles: parseCsvValues(accessOperatorForm.rolesText).map((role) => role.toUpperCase()),
-          warehouseScopes: parseCsvValues(accessOperatorForm.warehouseScopesText).map((scope) => scope.toUpperCase()),
-        }),
-      })
-
-      await fetchAccessAdminData()
-      setAccessAdminState((current) => ({
-        ...current,
-        loading: false,
-        error: '',
-        success: editing
-          ? `Operator ${payload.actorName} was updated and now carries ${payload.roles.length} role lane(s).`
-          : `Operator ${payload.actorName} is ready with ${payload.roles.length} role lane(s).`,
-      }))
-      resetAccessOperatorEditor()
-      setAccessUserForm((current) => ({
-        ...current,
-        operatorActorName: current.id ? current.operatorActorName : resolveDefaultManagedOperator(payload.actorName),
-      }))
-      const operators = await fetchJson(buildAccessOperatorsPath(activeTenantCode))
-      setOperatorDirectoryState({ loading: false, error: '', items: operators })
-    } catch (error) {
-      setAccessAdminState((current) => ({ ...current, loading: false, error: error.message, success: '' }))
-    }
-  }
-
-  async function saveTenantUser() {
-    setAccessAdminState((current) => ({ ...current, loading: true, error: '', success: '' }))
-    try {
-      const editing = Boolean(accessUserForm.id)
-      const payload = await fetchJson(editing ? `/api/access/admin/users/${accessUserForm.id}` : '/api/access/admin/users', {
-        method: editing ? 'PUT' : 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(editing
-          ? {
-              fullName: accessUserForm.fullName.trim(),
-              active: accessUserForm.active,
-              operatorActorName: accessUserForm.operatorActorName,
-            }
-          : {
-              username: accessUserForm.username.trim(),
-              fullName: accessUserForm.fullName.trim(),
-              password: accessUserForm.password,
-              operatorActorName: accessUserForm.operatorActorName,
-            }),
-      })
-
-      await fetchAccessAdminData()
-      setAccessAdminState((current) => ({
-        ...current,
-        loading: false,
-        error: '',
-        success: editing
-          ? `User ${payload.username} now maps to ${payload.operatorActorName} and is ${payload.active ? 'active' : 'inactive'}.`
-          : `User ${payload.username} now signs in as ${payload.operatorActorName} and must rotate the issued password at first sign-in.`,
-      }))
-      resetAccessUserEditor(payload.operatorActorName)
-    } catch (error) {
-      setAccessAdminState((current) => ({ ...current, loading: false, error: error.message, success: '' }))
-    }
-  }
-
-  async function resetTenantUserPassword() {
-    if (!accessUserForm.id) return
-    setAccessAdminState((current) => ({ ...current, loading: true, error: '', success: '' }))
-    try {
-      const payload = await fetchJson(`/api/access/admin/users/${accessUserForm.id}/reset-password`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          password: accessUserForm.password,
-        }),
-      })
-
-      await fetchAccessAdminData()
-      setAccessAdminState((current) => ({
-        ...current,
-        loading: false,
-        error: '',
-        success: `Password reset completed for ${payload.username}. They must rotate it at next sign-in.`,
-      }))
-      setAccessUserForm((current) => ({ ...current, password: '' }))
-    } catch (error) {
-      setAccessAdminState((current) => ({ ...current, loading: false, error: error.message, success: '' }))
-    }
-  }
-
+  const {
+    resetCatalogForm,
+    saveCatalogProduct,
+    importCatalogProducts,
+  } = useCatalogActions({
+    canManageTenantAccess,
+    catalogForm,
+    createDefaultCatalogForm,
+    fetchCatalogProducts,
+    fetchJson,
+    setCatalogForm,
+    setCatalogState,
+    setSelectedCatalogProductId,
+  })
+  const {
+    toggleConnector,
+    replayFailedIntegration,
+  } = useIntegrationActions({
+    fetchJson,
+    refreshSnapshotQuietly,
+    setIntegrationConnectorState,
+    setIntegrationReplayState,
+  })
+  const {
+    saveWorkspaceSettings,
+    saveWorkspaceSecuritySettings,
+    saveWorkspaceWarehouse,
+    saveWorkspaceConnectorSupport,
+    saveTenantOperator,
+    saveTenantUser,
+    resetTenantUserPassword,
+  } = useWorkspaceAdminActions({
+    accessAdminOperators,
+    accessOperatorForm,
+    accessUserForm,
+    activeTenantCode,
+    buildAccessOperatorsPath,
+    createDefaultAccessOperatorForm,
+    createDefaultAccessUserForm,
+    fetchAccessAdminData,
+    fetchJson,
+    parseCsvValues,
+    setAccessAdminState,
+    setAccessOperatorForm,
+    setAccessUserForm,
+    setOperatorDirectoryState,
+    workspaceConnectorDrafts,
+    workspaceSecurityForm,
+    workspaceSettingsForm,
+    workspaceWarehouseDrafts,
+  })
+  const {
+    analyzeScenario,
+    compareScenarios,
+    executeScenario,
+    loadScenarioIntoPlanner,
+    saveScenarioPlan,
+    approveScenarioPlan,
+    rejectScenarioPlan,
+    acknowledgeScenarioEscalation,
+  } = useScenarioActions({
+    alternativeContext,
+    authSessionState,
+    buildRevisionTitle,
+    comparisonForm,
+    defaultScenarioRequester,
+    defaultScenarioReviewOwner,
+    emptyRequestState,
+    fetchJson,
+    fetchSnapshot,
+    formatCodeLabel,
+    formatTimestamp,
+    primaryContext,
+    refreshScenarioHistoryQuietly,
+    refreshSnapshotQuietly,
+    scenarioActorRole,
+    scenarioForm,
+    scenarioHistoryItems,
+    scenarioPlanName,
+    scenarioRequestedBy,
+    scenarioReviewNote,
+    scenarioReviewOwner,
+    scenarioRevisionSource,
+    setComparisonState,
+    setScenarioApprovalState,
+    setScenarioEscalationAckState,
+    setScenarioExecutionState,
+    setScenarioForm,
+    setScenarioLoadState,
+    setScenarioPlanName,
+    setScenarioRequestedBy,
+    setScenarioRejectionState,
+    setScenarioReviewOwner,
+    setScenarioRevisionSource,
+    setScenarioSaveState,
+    setScenarioState,
+    signedInActorName,
+  })
   const scenarioDecisionContext = {
     getScenarioApprovalRole,
     getScenarioRejectionRole,

@@ -30,6 +30,7 @@ export default function RuntimePage({ context }) {
       { label: 'Queue depth', value: runtime.backbone.pendingDispatchCount, note: 'Pending work in dispatch backbone' },
       { label: 'Failed dispatch', value: runtime.backbone.failedDispatchCount, note: 'Dispatch work needing operator attention' },
       { label: 'Realtime broker', value: formatCodeLabel(runtime.backbone.realtimeBrokerMode || 'unknown'), note: 'Current websocket delivery strategy' },
+      { label: 'Alert hook', value: runtime.backbone.alertHookConfigured ? 'Configured' : 'Not configured', note: 'Operational alert delivery posture for severe failures' },
       { label: 'Observed', value: formatTimestamp(runtime.observedAt), note: 'Latest runtime observation point' },
     ]
     : []
@@ -96,7 +97,9 @@ export default function RuntimePage({ context }) {
                   <strong>Metrics surface</strong>
                   <p>Orders {formatMetricValue(runtime.metrics.ordersIngested)} | Fulfillment {formatMetricValue(runtime.metrics.fulfillmentUpdates)} | Dispatch processed {formatMetricValue(runtime.metrics.dispatchProcessed)}</p>
                   <p className="muted-text">Auth failures {formatMetricValue(runtime.metrics.authFailures)} | Tenant ops {formatMetricValue(runtime.metrics.tenantOperations)} | Catalog writes {formatMetricValue(runtime.metrics.catalogWrites)}</p>
-                  <p className="muted-text">Realtime publishes {formatMetricValue(runtime.metrics.realtimePublishes)} | Inventory lock conflicts {formatMetricValue(runtime.metrics.inventoryLockConflicts)} | Rate-limit rejections {formatMetricValue(runtime.metrics.rateLimitRejections)}</p>
+                  <p className="muted-text">Realtime publishes {formatMetricValue(runtime.metrics.realtimePublishes)} | Realtime publish failures {formatMetricValue(runtime.metrics.realtimePublishFailures)} | Inventory lock conflicts {formatMetricValue(runtime.metrics.inventoryLockConflicts)}</p>
+                  <p className="muted-text">Integration failures {formatMetricValue(runtime.metrics.integrationFailures)} | Replay failures {formatMetricValue(runtime.metrics.replayFailures)} | Rate-limit rejections {formatMetricValue(runtime.metrics.rateLimitRejections)}</p>
+                  <p className="muted-text">Alert hook deliveries {formatMetricValue(runtime.metrics.alertHookDeliveries)} | Alert hook failures {formatMetricValue(runtime.metrics.alertHookFailures)}</p>
                   <p className="muted-text">Prometheus metrics are exposed for production scraping at <code>/actuator/prometheus</code>.</p>
                 </div>
                 <div className="signal-list-item">
@@ -173,6 +176,7 @@ export default function RuntimePage({ context }) {
               <div><span>Failed dispatch</span><strong>{runtime?.backbone?.failedDispatchCount ?? 0}</strong></div>
               <div><span>Realtime</span><strong>{formatCodeLabel(runtime?.backbone?.realtimeBrokerMode || 'unknown')}</strong></div>
               <div><span>Scale mode</span><strong>{runtime?.backbone?.realtimeDistributedMode ? 'Multi node' : 'Single node'}</strong></div>
+              <div><span>Alert hook</span><strong>{runtime?.backbone?.alertHookConfigured ? 'Configured' : 'Off'}</strong></div>
               <div><span>High severity</span><strong>{systemIncidents.filter((incident) => ['CRITICAL', 'HIGH'].includes(incident.severity)).length}</strong></div>
               <div><span>Oldest queued</span><strong>{runtime?.backbone?.oldestPendingAgeSeconds == null ? 'Clear' : `${runtime.backbone.oldestPendingAgeSeconds}s`}</strong></div>
             </div>

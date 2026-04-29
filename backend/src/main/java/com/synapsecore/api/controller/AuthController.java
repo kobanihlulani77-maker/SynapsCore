@@ -4,6 +4,7 @@ import com.synapsecore.auth.AuthSessionService;
 import com.synapsecore.auth.dto.AuthSessionPasswordChangeRequest;
 import com.synapsecore.auth.dto.AuthSessionRequest;
 import com.synapsecore.auth.dto.AuthSessionResponse;
+import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpSession;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -29,9 +30,9 @@ public class AuthController {
 
     @PostMapping("/login")
     @ResponseStatus(HttpStatus.OK)
-    public AuthSessionResponse signIn(@Valid @RequestBody AuthSessionRequest request, HttpSession session) {
+    public AuthSessionResponse signIn(@Valid @RequestBody AuthSessionRequest request, HttpServletRequest httpRequest) {
         String tenantCode = request.tenantCode() == null ? null : request.tenantCode().trim();
-        return authSessionService.signIn(session, tenantCode, request.username().trim(), request.password().trim());
+        return authSessionService.signIn(httpRequest, tenantCode, request.username().trim(), request.password().trim());
     }
 
     @PostMapping("/logout")

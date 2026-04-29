@@ -32,6 +32,14 @@ Important production variables:
 - `SPRING_JPA_HIBERNATE_DDL_AUTO=validate`
 - `SYNAPSECORE_BOOTSTRAP_INITIAL_TOKEN` only for first-tenant bootstrap on an empty production database
 - `SYNAPSECORE_PLATFORM_ADMIN_TOKEN` for later production tenant provisioning
+- `SYNAPSECORE_RATE_LIMIT_ENABLED=true`
+- `SYNAPSECORE_RATE_LIMIT_AUTH_LOGIN_MAX_ATTEMPTS`
+- `SYNAPSECORE_RATE_LIMIT_AUTH_PASSWORD_MAX_ATTEMPTS`
+- `SYNAPSECORE_RATE_LIMIT_TENANT_ONBOARDING_MAX_ATTEMPTS`
+- `SYNAPSECORE_RATE_LIMIT_ACCESS_ADMIN_MUTATION_MAX_ATTEMPTS`
+- `SYNAPSECORE_RATE_LIMIT_INTEGRATION_MUTATION_MAX_ATTEMPTS`
+- `SYNAPSECORE_ALERT_HOOK_ENABLED`
+- `SYNAPSECORE_ALERT_HOOK_WEBHOOK_URL`
 - `PUBLIC_APP_URL`
 - `PUBLIC_API_URL`
 - `SYNAPSECORE_BUILD_VERSION`
@@ -105,7 +113,9 @@ Read the exact migration path in:
 8. Use `SYNAPSECORE_PLATFORM_ADMIN_TOKEN` for later tenant provisioning.
 9. Verify `/actuator/health` and `/actuator/health/readiness`.
 10. Verify dashboard REST and realtime connections from the deployed frontend.
-11. Treat `ddl-auto=validate` plus Flyway validation as required production posture.
+11. Verify wrong-password login returns a fast `401` instead of hanging.
+12. Verify `/api/system/runtime` shows the expected broker mode and alert-hook posture.
+13. Treat `ddl-auto=validate` plus Flyway validation as required production posture.
 
 ## Hosted Proof
 
@@ -138,6 +148,7 @@ Current hosted-proof truth:
 
 - tenant/user setup is real
 - the hosted proof passed end to end on Render
+- wrong-password auth rejection is now expected to return a fast structured `401`
 - remaining work is scope expansion and scale tuning, not proof-path repair
 
 ## Related Docs

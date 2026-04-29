@@ -26,6 +26,8 @@ Current scope boundaries still matter:
 - `ALLOW_HEADER_FALLBACK=false`
 - `SESSION_COOKIE_SECURE=true`
 - `SYNAPSECORE_REALTIME_BROKER_MODE=REDIS_PUBSUB`
+- `SYNAPSECORE_RATE_LIMIT_ENABLED=true`
+- `SYNAPSECORE_ALERT_HOOK_ENABLED` matches the current operator webhook posture
 
 ## Pilot Start Procedure
 
@@ -46,8 +48,9 @@ npm.cmd run test:e2e:prod
 ```
 
 7. Review `/api/system/runtime`, `/api/system/incidents`, and `/actuator/prometheus`.
+8. Probe a wrong-password login and expect a fast `401`, not a long-running request.
 
-The pilot is not considered live unless all seven steps pass.
+The pilot is not considered live unless all eight steps pass.
 
 ## Daily Operating Checks
 
@@ -56,6 +59,7 @@ The pilot is not considered live unless all seven steps pass.
 - disabled connectors are intentional
 - dispatch queue backlog is not growing unexpectedly
 - runtime broker mode still reports `REDIS_PUBSUB`
+- wrong-password login still rejects quickly
 - latest hosted-proof tenant can still sign in and load dashboard/runtime/catalog surfaces
 
 ## Rollback Procedure
@@ -99,7 +103,7 @@ Use recovery when the deployment is correct but operations are degraded.
 - rotate tenant user passwords through the real access APIs
 - keep production header fallback disabled
 - keep session cookies secure on HTTPS
-- keep rate limiting enabled for auth and tenant-bootstrap endpoints
+- keep rate limiting enabled for auth, password change, tenant bootstrap, tenant-admin mutation, policy mutation, and integration mutation endpoints
 - treat tenant-code mismatches, connector token failures, and unexpected platform-admin use as security incidents
 
 ## Monitoring Expectations
@@ -110,6 +114,6 @@ Operators should watch:
 - `/api/system/incidents`
 - `/actuator/prometheus`
 - hosted proof success on the current deployment
-- auth failure, catalog write, replay, realtime publish, dispatch, and inventory lock-conflict metrics
+- auth failure, rate-limit rejection, catalog write, replay, realtime publish, dispatch, alert-hook failure, integration failure, and inventory lock-conflict metrics
 
 If runtime truth and hosted proof disagree, trust hosted proof and investigate immediately.

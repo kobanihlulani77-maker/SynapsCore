@@ -1,6 +1,7 @@
 package com.synapsecore.security;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.synapsecore.auth.AuthSessionService;
 import com.synapsecore.audit.RequestTraceContext;
 import com.synapsecore.config.SynapseSecurityProperties;
 import com.synapsecore.observability.OperationalMetricsService;
@@ -24,11 +25,14 @@ import org.springframework.web.filter.OncePerRequestFilter;
 @Order(Ordered.HIGHEST_PRECEDENCE + 10)
 public class SecurityRateLimitFilter extends OncePerRequestFilter {
 
+    private static final java.util.Set<String> MUTATING_METHODS = java.util.Set.of("POST", "PUT", "PATCH", "DELETE");
+
     private final SynapseSecurityProperties securityProperties;
     private final SecurityRateLimitService securityRateLimitService;
     private final OperationalMetricsService operationalMetricsService;
     private final RequestTraceContext requestTraceContext;
     private final ObjectMapper objectMapper;
+    private final AuthSessionService authSessionService;
 
     @Override
     protected boolean shouldNotFilter(HttpServletRequest request) {
@@ -97,15 +101,57 @@ public class SecurityRateLimitFilter extends OncePerRequestFilter {
                 "Tenant onboarding rate limit exceeded. Wait before attempting another tenant bootstrap."
             );
         }
+        if (isMutatingAccessAdminRequest(method, path) || isMutatingSystemAdminRequest(method, path)) {
+            return new BucketDefinition(
+                "ACCESS_ADMIN_MUTATION",
+                properties.getAccessAdminMutation().getMaxAttempts(),
+                properties.getAccessAdminMutation().getWindowSeconds(),
+                "Workspace administration rate limit exceeded. Wait before attempting another tenant administration change."
+            );
+        }
+        if (isMutatingIntegrationRequest(method, path)) {
+            return new BucketDefinition(
+                "INTEGRATION_MUTATION",
+                properties.getIntegrationMutation().getMaxAttempts(),
+                properties.getIntegrationMutation().getWindowSeconds(),
+                "Integration mutation rate limit exceeded. Wait before attempting another connector, webhook, import, or replay change."
+            );
+        }
         return null;
     }
 
     private String resolvePrincipalKey(HttpServletRequest request) {
         String forwardedFor = request.getHeader("X-Forwarded-For");
+        String remoteAddress = request.getRemoteAddr();
+        String networkKey = remoteAddress;
         if (forwardedFor != null && !forwardedFor.isBlank()) {
-            return forwardedFor.split(",")[0].trim();
+            networkKey = forwardedFor.split(",")[0].trim();
         }
-        return request.getRemoteAddr();
+        jakarta.servlet.http.HttpSession session = request.getSession(false);
+        if (session != null && authSessionService.hasSessionIdentity(session)) {
+            String tenantCode = String.valueOf(session.getAttribute(AuthSessionService.SESSION_TENANT_CODE_KEY));
+            String username = String.valueOf(session.getAttribute(AuthSessionService.SESSION_USERNAME_KEY));
+            return ("session:" + tenantCode + ":" + username + ":" + networkKey).toUpperCase(java.util.Locale.ROOT);
+        }
+        return networkKey;
+    }
+
+    private boolean isMutatingAccessAdminRequest(String method, String path) {
+        return path != null
+            && path.startsWith("/api/access/admin/")
+            && MUTATING_METHODS.contains(method.toUpperCase(java.util.Locale.ROOT));
+    }
+
+    private boolean isMutatingIntegrationRequest(String method, String path) {
+        return path != null
+            && path.startsWith("/api/integrations/orders/")
+            && MUTATING_METHODS.contains(method.toUpperCase(java.util.Locale.ROOT));
+    }
+
+    private boolean isMutatingSystemAdminRequest(String method, String path) {
+        return path != null
+            && path.startsWith("/api/system/policy")
+            && MUTATING_METHODS.contains(method.toUpperCase(java.util.Locale.ROOT));
     }
 
     private record BucketDefinition(

@@ -18,10 +18,12 @@ import com.synapsecore.event.OperationalStateChangePublisher;
 import com.synapsecore.event.OperationalUpdateType;
 import com.synapsecore.integration.dto.IntegrationReplayRecordResponse;
 import com.synapsecore.integration.dto.IntegrationReplayResultResponse;
+import com.synapsecore.observability.OperationalAlertHookService;
 import com.synapsecore.observability.OperationalMetricsService;
 import com.synapsecore.tenant.TenantContextService;
 import java.time.Instant;
 import java.util.List;
+import lombok.extern.slf4j.Slf4j;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.http.HttpStatus;
@@ -33,6 +35,7 @@ import org.springframework.web.server.ResponseStatusException;
 
 @Service
 @RequiredArgsConstructor
+@Slf4j
 public class IntegrationReplayService {
 
     private static final int DEFAULT_QUEUE_LIMIT = 12;
@@ -50,6 +53,7 @@ public class IntegrationReplayService {
     private final OperationalMetricsService operationalMetricsService;
     private final IntegrationInboundRecordService integrationInboundRecordService;
     private final RequestTraceContext requestTraceContext;
+    private final OperationalAlertHookService operationalAlertHookService;
 
     @Value("${synapsecore.integration.replay.max-attempts:3}")
     private int maxReplayAttempts;
@@ -250,6 +254,7 @@ public class IntegrationReplayService {
             );
             operationalMetricsService.recordReplayAttempt(tenantCode, true);
             operationalStateChangePublisher.publish(OperationalUpdateType.INTEGRATION_STATE, "integration-replay");
+            log.info("Integration replay {} completed for tenant {} source {} as order {}.", record.getId(), tenantCode, record.getSourceSystem(), order.externalOrderId());
             return new IntegrationReplayResultResponse(toResponse(record), order, attemptedAt);
         } catch (ResponseStatusException exception) {
             var failure = IntegrationFailureCodes.extract(exception);
@@ -269,6 +274,14 @@ public class IntegrationReplayService {
                 record.setLastReplayMessage(limit(failure.failureMessage()));
             }
             record = integrationReplayRecordRepository.save(record);
+            if (exhausted) {
+                operationalAlertHookService.emit(
+                    "INTEGRATION_REPLAY_DEAD_LETTERED",
+                    "HIGH",
+                    "Integration replay " + record.getId() + " was dead-lettered.",
+                    "Tenant " + tenantCode + " source " + record.getSourceSystem() + " order " + record.getExternalOrderId() + " failed with " + failure.failureCode() + "."
+                );
+            }
 
             businessEventService.record(
                 BusinessEventType.INTEGRATION_REPLAY_FAILED,
@@ -287,6 +300,7 @@ public class IntegrationReplayService {
             );
             operationalMetricsService.recordReplayAttempt(tenantCode, false);
             operationalStateChangePublisher.publish(OperationalUpdateType.INTEGRATION_STATE, "integration-replay");
+            log.warn("Integration replay {} failed for tenant {} source {}: {}", record.getId(), tenantCode, record.getSourceSystem(), failure.failureMessage());
             throw exception;
         } catch (PessimisticLockingFailureException exception) {
             ResponseStatusException contention = IntegrationFailureCodes.status(
@@ -311,6 +325,14 @@ public class IntegrationReplayService {
                 record.setLastReplayMessage(limit(failure.failureMessage()));
             }
             record = integrationReplayRecordRepository.save(record);
+            if (exhausted) {
+                operationalAlertHookService.emit(
+                    "INTEGRATION_REPLAY_DEAD_LETTERED",
+                    "HIGH",
+                    "Integration replay " + record.getId() + " was dead-lettered after contention retries.",
+                    "Tenant " + tenantCode + " source " + record.getSourceSystem() + " order " + record.getExternalOrderId() + " exhausted contention retries."
+                );
+            }
 
             businessEventService.record(
                 BusinessEventType.INTEGRATION_REPLAY_FAILED,
@@ -329,6 +351,7 @@ public class IntegrationReplayService {
             );
             operationalMetricsService.recordReplayAttempt(tenantCode, false);
             operationalStateChangePublisher.publish(OperationalUpdateType.INTEGRATION_STATE, "integration-replay");
+            log.warn("Integration replay {} hit contention for tenant {} source {}: {}", record.getId(), tenantCode, record.getSourceSystem(), failure.failureMessage());
             throw contention;
         }
     }

@@ -8,14 +8,17 @@ import com.synapsecore.domain.entity.IntegrationConnectorType;
 import com.synapsecore.integration.IntegrationConnectorPolicyService.PreparedConnectorOrder;
 import com.synapsecore.integration.dto.ExternalOrderWebhookRequest;
 import com.synapsecore.integration.dto.ExternalOrderWebhookResponse;
+import com.synapsecore.observability.OperationalMetricsService;
 import java.time.Instant;
 import java.util.List;
 import java.util.Locale;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
 @Service
 @RequiredArgsConstructor
+@Slf4j
 public class ExternalOrderWebhookService {
 
     private final com.synapsecore.domain.service.OrderService orderService;
@@ -25,6 +28,7 @@ public class ExternalOrderWebhookService {
     private final IntegrationReplayService integrationReplayService;
     private final IntegrationInboundRecordService integrationInboundRecordService;
     private final RequestTraceContext requestTraceContext;
+    private final OperationalMetricsService operationalMetricsService;
 
     public ExternalOrderWebhookResponse ingest(ExternalOrderWebhookRequest request) {
         return ingest(request, null);
@@ -88,6 +92,12 @@ public class ExternalOrderWebhookService {
             );
         } catch (org.springframework.web.server.ResponseStatusException exception) {
             var failure = IntegrationFailureCodes.extract(exception);
+            operationalMetricsService.recordIntegrationFailure(tenantCode, sourceSystem, failure.failureCode().name());
+            log.warn("Webhook ingestion failed for source {} tenant {} externalOrderId {}: {}",
+                sourceSystem,
+                tenantCode,
+                request.externalOrderId(),
+                failure.failureMessage());
             integrationInboundRecordService.markRejected(inboundRecordId, failure.failureCode(), failure.failureMessage());
             integrationImportRunService.recordRun(
                 sourceSystem,

@@ -29,6 +29,7 @@ import com.synapsecore.domain.repository.OperationalDispatchWorkItemRepository;
 import com.synapsecore.event.OperationalDispatchQueueService;
 import com.synapsecore.integration.IntegrationConnectorService;
 import com.synapsecore.observability.OperationalMetricsService;
+import com.synapsecore.observability.OperationalAlertHookService;
 import com.synapsecore.realtime.RealtimeBrokerMode;
 import com.synapsecore.realtime.RealtimeService;
 import com.synapsecore.tenant.TenantContextService;
@@ -67,6 +68,7 @@ public class SystemRuntimeService {
     private final TenantContextService tenantContextService;
     private final IntegrationConnectorService integrationConnectorService;
     private final RealtimeService realtimeService;
+    private final OperationalAlertHookService operationalAlertHookService;
 
     @Value("${spring.application.name}")
     private String applicationName;
@@ -188,6 +190,7 @@ public class SystemRuntimeService {
             !singleNodeOnly,
             redisPubSubConfigured,
             stompRelayConfigured,
+            operationalAlertHookService.isConfigured(),
             operationalDispatchWorkItemRepository.countByTenantCodeIgnoreCaseAndStatusIn(
                 tenantCode,
                 List.of(OperationalDispatchStatus.PENDING, OperationalDispatchStatus.PROCESSING)

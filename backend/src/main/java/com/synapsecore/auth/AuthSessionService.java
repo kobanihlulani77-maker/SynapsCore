@@ -15,6 +15,7 @@ import java.time.Instant;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Optional;
+import lombok.extern.slf4j.Slf4j;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.crypto.password.PasswordEncoder;
@@ -24,6 +25,7 @@ import org.springframework.web.server.ResponseStatusException;
 
 @Service
 @RequiredArgsConstructor
+@Slf4j
 public class AuthSessionService {
 
     public static final String SESSION_TENANT_CODE_KEY = "synapsecore.auth.tenantCode";
@@ -39,8 +41,8 @@ public class AuthSessionService {
     private final RequestTraceContext requestTraceContext;
     private final OperationalMetricsService operationalMetricsService;
 
-    @Transactional
-    public AuthSessionResponse signIn(jakarta.servlet.http.HttpSession session,
+    @Transactional(readOnly = true)
+    public AuthSessionResponse signIn(jakarta.servlet.http.HttpServletRequest request,
                                       String tenantCode,
                                       String username,
                                       String password) {
@@ -50,26 +52,40 @@ public class AuthSessionService {
                 "tenantCode is required for sign-in.");
         }
         AccessUser user = resolveUser(tenantCode, username)
-            .orElseThrow(() -> invalidCredentials(tenantCode));
+            .orElseThrow(() -> {
+                log.warn("Sign-in rejected for tenant {} username {} because the user record was not found.", tenantCode, username);
+                return invalidCredentials(tenantCode);
+            });
         if (!passwordEncoder.matches(password, user.getPasswordHash())) {
+            log.warn("Sign-in rejected for tenant {} username {} due to invalid credentials.", tenantCode, username);
             throw invalidCredentials(tenantCode);
         }
 
         AccessOperator operator = user.getOperator();
         if (operator == null || !operator.isActive()) {
-            operationalMetricsService.recordAuthAttempt(tenantCode, false);
-            throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Signed-in operator is no longer active.");
+            log.warn("Sign-in rejected for tenant {} username {} because the operator is inactive.", tenantCode, username);
+            throw signInRejected(tenantCode, "Signed-in operator is no longer active.");
         }
 
         Tenant tenant = resolveTenant(user, operator);
         if (tenant == null || !tenant.isActive()) {
-            operationalMetricsService.recordAuthAttempt(tenantCode, false);
-            throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Signed-in tenant is no longer active.");
+            log.warn("Sign-in rejected for tenant {} username {} because the tenant is inactive.", tenantCode, username);
+            throw signInRejected(tenantCode, "Signed-in tenant is no longer active.");
         }
 
         Instant authenticatedAt = Instant.now();
+        jakarta.servlet.http.HttpSession existingSession = request.getSession(false);
+        if (existingSession != null) {
+            try {
+                existingSession.invalidate();
+            } catch (IllegalStateException ignored) {
+                // Another filter or container already disposed of the session.
+            }
+        }
+        jakarta.servlet.http.HttpSession session = request.getSession(true);
         writeSession(session, user, operator, tenant, authenticatedAt);
         operationalMetricsService.recordAuthAttempt(tenant.getCode(), true);
+        log.info("Signed in user {} for tenant {} as operator {}.", user.getUsername(), tenant.getCode(), operator.getActorName());
         return toResponse(buildSessionState(user, operator, tenant, authenticatedAt));
     }
 
@@ -380,8 +396,12 @@ public class AuthSessionService {
         );
     }
 
-    private ResponseStatusException invalidCredentials(String tenantCode) {
+    private FastAuthFailureException invalidCredentials(String tenantCode) {
+        return signInRejected(tenantCode, "Invalid operator credentials.");
+    }
+
+    private FastAuthFailureException signInRejected(String tenantCode, String message) {
         operationalMetricsService.recordAuthAttempt(tenantCode, false);
-        return new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Invalid operator credentials.");
+        return new FastAuthFailureException(message);
     }
 }

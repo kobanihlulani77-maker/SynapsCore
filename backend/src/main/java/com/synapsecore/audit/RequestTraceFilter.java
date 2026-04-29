@@ -73,6 +73,9 @@ public class RequestTraceFilter extends OncePerRequestFilter {
     }
 
     private String resolveActorName(HttpServletRequest request) {
+        if (isAuthLoginRequest(request)) {
+            return RequestTraceContext.ANONYMOUS_ACTOR;
+        }
         jakarta.servlet.http.HttpSession session = request.getSession(false);
         if (session != null && authSessionService.hasSessionIdentity(session)) {
             return authSessionService.resolveAuthenticatedSession(session)
@@ -91,6 +94,9 @@ public class RequestTraceFilter extends OncePerRequestFilter {
     }
 
     private String resolveTenantCode(HttpServletRequest request) {
+        if (isAuthLoginRequest(request)) {
+            return RequestTraceContext.MISSING_TENANT_CONTEXT;
+        }
         jakarta.servlet.http.HttpSession session = request.getSession(false);
         if (session != null && authSessionService.hasSessionIdentity(session)) {
             String sessionTenantCode = authSessionService.resolveAuthenticatedSession(session)
@@ -109,5 +115,11 @@ public class RequestTraceFilter extends OncePerRequestFilter {
         }
 
         return RequestTraceContext.MISSING_TENANT_CONTEXT;
+    }
+
+    private boolean isAuthLoginRequest(HttpServletRequest request) {
+        return request != null
+            && "POST".equalsIgnoreCase(request.getMethod())
+            && "/api/auth/session/login".equals(request.getRequestURI());
     }
 }

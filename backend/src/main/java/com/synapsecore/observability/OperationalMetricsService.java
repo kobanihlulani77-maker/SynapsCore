@@ -158,11 +158,37 @@ public class OperationalMetricsService {
             .increment();
     }
 
+    public void recordRealtimePublishFailure(String tenantCode, RealtimeBrokerMode brokerMode, String failureStage) {
+        meterRegistry.counter(
+                "synapsecore.realtime.publish.failures",
+                "tenant",
+                normalizeTenantCode(tenantCode),
+                "brokerMode",
+                brokerMode == null ? "UNKNOWN" : brokerMode.name(),
+                "stage",
+                normalizeTag(failureStage)
+            )
+            .increment();
+    }
+
     public void recordRateLimitRejection(String bucketName) {
         meterRegistry.counter(
                 "synapsecore.security.rate_limit.rejections",
                 "bucket",
                 normalizeTag(bucketName)
+            )
+            .increment();
+    }
+
+    public void recordIntegrationFailure(String tenantCode, String sourceSystem, String failureType) {
+        meterRegistry.counter(
+                "synapsecore.integration.failures",
+                "tenant",
+                normalizeTenantCode(tenantCode),
+                "source",
+                normalizeTag(sourceSystem),
+                "failureType",
+                normalizeTag(failureType)
             )
             .increment();
     }
@@ -201,6 +227,17 @@ public class OperationalMetricsService {
     public void recordReplayAttempt(String tenantCode, boolean success) {
         meterRegistry.counter(
                 "synapsecore.integration.replay.attempts",
+                "tenant",
+                normalizeTenantCode(tenantCode),
+                "outcome",
+                success ? "SUCCESS" : "FAILURE"
+            )
+            .increment();
+    }
+
+    public void recordAlertHookDelivery(String tenantCode, boolean success) {
+        meterRegistry.counter(
+                "synapsecore.observability.alert_hook.deliveries",
                 "tenant",
                 normalizeTenantCode(tenantCode),
                 "outcome",
@@ -280,13 +317,18 @@ public class OperationalMetricsService {
             countForTenant("synapsecore.orders.ingested", normalizedTenantCode),
             countForTenant("synapsecore.fulfillment.updates", normalizedTenantCode),
             countForTenant("synapsecore.integration.import.runs", normalizedTenantCode),
+            countForTenant("synapsecore.integration.failures", normalizedTenantCode),
             countForTenant("synapsecore.integration.replay.attempts", normalizedTenantCode),
+            countForTenantWithOutcome("synapsecore.integration.replay.attempts", normalizedTenantCode, "FAILURE"),
             countForTenantWithOutcome("synapsecore.auth.session.attempts", normalizedTenantCode, "FAILURE"),
             countForTenant("synapsecore.tenant.operations", normalizedTenantCode),
             countForTenant("synapsecore.catalog.writes", normalizedTenantCode),
             countForTenant("synapsecore.inventory.lock.conflicts", normalizedTenantCode),
             countForTenant("synapsecore.realtime.publishes", normalizedTenantCode),
+            countForTenant("synapsecore.realtime.publish.failures", normalizedTenantCode),
             countWithoutTenant("synapsecore.security.rate_limit.rejections"),
+            countForTenantWithOutcome("synapsecore.observability.alert_hook.deliveries", normalizedTenantCode, "SUCCESS"),
+            countForTenantWithOutcome("synapsecore.observability.alert_hook.deliveries", normalizedTenantCode, "FAILURE"),
             countForTenant("synapsecore.dispatch.queued", normalizedTenantCode),
             countForTenant("synapsecore.dispatch.processed", normalizedTenantCode),
             countForTenant("synapsecore.dispatch.failed", normalizedTenantCode),

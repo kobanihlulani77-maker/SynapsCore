@@ -28,6 +28,7 @@ import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
+import lombok.extern.slf4j.Slf4j;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.dao.CannotAcquireLockException;
@@ -42,6 +43,7 @@ import org.springframework.web.server.ResponseStatusException;
 
 @Service
 @RequiredArgsConstructor
+@Slf4j
 public class OrderService {
 
     private final CustomerOrderRepository customerOrderRepository;
@@ -166,6 +168,7 @@ public class OrderService {
             "Created order " + savedOrder.getExternalOrderId() + " in state " + savedOrder.getStatus() + "."
         );
         operationalStateChangePublisher.publish(OperationalUpdateType.ORDER_FLOW, source);
+        log.info("Order {} created for tenant {} from source {} with {} line item(s).", savedOrder.getExternalOrderId(), tenantCode, source, savedOrder.getItems().size());
         return toOrderResponse(savedOrder);
     }
 
@@ -181,6 +184,7 @@ public class OrderService {
         applyTransition(order, request.status(), source, request.note(), Boolean.TRUE.equals(request.restockInventory()));
         CustomerOrder savedOrder = customerOrderRepository.save(order);
         operationalStateChangePublisher.publish(OperationalUpdateType.ORDER_FLOW, source);
+        log.info("Order {} transitioned to {} for tenant {} by source {}.", savedOrder.getExternalOrderId(), savedOrder.getStatus(), tenantCode, source);
         return toOrderResponse(savedOrder);
     }
 

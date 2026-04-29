@@ -249,6 +249,7 @@ class RealtimeServiceTest {
             realtimeProperties,
             redisTemplate,
             new ObjectMapper().findAndRegisterModules(),
+            null,
             null
         );
         StompRealtimePublisher followerPublisher = new StompRealtimePublisher(
@@ -256,6 +257,7 @@ class RealtimeServiceTest {
             realtimeProperties,
             redisTemplate,
             new ObjectMapper().findAndRegisterModules(),
+            null,
             null
         );
 

@@ -2,7 +2,9 @@ package com.synapsecore.api.controller;
 
 import com.synapsecore.audit.AuditLogService;
 import com.synapsecore.audit.RequestTraceContext;
+import com.synapsecore.auth.FastAuthFailureException;
 import com.synapsecore.domain.service.CatalogWriteConflictResolver;
+import com.synapsecore.observability.OperationalAlertHookService;
 import com.synapsecore.observability.OperationalMetricsService;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.persistence.LockTimeoutException;
@@ -28,6 +30,20 @@ public class ApiExceptionHandler {
     private final RequestTraceContext requestTraceContext;
     private final CatalogWriteConflictResolver catalogWriteConflictResolver;
     private final OperationalMetricsService operationalMetricsService;
+    private final OperationalAlertHookService operationalAlertHookService;
+
+    @ExceptionHandler(FastAuthFailureException.class)
+    public ResponseEntity<ApiErrorResponse> handleFastAuthFailure(FastAuthFailureException exception,
+                                                                  HttpServletRequest request) {
+        HttpStatus status = HttpStatus.UNAUTHORIZED;
+        return ResponseEntity.status(status).body(new ApiErrorResponse(
+            Instant.now(),
+            status.value(),
+            status.getReasonPhrase(),
+            exception.getMessage(),
+            requestTraceContext.getRequiredRequestId()
+        ));
+    }
 
     @ExceptionHandler(ResponseStatusException.class)
     public ResponseEntity<ApiErrorResponse> handleResponseStatus(ResponseStatusException exception,
@@ -113,6 +129,12 @@ public class ApiExceptionHandler {
             requestId,
             exception.getMessage(),
             exception);
+        operationalAlertHookService.emit(
+            "API_UNEXPECTED_FAILURE",
+            "HIGH",
+            request.getMethod() + " " + request.getRequestURI() + " failed unexpectedly.",
+            message + " requestId=" + requestId
+        );
         auditFailureSafely(request, status, message);
         return ResponseEntity.status(status).body(new ApiErrorResponse(
             Instant.now(),

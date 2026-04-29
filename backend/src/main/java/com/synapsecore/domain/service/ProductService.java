@@ -30,6 +30,7 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
 import java.util.regex.Pattern;
+import lombok.extern.slf4j.Slf4j;
 import lombok.RequiredArgsConstructor;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.HttpStatus;
@@ -40,6 +41,7 @@ import org.springframework.web.server.ResponseStatusException;
 
 @Service
 @RequiredArgsConstructor
+@Slf4j
 public class ProductService {
 
     private static final Pattern CATALOG_SKU_PATTERN = Pattern.compile("^[A-Z0-9][A-Z0-9._-]{0,63}$");
@@ -86,6 +88,7 @@ public class ProductService {
                 );
                 flushCatalogWritePath();
                 operationalMetricsService.recordCatalogWrite(tenant.getCode(), "PRODUCT_CREATED", true);
+                log.info("Catalog product {} adopted into tenant {}.", adoptedProduct.resolveCatalogSku(), tenant.getCode());
                 return toResponse(adoptedProduct);
             }
             ensureInternalSkuIsAvailable(tenant.getCode(), catalogSku);
@@ -106,9 +109,11 @@ public class ProductService {
             );
             flushCatalogWritePath();
             operationalMetricsService.recordCatalogWrite(tenant.getCode(), "PRODUCT_CREATED", true);
+            log.info("Catalog product {} created for tenant {} by {}.", product.resolveCatalogSku(), tenant.getCode(), actorName);
             return toResponse(product);
         } catch (DataIntegrityViolationException exception) {
             operationalMetricsService.recordCatalogWrite(tenant.getCode(), "PRODUCT_CREATED", false);
+            log.warn("Catalog product create failed for tenant {} sku {}: {}", tenant.getCode(), catalogSku, exception.getMostSpecificCause() == null ? exception.getMessage() : exception.getMostSpecificCause().getMessage());
             throw catalogWriteConflictResolver.toResponseStatus(exception, catalogSku);
         }
     }
@@ -142,9 +147,11 @@ public class ProductService {
             );
             flushCatalogWritePath();
             operationalMetricsService.recordCatalogWrite(tenant.getCode(), "PRODUCT_UPDATED", true);
+            log.info("Catalog product {} updated for tenant {} by {}.", savedProduct.resolveCatalogSku(), tenant.getCode(), actorName);
             return toResponse(savedProduct);
         } catch (DataIntegrityViolationException exception) {
             operationalMetricsService.recordCatalogWrite(tenant.getCode(), "PRODUCT_UPDATED", false);
+            log.warn("Catalog product update failed for tenant {} sku {}: {}", tenant.getCode(), catalogSku, exception.getMostSpecificCause() == null ? exception.getMessage() : exception.getMostSpecificCause().getMessage());
             throw catalogWriteConflictResolver.toResponseStatus(exception, catalogSku);
         }
     }
@@ -274,6 +281,7 @@ public class ProductService {
             "Imported product catalog rows: created " + created + ", updated " + updated + ", failed " + failed + "."
         );
         operationalMetricsService.recordCatalogWrite(tenant.getCode(), "PRODUCT_IMPORT", failed == 0);
+        log.info("Product catalog import completed for tenant {} by {}: created {}, updated {}, failed {}.", tenant.getCode(), actorName, created, updated, failed);
         return new ProductImportResponse(totalRows, created, updated, failed, rowResults);
     }
 

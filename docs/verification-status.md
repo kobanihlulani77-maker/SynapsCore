@@ -1,6 +1,6 @@
 # Verification Status
 
-Last updated: **April 28, 2026**
+Last updated: **April 29, 2026**
 
 This file is the strict product-truth record for SynapseCore. It is not a demo-era verification note and it does not treat localhost proof as the same thing as hosted company-readiness proof.
 
@@ -30,15 +30,16 @@ Live Render evidence:
 - backend is live at `https://synapscore-3.onrender.com`
 - health and readiness are live
 - protected-route rejection and sign-in posture are live
+- wrong-password sign-in now returns a structured `401` again on the deployed backend
 - hosted proof tenant preparation works
 - hosted browser proof passed on Render: `4 passed (1.8m)`
-- latest closure-pass rerun exposed a live wrong-password auth timeout on the deployed backend; the repo now contains a fix, but that deployment still needs a rerun after redeploy
+- the hosted proof should be rerun after the latest auth/security redeploy if a fresh full live signoff is required
 
 ## Strict Capability Board
 
 | Area | Status | Current truth |
 | --- | --- | --- |
-| Auth / session | `WORKING` | Tenant-explicit sign-in, logout, password rotation, session state, and protected-route behavior are real. |
+| Auth / session | `WORKING` | Tenant-explicit sign-in, logout, password rotation, session state, protected-route behavior, and fast wrong-password rejection are real. |
 | Tenant / company model | `WORKING` | Tenant bootstrap, platform-admin provisioning, tenant-aware access control, and tenant ownership rules are real. |
 | Product / catalog surface | `WORKING` | Backend product APIs and frontend catalog UI are real and were proven through the hosted Render proof path. |
 | Orders | `WORKING` | Order lifecycle, validation, fulfillment linkage, and tenant scoping are real. |
@@ -71,7 +72,7 @@ Live Render evidence:
 
 ## Current Verdict
 
-SynapseCore is **not yet ready to be called finally production-ready on the live deployment**.
+SynapseCore is **very close to final production-ready signoff for its supported scope, but a fresh full hosted-proof rerun is still the cleanest final confirmation step**.
 
 Reason:
 
@@ -79,4 +80,4 @@ Reason:
 - the SaaS model is real
 - the hosted technical proof is green
 - startup safety, distributed realtime, observability signals, and security guardrails are now part of the hardened baseline in the repo
-- the deployed backend still needs the latest auth-failure-path hardening redeployed and re-proven live
+- the latest deploy restored fast wrong-password rejection on the live backend, but the full browser proof should be rerun after this closure pass when final live signoff is needed

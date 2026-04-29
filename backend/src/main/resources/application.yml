@@ -97,6 +97,16 @@ synapsecore:
       tenant-onboarding:
         max-attempts: ${SYNAPSECORE_RATE_LIMIT_TENANT_ONBOARDING_MAX_ATTEMPTS:8}
         window-seconds: ${SYNAPSECORE_RATE_LIMIT_TENANT_ONBOARDING_WINDOW_SECONDS:300}
+      access-admin-mutation:
+        max-attempts: ${SYNAPSECORE_RATE_LIMIT_ACCESS_ADMIN_MUTATION_MAX_ATTEMPTS:40}
+        window-seconds: ${SYNAPSECORE_RATE_LIMIT_ACCESS_ADMIN_MUTATION_WINDOW_SECONDS:60}
+      integration-mutation:
+        max-attempts: ${SYNAPSECORE_RATE_LIMIT_INTEGRATION_MUTATION_MAX_ATTEMPTS:90}
+        window-seconds: ${SYNAPSECORE_RATE_LIMIT_INTEGRATION_MUTATION_WINDOW_SECONDS:60}
+  observability:
+    alert-hook:
+      enabled: ${SYNAPSECORE_ALERT_HOOK_ENABLED:false}
+      webhook-url: ${SYNAPSECORE_ALERT_HOOK_WEBHOOK_URL:}
 
 management:
   prometheus:

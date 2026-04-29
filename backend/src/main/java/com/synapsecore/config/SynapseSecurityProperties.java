@@ -19,6 +19,8 @@ public class SynapseSecurityProperties {
         private final BucketProperties authLogin = new BucketProperties(30, 60);
         private final BucketProperties authPassword = new BucketProperties(12, 300);
         private final BucketProperties tenantOnboarding = new BucketProperties(8, 300);
+        private final BucketProperties accessAdminMutation = new BucketProperties(40, 60);
+        private final BucketProperties integrationMutation = new BucketProperties(90, 60);
     }
 
     @Getter
