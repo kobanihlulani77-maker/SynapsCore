@@ -356,17 +356,36 @@ async function createScenarioFixture() {
   const api = await createApiContext(users.operationsLead)
   const suffix = randomUUID().slice(0, 8).toUpperCase()
   const title = `UI Scenario ${suffix}`
+  const productSku = `SKU-SCN-${suffix}`
+  const warehouseCode = 'WH-NORTH'
 
   try {
+    await readJson(await api.post('/api/products', {
+      data: {
+        sku: productSku,
+        name: `Scenario Proof ${suffix}`,
+        category: 'Verification',
+      },
+    }))
+
+    await readJson(await api.post('/api/inventory/update', {
+      data: {
+        productSku,
+        warehouseCode,
+        quantityAvailable: 40,
+        reorderThreshold: 10,
+      },
+    }))
+
     const payload = await readJson(await api.post('/api/scenarios/save', {
       data: {
         title,
         requestedBy: 'Operations Lead',
         request: {
-          warehouseCode: 'WH-NORTH',
+          warehouseCode,
           items: [
             {
-              productSku: proofProductSku,
+              productSku,
               quantity: 1,
               unitPrice: 95,
             },
@@ -375,7 +394,18 @@ async function createScenarioFixture() {
       },
     }))
 
-    return { api, title, scenarioId: payload.id }
+    expect(payload.approvalPolicy).toBe('STANDARD')
+    expect(payload.approvalStatus).toBe('PENDING_APPROVAL')
+
+    return {
+      api,
+      title,
+      productSku,
+      warehouseCode,
+      scenarioId: payload.id,
+      approvalPolicy: payload.approvalPolicy,
+      approvalStatus: payload.approvalStatus,
+    }
   } catch (error) {
     await api.dispose()
     throw error
