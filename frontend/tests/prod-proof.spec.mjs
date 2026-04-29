@@ -318,6 +318,137 @@ async function createScenarioFixture() {
   }
 }
 
+async function waitForSnapshotMatch(api, predicate, message) {
+  let latestSnapshot = null
+  await expect.poll(async () => {
+    latestSnapshot = await readJson(await api.get('/api/dashboard/snapshot'))
+    return Boolean(predicate(latestSnapshot))
+  }, {
+    timeout: 30_000,
+    message,
+  }).toBe(true)
+  return latestSnapshot
+}
+
+function activeAlertsFromSnapshot(snapshot) {
+  return snapshot?.alerts?.activeAlerts ?? []
+}
+
+function textReferencesSku(value, sku) {
+  return typeof value === 'string' && value.toUpperCase().includes(sku.toUpperCase())
+}
+
+function alertReferencesSku(alert, sku) {
+  return textReferencesSku(alert?.title, sku)
+    || textReferencesSku(alert?.description, sku)
+    || textReferencesSku(alert?.recommendedAction, sku)
+}
+
+function recommendationReferencesSku(recommendation, sku) {
+  return textReferencesSku(recommendation?.title, sku)
+    || textReferencesSku(recommendation?.description, sku)
+}
+
+async function ensureRecentOrder(api) {
+  const recentOrders = await readJson(await api.get('/api/orders/recent'))
+  if (recentOrders.length) {
+    return recentOrders
+  }
+
+  const suffix = randomUUID().slice(0, 8).toUpperCase()
+  await readJson(await api.post('/api/orders', {
+    data: {
+      externalOrderId: `UI-ORD-${suffix}`,
+      warehouseCode: 'WH-NORTH',
+      items: [
+        {
+          productSku: proofProductSku,
+          quantity: 1,
+          unitPrice: 79,
+        },
+      ],
+    },
+  }))
+
+  let nextOrders = []
+  await expect.poll(async () => {
+    nextOrders = await readJson(await api.get('/api/orders/recent'))
+    return nextOrders.length > 0
+  }, {
+    timeout: 30_000,
+    message: 'Expected at least one recent order to appear after seeding the hosted proof order lane.',
+  }).toBe(true)
+  return nextOrders
+}
+
+async function ensureAlertAndRecommendationCoverage(api) {
+  const inventory = await readJson(await api.get('/api/inventory'))
+  const candidate = inventory.find((item) => item.productSku === proofProductSku && item.warehouseCode === 'WH-NORTH')
+    || inventory.find((item) => Number.isFinite(item.quantityAvailable) && Number.isFinite(item.reorderThreshold))
+
+  expect(candidate).toBeTruthy()
+
+  const findCoverage = (snapshot) => {
+    const activeAlerts = activeAlertsFromSnapshot(snapshot)
+    return {
+      alertRecord: activeAlerts.find((alert) => alertReferencesSku(alert, candidate.productSku)),
+      recommendationRecord: snapshot.recommendations.find((recommendation) => recommendationReferencesSku(recommendation, candidate.productSku)),
+    }
+  }
+
+  const initialSnapshot = await readJson(await api.get('/api/dashboard/snapshot'))
+  const initialCoverage = findCoverage(initialSnapshot)
+  if (initialCoverage.alertRecord && initialCoverage.recommendationRecord) {
+    return {
+      snapshot: initialSnapshot,
+      candidate,
+      alertRecord: initialCoverage.alertRecord,
+      recommendationRecord: initialCoverage.recommendationRecord,
+      restore: async () => {},
+    }
+  }
+
+  const revertQuantity = candidate.quantityAvailable
+  const revertThreshold = candidate.reorderThreshold
+  const threshold = Math.max(5, Number.isFinite(candidate.reorderThreshold) ? candidate.reorderThreshold : 5)
+  let latestCoverage = null
+
+  await readJson(await api.post('/api/inventory/update', {
+    data: {
+      productSku: candidate.productSku,
+      warehouseCode: candidate.warehouseCode,
+      quantityAvailable: Math.max(0, threshold - 1),
+      reorderThreshold: threshold,
+    },
+  }))
+
+  const snapshot = await waitForSnapshotMatch(
+    api,
+    (nextSnapshot) => {
+      latestCoverage = findCoverage(nextSnapshot)
+      return Boolean(latestCoverage.alertRecord && latestCoverage.recommendationRecord)
+    },
+    `Expected low-stock inventory on ${candidate.productSku} to produce matching alert and recommendation coverage from the live backend.`,
+  )
+
+  return {
+    snapshot,
+    candidate,
+    alertRecord: latestCoverage?.alertRecord ?? null,
+    recommendationRecord: latestCoverage?.recommendationRecord ?? null,
+    restore: async () => {
+      await readJson(await api.post('/api/inventory/update', {
+        data: {
+          productSku: candidate.productSku,
+          warehouseCode: candidate.warehouseCode,
+          quantityAvailable: revertQuantity,
+          reorderThreshold: revertThreshold,
+        },
+      }))
+    },
+  }
+}
+
 test('auth flow and the full authenticated page system render cleanly in a browser', async ({ page }) => {
   await page.goto('/dashboard')
   await expect(page.getByRole('heading', { name: 'Access your operational workspace.' })).toBeVisible()
@@ -333,6 +464,9 @@ test('auth flow and the full authenticated page system render cleanly in a brows
   await fillSignInForm(signInCard, users.operationsLead, users.operationsLead.password)
   await signInCard.getByRole('button', { name: 'Enter Platform' }).click()
   await expect(page).toHaveURL(/\/dashboard$/)
+  await page.reload()
+  await expect(page).toHaveURL(/\/dashboard$/)
+  await expect(page.getByRole('heading', { level: 1, name: 'Live operational command center' })).toBeVisible()
 
   for (const [route, title] of appPages) {
     await navigateWithinApp(page, route)
@@ -486,7 +620,7 @@ test('replay recovery, scenario approval, execution, and browser role gating wor
       message: `Expected ${replayFixture.externalOrderId} to reach a replayed state through manual or automated recovery.`,
     }).toBe('replayed')
 
-    await expect(page.getByText(/Replay queue is clear|Replayed .* into the live order flow\./).first()).toBeVisible()
+  await expect(page.getByText(/Replay queue is clear|Replayed .* into the live order flow\./).first()).toBeVisible()
   } finally {
     await replayFixture.api.dispose()
   }
@@ -526,4 +660,125 @@ test('replay recovery, scenario approval, execution, and browser role gating wor
   await expect(page.getByRole('heading', { level: 1, name: 'Users and access control' })).toBeVisible()
   await expect(page.getByText('Tenant admin access required')).toBeVisible()
   await expect(page.getByText('Operators', { exact: true }).first()).toBeVisible()
+})
+
+test('alerts, recommendations, orders, inventory, integrations, users, profile, and settings surfaces stay connected to the live backend', async ({ page }) => {
+  const api = await createApiContext(users.operationsLead)
+  let restoreAlertCoverage = async () => {}
+
+  try {
+    const alertCoverage = await ensureAlertAndRecommendationCoverage(api)
+    restoreAlertCoverage = alertCoverage.restore
+    const recentOrders = await ensureRecentOrder(api)
+    const workspace = await readJson(await api.get('/api/access/admin/workspace'))
+    const operators = await readJson(await api.get('/api/access/admin/operators'))
+    const accessUsers = await readJson(await api.get('/api/access/admin/users'))
+    const alertRecord = alertCoverage.alertRecord
+    const recommendationRecord = alertCoverage.recommendationRecord
+    const orderRecord = recentOrders[0]
+    const inventoryRecord = alertCoverage.snapshot.inventory.find((item) => item.lowStock) || alertCoverage.snapshot.inventory[0]
+    const connectorRecord = alertCoverage.snapshot.integrationConnectors[0] || workspace.connectors?.[0]
+
+    expect(alertRecord).toBeTruthy()
+    expect(recommendationRecord).toBeTruthy()
+    expect(orderRecord).toBeTruthy()
+    expect(inventoryRecord).toBeTruthy()
+    expect(workspace).toBeTruthy()
+    expect(operators.length).toBeGreaterThan(0)
+    expect(accessUsers.length).toBeGreaterThan(0)
+    expect(connectorRecord).toBeTruthy()
+
+    await loginViaUi(page, users.operationsLead)
+
+    await navigateWithinApp(page, '/alerts')
+    await expect(page.getByRole('heading', { level: 1, name: 'Operational warning center' })).toBeVisible()
+    await expect(page.getByText(alertRecord.title).first()).toBeVisible()
+    await page.locator('.stack-card.selectable-card').filter({ hasText: alertRecord.title }).first().click()
+    await expect(page.getByText(`Action: ${alertRecord.recommendedAction}`).first()).toBeVisible()
+
+    await navigateWithinApp(page, '/recommendations')
+    await expect(page.getByRole('heading', { level: 1, name: 'Action queue for the operating team' })).toBeVisible()
+    await expect(page.getByText(recommendationRecord.title).first()).toBeVisible()
+    await page.locator('.stack-card.selectable-card').filter({ hasText: recommendationRecord.title }).first().click()
+    await expect(page.getByText(recommendationRecord.description).first()).toBeVisible()
+
+    await navigateWithinApp(page, '/orders')
+    await expect(page.getByRole('heading', { level: 1, name: 'Live order operations' })).toBeVisible()
+    await expect(page.getByText(orderRecord.externalOrderId).first()).toBeVisible()
+    await page.locator('.stack-card.selectable-card').filter({ hasText: orderRecord.externalOrderId }).first().click()
+    await expect(page.getByText(orderRecord.warehouseCode).first()).toBeVisible()
+
+    await navigateWithinApp(page, '/inventory')
+    await expect(page.getByRole('heading', { level: 1, name: 'Inventory intelligence' })).toBeVisible()
+    await expect(page.getByText(inventoryRecord.productName).first()).toBeVisible()
+    await page.locator('.stack-card.selectable-card').filter({ hasText: inventoryRecord.productName }).first().click()
+    await expect(page.getByText(inventoryRecord.productSku).first()).toBeVisible()
+
+    await navigateWithinApp(page, '/integrations')
+    await expect(page.getByRole('heading', { level: 1, name: 'Connector management and telemetry' })).toBeVisible()
+    await expect(page.getByText(connectorRecord.displayName).first()).toBeVisible()
+    await page.locator('.selectable-card').filter({ hasText: connectorRecord.displayName }).first().click()
+    await expect(page.getByText(connectorRecord.sourceSystem).first()).toBeVisible()
+    await page.getByRole('button', { name: 'Manage Policies' }).click()
+
+    await expect(page.getByRole('heading', { level: 1, name: 'Tenant and workspace settings' })).toBeVisible()
+    await expect(page.getByDisplayValue(workspace.tenantName)).toBeVisible()
+    if (workspace.connectors?.length) {
+      await expect(page.getByText(workspace.connectors[0].displayName).first()).toBeVisible()
+    }
+
+    await navigateWithinApp(page, '/users')
+    await expect(page.getByRole('heading', { level: 1, name: 'Users and access control' })).toBeVisible()
+    await expect(page.getByText(operators[0].displayName).first()).toBeVisible()
+    await expect(page.getByText(accessUsers[0].fullName).first()).toBeVisible()
+
+    await navigateWithinApp(page, '/profile')
+    await expect(page.getByRole('heading', { level: 1, name: 'Personal profile and session controls' })).toBeVisible()
+    await expect(page.getByText(users.operationsLead.username).first()).toBeVisible()
+    await expect(page.getByText(workspace.tenantName).first()).toBeVisible()
+
+    await expectNoFatalUiErrors(page)
+  } finally {
+    await restoreAlertCoverage()
+    await api.dispose()
+  }
+})
+
+test('frontend surfaces backend auth rate limiting without getting stuck in a loading state', async ({ page }) => {
+  await page.goto('/sign-in')
+  await expect(page.getByRole('heading', { name: 'Access your operational workspace.' })).toBeVisible()
+  const signInCard = page.locator('.public-signin-card')
+  await waitForSignInReady(signInCard)
+
+  const hitRateLimit = await page.evaluate(async ({ nextBackendUrl, tenantCode, username }) => {
+    const body = JSON.stringify({
+      tenantCode,
+      username,
+      password: 'wrong-rate-limit',
+    })
+
+    for (let attempt = 0; attempt < 35; attempt += 1) {
+      const response = await fetch(`${nextBackendUrl}/api/auth/session/login`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body,
+      })
+      if (response.status === 429) {
+        return true
+      }
+    }
+
+    return false
+  }, {
+    nextBackendUrl: backendUrl,
+    tenantCode: users.operationsLead.tenantCode,
+    username: users.operationsLead.username,
+  })
+
+  expect(hitRateLimit).toBeTruthy()
+
+  await fillSignInForm(signInCard, users.operationsLead, 'wrong-rate-limit')
+  await signInCard.getByRole('button', { name: 'Enter Platform' }).click()
+  await expect(signInCard.getByRole('button', { name: 'Enter Platform' })).toBeEnabled({ timeout: 60_000 })
+  await expect(signInCard.getByText('Authentication rate limit exceeded. Wait before attempting another sign-in.')).toBeVisible({ timeout: 15_000 })
 })
