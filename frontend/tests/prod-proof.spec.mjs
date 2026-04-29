@@ -218,6 +218,22 @@ async function findVisibleIntegrationConnector(page, connectors) {
   return null
 }
 
+async function waitForScenarioHistoryCard(page, scenarioTitle) {
+  const scenarioCard = page.locator('.approval-board').getByRole('button', {
+    name: new RegExp(escapeRegExp(scenarioTitle), 'i'),
+  }).first()
+
+  await expect.poll(async () => {
+    await refreshWorkspace(page)
+    return await scenarioCard.isVisible().catch(() => false)
+  }, {
+    timeout: 30_000,
+    message: `Expected scenario history to render ${scenarioTitle} in the approval board.`,
+  }).toBe(true)
+
+  return scenarioCard
+}
+
 async function readReplayOutcome(api, externalOrderId) {
   const replayQueue = await readJson(await api.get('/api/integrations/orders/replay-queue'))
   const replayRecord = replayQueue.find((record) => record.externalOrderId === externalOrderId)
@@ -342,7 +358,7 @@ async function createScenarioFixture() {
   const title = `UI Scenario ${suffix}`
 
   try {
-    await readJson(await api.post('/api/scenarios/save', {
+    const payload = await readJson(await api.post('/api/scenarios/save', {
       data: {
         title,
         requestedBy: 'Operations Lead',
@@ -359,7 +375,7 @@ async function createScenarioFixture() {
       },
     }))
 
-    return { api, title }
+    return { api, title, scenarioId: payload.id }
   } catch (error) {
     await api.dispose()
     throw error
@@ -770,20 +786,19 @@ test('replay recovery, scenario approval, execution, and browser role gating wor
     await navigateWithinApp(page, '/scenario-history')
     await expect(page.getByRole('heading', { level: 1, name: 'Scenario history and compare' })).toBeVisible()
 
-    const scenarioApprovalConsole = page.locator('.stack-card').filter({
-      hasText: scenarioFixture.title,
-      has: page.getByRole('button', { name: 'Approve Plan' }),
+    const scenarioHistoryCard = await waitForScenarioHistoryCard(page, scenarioFixture.title)
+    await activateSelectableButton(scenarioHistoryCard)
+
+    const scenarioActionConsole = page.locator('.section-card').filter({
+      hasText: 'Scenario action console',
+      has: page.getByText(scenarioFixture.title),
     }).first()
-    await expect(scenarioApprovalConsole).toBeVisible()
-    await scenarioApprovalConsole.getByRole('button', { name: 'Approve Plan' }).click()
+    await expect(scenarioActionConsole).toBeVisible()
+    await scenarioActionConsole.getByRole('button', { name: 'Approve Plan' }).click()
     await expect(page.locator('.success-text').filter({ hasText: `Approved ${scenarioFixture.title} for execution under Standard approval.` }).first()).toBeVisible()
 
-    const scenarioExecutionConsole = page.locator('.stack-card').filter({
-      hasText: scenarioFixture.title,
-      has: page.getByRole('button', { name: 'Execute Scenario' }),
-    }).first()
-    await expect(scenarioExecutionConsole.getByRole('button', { name: 'Execute Scenario' })).toBeVisible()
-    await scenarioExecutionConsole.getByRole('button', { name: 'Execute Scenario' }).click()
+    await expect(scenarioActionConsole.getByRole('button', { name: 'Execute Scenario' })).toBeVisible()
+    await scenarioActionConsole.getByRole('button', { name: 'Execute Scenario' }).click()
     await expect(page.locator('.success-text').filter({ hasText: new RegExp(`^Executed ${scenarioFixture.title} as live order `, 'i') }).first()).toBeVisible()
   } finally {
     await scenarioFixture.api.dispose()
