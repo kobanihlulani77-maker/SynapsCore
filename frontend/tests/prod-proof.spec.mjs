@@ -197,6 +197,14 @@ async function refreshWorkspace(page) {
   }
 }
 
+async function activateSelectableButton(buttonLocator) {
+  await expect(buttonLocator).toBeVisible()
+  await buttonLocator.scrollIntoViewIfNeeded()
+  await buttonLocator.focus()
+  await expect(buttonLocator).toBeFocused()
+  await buttonLocator.press('Enter')
+}
+
 async function readReplayOutcome(api, externalOrderId) {
   const replayQueue = await readJson(await api.get('/api/integrations/orders/replay-queue'))
   const replayRecord = replayQueue.find((record) => record.externalOrderId === externalOrderId)
@@ -780,31 +788,41 @@ test('alerts, recommendations, orders, inventory, integrations, users, profile, 
     await navigateWithinApp(page, '/alerts')
     await expect(page.getByRole('heading', { level: 1, name: 'Operational warning center' })).toBeVisible()
     await expect(page.getByText(alertRecord.title).first()).toBeVisible()
-    await page.locator('.stack-card.selectable-card').filter({ hasText: alertRecord.title }).first().click()
+    await activateSelectableButton(
+      page.getByRole('button', { name: new RegExp(escapeRegExp(alertRecord.title), 'i') }).first(),
+    )
     await expect(page.getByText(`Action: ${alertRecord.recommendedAction}`).first()).toBeVisible()
 
     await navigateWithinApp(page, '/recommendations')
     await expect(page.getByRole('heading', { level: 1, name: 'Action queue for the operating team' })).toBeVisible()
     await expect(page.getByText(recommendationRecord.title).first()).toBeVisible()
-    await page.locator('.stack-card.selectable-card').filter({ hasText: recommendationRecord.title }).first().click()
+    await activateSelectableButton(
+      page.locator('.recommendation-board').getByRole('button', { name: new RegExp(escapeRegExp(recommendationRecord.title), 'i') }).first(),
+    )
     await expect(page.getByText(recommendationRecord.description).first()).toBeVisible()
 
     await navigateWithinApp(page, '/orders')
     await expect(page.getByRole('heading', { level: 1, name: 'Live order operations' })).toBeVisible()
     await expect(page.getByText(orderRecord.externalOrderId).first()).toBeVisible()
-    await page.locator('.stack-card.selectable-card').filter({ hasText: orderRecord.externalOrderId }).first().click()
+    await activateSelectableButton(
+      page.getByRole('button', { name: new RegExp(escapeRegExp(orderRecord.externalOrderId), 'i') }).first(),
+    )
     await expect(page.getByText(orderRecord.warehouseCode).first()).toBeVisible()
 
     await navigateWithinApp(page, '/inventory')
     await expect(page.getByRole('heading', { level: 1, name: 'Inventory intelligence' })).toBeVisible()
     await expect(page.getByText(inventoryRecord.productName).first()).toBeVisible()
-    await page.locator('.stack-card.selectable-card').filter({ hasText: inventoryRecord.productName }).first().click()
+    await activateSelectableButton(
+      page.getByRole('button', { name: new RegExp(escapeRegExp(inventoryRecord.productName), 'i') }).first(),
+    )
     await expect(page.getByText(inventoryRecord.productSku).first()).toBeVisible()
 
     await navigateWithinApp(page, '/integrations')
     await expect(page.getByRole('heading', { level: 1, name: 'Connector management and telemetry' })).toBeVisible()
     await expect(page.getByText(connectorRecord.displayName).first()).toBeVisible()
-    await page.locator('.selectable-card').filter({ hasText: connectorRecord.displayName }).first().click()
+    await activateSelectableButton(
+      page.getByRole('button', { name: new RegExp(escapeRegExp(connectorRecord.displayName), 'i') }).first(),
+    )
     await expect(page.getByText(connectorRecord.sourceSystem).first()).toBeVisible()
     await page.getByRole('button', { name: 'Manage Policies' }).click()
 
