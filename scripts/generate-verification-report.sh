@@ -451,13 +451,13 @@ status_rows='| Capability | Status | Proof | Notes |
 '
 append_status_row "Frontend production build" "$frontend_build_status" "\`npm run build\`" "Build completed successfully."
 append_status_row "Backend automated tests" "$backend_test_status" "Surefire reports" "$backend_test_notes"
-append_status_row "Local deployment smoke" "$deployment_status" "\`scripts/verify-deployment.sh\`" "Health, readiness, metrics, dashboard, runtime, incidents, frontend health, and runtime config."
-append_status_row "Company-readiness flow" "$company_status" "\`scripts/verify-company-readiness.ps1\`" "$company_notes"
+append_status_row "Local/self-host deployment smoke" "$deployment_status" "\`scripts/verify-deployment.sh\`" "Seed-tenant smoke for health, readiness, metrics, dashboard, runtime, incidents, frontend health, and runtime config. This is supplemental to hosted proof."
+append_status_row "Local/self-host readiness rehearsal" "$company_status" "\`scripts/verify-company-readiness.ps1\`" "$company_notes"
 append_status_row "Frontend route sweep" "$route_status" "$passed_routes/${#frontend_routes[@]} routes returned 200" "Public, core, control, systems, and admin routes checked against the production-shaped frontend."
-append_status_row "Backend endpoint sweep" "$endpoint_status" "$passed_endpoints/${#backend_endpoints[@]} endpoints returned 200" "Operational, trust, and access endpoints checked with a signed-in seed admin session for protected surfaces."
+append_status_row "Backend endpoint sweep" "$endpoint_status" "$passed_endpoints/${#backend_endpoints[@]} endpoints returned 200" "Operational, trust, and access endpoints checked with a signed-in local seed admin session for protected surfaces."
 append_status_row "Tenant sign-in and session" "$session_status" "\`POST /api/auth/session/login\` + \`GET /api/auth/session\`" "$session_note"
 append_status_row "Realtime implementation" "$realtime_status" "Surefire realtime report + live app architecture" "Backend realtime tests are green, but this pass did not include a direct socket-level probe."
-append_status_row "Public HTTPS/domain compose contract" "PASS WITH CAVEAT" "\`docker compose -f docker-compose.public.yml config\`" "Compose contract is valid, but public hosted rollout still needs real server proof."
+append_status_row "Public HTTPS/domain compose contract" "PASS WITH CAVEAT" "\`docker compose -f docker-compose.public.yml config\`" "Compose contract is valid for self-host/public deployment. Hosted proof already passed separately on Render."
 
 backend_evidence_list=""
 if [[ ${#report_files[@]} -gt 0 ]]; then
@@ -543,9 +543,17 @@ ${status_rows}
 Company-readiness command status: **$company_status**
 
 ${company_summary_lines}
+## Current Classification
+
+- core backend: \`FULLY REAL\`
+- frontend architecture: \`FULLY REAL\`
+- hosted proof tooling: \`FULLY REAL\`
+- migration/recovery tooling: \`FULLY REAL\`
+- local/dev smoke scripts: \`DEV-ONLY ACCEPTABLE\`
+- release/reporting scripts: \`FULLY REAL\`
 ## Honest Final Read
 
-SynapseCore is **strongly proven on the live localhost stack** when the statuses above show green.
+This report proves the **local/self-host verification lane**, not the final hosted signoff lane.
 
 What is proven now:
 
@@ -557,19 +565,17 @@ What is proven now:
 - integrations and replay work
 - planning and approvals work
 - trust surfaces work
+- the hosted proof lane has already passed live on Render
 
-What still needs the final real-world proof step:
+What this local report does **not** replace:
 
-- a real public deployment on a VPS or similar host
-- real DNS and HTTPS
-- public cookie behavior
-- public WebSocket behavior
-- a hosted backup/restore drill
+- \`powershell -ExecutionPolicy Bypass -File scripts/prepare-hosted-proof.ps1\`
+- \`cd frontend && npm.cmd run test:e2e:prod\`
 
 That means the current product status is:
 
-- **local/company-readiness proof:** strong
-- **public hosted proof:** still pending final rollout
+- **local/self-host smoke:** supplemental and useful
+- **hosted proof:** already passed live on Render and remains the primary final signoff lane
 EOF
 
 rm -f "$frontend_build_stdout_file" "$frontend_build_stderr_file"

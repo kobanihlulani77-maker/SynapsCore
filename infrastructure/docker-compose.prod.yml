@@ -35,7 +35,8 @@ services:
     env_file:
       - ${BACKEND_ENV_FILE:-./env/backend.prod.selfhost.env}
     environment:
-      SPRING_JPA_HIBERNATE_DDL_AUTO: update
+      SPRING_FLYWAY_ENABLED: "true"
+      SPRING_JPA_HIBERNATE_DDL_AUTO: validate
       SYNAPSECORE_BOOTSTRAP_SCHEMA_ONLY: "true"
       SPRING_MAIN_WEB_APPLICATION_TYPE: none
     depends_on:

@@ -10,6 +10,17 @@ Set-StrictMode -Version Latest
 $ErrorActionPreference = "Stop"
 Add-Type -AssemblyName System.Net.Http
 
+Write-Host "========================================"
+Write-Host "SYNAPSECORE LOCAL/SELF-HOST READINESS REHEARSAL"
+Write-Host "========================================"
+Write-Host "Frontend URL : $FrontendUrl"
+Write-Host "Backend URL  : $BackendUrl"
+Write-Host "Seed tenant  : $SeedTenantCode / $SeedAdminUsername"
+Write-Host "Scope        : local/self-host workflow rehearsal using seed users"
+Write-Host "Hosted proof : powershell -ExecutionPolicy Bypass -File scripts\\prepare-hosted-proof.ps1"
+Write-Host "              cd frontend && npm.cmd run test:e2e:prod"
+Write-Host ""
+
 function Write-Step {
     param([string]$Message)
     Write-Host ""
@@ -564,5 +575,5 @@ Assert-True ($audit.Json.Count -ge 1) "Recent audit feed is empty."
 Assert-True ($incidents.StatusCode -eq 200) "System incidents payload was not returned."
 $companySummary.trustSurfaceVerified = $true
 
-Write-Step "Company readiness verification passed"
+Write-Step "Local/self-host company readiness rehearsal passed"
 $companySummary | ConvertTo-Json -Depth 12

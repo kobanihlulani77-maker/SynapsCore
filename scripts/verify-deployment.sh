@@ -11,6 +11,17 @@ MAX_ATTEMPTS="${MAX_ATTEMPTS:-20}"
 SLEEP_SECONDS="${SLEEP_SECONDS:-5}"
 COOKIE_JAR="${COOKIE_JAR:-$(mktemp)}"
 
+echo "========================================"
+echo "SYNAPSECORE LOCAL/SELF-HOST DEPLOYMENT SMOKE"
+echo "========================================"
+echo "Frontend URL : $FRONTEND_URL"
+echo "Backend URL  : $BACKEND_URL"
+echo "Tenant/user  : $SEED_TENANT_CODE / $SEED_ADMIN_USERNAME"
+echo "Proof lane   : local/self-host smoke only"
+echo "Hosted proof : powershell -ExecutionPolicy Bypass -File scripts/prepare-hosted-proof.ps1"
+echo "              cd frontend && npm.cmd run test:e2e:prod"
+echo
+
 check_endpoint() {
   local label="$1"
   local url="$2"
@@ -51,6 +62,6 @@ curl --fail --silent --show-error --cookie "$COOKIE_JAR" "$BACKEND_URL/api/syste
 echo "Checking system incidents -> $BACKEND_URL/api/system/incidents"
 
 echo
-echo "SynapseCore deployment checks passed."
+echo "SynapseCore local/self-host deployment smoke checks passed."
 
 rm -f "$COOKIE_JAR"

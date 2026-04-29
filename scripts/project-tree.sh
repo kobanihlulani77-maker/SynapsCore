@@ -47,7 +47,9 @@ echo "|-- frontend/             React + Vite live operational dashboard"
 echo "|   |-- package.json      Frontend scripts and dependencies"
 echo "|   |-- Dockerfile        Frontend container image definition"
 echo '|   `-- src/'
-echo "|       |-- App.jsx       Main dashboard wiring and live subscriptions"
+echo "|       |-- App.jsx       Root shell that mounts the workspace application model"
+echo "|       |-- components/   Route switch, workspace shell, and page composition"
+echo "|       |-- hooks/        Session/bootstrap/realtime/page-context orchestration"
 echo "|       |-- main.jsx      Frontend bootstrap"
 echo '|       `-- styles.css    Dashboard styling'
 echo "|-- infrastructure/      Docker Compose and environment setup"

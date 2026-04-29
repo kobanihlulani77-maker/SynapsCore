@@ -13,6 +13,17 @@ $ErrorActionPreference = "Stop"
 
 . (Join-Path $PSScriptRoot "ProdEnvTools.ps1")
 
+Write-Host "========================================"
+Write-Host "SYNAPSECORE LOCAL/SELF-HOST DEPLOYMENT SMOKE"
+Write-Host "========================================"
+Write-Host "Frontend URL : $FrontendUrl"
+Write-Host "Backend URL  : $BackendUrl"
+Write-Host "Tenant/user  : $SeedTenantCode / $SeedAdminUsername"
+Write-Host "Proof lane   : local/self-host smoke only"
+Write-Host "Hosted proof : powershell -ExecutionPolicy Bypass -File scripts\\prepare-hosted-proof.ps1"
+Write-Host "              cd frontend && npm.cmd run test:e2e:prod"
+Write-Host ""
+
 function Invoke-SessionCheck {
     param(
         [string]$Label,
@@ -51,4 +62,4 @@ Invoke-SessionCheck -Label "system runtime" -Url "$BackendUrl/api/system/runtime
 Invoke-SessionCheck -Label "system incidents" -Url "$BackendUrl/api/system/incidents" -Session $session
 
 Write-Host ""
-Write-Host "SynapseCore deployment checks passed."
+Write-Host "SynapseCore local/self-host deployment smoke checks passed."

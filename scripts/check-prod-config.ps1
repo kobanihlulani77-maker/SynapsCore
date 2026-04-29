@@ -48,6 +48,7 @@ $backendCookieSecure = Get-RequiredEnvValue -Values $backendValues -Key "SESSION
 $backendSameSite = Get-RequiredEnvValue -Values $backendValues -Key "SESSION_COOKIE_SAME_SITE" -FilePath $backendFile
 $backendHeaderFallback = Get-RequiredEnvValue -Values $backendValues -Key "ALLOW_HEADER_FALLBACK" -FilePath $backendFile
 $backendDdlAuto = Get-RequiredEnvValue -Values $backendValues -Key "SPRING_JPA_HIBERNATE_DDL_AUTO" -FilePath $backendFile
+$backendFlywayEnabled = Get-FirstNonEmptyEnvValue -Values $backendValues -Keys @("SPRING_FLYWAY_ENABLED")
 $backendBuildVersion = Get-RequiredEnvValue -Values $backendValues -Key "SYNAPSECORE_BUILD_VERSION" -FilePath $backendFile
 $backendBuildCommit = Get-RequiredEnvValue -Values $backendValues -Key "SYNAPSECORE_BUILD_COMMIT" -FilePath $backendFile
 $backendBuildTime = Get-RequiredEnvValue -Values $backendValues -Key "SYNAPSECORE_BUILD_TIME" -FilePath $backendFile
@@ -59,7 +60,11 @@ $frontendBuildTime = Get-RequiredEnvValue -Values $frontendValues -Key "VITE_APP
 
 Assert-EnvEquals -Values $backendValues -Key "SPRING_PROFILES_ACTIVE" -Expected "prod" -FilePath $backendFile
 Assert-EnvEquals -Values $backendValues -Key "ALLOW_HEADER_FALLBACK" -Expected "false" -FilePath $backendFile
-Assert-EnvEquals -Values $backendValues -Key "SPRING_JPA_HIBERNATE_DDL_AUTO" -Expected "update" -FilePath $backendFile
+Assert-EnvEquals -Values $backendValues -Key "SPRING_JPA_HIBERNATE_DDL_AUTO" -Expected "validate" -FilePath $backendFile
+
+if (-not [string]::IsNullOrWhiteSpace($backendFlywayEnabled) -and $backendFlywayEnabled -ne "true") {
+    throw "SPRING_FLYWAY_ENABLED must be true or omitted in $backendFile so production keeps Flyway enabled."
+}
 
 if ([string]::IsNullOrWhiteSpace($backendDatasourceUrl)) {
     if ([string]::IsNullOrWhiteSpace($backendDbHost) -or [string]::IsNullOrWhiteSpace($backendDbName) -or [string]::IsNullOrWhiteSpace($backendDbUser) -or [string]::IsNullOrWhiteSpace($backendDbPassword)) {

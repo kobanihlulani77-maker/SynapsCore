@@ -121,7 +121,8 @@ $backendUpdates = [ordered]@{
     SESSION_COOKIE_SECURE = "true"
     SESSION_COOKIE_SAME_SITE = "Lax"
     ALLOW_HEADER_FALLBACK = "false"
-    SPRING_JPA_HIBERNATE_DDL_AUTO = "update"
+    SPRING_FLYWAY_ENABLED = "true"
+    SPRING_JPA_HIBERNATE_DDL_AUTO = "validate"
     SYNAPSECORE_BUILD_VERSION = $buildVersion
     SYNAPSECORE_BUILD_COMMIT = $buildCommit
     SYNAPSECORE_BUILD_TIME = $buildTime
@@ -154,7 +155,7 @@ foreach ($entry in $edgeUpdates.GetEnumerator()) {
 }
 
 Write-Host ""
-Write-Host "Prepared free-test deployment env files:"
+Write-Host "Prepared disposable free-test deployment env files:"
 Write-Host "  $backendTarget"
 Write-Host "  $frontendTarget"
 Write-Host "  $edgeTarget"
@@ -166,7 +167,11 @@ Write-Host ""
 Write-Host "Database password in backend.prod.env:"
 Write-Host "  $dbPasswordToUse"
 Write-Host ""
+Write-Host "These env files are for disposable free-test/self-host verification only."
+Write-Host "They are not the primary hosted-proof signoff lane."
+Write-Host ""
 Write-Host "Next steps:"
 Write-Host "1. powershell -ExecutionPolicy Bypass -File scripts\release-readiness.ps1 -BackendEnvFile ./env/backend.prod.env -FrontendEnvFile ./env/frontend.prod.env"
 Write-Host "2. powershell -ExecutionPolicy Bypass -File scripts\start-public-prod.ps1 -BackendEnvFile ./env/backend.prod.env -FrontendEnvFile ./env/frontend.prod.env -EdgeEnvFile ./env/edge.prod.env"
 Write-Host "3. powershell -ExecutionPolicy Bypass -File scripts\verify-deployment.ps1 -FrontendUrl https://$appDomain -BackendUrl https://$apiDomain"
+Write-Host "4. Primary final signoff still runs through prepare-hosted-proof.ps1 plus frontend npm.cmd run test:e2e:prod"

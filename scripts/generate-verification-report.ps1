@@ -396,16 +396,16 @@ $md = [char]96
 $statusRows = @(
     [pscustomobject]@{ Capability = "Frontend production build"; Status = $frontendBuildStatus; Proof = "$md" + "npm.cmd run build" + "$md"; Notes = "Build completed successfully." },
     [pscustomobject]@{ Capability = "Backend automated tests"; Status = $backendTestStatus; Proof = $(if ($RunBackendTests) { "$md" + "mvnw.cmd test" + "$md" } else { "Surefire reports" }); Notes = $backendTestNotes },
-    [pscustomobject]@{ Capability = "Local deployment smoke"; Status = $deploymentSmokeStatus; Proof = "$md" + "scripts/verify-deployment.ps1" + "$md"; Notes = "Health, readiness, metrics, dashboard, runtime, incidents, frontend health, and runtime config." },
-    [pscustomobject]@{ Capability = "Company-readiness flow"; Status = $companyReadinessStatus; Proof = "$md" + "scripts/verify-company-readiness.ps1" + "$md"; Notes = "Onboarding, workspace administration, integrations, replay, planning, fulfillment, and trust." },
+    [pscustomobject]@{ Capability = "Local/self-host deployment smoke"; Status = $deploymentSmokeStatus; Proof = "$md" + "scripts/verify-deployment.ps1" + "$md"; Notes = "Seed-tenant smoke for health, readiness, metrics, dashboard, runtime, incidents, frontend health, and runtime config. This is supplemental to hosted proof." },
+    [pscustomobject]@{ Capability = "Local/self-host readiness rehearsal"; Status = $companyReadinessStatus; Proof = "$md" + "scripts/verify-company-readiness.ps1" + "$md"; Notes = "Seed-backed rehearsal for onboarding, workspace administration, integrations, replay, planning, fulfillment, and trust. This is not the hosted proof lane." },
     [pscustomobject]@{ Capability = "Browser end-to-end proof"; Status = $browserE2EStatus; Proof = "$md" + "npm.cmd run test:e2e:prod" + "$md"; Notes = "Real browser proof for sign-in, authenticated page rendering, replay, scenario approval/execution, and role gating. $browserReportNote" },
     [pscustomobject]@{ Capability = "Realtime browser proof"; Status = $realtimeStatus; Proof = "$md" + "scripts/verify-realtime.ps1" + "$md"; Notes = "Direct browser proof that summary cards change live without a manual refresh." },
     [pscustomobject]@{ Capability = "Frontend route sweep"; Status = $routeStatus; Proof = "$passedRoutes/$($frontendRoutes.Count) routes returned 200"; Notes = "Public, core, control, systems, and admin routes checked against the production-shaped frontend." },
-    [pscustomobject]@{ Capability = "Backend endpoint sweep"; Status = $endpointStatus; Proof = "$passedEndpoints/$($backendEndpoints.Count) endpoints returned 200"; Notes = "Operational, trust, and access endpoints checked with a signed-in seed admin session for protected surfaces." },
-    [pscustomobject]@{ Capability = "Tenant sign-in and session"; Status = $sessionStatus; Proof = "$md" + "POST /api/auth/session/login" + "$md + " + "$md" + "GET /api/auth/session" + "$md"; Notes = $(if ($sessionCheck.Passed) { "Signed in as $($sessionCheck.TenantCode) / $($sessionCheck.Username)." } else { "Session verification failed in this pass." }) },
+    [pscustomobject]@{ Capability = "Backend endpoint sweep"; Status = $endpointStatus; Proof = "$passedEndpoints/$($backendEndpoints.Count) endpoints returned 200"; Notes = "Operational, trust, and access endpoints checked with a signed-in local seed admin session for protected surfaces." },
+    [pscustomobject]@{ Capability = "Tenant sign-in and session"; Status = $sessionStatus; Proof = "$md" + "POST /api/auth/session/login" + "$md + " + "$md" + "GET /api/auth/session" + "$md"; Notes = $(if ($sessionCheck.Passed) { "Signed in as local seed tenant $($sessionCheck.TenantCode) / $($sessionCheck.Username)." } else { "Local seed-session verification failed in this pass." }) },
     [pscustomobject]@{ Capability = "Backup snapshot proof"; Status = $backupStatus; Proof = "$md" + "scripts/backup-postgres.ps1" + "$md"; Notes = $backupNote },
     [pscustomobject]@{ Capability = "Restore drill proof"; Status = $restoreDrillStatus; Proof = "$md" + "scripts/verify-restore-drill.ps1" + "$md"; Notes = $restoreNote },
-    [pscustomobject]@{ Capability = "Public HTTPS/domain compose contract"; Status = $publicComposeStatus; Proof = "$md" + "docker compose -f docker-compose.public.yml config" + "$md"; Notes = "Compose contract is valid, but public hosted rollout still needs real server proof." }
+    [pscustomobject]@{ Capability = "Public HTTPS/domain compose contract"; Status = $publicComposeStatus; Proof = "$md" + "docker compose -f docker-compose.public.yml config" + "$md"; Notes = "Compose contract is valid for self-host/public deployment. Hosted proof already passed separately on Render." }
 )
 
 $dateText = (Get-Date).ToString("MMMM d, yyyy")
@@ -548,9 +548,18 @@ Company-readiness command status: **__COMPANY_STATUS__**
 
 __COMPANY_LINES__
 
+## Current Classification
+
+- core backend: `FULLY REAL`
+- frontend architecture: `FULLY REAL`
+- hosted proof tooling: `FULLY REAL`
+- migration/recovery tooling: `FULLY REAL`
+- local/dev smoke scripts: `DEV-ONLY ACCEPTABLE`
+- release/reporting scripts: `FULLY REAL`
+
 ## Honest Final Read
 
-SynapseCore is **strongly proven on the live localhost stack** when the statuses above show green.
+This report proves the **local/self-host verification lane**, not the final hosted signoff lane.
 
 What is proven now:
 
@@ -562,19 +571,17 @@ What is proven now:
 - realtime browser updates happen without refresh
 - tenant onboarding, workspace administration, integrations, replay, planning, approvals, fulfillment, audit, and trust surfaces work
 - a fresh Postgres backup can be created and restored into a disposable scratch database
+- the hosted proof lane has already passed live on Render
 
-What still needs the final real-world proof step:
+What this local report does **not** replace:
 
-- a real public deployment on a VPS or similar host
-- real DNS and HTTPS
-- public cookie behavior
-- public WebSocket behavior
-- real VPS, container, firewall, and internet-facing performance behavior
+- `powershell -ExecutionPolicy Bypass -File scripts\prepare-hosted-proof.ps1`
+- `cd frontend && npm.cmd run test:e2e:prod`
 
 That means the current product status is:
 
-- **local/company-readiness proof:** strong
-- **public hosted proof:** still pending final rollout
+- **local/self-host smoke:** supplemental and useful
+- **hosted proof:** already passed live on Render and remains the primary final signoff lane
 '@
 
 $markdown = $markdownTemplate.

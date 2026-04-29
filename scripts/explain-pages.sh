@@ -139,5 +139,9 @@ BEST WAY TO READ THIS WITH THE REPO
 
 Use this explainer with:
 - frontend/src/App.jsx
+- frontend/src/components/WorkspaceApplication.jsx
+- frontend/src/components/WorkspaceRouteSwitch.jsx
+- frontend/src/hooks/useWorkspaceAppModel.js
+- frontend/src/hooks/useWorkspacePageContexts.js
 - frontend/src/styles.css
 EOF

@@ -45,6 +45,8 @@ $frontendValues = Read-SynapseEnvFile -FilePath $frontendFile
 $backendProfile = Get-RequiredEnvValue -Values $backendValues -Key "SPRING_PROFILES_ACTIVE" -FilePath $backendFile
 $backendOrigin = Get-RequiredEnvValue -Values $backendValues -Key "CORS_ALLOWED_ORIGINS" -FilePath $backendFile
 $backendCookieSecure = Get-RequiredEnvValue -Values $backendValues -Key "SESSION_COOKIE_SECURE" -FilePath $backendFile
+$backendDdlAuto = Get-RequiredEnvValue -Values $backendValues -Key "SPRING_JPA_HIBERNATE_DDL_AUTO" -FilePath $backendFile
+$backendFlywayEnabled = if ($backendValues.ContainsKey("SPRING_FLYWAY_ENABLED") -and -not [string]::IsNullOrWhiteSpace([string]$backendValues["SPRING_FLYWAY_ENABLED"])) { [string]$backendValues["SPRING_FLYWAY_ENABLED"] } else { "true" }
 $backendVersion = Get-RequiredEnvValue -Values $backendValues -Key "SYNAPSECORE_BUILD_VERSION" -FilePath $backendFile
 $backendCommit = Get-RequiredEnvValue -Values $backendValues -Key "SYNAPSECORE_BUILD_COMMIT" -FilePath $backendFile
 $backendBuildTime = Get-RequiredEnvValue -Values $backendValues -Key "SYNAPSECORE_BUILD_TIME" -FilePath $backendFile
@@ -68,6 +70,8 @@ Write-Host "  Commit           : $backendCommit"
 Write-Host "  Build time       : $backendBuildTime"
 Write-Host "  Allowed origins  : $backendOrigin"
 Write-Host "  Secure cookies   : $backendCookieSecure"
+Write-Host "  Hibernate mode   : $backendDdlAuto"
+Write-Host "  Flyway enabled   : $backendFlywayEnabled"
 Write-Host ""
 Write-Host "Frontend fingerprint"
 Write-Host "  Version          : $frontendVersion"
@@ -76,13 +80,22 @@ Write-Host "  Build time       : $frontendBuildTime"
 Write-Host "  API URL          : $frontendApiUrl"
 Write-Host "  WS URL           : $frontendWsUrl"
 Write-Host ""
-Write-Host "Release commands"
+Write-Host "Final signoff lane"
 Write-Host "  Config gate      : powershell -ExecutionPolicy Bypass -File scripts\\check-prod-config.ps1 -BackendEnvFile $BackendEnvFile -FrontendEnvFile $FrontendEnvFile"
+Write-Host "  Hosted prep      : powershell -ExecutionPolicy Bypass -File scripts\\prepare-hosted-proof.ps1"
+Write-Host "  Hosted proof     : cd frontend && npm.cmd run test:e2e:prod"
+Write-Host ""
+Write-Host "Supplemental self-host smoke"
 Write-Host "  Smoke verify     : powershell -ExecutionPolicy Bypass -File scripts\\verify-deployment.ps1 -FrontendUrl http://localhost -BackendUrl http://localhost:8080"
-Write-Host "  Browser proof    : powershell -ExecutionPolicy Bypass -File scripts\\verify-realtime.ps1 -FrontendUrl http://localhost -BackendUrl http://localhost:8080"
-Write-Host "  Full E2E proof   : cd frontend && npm.cmd run test:e2e:prod"
+Write-Host "  Realtime smoke   : powershell -ExecutionPolicy Bypass -File scripts\\verify-realtime.ps1 -FrontendUrl http://localhost -BackendUrl http://localhost:8080"
+Write-Host "  Workflow smoke   : powershell -ExecutionPolicy Bypass -File scripts\\verify-company-readiness.ps1 -FrontendUrl http://localhost -BackendUrl http://localhost:8080"
+Write-Host ""
+Write-Host "Recovery / operations"
 Write-Host "  Backup           : powershell -ExecutionPolicy Bypass -File scripts\\backup-postgres.ps1"
 Write-Host "  Restore          : powershell -ExecutionPolicy Bypass -File scripts\\restore-postgres.ps1 -BackupFile backups\\<backup>.sql -Yes"
 Write-Host "  Restore drill    : powershell -ExecutionPolicy Bypass -File scripts\\verify-restore-drill.ps1"
+Write-Host ""
+Write-Host "Hosted proof is the primary final signoff lane."
+Write-Host "Localhost verification remains useful for self-host smoke only."
 Write-Host ""
 Write-Host "Release readiness checks passed."

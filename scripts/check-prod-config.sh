@@ -122,6 +122,7 @@ backend_cookie_secure="$(require_value "$BACKEND_FILE" "SESSION_COOKIE_SECURE")"
 backend_same_site="$(require_value "$BACKEND_FILE" "SESSION_COOKIE_SAME_SITE")"
 backend_header_fallback="$(require_value "$BACKEND_FILE" "ALLOW_HEADER_FALLBACK")"
 backend_ddl_auto="$(require_value "$BACKEND_FILE" "SPRING_JPA_HIBERNATE_DDL_AUTO")"
+backend_flyway_enabled="$(get_env_value "$BACKEND_FILE" "SPRING_FLYWAY_ENABLED")"
 backend_build_version="$(require_value "$BACKEND_FILE" "SYNAPSECORE_BUILD_VERSION")"
 backend_build_commit="$(require_value "$BACKEND_FILE" "SYNAPSECORE_BUILD_COMMIT")"
 backend_build_time="$(require_value "$BACKEND_FILE" "SYNAPSECORE_BUILD_TIME")"
@@ -133,7 +134,12 @@ frontend_build_time="$(require_value "$FRONTEND_FILE" "VITE_APP_BUILD_TIME")"
 
 require_equals "$BACKEND_FILE" "SPRING_PROFILES_ACTIVE" "prod"
 require_equals "$BACKEND_FILE" "ALLOW_HEADER_FALLBACK" "false"
-require_equals "$BACKEND_FILE" "SPRING_JPA_HIBERNATE_DDL_AUTO" "update"
+require_equals "$BACKEND_FILE" "SPRING_JPA_HIBERNATE_DDL_AUTO" "validate"
+
+if [[ -n "$backend_flyway_enabled" && "$backend_flyway_enabled" != "true" ]]; then
+  echo "SPRING_FLYWAY_ENABLED must be true or omitted in $BACKEND_FILE so production keeps Flyway enabled." >&2
+  exit 1
+fi
 
 if [[ -z "$backend_datasource_url" ]]; then
   if [[ -z "$backend_db_host" || -z "$backend_db_name" || -z "$backend_db_user" || -z "$backend_db_password" ]]; then

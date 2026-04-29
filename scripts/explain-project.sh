@@ -274,7 +274,8 @@ note "4. Read docs/architecture.md for package and module boundaries."
 note "5. Read docs/system-flow.md for the operational event loop."
 note "6. Read docs/deployment.md for profile, env, and deployment configuration."
 note "7. Inspect OrderService, InventoryMonitoringService, AlertService,"
-note "   RecommendationService, RealtimeService, and App.jsx."
+note "   RecommendationService, RealtimeService, App.jsx, useWorkspaceAppModel,"
+note "   and WorkspaceRouteSwitch."
 echo
 note "Those files show the main business path from incoming activity to live decision output."
 
