@@ -381,6 +381,42 @@ async function ensureRecentOrder(api) {
   return nextOrders
 }
 
+async function createRealtimeInventoryFixture(api) {
+  const suffix = randomUUID().slice(0, 8).toUpperCase()
+  const productSku = `SKU-RT-${suffix}`
+  const productName = `Realtime Proof ${suffix}`
+  const warehouseCode = 'WH-NORTH'
+  const reorderThreshold = 10
+  const safeQuantity = 20
+  const lowQuantity = 5
+
+  await readJson(await api.post('/api/products', {
+    data: {
+      sku: productSku,
+      name: productName,
+      category: 'Verification',
+    },
+  }))
+
+  await readJson(await api.post('/api/inventory/update', {
+    data: {
+      productSku,
+      warehouseCode,
+      quantityAvailable: safeQuantity,
+      reorderThreshold,
+    },
+  }))
+
+  return {
+    productSku,
+    productName,
+    warehouseCode,
+    reorderThreshold,
+    safeQuantity,
+    lowQuantity,
+  }
+}
+
 async function ensureAlertAndRecommendationCoverage(api) {
   const inventory = await readJson(await api.get('/api/inventory'))
   const candidate = inventory.find((item) => item.productSku === proofProductSku && item.warehouseCode === 'WH-NORTH')
@@ -536,53 +572,38 @@ test('product catalog onboarding works through tenant-scoped API and browser sur
 })
 
 test('@realtime dashboard summary updates live without a browser refresh', async ({ page }) => {
+  const api = await createApiContext(users.operationsLead)
+  const realtimeFixture = await createRealtimeInventoryFixture(api)
+
   await loginViaUi(page, users.operationsLead)
   await expect(page.getByRole('heading', { level: 1, name: 'Live operational command center' })).toBeVisible()
   await expect(page.getByText('Realtime state')).toBeVisible()
 
-  const api = await createApiContext(users.operationsLead)
-  let candidate = null
-  let revertQuantity = null
-  let revertThreshold = null
-
   try {
-    const inventory = await readJson(await api.get('/api/inventory'))
-    candidate = inventory.find((item) => item.productSku === proofProductSku && item.warehouseCode === 'WH-NORTH')
-      || inventory.find((item) => Number.isFinite(item.quantityAvailable) && Number.isFinite(item.reorderThreshold))
-    expect(candidate).toBeTruthy()
-
-    revertQuantity = candidate.quantityAvailable
-    revertThreshold = candidate.reorderThreshold
-
     const beforeRisk = await waitForNumericSummaryCard(page, 'Risk')
-    const threshold = Number.isFinite(candidate.reorderThreshold) ? candidate.reorderThreshold : 5
-    const forceLowQuantity = Math.max(0, threshold - 1)
-    const safeQuantity = threshold + 5
 
     await readJson(await api.post('/api/inventory/update', {
       data: {
-        productSku: candidate.productSku,
-        warehouseCode: candidate.warehouseCode,
-        quantityAvailable: candidate.lowStock ? safeQuantity : forceLowQuantity,
-        reorderThreshold: threshold,
+        productSku: realtimeFixture.productSku,
+        warehouseCode: realtimeFixture.warehouseCode,
+        quantityAvailable: realtimeFixture.lowQuantity,
+        reorderThreshold: realtimeFixture.reorderThreshold,
       },
     }))
 
     await expect.poll(async () => summaryCardValue(page, 'Risk'), {
       timeout: 30_000,
-      message: 'Expected the dashboard low-stock summary to change through the live websocket path.',
-    })[candidate.lowStock ? 'toBeLessThan' : 'toBeGreaterThan'](beforeRisk)
+      message: `Expected the dashboard low-stock summary to increase through the live websocket path for ${realtimeFixture.productSku}.`,
+    }).toBe(beforeRisk + 1)
   } finally {
-    if (candidate && revertQuantity != null && revertThreshold != null) {
-      await readJson(await api.post('/api/inventory/update', {
-        data: {
-          productSku: candidate.productSku,
-          warehouseCode: candidate.warehouseCode,
-          quantityAvailable: revertQuantity,
-          reorderThreshold: revertThreshold,
-        },
-      }))
-    }
+    await readJson(await api.post('/api/inventory/update', {
+      data: {
+        productSku: realtimeFixture.productSku,
+        warehouseCode: realtimeFixture.warehouseCode,
+        quantityAvailable: realtimeFixture.safeQuantity,
+        reorderThreshold: realtimeFixture.reorderThreshold,
+      },
+    }))
     await api.dispose()
   }
 })
