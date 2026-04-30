@@ -3,6 +3,7 @@ package com.synapsecore.security;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.synapsecore.auth.AuthSessionService;
 import com.synapsecore.audit.RequestTraceContext;
+import com.synapsecore.config.SynapseCorsProperties;
 import com.synapsecore.config.SynapseSecurityProperties;
 import com.synapsecore.observability.OperationalMetricsService;
 import jakarta.servlet.FilterChain;
@@ -15,9 +16,11 @@ import java.util.Map;
 import lombok.RequiredArgsConstructor;
 import org.springframework.core.Ordered;
 import org.springframework.core.annotation.Order;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.stereotype.Component;
+import org.springframework.web.cors.CorsConfiguration;
 import org.springframework.web.filter.OncePerRequestFilter;
 
 @Component
@@ -28,6 +31,7 @@ public class SecurityRateLimitFilter extends OncePerRequestFilter {
     private static final java.util.Set<String> MUTATING_METHODS = java.util.Set.of("POST", "PUT", "PATCH", "DELETE");
 
     private final SynapseSecurityProperties securityProperties;
+    private final SynapseCorsProperties corsProperties;
     private final SecurityRateLimitService securityRateLimitService;
     private final OperationalMetricsService operationalMetricsService;
     private final RequestTraceContext requestTraceContext;
@@ -62,6 +66,7 @@ public class SecurityRateLimitFilter extends OncePerRequestFilter {
         }
 
         operationalMetricsService.recordRateLimitRejection(bucket.name());
+        applyCorsHeaders(request, response);
         response.setStatus(HttpStatus.TOO_MANY_REQUESTS.value());
         response.setContentType(MediaType.APPLICATION_JSON_VALUE);
         objectMapper.writeValue(response.getWriter(), Map.of(
@@ -71,6 +76,25 @@ public class SecurityRateLimitFilter extends OncePerRequestFilter {
             "message", bucket.rejectionMessage(),
             "requestId", requestTraceContext.getRequiredRequestId()
         ));
+    }
+
+    private void applyCorsHeaders(HttpServletRequest request, HttpServletResponse response) {
+        String origin = request.getHeader(HttpHeaders.ORIGIN);
+        if (origin == null || origin.isBlank()) {
+            return;
+        }
+
+        CorsConfiguration configuration = new CorsConfiguration();
+        configuration.setAllowedOriginPatterns(corsProperties.getAllowedOrigins());
+        configuration.setAllowCredentials(true);
+        String allowedOrigin = configuration.checkOrigin(origin);
+        if (allowedOrigin == null) {
+            return;
+        }
+
+        response.setHeader(HttpHeaders.ACCESS_CONTROL_ALLOW_ORIGIN, allowedOrigin);
+        response.setHeader(HttpHeaders.ACCESS_CONTROL_ALLOW_CREDENTIALS, "true");
+        response.addHeader(HttpHeaders.VARY, HttpHeaders.ORIGIN);
     }
 
     private BucketDefinition resolveBucket(HttpServletRequest request) {

@@ -29,6 +29,7 @@ import org.springframework.test.web.servlet.MvcResult;
     "synapsecore.realtime.broker-mode=SIMPLE_IN_MEMORY",
     "synapsecore.bootstrap.initial-token=bootstrap-secret",
     "synapsecore.bootstrap.platform-admin-token=platform-admin-secret",
+    "synapsecore.cors.allowed-origins=https://synapscore-frontend-3.onrender.com",
     "synapsecore.security.rate-limit.enabled=true",
     "synapsecore.security.rate-limit.auth-login.max-attempts=2",
     "synapsecore.security.rate-limit.auth-login.window-seconds=300",
@@ -58,6 +59,7 @@ class SecurityHardeningIntegrationTest {
     void authLoginEndpointRejectsRequestsQuicklyWithoutCreatingSessionsOrAuditWrites() throws Exception {
         long auditCountBefore = auditLogRepository.count();
         String forwardedFor = "203.0.113.10";
+        String origin = "https://synapscore-frontend-3.onrender.com";
         String requestBody = """
             {
               "tenantCode": "PILOT-TENANT",
@@ -68,6 +70,7 @@ class SecurityHardeningIntegrationTest {
 
         MvcResult firstAttempt = mockMvc.perform(post("/api/auth/session/login")
                 .header("X-Forwarded-For", forwardedFor)
+                .header("Origin", origin)
                 .contentType(APPLICATION_JSON)
                 .content(requestBody))
             .andExpect(status().isUnauthorized())
@@ -83,15 +86,19 @@ class SecurityHardeningIntegrationTest {
 
         mockMvc.perform(post("/api/auth/session/login")
                 .header("X-Forwarded-For", forwardedFor)
+                .header("Origin", origin)
                 .contentType(APPLICATION_JSON)
                 .content(requestBody))
             .andExpect(status().isUnauthorized());
 
         mockMvc.perform(post("/api/auth/session/login")
                 .header("X-Forwarded-For", forwardedFor)
+                .header("Origin", origin)
                 .contentType(APPLICATION_JSON)
                 .content(requestBody))
             .andExpect(status().isTooManyRequests())
+            .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.header().string("Access-Control-Allow-Origin", origin))
+            .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.header().string("Access-Control-Allow-Credentials", "true"))
             .andExpect(jsonPath("$.message").value("Authentication rate limit exceeded. Wait before attempting another sign-in."));
 
         org.assertj.core.api.Assertions.assertThat(auditLogRepository.count())
