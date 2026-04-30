@@ -948,35 +948,31 @@ test('frontend surfaces backend auth rate limiting without getting stuck in a lo
   const signInCard = page.locator('.public-signin-card')
   await waitForSignInReady(signInCard)
 
-  const hitRateLimit = await page.evaluate(async ({ nextBackendUrl, tenantCode, username }) => {
-    const body = JSON.stringify({
-      tenantCode,
-      username,
-      password: 'wrong-rate-limit',
-    })
+  const rateLimitApi = await playwrightRequest.newContext({ baseURL: backendUrl })
 
+  try {
+    let hitRateLimit = false
     for (let attempt = 0; attempt < 35; attempt += 1) {
-      const response = await fetch(`${nextBackendUrl}/api/auth/session/login`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body,
+      const response = await rateLimitApi.post('/api/auth/session/login', {
+        data: {
+          tenantCode: users.operationsLead.tenantCode,
+          username: users.operationsLead.username,
+          password: 'wrong-rate-limit',
+        },
       })
-      if (response.status === 429) {
-        return true
+      if (response.status() === 429) {
+        hitRateLimit = true
+        break
       }
     }
 
-    return false
-  }, {
-    nextBackendUrl: backendUrl,
-    tenantCode: users.operationsLead.tenantCode,
-    username: users.operationsLead.username,
-  })
+    expect(hitRateLimit).toBeTruthy()
 
-  expect(hitRateLimit).toBeTruthy()
-
-  await fillSignInForm(signInCard, users.operationsLead, 'wrong-rate-limit')
-  await signInCard.getByRole('button', { name: 'Enter Platform' }).click()
-  await expect(signInCard.getByRole('button', { name: 'Enter Platform' })).toBeEnabled({ timeout: 60_000 })
-  await expect(signInCard.getByText('Authentication rate limit exceeded. Wait before attempting another sign-in.')).toBeVisible({ timeout: 15_000 })
+    await fillSignInForm(signInCard, users.operationsLead, 'wrong-rate-limit')
+    await signInCard.getByRole('button', { name: 'Enter Platform' }).click()
+    await expect(signInCard.getByRole('button', { name: 'Enter Platform' })).toBeEnabled({ timeout: 60_000 })
+    await expect(signInCard.getByText('Authentication rate limit exceeded. Wait before attempting another sign-in.')).toBeVisible({ timeout: 15_000 })
+  } finally {
+    await rateLimitApi.dispose()
+  }
 })
