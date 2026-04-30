@@ -147,6 +147,11 @@ async function waitForSignInReady(signInCard) {
   await expect(signInCard.getByLabel('Password', { exact: true })).toBeEnabled()
 }
 
+async function expectSignInErrorAndRecovery(signInCard, message) {
+  await expect(signInCard.getByText(message)).toBeVisible({ timeout: 15_000 })
+  await waitForSignInReady(signInCard)
+}
+
 async function navigateWithinApp(page, route) {
   await page.evaluate((nextRoute) => {
     window.history.pushState({}, '', nextRoute)
@@ -232,6 +237,28 @@ async function waitForScenarioHistoryCard(page, scenarioTitle) {
   }).toBe(true)
 
   return scenarioCard
+}
+
+async function waitForAuthLoginBucketToClear() {
+  const api = await playwrightRequest.newContext({ baseURL: backendUrl })
+  try {
+    await expect.poll(async () => {
+      const response = await api.post('/api/auth/session/login', {
+        data: {
+          tenantCode: users.operationsLead.tenantCode,
+          username: users.operationsLead.username,
+          password: 'wrong-code',
+        },
+      })
+      return response.status()
+    }, {
+      timeout: 90_000,
+      intervals: [2_000, 2_000, 3_000, 5_000],
+      message: 'Expected the hosted auth login bucket to clear before negative-auth proof starts.',
+    }).not.toBe(429)
+  } finally {
+    await api.dispose()
+  }
 }
 
 async function readReplayOutcome(api, externalOrderId) {
@@ -580,6 +607,7 @@ async function ensureAlertAndRecommendationCoverage(api) {
 }
 
 test('auth flow and the full authenticated page system render cleanly in a browser', async ({ page }) => {
+  await waitForAuthLoginBucketToClear()
   await page.goto('/dashboard')
   await expect(page.getByRole('heading', { name: 'Access your operational workspace.' })).toBeVisible()
   const signInCard = page.locator('.public-signin-card')
@@ -587,10 +615,8 @@ test('auth flow and the full authenticated page system render cleanly in a brows
 
   await fillSignInForm(signInCard, users.operationsLead, 'wrong-code')
   await signInCard.getByRole('button', { name: 'Enter Platform' }).click()
-  await expect(signInCard.getByRole('button', { name: 'Enter Platform' })).toBeEnabled({ timeout: 60_000 })
-  await expect(signInCard.getByText('Invalid operator credentials.')).toBeVisible({ timeout: 15_000 })
+  await expectSignInErrorAndRecovery(signInCard, 'Invalid operator credentials.')
 
-  await waitForSignInReady(signInCard)
   await fillSignInForm(signInCard, users.operationsLead, users.operationsLead.password)
   await signInCard.getByRole('button', { name: 'Enter Platform' }).click()
   await expect(page).toHaveURL(/\/dashboard$/)
@@ -970,8 +996,10 @@ test('frontend surfaces backend auth rate limiting without getting stuck in a lo
 
     await fillSignInForm(signInCard, users.operationsLead, 'wrong-rate-limit')
     await signInCard.getByRole('button', { name: 'Enter Platform' }).click()
-    await expect(signInCard.getByRole('button', { name: 'Enter Platform' })).toBeEnabled({ timeout: 60_000 })
-    await expect(signInCard.getByText('Authentication rate limit exceeded. Wait before attempting another sign-in.')).toBeVisible({ timeout: 15_000 })
+    await expectSignInErrorAndRecovery(
+      signInCard,
+      'Authentication rate limit exceeded. Wait before attempting another sign-in.',
+    )
   } finally {
     await rateLimitApi.dispose()
   }
