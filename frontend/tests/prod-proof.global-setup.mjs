@@ -20,7 +20,7 @@ const backendUrl = (
 ).replace(/\/+$/, '')
 
 const warmupTimeoutMs = Number.parseInt(process.env.PLAYWRIGHT_WARMUP_TIMEOUT_MS || '240000', 10)
-const authenticatedWarmupTimeoutMs = Number.parseInt(process.env.PLAYWRIGHT_AUTHENTICATED_WARMUP_TIMEOUT_MS || '120000', 10)
+const authenticatedWarmupTimeoutMs = Number.parseInt(process.env.PLAYWRIGHT_AUTHENTICATED_WARMUP_TIMEOUT_MS || '180000', 10)
 
 const optionalEnv = (...names) => {
   for (const name of names) {
@@ -118,33 +118,92 @@ async function waitForAuthenticatedProofTraffic(credentials) {
       }
 
       const remainingWarmupMs = Math.max(15_000, authenticatedWarmupTimeoutMs - (Date.now() - startedAt))
-      await waitForProbe(
-        'authenticated dashboard session',
-        async () => {
-          const sessionResponse = await proofApi.get('/api/auth/session')
-          const sessionPayload = await sessionResponse.json().catch(() => null)
-          const snapshotResponse = await proofApi.get('/api/dashboard/snapshot')
-          const snapshotPayload = await snapshotResponse.json().catch(() => null)
-          const runtimeResponse = await proofApi.get('/api/system/runtime')
-          const runtimePayload = await runtimeResponse.json().catch(() => null)
+      const waitWithinRemainingBudget = async (description, probe, predicate, maxRequestTimeoutMs = 30_000) => {
+        const phaseRemainingMs = Math.max(15_000, authenticatedWarmupTimeoutMs - (Date.now() - startedAt))
+        const requestTimeoutMs = Math.max(
+          15_000,
+          Math.min(
+            maxRequestTimeoutMs,
+            phaseRemainingMs - 5_000,
+          ),
+        )
 
+        await waitForProbe(
+          description,
+          () => probe(requestTimeoutMs),
+          predicate,
+          phaseRemainingMs,
+        )
+      }
+
+      await waitWithinRemainingBudget(
+        'authenticated session',
+        async (requestTimeoutMs) => {
+          const sessionResponse = await proofApi.get('/api/auth/session', { timeout: requestTimeoutMs })
+          const sessionPayload = await sessionResponse.json().catch(() => null)
           return {
-            detail: `session=${sessionResponse.status()} snapshot=${snapshotResponse.status()} runtime=${runtimeResponse.status()}`,
-            sessionStatus: sessionResponse.status(),
-            sessionPayload,
-            snapshotStatus: snapshotResponse.status(),
-            snapshotPayload,
-            runtimeStatus: runtimeResponse.status(),
-            runtimePayload,
+            detail: `session=${sessionResponse.status()} signedIn=${sessionPayload?.signedIn}`,
+            status: sessionResponse.status(),
+            payload: sessionPayload,
+          }
+        },
+        (result) => result.status === 200 && result.payload?.signedIn === true,
+        20_000,
+      )
+
+      await waitWithinRemainingBudget(
+        'authenticated dashboard summary',
+        async (requestTimeoutMs) => {
+          const summaryResponse = await proofApi.get('/api/dashboard/summary', { timeout: requestTimeoutMs })
+          const summaryPayload = await summaryResponse.json().catch(() => null)
+          return {
+            detail: `summary=${summaryResponse.status()} totalOrders=${summaryPayload?.totalOrders}`,
+            status: summaryResponse.status(),
+            payload: summaryPayload,
           }
         },
         (result) => (
-          result.sessionStatus === 200
-          && result.sessionPayload?.signedIn === true
-          && result.snapshotStatus === 200
+          result.status === 200
+          && typeof result.payload?.totalOrders === 'number'
+        ),
+        30_000,
+      )
+
+      await waitWithinRemainingBudget(
+        'authenticated runtime',
+        async (requestTimeoutMs) => {
+          const runtimeResponse = await proofApi.get('/api/system/runtime', { timeout: requestTimeoutMs })
+          const runtimePayload = await runtimeResponse.json().catch(() => null)
+          return {
+            detail: `runtime=${runtimeResponse.status()} readiness=${runtimePayload?.readinessState}`,
+            status: runtimeResponse.status(),
+            payload: runtimePayload,
+          }
+        },
+        (result) => (
+          result.status === 200
+          && typeof result.payload?.readinessState === 'string'
+        ),
+        30_000,
+      )
+
+      await waitForProbe(
+        'authenticated dashboard snapshot',
+        async () => {
+          const phaseRemainingMs = Math.max(15_000, authenticatedWarmupTimeoutMs - (Date.now() - startedAt))
+          const requestTimeoutMs = Math.max(20_000, Math.min(60_000, phaseRemainingMs - 5_000))
+          const snapshotResponse = await proofApi.get('/api/dashboard/snapshot', { timeout: requestTimeoutMs })
+          const snapshotPayload = await snapshotResponse.json().catch(() => null)
+
+          return {
+            detail: `snapshot=${snapshotResponse.status()} inventory=${Array.isArray(snapshotPayload?.inventory)} generatedAt=${snapshotPayload?.generatedAt || ''}`.trim(),
+            snapshotStatus: snapshotResponse.status(),
+            snapshotPayload,
+          }
+        },
+        (result) => (
+          result.snapshotStatus === 200
           && Array.isArray(result.snapshotPayload?.inventory)
-          && result.runtimeStatus === 200
-          && typeof result.runtimePayload?.readinessState === 'string'
         ),
         remainingWarmupMs,
       )

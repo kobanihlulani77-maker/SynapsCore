@@ -161,18 +161,46 @@ function Get-ErrorHeaderValue {
     return $null
 }
 
+function Convert-ResponseContentToText {
+    param([object]$Content)
+
+    if ($null -eq $Content) {
+        return ""
+    }
+
+    if ($Content -is [byte[]]) {
+        return [System.Text.Encoding]::UTF8.GetString($Content)
+    }
+
+    return [string]$Content
+}
+
 function Invoke-HostedProbe {
     param(
         [string]$Url,
-        [hashtable]$Headers = @{}
+        [hashtable]$Headers = @{},
+        [Microsoft.PowerShell.Commands.WebRequestSession]$Session = $null,
+        [int]$TimeoutSec = 30
     )
 
+    $invokeArgs = @{
+        Uri = $Url
+        UseBasicParsing = $true
+        Headers = $Headers
+        TimeoutSec = $TimeoutSec
+    }
+
+    if ($null -ne $Session) {
+        $invokeArgs.WebSession = $Session
+    }
+
     try {
-        $response = Invoke-WebRequest -Uri $Url -UseBasicParsing -Headers $Headers
+        $response = Invoke-WebRequest @invokeArgs
+        $contentText = Convert-ResponseContentToText -Content $response.Content
         $json = $null
-        if (-not [string]::IsNullOrWhiteSpace($response.Content)) {
+        if (-not [string]::IsNullOrWhiteSpace($contentText)) {
             try {
-                $json = $response.Content | ConvertFrom-Json -ErrorAction Stop
+                $json = $contentText | ConvertFrom-Json -ErrorAction Stop
             } catch {
                 $json = $null
             }
@@ -180,7 +208,7 @@ function Invoke-HostedProbe {
 
         return [pscustomobject]@{
             StatusCode = [int]$response.StatusCode
-            Content    = $response.Content
+            Content    = $contentText
             Json       = $json
         }
     } catch {
@@ -197,7 +225,7 @@ function Invoke-HostedProbe {
 
         return [pscustomobject]@{
             StatusCode = $statusCode
-            Content    = $body
+            Content    = (Convert-ResponseContentToText -Content $body)
             Json       = $json
         }
     }
@@ -343,6 +371,79 @@ function New-AuthenticatedSession {
         Session = $session
         Response = $response
     }
+}
+
+function Wait-AuthenticatedProofWarmup {
+    param(
+        [Microsoft.PowerShell.Commands.WebRequestSession]$Session
+    )
+
+    Write-Host "Verifying authenticated dashboard and runtime warm-up..."
+
+    Wait-HostedProbe `
+        -Description "Authenticated session" `
+        -Probe {
+            Invoke-HostedProbe `
+                -Url "$script:ApiBaseUrlValue/api/auth/session" `
+                -Session $Session `
+                -TimeoutSec 20
+        } `
+        -IsReady {
+            param($result)
+            $null -ne $result -and
+                $result.StatusCode -eq 200 -and
+                (Get-PropertyValue -Object $result.Json -PropertyName "signedIn") -eq $true
+        } `
+        -TimeoutSeconds 120 | Out-Null
+
+    Wait-HostedProbe `
+        -Description "Authenticated dashboard summary" `
+        -Probe {
+            Invoke-HostedProbe `
+                -Url "$script:ApiBaseUrlValue/api/dashboard/summary" `
+                -Session $Session `
+                -TimeoutSec 30
+        } `
+        -IsReady {
+            param($result)
+            $null -ne $result -and
+                $result.StatusCode -eq 200 -and
+                $null -ne (Get-PropertyValue -Object $result.Json -PropertyName "totalOrders")
+        } `
+        -TimeoutSeconds 150 | Out-Null
+
+    Wait-HostedProbe `
+        -Description "Authenticated runtime" `
+        -Probe {
+            Invoke-HostedProbe `
+                -Url "$script:ApiBaseUrlValue/api/system/runtime" `
+                -Session $Session `
+                -TimeoutSec 30
+        } `
+        -IsReady {
+            param($result)
+            $null -ne $result -and
+                $result.StatusCode -eq 200 -and
+                -not [string]::IsNullOrWhiteSpace([string](Get-PropertyValue -Object $result.Json -PropertyName "readinessState"))
+        } `
+        -TimeoutSeconds 150 | Out-Null
+
+    Wait-HostedProbe `
+        -Description "Authenticated dashboard snapshot" `
+        -Probe {
+            Invoke-HostedProbe `
+                -Url "$script:ApiBaseUrlValue/api/dashboard/snapshot" `
+                -Session $Session `
+                -TimeoutSec 60
+        } `
+        -IsReady {
+            param($result)
+            $inventory = Get-PropertyValue -Object $result.Json -PropertyName "inventory"
+            $null -ne $result -and
+                $result.StatusCode -eq 200 -and
+                $null -ne $inventory
+        } `
+        -TimeoutSeconds 180 | Out-Null
 }
 
 function Invoke-PasswordChange {
@@ -737,30 +838,7 @@ Ensure-User `
 Write-Host "Preparing real catalog and inventory baseline for proof flows..."
 Ensure-ProofCatalogAndInventory -AdminSession $adminSession -Sku $ProofProductSkuValue
 
-Write-Host "Verifying authenticated dashboard and runtime warm-up..."
-$authedSessionState = Invoke-SynapseJson `
-    -Method GET `
-    -Url "$script:ApiBaseUrlValue/api/auth/session" `
-    -Session $adminSession
-if (-not (Get-PropertyValue -Object $authedSessionState -PropertyName "signedIn")) {
-    throw "Authenticated proof warm-up did not keep the tenant admin session alive after prep."
-}
-
-$authedDashboardSnapshot = Invoke-SynapseJson `
-    -Method GET `
-    -Url "$script:ApiBaseUrlValue/api/dashboard/snapshot" `
-    -Session $adminSession
-if ($null -eq (Get-PropertyValue -Object $authedDashboardSnapshot -PropertyName "inventory")) {
-    throw "Authenticated dashboard warm-up did not return inventory data from /api/dashboard/snapshot."
-}
-
-$authedRuntime = Invoke-SynapseJson `
-    -Method GET `
-    -Url "$script:ApiBaseUrlValue/api/system/runtime" `
-    -Session $adminSession
-if ([string]::IsNullOrWhiteSpace([string](Get-PropertyValue -Object $authedRuntime -PropertyName "readinessState"))) {
-    throw "Authenticated runtime warm-up did not return a readiness state from /api/system/runtime."
-}
+Wait-AuthenticatedProofWarmup -Session $adminSession
 
 Write-Host ""
 Write-Host "Hosted proof credential path is ready."
