@@ -507,7 +507,7 @@ async function createReplayFixture() {
           name: 'orders.csv',
           mimeType: 'text/csv',
           buffer: Buffer.from(
-            `externalOrderId,warehouseCode,productSku,quantity,unitPrice\n${externalOrderId},WH-NORTH,${proofProductSku},2,88.00\n`,
+            `sourceSystem,externalOrderId,warehouseCode,productSku,quantity,unitPrice\n${sourceSystem},${externalOrderId},WH-NORTH,${proofProductSku},2,88.00\n`,
             'utf8',
           ),
         },
@@ -516,6 +516,8 @@ async function createReplayFixture() {
     })
     const csvImportPayload = await readJson(csvImportResponse)
     expect(csvImportPayload.ordersFailed).toBe(1)
+    expect(csvImportPayload.failedOrders?.[0]?.externalOrderId).toBe(externalOrderId)
+    expect(csvImportPayload.failedOrders?.[0]?.failureCode).toBe('CONNECTOR_DISABLED')
 
     await expect.poll(async () => {
       const replayOutcome = await readReplayOutcome(api, externalOrderId)
