@@ -471,10 +471,11 @@ async function waitForReplayResolution(api, externalOrderId, timeout, message) {
 
 async function createReplayFixture() {
   const inventoryAdmin = await createApiContext(users.operationsLead)
-  const api = await createApiContext(users.integrationLead)
+  const api = await createApiContext(users.operationsLead)
   const suffix = randomUUID().slice(0, 8).toUpperCase()
   const sourceSystem = `ui_replay_${suffix}`.toLowerCase()
   const externalOrderId = `UI-RPL-${suffix}`
+  const connectorDisplayName = `UI Replay ${suffix}`
 
   try {
     await readJson(await inventoryAdmin.post('/api/inventory/update', {
@@ -490,7 +491,7 @@ async function createReplayFixture() {
       data: {
         sourceSystem,
         type: 'CSV_ORDER_IMPORT',
-        displayName: `UI Replay ${suffix}`,
+        displayName: connectorDisplayName,
         enabled: false,
         syncMode: 'BATCH_FILE_DROP',
         validationPolicy: 'RELAXED',
@@ -516,37 +517,42 @@ async function createReplayFixture() {
     const csvImportPayload = await readJson(csvImportResponse)
     expect(csvImportPayload.ordersFailed).toBe(1)
 
-    await readJson(await api.post('/api/integrations/orders/connectors', {
-      data: {
-        sourceSystem,
-        type: 'CSV_ORDER_IMPORT',
-        displayName: `UI Replay ${suffix}`,
-        enabled: true,
-        syncMode: 'BATCH_FILE_DROP',
-        validationPolicy: 'RELAXED',
-        transformationPolicy: 'NORMALIZE_CODES',
-        allowDefaultWarehouseFallback: false,
-        notes: 'Enabled for replay verification.',
-      },
-    }))
-
-    await expect.poll(async () => {
-      const connectors = await readJson(await api.get('/api/integrations/orders/connectors'))
-      return connectors.find((connector) => connector.sourceSystem === sourceSystem && connector.type === 'CSV_ORDER_IMPORT')?.enabled ?? false
-    }, {
-      timeout: 30_000,
-      message: `Expected replay verification connector ${sourceSystem} to become enabled before UI replay proof.`,
-    }).toBe(true)
-
     await expect.poll(async () => {
       const replayOutcome = await readReplayOutcome(api, externalOrderId)
       return describeReplayOutcome(replayOutcome)
     }, {
-      timeout: 30_000,
-      message: `Expected replay verification record ${externalOrderId} to remain replayable or finish automated recovery before UI replay proof.`,
-    }).toMatch(/^(replayed|queued:PENDING|queued:REPLAY_FAILED)$/)
+      timeout: 15_000,
+      message: `Expected replay verification record ${externalOrderId} to be queued before UI replay proof enables live recovery.`,
+    }).toMatch(/^(queued:PENDING|queued:REPLAY_FAILED|queued:REPLAY_FAILED:waiting)$/)
 
-    return { api, sourceSystem, externalOrderId }
+    return {
+      api,
+      sourceSystem,
+      externalOrderId,
+      enableConnector: async () => {
+        await readJson(await api.post('/api/integrations/orders/connectors', {
+          data: {
+            sourceSystem,
+            type: 'CSV_ORDER_IMPORT',
+            displayName: connectorDisplayName,
+            enabled: true,
+            syncMode: 'BATCH_FILE_DROP',
+            validationPolicy: 'RELAXED',
+            transformationPolicy: 'NORMALIZE_CODES',
+            allowDefaultWarehouseFallback: false,
+            notes: 'Enabled for replay verification.',
+          },
+        }))
+
+        await expect.poll(async () => {
+          const connectors = await readJson(await api.get('/api/integrations/orders/connectors'))
+          return connectors.find((connector) => connector.sourceSystem === sourceSystem && connector.type === 'CSV_ORDER_IMPORT')?.enabled ?? false
+        }, {
+          timeout: 15_000,
+          message: `Expected replay verification connector ${sourceSystem} to become enabled before manual UI replay.`,
+        }).toBe(true)
+      },
+    }
   } catch (error) {
     await api.dispose()
     throw error
@@ -937,58 +943,72 @@ test('replay recovery, scenario approval, execution, and browser role gating wor
         const replayDetail = page.locator('.section-card').filter({ hasText: 'Recovery detail' }).first()
         await expect(replayDetail.getByText(replayFixture.externalOrderId).first()).toBeVisible()
 
-        const replayButton = replayDetail.getByRole('button', { name: 'Replay Into Live Flow' })
-        await expect(replayButton).toBeVisible()
-        await expect(replayButton).toBeEnabled()
-
-        const replayResponsePromise = page.waitForResponse((response) => (
-          response.request().method() === 'POST'
-            && /\/api\/integrations\/orders\/replay\/\d+$/i.test(response.url())
-        ), { timeout: 20_000 })
-
-        let replayResponse = null
-        try {
-          await replayButton.scrollIntoViewIfNeeded()
-          ;[replayResponse] = await Promise.all([
-            replayResponsePromise,
-            replayButton.click(),
-          ])
-        } catch (error) {
+        await replayFixture.enableConnector()
+        await expect.poll(async () => {
           currentReplayOutcome = await readReplayOutcome(replayFixture.api, replayFixture.externalOrderId)
-          if (currentReplayOutcome.state !== 'replayed') {
-            throw error
+          return describeReplayOutcome(currentReplayOutcome)
+        }, {
+          timeout: 20_000,
+          message: `Expected ${replayFixture.externalOrderId} to remain manually replayable or finish automated recovery after enabling the replay connector.`,
+        }).toMatch(/^(replayed|queued:PENDING|queued:REPLAY_FAILED)$/)
+
+        if (currentReplayOutcome.state === 'replayed') {
+          await refreshWorkspace(page)
+          await expect(page.getByText(/Replay queue is clear|Replayed .* into the live order flow\./).first()).toBeVisible()
+        } else {
+          const replayButton = replayDetail.getByRole('button', { name: 'Replay Into Live Flow' })
+          await expect(replayButton).toBeVisible()
+          await expect(replayButton).toBeEnabled()
+
+          const replayResponsePromise = page.waitForResponse((response) => (
+            response.request().method() === 'POST'
+              && /\/api\/integrations\/orders\/replay\/\d+$/i.test(response.url())
+          ), { timeout: 20_000 })
+
+          let replayResponse = null
+          try {
+            await replayButton.scrollIntoViewIfNeeded()
+            ;[replayResponse] = await Promise.all([
+              replayResponsePromise,
+              replayButton.click(),
+            ])
+          } catch (error) {
+            currentReplayOutcome = await readReplayOutcome(replayFixture.api, replayFixture.externalOrderId)
+            if (currentReplayOutcome.state !== 'replayed') {
+              throw error
+            }
           }
-        }
 
-        if (replayResponse) {
-          const replayPayload = await replayResponse.json().catch(() => null)
-          if (!replayResponse.ok()) {
-            const replayFailureMessage = replayPayload?.message
-              || `Replay request failed with status ${replayResponse.status()} for ${replayFixture.externalOrderId}.`
+          if (replayResponse) {
+            const replayPayload = await replayResponse.json().catch(() => null)
+            if (!replayResponse.ok()) {
+              const replayFailureMessage = replayPayload?.message
+                || `Replay request failed with status ${replayResponse.status()} for ${replayFixture.externalOrderId}.`
 
-            let replayResolvedAfterConflict = false
-            try {
-              await waitForReplayResolution(
-                replayFixture.api,
-                replayFixture.externalOrderId,
-                20_000,
-                `Expected ${replayFixture.externalOrderId} to settle into a replayed state after replay response ${replayResponse.status()}.`,
-              )
-              replayResolvedAfterConflict = true
-            } catch {
-              replayResolvedAfterConflict = false
+              let replayResolvedAfterConflict = false
+              try {
+                await waitForReplayResolution(
+                  replayFixture.api,
+                  replayFixture.externalOrderId,
+                  20_000,
+                  `Expected ${replayFixture.externalOrderId} to settle into a replayed state after replay response ${replayResponse.status()}.`,
+                )
+                replayResolvedAfterConflict = true
+              } catch {
+                replayResolvedAfterConflict = false
+              }
+
+              if (!replayResolvedAfterConflict) {
+                throw new Error(replayFailureMessage)
+              }
+
+              await refreshWorkspace(page)
+              await expect(page.getByText(/Replay queue is clear|Replayed .* into the live order flow\./).first()).toBeVisible()
+            } else {
+              await expect(page.locator('.success-text').filter({
+                hasText: `Replayed ${replayFixture.externalOrderId} into the live order flow.`,
+              }).first()).toBeVisible()
             }
-
-            if (!replayResolvedAfterConflict) {
-              throw new Error(replayFailureMessage)
-            }
-
-            await refreshWorkspace(page)
-            await expect(page.getByText(/Replay queue is clear|Replayed .* into the live order flow\./).first()).toBeVisible()
-          } else {
-            await expect(page.locator('.success-text').filter({
-              hasText: `Replayed ${replayFixture.externalOrderId} into the live order flow.`,
-            }).first()).toBeVisible()
           }
         }
       }
