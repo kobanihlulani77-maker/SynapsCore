@@ -36,5 +36,6 @@ class DeploymentHardeningConfigurationTest {
         assertThat(prodConfig).contains("store-type: redis");
         assertThat(prodConfig).contains("namespace: ${SPRING_SESSION_REDIS_NAMESPACE:synapsecore:sessions}");
         assertThat(baseConfig).contains("include: livenessState,ping");
+        assertThat(baseConfig).contains("include: readinessState,db,redis,ping");
     }
 }

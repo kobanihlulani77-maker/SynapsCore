@@ -28,6 +28,7 @@ import org.springframework.test.web.servlet.MvcResult;
     "spring.session.store-type=none",
     "spring.autoconfigure.exclude=org.springframework.boot.autoconfigure.session.SessionAutoConfiguration",
     "management.health.redis.enabled=false",
+    "management.endpoint.health.validate-group-membership=false",
     "synapsecore.realtime.broker-mode=SIMPLE_IN_MEMORY",
     "synapsecore.bootstrap.initial-token=bootstrap-secret",
     "synapsecore.bootstrap.platform-admin-token=platform-admin-secret",

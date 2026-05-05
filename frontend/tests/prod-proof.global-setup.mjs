@@ -21,7 +21,6 @@ const backendUrl = (
 
 const warmupTimeoutMs = Number.parseInt(process.env.PLAYWRIGHT_WARMUP_TIMEOUT_MS || '240000', 10)
 const authenticatedWarmupTimeoutMs = Number.parseInt(process.env.PLAYWRIGHT_AUTHENTICATED_WARMUP_TIMEOUT_MS || '120000', 10)
-const authenticatedWarmupRetryLimit = 3
 
 const optionalEnv = (...names) => {
   for (const name of names) {
@@ -97,8 +96,11 @@ async function waitForProbe(description, probe, predicate, timeoutMs = warmupTim
 
 async function waitForAuthenticatedProofTraffic(credentials) {
   let lastError = new Error('[hosted-proof] authenticated proof warm-up was not attempted')
+  const startedAt = Date.now()
+  let attempt = 0
 
-  for (let attempt = 1; attempt <= authenticatedWarmupRetryLimit; attempt += 1) {
+  while (Date.now() - startedAt < authenticatedWarmupTimeoutMs) {
+    attempt += 1
     const proofApi = await playwrightRequest.newContext({
       baseURL: backendUrl,
       extraHTTPHeaders: {
@@ -115,6 +117,7 @@ async function waitForAuthenticatedProofTraffic(credentials) {
         throw new Error(`login HTTP ${loginResponse.status()} ${loginPayload?.message || ''}`.trim())
       }
 
+      const remainingWarmupMs = Math.max(15_000, authenticatedWarmupTimeoutMs - (Date.now() - startedAt))
       await waitForProbe(
         'authenticated dashboard session',
         async () => {
@@ -143,7 +146,7 @@ async function waitForAuthenticatedProofTraffic(credentials) {
           && result.runtimeStatus === 200
           && typeof result.runtimePayload?.readinessState === 'string'
         ),
-        authenticatedWarmupTimeoutMs,
+        remainingWarmupMs,
       )
 
       await proofApi.post('/api/auth/session/logout').catch(() => null)
@@ -152,10 +155,13 @@ async function waitForAuthenticatedProofTraffic(credentials) {
     } catch (error) {
       lastError = error instanceof Error ? error : new Error(String(error))
       await proofApi.dispose()
-      if (attempt < authenticatedWarmupRetryLimit) {
-        console.log(`[hosted-proof] authenticated warm-up attempt ${attempt} did not settle yet; retrying shortly`)
-        await delay(10_000)
+      const remainingMs = authenticatedWarmupTimeoutMs - (Date.now() - startedAt)
+      if (remainingMs <= 0) {
+        break
       }
+
+      console.log(`[hosted-proof] authenticated warm-up attempt ${attempt} did not settle yet; retrying shortly`)
+      await delay(Math.min(10_000, remainingMs))
     }
   }
 

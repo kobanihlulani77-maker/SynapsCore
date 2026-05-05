@@ -118,6 +118,8 @@ management:
       group:
         liveness:
           include: livenessState,ping
+        readiness:
+          include: readinessState,db,redis,ping
       probes:
         enabled: true
   endpoints:
