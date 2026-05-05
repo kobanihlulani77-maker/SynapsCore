@@ -5,7 +5,44 @@ export const postAuthRedirectStorageKey = 'synapsecore.postAuthRedirect'
 
 export const trimTrailingSlash = (value = '') => value.replace(/\/+$/, '')
 export const isLocalHostname = (hostname = '') => ['localhost', '127.0.0.1', '0.0.0.0'].includes((hostname || '').toLowerCase())
-export const isExplicitNativeRealtimeUrl = (value = '') => /^wss?:/i.test(String(value).trim())
+
+export const looksLikeSockJsEndpoint = (value = '') => {
+  const rawValue = String(value).trim()
+  if (!rawValue) return false
+
+  try {
+    const normalizedUrl = new URL(rawValue, globalThis.location?.origin || undefined)
+    const normalizedPathname = trimTrailingSlash(normalizedUrl.pathname || '').toLowerCase()
+    return normalizedPathname === '/ws'
+  } catch {
+    return trimTrailingSlash(rawValue)
+      .replace(/^wss?:\/\/[^/]+/i, '')
+      .replace(/^https?:\/\/[^/]+/i, '')
+      .toLowerCase() === '/ws'
+  }
+}
+
+export const isExplicitNativeRealtimeUrl = (value = '') => {
+  const rawValue = String(value).trim()
+  if (!/^wss?:/i.test(rawValue)) {
+    return false
+  }
+
+  // Spring registers /ws as the SockJS endpoint on hosted deployments.
+  // Treat plain /ws as SockJS even if a stale env accidentally provides it as wss://.../ws.
+  if (looksLikeSockJsEndpoint(rawValue)) {
+    return false
+  }
+
+  try {
+    const normalizedUrl = new URL(rawValue, globalThis.location?.origin || undefined)
+    const normalizedPathname = trimTrailingSlash(normalizedUrl.pathname || '').toLowerCase()
+    return normalizedPathname.endsWith('/websocket') || normalizedPathname.endsWith('/stomp')
+  } catch {
+    const normalizedValue = trimTrailingSlash(rawValue).toLowerCase()
+    return normalizedValue.endsWith('/websocket') || normalizedValue.endsWith('/stomp')
+  }
+}
 
 export const normalizeAbsoluteUrl = (value) => {
   if (!value || !String(value).trim()) return ''
