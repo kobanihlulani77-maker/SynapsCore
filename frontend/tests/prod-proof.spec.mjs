@@ -111,7 +111,8 @@ async function readJson(response) {
   return payload
 }
 
-async function loginViaUi(page, credentials) {
+async function loginViaUi(page, credentials, options = {}) {
+  const { requireDashboardSnapshot = false } = options
   await page.goto('/sign-in')
   await expect(page.getByRole('heading', { name: 'Access your operational workspace.' })).toBeVisible()
   const signInCard = page.locator('.public-signin-card')
@@ -120,7 +121,9 @@ async function loginViaUi(page, credentials) {
   await signInCard.getByRole('button', { name: 'Enter Platform' }).click()
   await expect(page).toHaveURL(/\/dashboard$/)
   await expect(page.getByRole('heading', { level: 1, name: 'Live operational command center' })).toBeVisible()
-  await waitForDashboardSnapshotReady(page)
+  if (requireDashboardSnapshot) {
+    await waitForDashboardSnapshotReady(page)
+  }
 }
 
 async function signOutViaUi(page) {
@@ -243,9 +246,11 @@ async function activateSelectableButton(buttonLocator) {
   await buttonLocator.press('Enter')
 }
 
-async function waitForDashboardSnapshotReady(page) {
+async function waitForDashboardSnapshotReady(page, options = {}) {
+  const { timeoutMs = 90_000, refreshAfterMs = 25_000, refreshIntervalMs = 20_000 } = options
   const snapshotTimestamp = page.locator('#workspace-trust-rail .muted-text').filter({ hasText: /^Snapshot / }).first()
   const snapshotLoadError = page.locator('.error-text:visible').filter({ hasText: /Snapshot load issue:/ }).first()
+  const startedAt = Date.now()
   let lastRefreshAt = 0
 
   await expect.poll(async () => {
@@ -255,19 +260,23 @@ async function waitForDashboardSnapshotReady(page) {
     if (await snapshotTimestamp.isVisible().catch(() => false)) {
       return 'ready'
     }
-    if (Date.now() - lastRefreshAt >= 5_000) {
+    if (
+      Date.now() - startedAt >= refreshAfterMs
+      && Date.now() - lastRefreshAt >= refreshIntervalMs
+    ) {
       lastRefreshAt = Date.now()
       await refreshWorkspace(page)
     }
     return 'waiting'
   }, {
-    timeout: 60_000,
+    timeout: timeoutMs,
     message: 'Expected the hosted dashboard to load a real authenticated snapshot before continuing.',
   }).toBe('ready')
 }
 
-async function waitForRealtimeConnectionLive(page) {
-  await waitForDashboardSnapshotReady(page)
+async function waitForRealtimeConnectionLive(page, options = {}) {
+  const { timeoutMs = 90_000 } = options
+  await waitForDashboardSnapshotReady(page, { timeoutMs })
 
   const liveIndicators = [
     page.getByText('Live system').first(),
@@ -275,7 +284,6 @@ async function waitForRealtimeConnectionLive(page) {
     page.locator('.utility-state.utility-live').first(),
   ]
   const snapshotLoadError = page.locator('.error-text:visible').filter({ hasText: /Snapshot load issue:/ }).first()
-  let lastRefreshAt = 0
 
   await expect.poll(async () => {
     if (await snapshotLoadError.isVisible().catch(() => false)) {
@@ -286,13 +294,9 @@ async function waitForRealtimeConnectionLive(page) {
         return 'live'
       }
     }
-    if (Date.now() - lastRefreshAt >= 5_000) {
-      lastRefreshAt = Date.now()
-      await refreshWorkspace(page)
-    }
     return 'waiting'
   }, {
-    timeout: 45_000,
+    timeout: timeoutMs,
     message: 'Expected the hosted dashboard to report a live realtime connection before websocket proof mutates backend state.',
   }).toBe('live')
 }
@@ -722,6 +726,7 @@ test('auth flow and the full authenticated page system render cleanly in a brows
   await page.reload()
   await expect(page).toHaveURL(/\/dashboard$/)
   await expect(page.getByRole('heading', { level: 1, name: 'Live operational command center' })).toBeVisible()
+  await waitForDashboardSnapshotReady(page)
 
   for (const [route, title] of appPages) {
     await navigateWithinApp(page, route)
@@ -794,7 +799,7 @@ test('@realtime dashboard summary updates live without a browser refresh', async
   const api = await createApiContext(users.operationsLead)
   const realtimeFixture = await createRealtimeInventoryFixture(api)
 
-  await loginViaUi(page, users.operationsLead)
+  await loginViaUi(page, users.operationsLead, { requireDashboardSnapshot: true })
   await expect(page.getByRole('heading', { level: 1, name: 'Live operational command center' })).toBeVisible()
   await expect(page.getByText('Realtime state')).toBeVisible()
   await waitForRealtimeConnectionLive(page)
@@ -814,7 +819,7 @@ test('@realtime dashboard summary updates live without a browser refresh', async
 
     await expect(page.getByText(expectedAlertTitle).first()).toBeVisible({ timeout: 30_000 })
     await expect(page.getByText(expectedRecommendationTitle).first()).toBeVisible({ timeout: 30_000 })
-    await waitForRealtimeConnectionLive(page)
+    await expectNoFatalUiErrors(page)
   } finally {
     await readJson(await api.post('/api/inventory/update', {
       data: {

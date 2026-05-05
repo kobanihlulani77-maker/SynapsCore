@@ -62,7 +62,7 @@ SYNAPSECORE_RATE_LIMIT_INTEGRATION_MUTATION_MAX_ATTEMPTS=<count per window>
 
 ```text
 VITE_API_URL=https://synapscore-3.onrender.com
-VITE_WS_URL=https://synapscore-3.onrender.com/ws
+VITE_WS_URL=wss://synapscore-3.onrender.com/ws
 VITE_APP_BUILD_VERSION=<release-version>
 VITE_APP_BUILD_COMMIT=<git-sha>
 VITE_APP_BUILD_TIME=<utc-timestamp>

@@ -23,6 +23,11 @@ export default function useWorkspaceRealtime({
     let active = true
     let connectionMode = 'connecting'
     let fallbackIntervalId = null
+    let connectionWatchdogId = null
+    let activeClient = null
+    let transportMode = websocketBrokerUrl ? 'native' : (sockJsUrl ? 'sockjs' : 'none')
+    let fallbackTransportAttempted = false
+    let hasConnectedLive = false
 
     async function loadSnapshot() {
       if (!signedInTenantCode) {
@@ -46,6 +51,28 @@ export default function useWorkspaceRealtime({
     function updateConnectionState(nextState) {
       connectionMode = nextState
       setConnectionState(nextState)
+    }
+
+    function clearConnectionWatchdog() {
+      if (connectionWatchdogId !== null) {
+        globalThis.clearTimeout(connectionWatchdogId)
+        connectionWatchdogId = null
+      }
+    }
+
+    function scheduleSockJsFallback(sourceClient, delayMs) {
+      if (!sockJsUrl || transportMode !== 'native' || fallbackTransportAttempted) {
+        return
+      }
+
+      clearConnectionWatchdog()
+      connectionWatchdogId = globalThis.setTimeout(() => {
+        if (!active || activeClient !== sourceClient || hasConnectedLive || fallbackTransportAttempted) {
+          return
+        }
+        fallbackTransportAttempted = true
+        startClient('sockjs')
+      }, delayMs)
     }
 
     async function refreshWhileDegraded() {
@@ -82,51 +109,85 @@ export default function useWorkspaceRealtime({
       void refreshWhileDegraded()
     }, 5000)
 
-    const client = new Client({
-      reconnectDelay: 5000,
-      heartbeatIncoming: 10000,
-      heartbeatOutgoing: 10000,
-      brokerURL: /^wss?:/i.test(websocketBrokerUrl) ? websocketBrokerUrl : undefined,
-      webSocketFactory: /^wss?:/i.test(websocketBrokerUrl) ? undefined : () => new SockJS(sockJsUrl),
-      onConnect: () => {
-        updateConnectionState('live')
-        client.subscribe(`${topicPrefix}/dashboard.summary`, (message) => mergeSnapshot({ summary: JSON.parse(message.body) }))
-        client.subscribe(`${topicPrefix}/alerts`, (message) => mergeSnapshot({ alerts: JSON.parse(message.body) }))
-        client.subscribe(`${topicPrefix}/recommendations`, (message) => mergeSnapshot({ recommendations: JSON.parse(message.body) }))
-        client.subscribe(`${topicPrefix}/inventory`, (message) => mergeSnapshot({ inventory: JSON.parse(message.body) }))
-        client.subscribe(`${topicPrefix}/fulfillment.overview`, (message) => mergeSnapshot({ fulfillment: JSON.parse(message.body) }))
-        client.subscribe(`${topicPrefix}/orders.recent`, (message) => mergeSnapshot({ recentOrders: JSON.parse(message.body) }))
-        client.subscribe(`${topicPrefix}/events.recent`, (message) => mergeSnapshot({ recentEvents: JSON.parse(message.body) }))
-        client.subscribe(`${topicPrefix}/audit.recent`, (message) => mergeSnapshot({ auditLogs: JSON.parse(message.body) }))
-        client.subscribe(`${topicPrefix}/system.incidents`, (message) => mergeSnapshot({ systemIncidents: JSON.parse(message.body) }))
-        client.subscribe(`${topicPrefix}/integrations.connectors`, (message) => mergeSnapshot({ integrationConnectors: JSON.parse(message.body) }))
-        client.subscribe(`${topicPrefix}/integrations.imports`, (message) => mergeSnapshot({ integrationImportRuns: JSON.parse(message.body) }))
-        client.subscribe(`${topicPrefix}/integrations.replay`, (message) => mergeSnapshot({ integrationReplayQueue: JSON.parse(message.body) }))
-        client.subscribe(`${topicPrefix}/scenarios.notifications`, (message) => mergeSnapshot({ scenarioNotifications: JSON.parse(message.body) }))
-        client.subscribe(`${topicPrefix}/scenarios.escalated`, (message) => mergeSnapshot({ slaEscalations: JSON.parse(message.body) }))
-      },
-      onStompError: () => {
-        updateConnectionState('degraded')
-        void refreshWhileDegraded()
-      },
-      onWebSocketError: () => {
-        updateConnectionState('degraded')
-        void refreshWhileDegraded()
-      },
-      onWebSocketClose: () => {
-        updateConnectionState('reconnecting')
-        void refreshWhileDegraded()
-      },
-    })
+    function handleTransportFailure(sourceClient, nextState) {
+      if (!active || activeClient !== sourceClient) {
+        return
+      }
 
-    client.activate()
+      if (transportMode === 'native' && sockJsUrl && !fallbackTransportAttempted) {
+        scheduleSockJsFallback(sourceClient, 12_000)
+      }
+
+      updateConnectionState(nextState)
+      void refreshWhileDegraded()
+    }
+
+    function startClient(nextTransportMode) {
+      const previousClient = activeClient
+      transportMode = nextTransportMode
+      hasConnectedLive = false
+
+      const nextClient = new Client({
+        reconnectDelay: 5000,
+        heartbeatIncoming: 10000,
+        heartbeatOutgoing: 10000,
+        brokerURL: nextTransportMode === 'native' && /^wss?:/i.test(websocketBrokerUrl) ? websocketBrokerUrl : undefined,
+        webSocketFactory: nextTransportMode === 'sockjs' && sockJsUrl ? () => new SockJS(sockJsUrl) : undefined,
+        onConnect: () => {
+          if (!active || activeClient !== nextClient) {
+            return
+          }
+
+          hasConnectedLive = true
+          clearConnectionWatchdog()
+          updateConnectionState('live')
+          nextClient.subscribe(`${topicPrefix}/dashboard.summary`, (message) => mergeSnapshot({ summary: JSON.parse(message.body) }))
+          nextClient.subscribe(`${topicPrefix}/alerts`, (message) => mergeSnapshot({ alerts: JSON.parse(message.body) }))
+          nextClient.subscribe(`${topicPrefix}/recommendations`, (message) => mergeSnapshot({ recommendations: JSON.parse(message.body) }))
+          nextClient.subscribe(`${topicPrefix}/inventory`, (message) => mergeSnapshot({ inventory: JSON.parse(message.body) }))
+          nextClient.subscribe(`${topicPrefix}/fulfillment.overview`, (message) => mergeSnapshot({ fulfillment: JSON.parse(message.body) }))
+          nextClient.subscribe(`${topicPrefix}/orders.recent`, (message) => mergeSnapshot({ recentOrders: JSON.parse(message.body) }))
+          nextClient.subscribe(`${topicPrefix}/events.recent`, (message) => mergeSnapshot({ recentEvents: JSON.parse(message.body) }))
+          nextClient.subscribe(`${topicPrefix}/audit.recent`, (message) => mergeSnapshot({ auditLogs: JSON.parse(message.body) }))
+          nextClient.subscribe(`${topicPrefix}/system.incidents`, (message) => mergeSnapshot({ systemIncidents: JSON.parse(message.body) }))
+          nextClient.subscribe(`${topicPrefix}/integrations.connectors`, (message) => mergeSnapshot({ integrationConnectors: JSON.parse(message.body) }))
+          nextClient.subscribe(`${topicPrefix}/integrations.imports`, (message) => mergeSnapshot({ integrationImportRuns: JSON.parse(message.body) }))
+          nextClient.subscribe(`${topicPrefix}/integrations.replay`, (message) => mergeSnapshot({ integrationReplayQueue: JSON.parse(message.body) }))
+          nextClient.subscribe(`${topicPrefix}/scenarios.notifications`, (message) => mergeSnapshot({ scenarioNotifications: JSON.parse(message.body) }))
+          nextClient.subscribe(`${topicPrefix}/scenarios.escalated`, (message) => mergeSnapshot({ slaEscalations: JSON.parse(message.body) }))
+        },
+        onStompError: () => {
+          handleTransportFailure(nextClient, 'degraded')
+        },
+        onWebSocketError: () => {
+          handleTransportFailure(nextClient, 'degraded')
+        },
+        onWebSocketClose: () => {
+          handleTransportFailure(nextClient, 'reconnecting')
+        },
+      })
+
+      activeClient = nextClient
+      clearConnectionWatchdog()
+      if (previousClient && previousClient !== nextClient) {
+        previousClient.deactivate().catch(() => {})
+      }
+      updateConnectionState(previousClient ? 'reconnecting' : 'connecting')
+      if (nextTransportMode === 'native' && sockJsUrl) {
+        scheduleSockJsFallback(nextClient, 15_000)
+      }
+      nextClient.activate()
+    }
+
+    startClient(transportMode)
 
     return () => {
       active = false
+      clearConnectionWatchdog()
       if (fallbackIntervalId !== null) {
         globalThis.clearInterval(fallbackIntervalId)
       }
-      client.deactivate()
+      activeClient?.deactivate().catch(() => {})
     }
   }, [activeTenantCode, signedInTenantCode, websocketBrokerUrl, sockJsUrl])
 }
