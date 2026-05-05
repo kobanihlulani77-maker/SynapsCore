@@ -2,6 +2,8 @@ import { useEffect } from 'react'
 import { Client } from '@stomp/stompjs'
 import SockJS from 'sockjs-client'
 
+const isSessionBootstrapError = (message = '') => /signed-in user session|session is missing or expired|sign in again/i.test(String(message))
+
 export default function useWorkspaceRealtime({
   activeTenantCode,
   signedInTenantCode,
@@ -35,7 +37,7 @@ export default function useWorkspaceRealtime({
       try {
         await Promise.all([fetchSnapshot(), fetchCatalogProducts({ quiet: true })])
       } catch (error) {
-        if (active) {
+        if (active && !isSessionBootstrapError(error?.message)) {
           setPageState({ loading: false, error: error.message })
         }
       }

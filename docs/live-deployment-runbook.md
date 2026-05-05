@@ -31,6 +31,7 @@ Key backend truths:
 - `SPRING_PROFILES_ACTIVE=prod`
 - `ALLOW_HEADER_FALLBACK=false`
 - `SESSION_COOKIE_SECURE=true`
+- authenticated browser sessions should be Redis-backed in production so node restarts do not drop live operator access
 - `SYNAPSECORE_REALTIME_BROKER_MODE=REDIS_PUBSUB`
 - `SPRING_JPA_HIBERNATE_DDL_AUTO=validate`; Flyway baseline coverage is active and startup fails on schema mismatch
 
@@ -106,6 +107,7 @@ Current rollout posture no longer mutates schema implicitly at startup. It relie
 ## Verification Order
 
 1. warm the live deployment first:
+   - `GET /actuator/health/liveness`
    - `GET /actuator/health/readiness`
    - `GET /api/auth/session`
    - `GET /ws/info`
@@ -126,14 +128,15 @@ The official hosted-proof order is:
 
 The repo now hardens that order in two places:
 
-- [prepare-hosted-proof.ps1](../scripts/prepare-hosted-proof.ps1) waits for backend readiness, unauthenticated session bootstrap, realtime SockJS availability, and optionally the frontend sign-in shell
-- the Playwright hosted proof has a global warm-up gate before test `1` starts
+- [prepare-hosted-proof.ps1](../scripts/prepare-hosted-proof.ps1) waits for backend readiness, unauthenticated session bootstrap, realtime SockJS availability, the frontend sign-in shell, and then verifies authenticated dashboard/runtime traffic
+- the Playwright hosted proof has a global warm-up gate before test `1` starts and will not continue until an authenticated dashboard snapshot is reachable
 
 Operational note:
 
 - the auth rate-limit proof intentionally ends by hitting a real `429`
 - the next proof run must allow that bucket window to cool before negative-auth proof starts again
 - the hosted proof now records that cooldown locally and waits it out automatically on the next run instead of relying on human reruns
+- Render health checks should target liveness, while hosted proof should still wait on readiness before sending browser traffic
 
 ## Bottom Line
 

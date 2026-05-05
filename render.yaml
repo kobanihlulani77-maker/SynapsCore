@@ -5,7 +5,7 @@ services:
     plan: starter
     rootDir: backend
     dockerfilePath: Dockerfile
-    healthCheckPath: /actuator/health
+    healthCheckPath: /actuator/health/liveness
     envVars:
       - key: SPRING_PROFILES_ACTIVE
         value: prod
@@ -20,6 +20,8 @@ services:
           type: redis
           name: synapscore-redis
           property: connectionString
+      - key: SPRING_SESSION_REDIS_NAMESPACE
+        value: synapsecore:sessions
       - key: CORS_ALLOWED_ORIGINS
         value: https://synapscore-frontend-3.onrender.com
       - key: SESSION_COOKIE_SECURE

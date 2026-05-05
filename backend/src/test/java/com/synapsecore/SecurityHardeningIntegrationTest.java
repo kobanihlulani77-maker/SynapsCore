@@ -25,6 +25,8 @@ import org.springframework.test.web.servlet.MvcResult;
     "spring.datasource.password=",
     "spring.jpa.hibernate.ddl-auto=validate",
     "spring.data.redis.url=redis://localhost:6379",
+    "spring.session.store-type=none",
+    "spring.autoconfigure.exclude=org.springframework.boot.autoconfigure.session.SessionAutoConfiguration",
     "management.health.redis.enabled=false",
     "synapsecore.realtime.broker-mode=SIMPLE_IN_MEMORY",
     "synapsecore.bootstrap.initial-token=bootstrap-secret",

@@ -737,6 +737,31 @@ Ensure-User `
 Write-Host "Preparing real catalog and inventory baseline for proof flows..."
 Ensure-ProofCatalogAndInventory -AdminSession $adminSession -Sku $ProofProductSkuValue
 
+Write-Host "Verifying authenticated dashboard and runtime warm-up..."
+$authedSessionState = Invoke-SynapseJson `
+    -Method GET `
+    -Url "$script:ApiBaseUrlValue/api/auth/session" `
+    -Session $adminSession
+if (-not (Get-PropertyValue -Object $authedSessionState -PropertyName "signedIn")) {
+    throw "Authenticated proof warm-up did not keep the tenant admin session alive after prep."
+}
+
+$authedDashboardSnapshot = Invoke-SynapseJson `
+    -Method GET `
+    -Url "$script:ApiBaseUrlValue/api/dashboard/snapshot" `
+    -Session $adminSession
+if ($null -eq (Get-PropertyValue -Object $authedDashboardSnapshot -PropertyName "inventory")) {
+    throw "Authenticated dashboard warm-up did not return inventory data from /api/dashboard/snapshot."
+}
+
+$authedRuntime = Invoke-SynapseJson `
+    -Method GET `
+    -Url "$script:ApiBaseUrlValue/api/system/runtime" `
+    -Session $adminSession
+if ([string]::IsNullOrWhiteSpace([string](Get-PropertyValue -Object $authedRuntime -PropertyName "readinessState"))) {
+    throw "Authenticated runtime warm-up did not return a readiness state from /api/system/runtime."
+}
+
 Write-Host ""
 Write-Host "Hosted proof credential path is ready."
 Write-Host "Use these non-secret values when running frontend hosted proof:"

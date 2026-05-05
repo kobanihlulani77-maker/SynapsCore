@@ -115,6 +115,9 @@ management:
         enabled: true
   endpoint:
     health:
+      group:
+        liveness:
+          include: livenessState,ping
       probes:
         enabled: true
   endpoints:

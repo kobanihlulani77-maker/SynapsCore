@@ -15,7 +15,8 @@ Live URLs:
 
 - frontend: `https://synapscore-frontend-3.onrender.com`
 - backend: `https://synapscore-3.onrender.com`
-- backend health: `https://synapscore-3.onrender.com/actuator/health`
+- backend liveness: `https://synapscore-3.onrender.com/actuator/health/liveness`
+- backend readiness: `https://synapscore-3.onrender.com/actuator/health/readiness`
 
 ## Backend Render Environment
 
@@ -29,6 +30,7 @@ SPRING_DATA_REDIS_URL=<Render Redis internal connection string>
 CORS_ALLOWED_ORIGINS=https://synapscore-frontend-3.onrender.com
 SESSION_COOKIE_SECURE=true
 SESSION_COOKIE_SAME_SITE=None
+SPRING_SESSION_REDIS_NAMESPACE=synapsecore:sessions
 ALLOW_HEADER_FALLBACK=false
 SYNAPSECORE_REALTIME_BROKER_MODE=REDIS_PUBSUB
 SYNAPSECORE_INTEGRATION_PULL_WORKER_ENABLED=true
@@ -81,6 +83,7 @@ These are truthful current Render boundaries:
 
 - schema startup is validate-only with Flyway-backed baseline coverage
 - realtime is broker-backed through `REDIS_PUBSUB`
+- authenticated browser sessions are Redis-backed so a backend recycle does not strand signed-in operators on stale local state
 - integration breadth is intentionally narrow
 
 ## Supported Integration Breadth On Render
@@ -95,7 +98,7 @@ Do not describe the platform on Render as having broad connector coverage beyond
 
 ## Post-Deploy Checks
 
-1. Verify `GET /actuator/health` is up.
+1. Verify `GET /actuator/health/liveness` is up.
 2. Verify `GET /actuator/health/readiness` is up.
 3. Verify `GET /api/auth/session` answers cleanly before browser proof starts.
 4. Verify `GET /ws/info` answers cleanly before realtime proof starts.
@@ -118,7 +121,8 @@ Render free instances can be slow on the first request after idle time. Treat ho
 The repo now supports that sequence directly:
 
 - [prepare-hosted-proof.ps1](../scripts/prepare-hosted-proof.ps1) performs readiness and proof-state preparation
-- `npm.cmd run test:e2e:prod` now runs a Playwright global warm-up gate before test `1`
+- [prepare-hosted-proof.ps1](../scripts/prepare-hosted-proof.ps1) now also verifies authenticated dashboard and runtime traffic after tenant prep
+- `npm.cmd run test:e2e:prod` now runs a Playwright global warm-up gate before test `1`, including an authenticated dashboard snapshot check
 
 This is especially important because the final proof intentionally exercises auth rate limiting. The next run must start after that bucket cools down, and the hosted proof now waits for that cooldown automatically.
 

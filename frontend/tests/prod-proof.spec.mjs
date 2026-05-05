@@ -31,6 +31,15 @@ const deriveDefaultProofProductSku = (tenantCode) => {
 }
 const defaultProofProductSku = deriveDefaultProofProductSku(proofTenantCode)
 const proofProductSku = (process.env.PLAYWRIGHT_PROOF_PRODUCT_SKU || defaultProofProductSku).trim().toUpperCase()
+const configuredAuthRateLimitMaxAttempts = Number.parseInt(
+  process.env.PLAYWRIGHT_AUTH_RATE_LIMIT_MAX_ATTEMPTS
+    || process.env.SYNAPSECORE_RATE_LIMIT_AUTH_LOGIN_MAX_ATTEMPTS
+    || '30',
+  10,
+)
+const authRateLimitAttemptBudget = Number.isFinite(configuredAuthRateLimitMaxAttempts) && configuredAuthRateLimitMaxAttempts > 0
+  ? configuredAuthRateLimitMaxAttempts + 20
+  : 50
 
 const users = {
   operationsLead: {
@@ -111,6 +120,7 @@ async function loginViaUi(page, credentials) {
   await signInCard.getByRole('button', { name: 'Enter Platform' }).click()
   await expect(page).toHaveURL(/\/dashboard$/)
   await expect(page.getByRole('heading', { level: 1, name: 'Live operational command center' })).toBeVisible()
+  await waitForDashboardSnapshotReady(page)
 }
 
 async function signOutViaUi(page) {
@@ -233,24 +243,58 @@ async function activateSelectableButton(buttonLocator) {
   await buttonLocator.press('Enter')
 }
 
+async function waitForDashboardSnapshotReady(page) {
+  const snapshotTimestamp = page.locator('#workspace-trust-rail .muted-text').filter({ hasText: /^Snapshot / }).first()
+  const snapshotLoadError = page.locator('.error-text:visible').filter({ hasText: /Snapshot load issue:/ }).first()
+  let lastRefreshAt = 0
+
+  await expect.poll(async () => {
+    if (await snapshotLoadError.isVisible().catch(() => false)) {
+      return 'error'
+    }
+    if (await snapshotTimestamp.isVisible().catch(() => false)) {
+      return 'ready'
+    }
+    if (Date.now() - lastRefreshAt >= 5_000) {
+      lastRefreshAt = Date.now()
+      await refreshWorkspace(page)
+    }
+    return 'waiting'
+  }, {
+    timeout: 60_000,
+    message: 'Expected the hosted dashboard to load a real authenticated snapshot before continuing.',
+  }).toBe('ready')
+}
+
 async function waitForRealtimeConnectionLive(page) {
+  await waitForDashboardSnapshotReady(page)
+
   const liveIndicators = [
     page.getByText('Live system').first(),
     page.getByText('Realtime live').first(),
     page.locator('.utility-state.utility-live').first(),
   ]
+  const snapshotLoadError = page.locator('.error-text:visible').filter({ hasText: /Snapshot load issue:/ }).first()
+  let lastRefreshAt = 0
 
   await expect.poll(async () => {
+    if (await snapshotLoadError.isVisible().catch(() => false)) {
+      return 'error'
+    }
     for (const indicator of liveIndicators) {
       if (await indicator.isVisible().catch(() => false)) {
-        return true
+        return 'live'
       }
     }
-    return false
+    if (Date.now() - lastRefreshAt >= 5_000) {
+      lastRefreshAt = Date.now()
+      await refreshWorkspace(page)
+    }
+    return 'waiting'
   }, {
-    timeout: 30_000,
+    timeout: 45_000,
     message: 'Expected the hosted dashboard to report a live realtime connection before websocket proof mutates backend state.',
-  }).toBe(true)
+  }).toBe('live')
 }
 
 async function findVisibleIntegrationConnector(page, connectors) {
@@ -286,7 +330,7 @@ async function triggerUiAuthRateLimit(page, signInCard, credentials) {
   const invalidMessage = 'Invalid operator credentials.'
   const rateLimitMessage = 'Authentication rate limit exceeded. Wait before attempting another sign-in.'
 
-  for (let attempt = 1; attempt <= 40; attempt += 1) {
+  for (let attempt = 1; attempt <= authRateLimitAttemptBudget; attempt += 1) {
     await fillSignInForm(signInCard, credentials, 'wrong-rate-limit')
     const submitButton = signInCard.getByRole('button', { name: 'Enter Platform' })
     const responsePromise = page.waitForResponse((response) => (
@@ -314,7 +358,7 @@ async function triggerUiAuthRateLimit(page, signInCard, credentials) {
     await expectSignInErrorAndRecovery(signInCard, invalidMessage)
   }
 
-  throw new Error('Expected repeated real browser sign-in attempts to reach the hosted auth rate-limit threshold.')
+  throw new Error(`Expected repeated real browser sign-in attempts to reach the hosted auth rate-limit threshold within ${authRateLimitAttemptBudget} tries.`)
 }
 
 async function readReplayOutcome(api, externalOrderId) {
