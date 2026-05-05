@@ -105,13 +105,35 @@ Current rollout posture no longer mutates schema implicitly at startup. It relie
 
 ## Verification Order
 
-1. verify backend health and readiness
-2. verify frontend loads and deep links work
-3. verify sign-in and protected routes
-4. verify dashboard, catalog, integrations, runtime, and audit pages
-5. run hosted proof preparation
-6. run browser proof
-7. verify replay and runtime trust surfaces
+1. warm the live deployment first:
+   - `GET /actuator/health/readiness`
+   - `GET /api/auth/session`
+   - `GET /ws/info`
+   - open `/sign-in` on the frontend origin
+2. run hosted proof preparation
+3. run browser proof
+4. verify replay and runtime trust surfaces
+
+## Cold Start And Warm-up
+
+Render free-instance cold starts can accept traffic before the whole proof lane is stable enough for a first browser pass.
+
+The official hosted-proof order is:
+
+1. readiness check
+2. hosted proof prep
+3. E2E proof
+
+The repo now hardens that order in two places:
+
+- [prepare-hosted-proof.ps1](../scripts/prepare-hosted-proof.ps1) waits for backend readiness, unauthenticated session bootstrap, realtime SockJS availability, and optionally the frontend sign-in shell
+- the Playwright hosted proof has a global warm-up gate before test `1` starts
+
+Operational note:
+
+- the auth rate-limit proof intentionally ends by hitting a real `429`
+- the next proof run must allow that bucket window to cool before negative-auth proof starts again
+- the hosted proof now records that cooldown locally and waits it out automatically on the next run instead of relying on human reruns
 
 ## Bottom Line
 

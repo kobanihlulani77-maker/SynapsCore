@@ -95,15 +95,32 @@ Do not describe the platform on Render as having broad connector coverage beyond
 
 ## Post-Deploy Checks
 
-1. Open the frontend URL.
-2. Verify deep links such as `/sign-in` and `/dashboard`.
-3. Verify backend health and readiness.
-4. Verify sign-in loads tenant directory correctly.
-5. Verify session cookies and redirect behavior.
-6. Verify dashboard, integrations, runtime, and audit load without CORS failures.
-7. Verify realtime works with the current Redis pub/sub posture in mind.
-8. Verify a wrong-password `POST /api/auth/session/login` returns a fast `401`.
-9. Run hosted proof preparation and browser proof and expect the Render proof pack to pass.
+1. Verify `GET /actuator/health` is up.
+2. Verify `GET /actuator/health/readiness` is up.
+3. Verify `GET /api/auth/session` answers cleanly before browser proof starts.
+4. Verify `GET /ws/info` answers cleanly before realtime proof starts.
+5. Open the frontend URL and verify deep links such as `/sign-in` and `/dashboard`.
+6. Verify sign-in loads tenant directory correctly.
+7. Verify session cookies and redirect behavior.
+8. Verify dashboard, integrations, runtime, and audit load without CORS failures.
+9. Verify realtime works with the current Redis pub/sub posture in mind.
+10. Verify a wrong-password `POST /api/auth/session/login` returns a fast `401`.
+11. Run hosted proof preparation and browser proof and expect the Render proof pack to pass.
+
+## Cold Start And Warm-up
+
+Render free instances can be slow on the first request after idle time. Treat hosted proof as a three-step sequence instead of a single blind browser run:
+
+1. readiness warm-up
+2. hosted proof prep
+3. Playwright E2E proof
+
+The repo now supports that sequence directly:
+
+- [prepare-hosted-proof.ps1](../scripts/prepare-hosted-proof.ps1) performs readiness and proof-state preparation
+- `npm.cmd run test:e2e:prod` now runs a Playwright global warm-up gate before test `1`
+
+This is especially important because the final proof intentionally exercises auth rate limiting. The next run must start after that bucket cools down, and the hosted proof now waits for that cooldown automatically.
 
 ## Related Docs
 

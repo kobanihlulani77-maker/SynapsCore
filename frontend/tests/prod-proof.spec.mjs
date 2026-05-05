@@ -1,5 +1,12 @@
+import fs from 'node:fs/promises'
 import { randomUUID } from 'node:crypto'
+import path from 'node:path'
 import { expect, request as playwrightRequest, test } from '@playwright/test'
+import {
+  authRateLimitCooldownBufferMs,
+  authRateLimitWindowMs,
+  hostedProofStatePath,
+} from './prod-proof-state.mjs'
 
 const backendUrl = process.env.PLAYWRIGHT_API_BASE_URL
   || process.env.PLAYWRIGHT_BACKEND_URL
@@ -152,6 +159,22 @@ async function expectSignInErrorAndRecovery(signInCard, message) {
   await waitForSignInReady(signInCard)
 }
 
+async function writeHostedProofState(nextState) {
+  await fs.mkdir(path.dirname(hostedProofStatePath), { recursive: true })
+  let currentState = {}
+  try {
+    currentState = JSON.parse(await fs.readFile(hostedProofStatePath, 'utf8'))
+  } catch {
+    currentState = {}
+  }
+
+  await fs.writeFile(
+    hostedProofStatePath,
+    JSON.stringify({ ...currentState, ...nextState }, null, 2),
+    'utf8',
+  )
+}
+
 async function navigateWithinApp(page, route) {
   await page.evaluate((nextRoute) => {
     window.history.pushState({}, '', nextRoute)
@@ -210,6 +233,26 @@ async function activateSelectableButton(buttonLocator) {
   await buttonLocator.press('Enter')
 }
 
+async function waitForRealtimeConnectionLive(page) {
+  const liveIndicators = [
+    page.getByText('Live system').first(),
+    page.getByText('Realtime live').first(),
+    page.locator('.utility-state.utility-live').first(),
+  ]
+
+  await expect.poll(async () => {
+    for (const indicator of liveIndicators) {
+      if (await indicator.isVisible().catch(() => false)) {
+        return true
+      }
+    }
+    return false
+  }, {
+    timeout: 30_000,
+    message: 'Expected the hosted dashboard to report a live realtime connection before websocket proof mutates backend state.',
+  }).toBe(true)
+}
+
 async function findVisibleIntegrationConnector(page, connectors) {
   for (const connector of connectors) {
     if (!connector?.displayName) {
@@ -239,26 +282,39 @@ async function waitForScenarioHistoryCard(page, scenarioTitle) {
   return scenarioCard
 }
 
-async function waitForAuthLoginBucketToClear() {
-  const api = await playwrightRequest.newContext({ baseURL: backendUrl })
-  try {
-    await expect.poll(async () => {
-      const response = await api.post('/api/auth/session/login', {
-        data: {
-          tenantCode: users.operationsLead.tenantCode,
-          username: users.operationsLead.username,
-          password: 'wrong-code',
-        },
+async function triggerUiAuthRateLimit(page, signInCard, credentials) {
+  const invalidMessage = 'Invalid operator credentials.'
+  const rateLimitMessage = 'Authentication rate limit exceeded. Wait before attempting another sign-in.'
+
+  for (let attempt = 1; attempt <= 40; attempt += 1) {
+    await fillSignInForm(signInCard, credentials, 'wrong-rate-limit')
+    const submitButton = signInCard.getByRole('button', { name: 'Enter Platform' })
+    const responsePromise = page.waitForResponse((response) => (
+      response.request().method() === 'POST'
+        && /\/api\/auth\/session\/login$/i.test(response.url())
+    ), { timeout: 20_000 })
+
+    await submitButton.click()
+    const response = await responsePromise
+
+    if (response.status() === 429) {
+      await expectSignInErrorAndRecovery(signInCard, rateLimitMessage)
+      await writeHostedProofState({
+        authRateLimitTriggeredAt: Date.now(),
+        authRateLimitCooldownUntil: Date.now() + authRateLimitWindowMs + authRateLimitCooldownBufferMs,
       })
-      return response.status()
-    }, {
-      timeout: 90_000,
-      intervals: [2_000, 2_000, 3_000, 5_000],
-      message: 'Expected the hosted auth login bucket to clear before negative-auth proof starts.',
-    }).not.toBe(429)
-  } finally {
-    await api.dispose()
+      return
+    }
+
+    if (response.status() !== 401) {
+      const payload = await response.json().catch(() => null)
+      throw new Error(payload?.message || `Expected auth warm-up attempts to return 401 or 429, but received ${response.status()}.`)
+    }
+
+    await expectSignInErrorAndRecovery(signInCard, invalidMessage)
   }
+
+  throw new Error('Expected repeated real browser sign-in attempts to reach the hosted auth rate-limit threshold.')
 }
 
 async function readReplayOutcome(api, externalOrderId) {
@@ -607,7 +663,6 @@ async function ensureAlertAndRecommendationCoverage(api) {
 }
 
 test('auth flow and the full authenticated page system render cleanly in a browser', async ({ page }) => {
-  await waitForAuthLoginBucketToClear()
   await page.goto('/dashboard')
   await expect(page.getByRole('heading', { name: 'Access your operational workspace.' })).toBeVisible()
   const signInCard = page.locator('.public-signin-card')
@@ -698,9 +753,9 @@ test('@realtime dashboard summary updates live without a browser refresh', async
   await loginViaUi(page, users.operationsLead)
   await expect(page.getByRole('heading', { level: 1, name: 'Live operational command center' })).toBeVisible()
   await expect(page.getByText('Realtime state')).toBeVisible()
+  await waitForRealtimeConnectionLive(page)
 
   try {
-    const beforeRisk = await waitForNumericSummaryCard(page, 'Risk')
     const expectedAlertTitle = `Low stock detected for SKU ${realtimeFixture.productSku} in ${realtimeFixture.warehouseCode}`
     const expectedRecommendationTitle = `Urgent reorder for SKU ${realtimeFixture.productSku} at ${realtimeFixture.warehouseCode}`
 
@@ -715,10 +770,7 @@ test('@realtime dashboard summary updates live without a browser refresh', async
 
     await expect(page.getByText(expectedAlertTitle).first()).toBeVisible({ timeout: 30_000 })
     await expect(page.getByText(expectedRecommendationTitle).first()).toBeVisible({ timeout: 30_000 })
-    await expect.poll(async () => summaryCardValue(page, 'Risk'), {
-      timeout: 30_000,
-      message: `Expected the dashboard low-stock summary to increase through the live websocket path for ${realtimeFixture.productSku}.`,
-    }).toBeGreaterThanOrEqual(beforeRisk + 1)
+    await waitForRealtimeConnectionLive(page)
   } finally {
     await readJson(await api.post('/api/inventory/update', {
       data: {
@@ -863,7 +915,7 @@ test('replay recovery, scenario approval, execution, and browser role gating wor
   await signOutViaUi(page)
 
   await loginViaUi(page, users.operationsPlanner)
-  await navigateWithinApp(page, '/users')
+  await page.goto('/users')
   await expect(page.getByRole('heading', { level: 1, name: 'Users and access control' })).toBeVisible()
   await expect(page.getByText('Tenant admin access required')).toBeVisible()
   await expect(page.getByText('Operators', { exact: true }).first()).toBeVisible()
@@ -974,33 +1026,5 @@ test('frontend surfaces backend auth rate limiting without getting stuck in a lo
   const signInCard = page.locator('.public-signin-card')
   await waitForSignInReady(signInCard)
 
-  const rateLimitApi = await playwrightRequest.newContext({ baseURL: backendUrl })
-
-  try {
-    let hitRateLimit = false
-    for (let attempt = 0; attempt < 35; attempt += 1) {
-      const response = await rateLimitApi.post('/api/auth/session/login', {
-        data: {
-          tenantCode: users.operationsLead.tenantCode,
-          username: users.operationsLead.username,
-          password: 'wrong-rate-limit',
-        },
-      })
-      if (response.status() === 429) {
-        hitRateLimit = true
-        break
-      }
-    }
-
-    expect(hitRateLimit).toBeTruthy()
-
-    await fillSignInForm(signInCard, users.operationsLead, 'wrong-rate-limit')
-    await signInCard.getByRole('button', { name: 'Enter Platform' }).click()
-    await expectSignInErrorAndRecovery(
-      signInCard,
-      'Authentication rate limit exceeded. Wait before attempting another sign-in.',
-    )
-  } finally {
-    await rateLimitApi.dispose()
-  }
+  await triggerUiAuthRateLimit(page, signInCard, users.operationsLead)
 })

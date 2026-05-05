@@ -1,5 +1,6 @@
 param(
     [string]$ApiBaseUrl,
+    [string]$FrontendBaseUrl,
     [string]$TenantCode,
     [string]$TenantName,
     [string]$TenantAdminUsername,
@@ -158,6 +159,79 @@ function Get-ErrorHeaderValue {
     }
 
     return $null
+}
+
+function Invoke-HostedProbe {
+    param(
+        [string]$Url,
+        [hashtable]$Headers = @{}
+    )
+
+    try {
+        $response = Invoke-WebRequest -Uri $Url -UseBasicParsing -Headers $Headers
+        $json = $null
+        if (-not [string]::IsNullOrWhiteSpace($response.Content)) {
+            try {
+                $json = $response.Content | ConvertFrom-Json -ErrorAction Stop
+            } catch {
+                $json = $null
+            }
+        }
+
+        return [pscustomobject]@{
+            StatusCode = [int]$response.StatusCode
+            Content    = $response.Content
+            Json       = $json
+        }
+    } catch {
+        $body = Get-ErrorBody -ErrorRecord $_
+        $statusCode = Get-ErrorStatusCode -ErrorRecord $_
+        $json = $null
+        if (-not [string]::IsNullOrWhiteSpace($body)) {
+            try {
+                $json = $body | ConvertFrom-Json -ErrorAction Stop
+            } catch {
+                $json = $null
+            }
+        }
+
+        return [pscustomobject]@{
+            StatusCode = $statusCode
+            Content    = $body
+            Json       = $json
+        }
+    }
+}
+
+function Wait-HostedProbe {
+    param(
+        [string]$Description,
+        [scriptblock]$Probe,
+        [scriptblock]$IsReady,
+        [int]$TimeoutSeconds = 240,
+        [int]$DelaySeconds = 5
+    )
+
+    $deadline = (Get-Date).AddSeconds($TimeoutSeconds)
+    $lastDetail = "No response yet."
+
+    while ((Get-Date) -lt $deadline) {
+        $result = & $Probe
+        if ($null -ne $result) {
+            $statusSuffix = if ($null -ne $result.StatusCode) { "HTTP $($result.StatusCode)" } else { "HTTP unavailable" }
+            $contentSuffix = if (-not [string]::IsNullOrWhiteSpace($result.Content)) { $result.Content } else { "No body" }
+            $lastDetail = "$statusSuffix $contentSuffix"
+        }
+
+        if (& $IsReady $result) {
+            Write-Host "$Description ready."
+            return $result
+        }
+
+        Start-Sleep -Seconds $DelaySeconds
+    }
+
+    throw "$Description did not become ready within $TimeoutSeconds seconds. Last detail: $lastDetail"
 }
 
 function Invoke-SynapseJson {
@@ -483,7 +557,7 @@ function Ensure-ProofCatalogAndInventory {
         -Body @{
             productSku = $sku
             warehouseCode = "WH-NORTH"
-            quantityAvailable = 8
+            quantityAvailable = 24
             reorderThreshold = 12
         } | Out-Null
 }
@@ -491,6 +565,10 @@ function Ensure-ProofCatalogAndInventory {
 $script:ApiBaseUrlValue = (Require-Value `
     -Name "PLAYWRIGHT_API_BASE_URL" `
     -Value (Get-FirstValue -Values @($ApiBaseUrl, $env:PLAYWRIGHT_API_BASE_URL, $env:PLAYWRIGHT_BACKEND_URL, "https://synapscore-3.onrender.com"))).TrimEnd("/")
+$FrontendBaseUrlValue = Get-FirstValue -Values @($FrontendBaseUrl, $env:PLAYWRIGHT_BASE_URL, $env:PLAYWRIGHT_FRONTEND_URL)
+if (-not [string]::IsNullOrWhiteSpace($FrontendBaseUrlValue)) {
+    $FrontendBaseUrlValue = $FrontendBaseUrlValue.TrimEnd("/")
+}
 $script:TenantCodeValue = Require-TenantCode -Name "PLAYWRIGHT_TENANT_CODE" -Value (Get-FirstValue -Values @($TenantCode, $env:PLAYWRIGHT_TENANT_CODE))
 $TenantNameValue = Get-FirstValue -Values @($TenantName, $env:PLAYWRIGHT_TENANT_NAME, "$script:TenantCodeValue Hosted Verification")
 $TenantAdminUsernameValue = Require-Username -Name "PLAYWRIGHT_TENANT_ADMIN_USERNAME" -Value (Get-FirstValue -Values @($TenantAdminUsername, $env:PLAYWRIGHT_TENANT_ADMIN_USERNAME, $env:PLAYWRIGHT_OPERATIONS_LEAD_USERNAME))
@@ -516,9 +594,60 @@ Write-Host "========================================"
 Write-Host "SYNAPSECORE HOSTED PROOF PREP"
 Write-Host "========================================"
 Write-Host "Backend API : $script:ApiBaseUrlValue"
+if (-not [string]::IsNullOrWhiteSpace($FrontendBaseUrlValue)) {
+    Write-Host "Frontend    : $FrontendBaseUrlValue"
+}
 Write-Host "Tenant      : $script:TenantCodeValue"
 Write-Host "Mode        : real tenant/admin APIs, no seed or DB edits"
 Write-Host ""
+
+$readinessUrl = "$script:ApiBaseUrlValue/actuator/health/readiness"
+$authSessionUrl = "$script:ApiBaseUrlValue/api/auth/session"
+$realtimeInfoUrl = "$script:ApiBaseUrlValue/ws/info?t=$([DateTimeOffset]::UtcNow.ToUnixTimeMilliseconds())"
+
+Write-Host "Waiting for backend readiness and warm-up..."
+Wait-HostedProbe `
+    -Description "Backend readiness" `
+    -Probe { Invoke-HostedProbe -Url $readinessUrl } `
+    -IsReady {
+        param($result)
+        $null -ne $result -and
+            $result.StatusCode -eq 200 -and
+            (Get-PropertyValue -Object $result.Json -PropertyName "status") -eq "UP"
+    } | Out-Null
+
+Wait-HostedProbe `
+    -Description "Auth session endpoint" `
+    -Probe { Invoke-HostedProbe -Url $authSessionUrl } `
+    -IsReady {
+        param($result)
+        $null -ne $result -and
+            $result.StatusCode -eq 200 -and
+            $null -ne (Get-PropertyValue -Object $result.Json -PropertyName "signedIn")
+    } | Out-Null
+
+Wait-HostedProbe `
+    -Description "Realtime SockJS endpoint" `
+    -Probe { Invoke-HostedProbe -Url $realtimeInfoUrl } `
+    -IsReady {
+        param($result)
+        $null -ne $result -and
+            $result.StatusCode -eq 200 -and
+            $null -ne (Get-PropertyValue -Object $result.Json -PropertyName "websocket")
+    } | Out-Null
+
+if (-not [string]::IsNullOrWhiteSpace($FrontendBaseUrlValue)) {
+    Wait-HostedProbe `
+        -Description "Frontend sign-in shell" `
+        -Probe { Invoke-HostedProbe -Url "$FrontendBaseUrlValue/sign-in" } `
+        -IsReady {
+            param($result)
+            $null -ne $result -and
+                $result.StatusCode -eq 200 -and
+                -not [string]::IsNullOrWhiteSpace($result.Content) -and
+                $result.Content -match "SynapseCore"
+        } | Out-Null
+}
 
 $tenants = @(Get-JsonArray -Url "$script:ApiBaseUrlValue/api/access/tenants")
 $tenant = $tenants | Where-Object { $null -ne $_ -and (Get-PropertyValue -Object $_ -PropertyName "code") -ieq $script:TenantCodeValue } | Select-Object -First 1
@@ -618,3 +747,9 @@ Write-Host "PLAYWRIGHT_TENANT_ADMIN_USERNAME=$TenantAdminUsernameValue"
 Write-Host "PLAYWRIGHT_PLANNER_USERNAME=$PlannerUsernameValue"
 Write-Host "PLAYWRIGHT_INTEGRATION_ADMIN_USERNAME=$IntegrationAdminUsernameValue"
 Write-Host "Keep the password env vars set to the secret values supplied to this script."
+Write-Host ""
+Write-Host "Official hosted proof order:"
+Write-Host "1. readiness warm-up (performed by this script and Playwright global setup)"
+Write-Host "2. hosted proof tenant prep (this script)"
+Write-Host "3. cd frontend"
+Write-Host "4. npm.cmd run test:e2e:prod"
