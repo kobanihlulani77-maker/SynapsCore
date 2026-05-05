@@ -442,6 +442,23 @@ async function readReplayOutcome(api, externalOrderId) {
   return { state: 'missing' }
 }
 
+function describeReplayOutcome(replayOutcome) {
+  if (!replayOutcome || replayOutcome.state === 'missing') {
+    return 'missing'
+  }
+
+  if (replayOutcome.state === 'replayed') {
+    return 'replayed'
+  }
+
+  const nextEligibleAt = replayOutcome.record?.nextEligibleAt
+  if (nextEligibleAt && Date.parse(nextEligibleAt) > Date.now()) {
+    return `queued:${replayOutcome.status}:waiting`
+  }
+
+  return `queued:${replayOutcome.status}`
+}
+
 async function waitForReplayResolution(api, externalOrderId, timeout, message) {
   await expect.poll(async () => {
     const replayOutcome = await readReplayOutcome(api, externalOrderId)
@@ -522,19 +539,12 @@ async function createReplayFixture() {
     }).toBe(true)
 
     await expect.poll(async () => {
-      const replayQueue = await readJson(await api.get('/api/integrations/orders/replay-queue'))
-      const replayRecord = replayQueue.find((record) => record.externalOrderId === externalOrderId)
-      if (!replayRecord) {
-        return 'missing'
-      }
-      if (replayRecord.nextEligibleAt && Date.parse(replayRecord.nextEligibleAt) > Date.now()) {
-        return 'waiting'
-      }
-      return replayRecord.status
+      const replayOutcome = await readReplayOutcome(api, externalOrderId)
+      return describeReplayOutcome(replayOutcome)
     }, {
       timeout: 30_000,
-      message: `Expected replay verification record ${externalOrderId} to be present and eligible before UI replay proof.`,
-    }).toBe('PENDING')
+      message: `Expected replay verification record ${externalOrderId} to remain replayable or finish automated recovery before UI replay proof.`,
+    }).toMatch(/^(replayed|queued:PENDING|queued:REPLAY_FAILED)$/)
 
     return { api, sourceSystem, externalOrderId }
   } catch (error) {
