@@ -15,6 +15,11 @@ spring:
         enabled: false
 
 management:
+  endpoint:
+    health:
+      group:
+        readiness:
+          include: readinessState,db,ping
   health:
     redis:
       enabled: false

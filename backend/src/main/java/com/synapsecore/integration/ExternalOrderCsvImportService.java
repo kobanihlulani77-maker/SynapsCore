@@ -86,7 +86,7 @@ public class ExternalOrderCsvImportService {
                 }
                 var connector = authenticatedConnector != null
                     ? authenticatedConnector
-                    : integrationConnectorService.requireEnabledConnector(
+                    : integrationConnectorService.requireConfiguredConnector(
                         key.sourceSystem(),
                         IntegrationConnectorType.CSV_ORDER_IMPORT,
                         "accept CSV imports");
@@ -106,6 +106,7 @@ public class ExternalOrderCsvImportService {
                             .toList()
                     )
                 ).getId();
+                integrationConnectorService.requireEnabledConnector(connector, "accept CSV imports");
 
                 var preparedOrder = integrationConnectorPolicyService.prepareOrder(
                     connector,

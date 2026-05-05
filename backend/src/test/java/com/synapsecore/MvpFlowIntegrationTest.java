@@ -3799,6 +3799,84 @@ class MvpFlowIntegrationTest {
     }
 
     @Test
+    void disabledCsvConnectorFailureQueuesReplayRecordImmediately() throws Exception {
+        mockMvc.perform(post("/api/integrations/orders/connectors")
+                .with(accessHeaders("Integration Lead", "INTEGRATION_ADMIN"))
+                .header("X-Synapse-Tenant", "STARTER-OPS")
+                .contentType(APPLICATION_JSON)
+                .content("""
+                    {
+                      "sourceSystem": "erp_batch",
+                      "type": "CSV_ORDER_IMPORT",
+                      "displayName": "ERP Batch CSV Feed",
+                      "enabled": false,
+                      "syncMode": "BATCH_FILE_DROP",
+                      "validationPolicy": "RELAXED",
+                      "transformationPolicy": "NORMALIZE_CODES",
+                      "allowDefaultWarehouseFallback": false,
+                      "notes": "Disabled for replay queue verification."
+                    }
+                    """))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.enabled").value(false));
+
+        String csvBody = """
+            sourceSystem,externalOrderId,warehouseCode,productSku,quantity,unitPrice
+            erp_batch,CSV-DISABLED-1001,WH-NORTH,SKU-FLX-100,2,88.00
+            """;
+
+        MockMultipartFile file = new MockMultipartFile(
+            "file",
+            "disabled-replay-orders.csv",
+            "text/csv",
+            csvBody.getBytes()
+        );
+
+        mockMvc.perform(multipart("/api/integrations/orders/csv-import")
+                .file(file)
+                .header("X-Synapse-Tenant", "STARTER-OPS")
+                .param("sourceSystem", "erp_batch"))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.ordersImported").value(0))
+            .andExpect(jsonPath("$.ordersFailed").value(1))
+            .andExpect(jsonPath("$.failedOrders[0].sourceSystem").value("erp_batch"))
+            .andExpect(jsonPath("$.failedOrders[0].externalOrderId").value("CSV-DISABLED-1001"))
+            .andExpect(jsonPath("$.failedOrders[0].failureCode").value("CONNECTOR_DISABLED"));
+
+        var inboundRecord = integrationInboundRecordRepository.findAll().stream()
+            .filter(record -> "CSV-DISABLED-1001".equals(record.getExternalOrderId()))
+            .findFirst()
+            .orElseThrow();
+        var replayRecord = integrationReplayRecordRepository.findAll().stream()
+            .filter(record -> "CSV-DISABLED-1001".equals(record.getExternalOrderId()))
+            .findFirst()
+            .orElseThrow();
+
+        assertThat(inboundRecord.getStatus()).isEqualTo(com.synapsecore.domain.entity.IntegrationInboundStatus.REPLAY_QUEUED);
+        assertThat(replayRecord.getInboundRecordId()).isEqualTo(inboundRecord.getId());
+        assertThat(replayRecord.getFailureCode()).isEqualTo(com.synapsecore.integration.IntegrationFailureCode.CONNECTOR_DISABLED);
+        assertThat(replayRecord.getStatus()).isEqualTo(com.synapsecore.domain.entity.IntegrationReplayStatus.PENDING);
+
+        mockMvc.perform(get("/api/integrations/orders/replay-queue")
+                .with(accessHeaders("Operations Lead", "TENANT_ADMIN"))
+                .header("X-Synapse-Tenant", "STARTER-OPS"))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$[?(@.externalOrderId == 'CSV-DISABLED-1001')].sourceSystem")
+                .value(org.hamcrest.Matchers.hasItem("erp_batch")))
+            .andExpect(jsonPath("$[?(@.externalOrderId == 'CSV-DISABLED-1001')].failureCode")
+                .value(org.hamcrest.Matchers.hasItem("CONNECTOR_DISABLED")))
+            .andExpect(jsonPath("$[?(@.externalOrderId == 'CSV-DISABLED-1001')].status")
+                .value(org.hamcrest.Matchers.hasItem("PENDING")));
+
+        mockMvc.perform(get("/api/dashboard/snapshot")
+                .with(accessHeaders("Operations Lead", "TENANT_ADMIN"))
+                .header("X-Synapse-Tenant", "STARTER-OPS"))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.integrationReplayQueue[?(@.externalOrderId == 'CSV-DISABLED-1001')].failureCode")
+                .value(org.hamcrest.Matchers.hasItem("CONNECTOR_DISABLED")));
+    }
+
+    @Test
     void replayRecordDeadLettersAfterConfiguredFailures() throws Exception {
         String csvBody = """
             externalOrderId,warehouseCode,productSku,quantity,unitPrice

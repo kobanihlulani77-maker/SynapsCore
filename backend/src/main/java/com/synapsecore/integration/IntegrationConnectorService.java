@@ -155,16 +155,37 @@ public class IntegrationConnectorService {
         return requireEnabledConnectorForTenant(tenantCode, sourceSystem, type, actionDescription);
     }
 
-    public IntegrationConnector requireEnabledConnectorForTenant(String tenantCode,
-                                                                 String sourceSystem,
-                                                                 IntegrationConnectorType type,
-                                                                 String actionDescription) {
+    public IntegrationConnector requireConfiguredConnector(String sourceSystem,
+                                                           IntegrationConnectorType type,
+                                                           String actionDescription) {
+        String tenantCode = tenantContextService.getCurrentTenantCodeOrDefault();
+        return requireConfiguredConnectorForTenant(tenantCode, sourceSystem, type, actionDescription);
+    }
+
+    public IntegrationConnector requireConfiguredConnectorForTenant(String tenantCode,
+                                                                    String sourceSystem,
+                                                                    IntegrationConnectorType type,
+                                                                    String actionDescription) {
         String normalizedSourceSystem = normalizeSourceSystem(sourceSystem);
-        IntegrationConnector connector = integrationConnectorRepository
+        return integrationConnectorRepository
             .findByTenant_CodeIgnoreCaseAndSourceSystemIgnoreCaseAndType(tenantCode, normalizedSourceSystem, type)
             .orElseThrow(() -> IntegrationFailureCodes.status(HttpStatus.NOT_FOUND,
                 IntegrationFailureCode.CONNECTOR_NOT_CONFIGURED,
                 "Integration connector not configured for sourceSystem " + normalizedSourceSystem + " and type " + type));
+    }
+
+    public IntegrationConnector requireEnabledConnectorForTenant(String tenantCode,
+                                                                 String sourceSystem,
+                                                                 IntegrationConnectorType type,
+                                                                 String actionDescription) {
+        return requireEnabled(
+            requireConfiguredConnectorForTenant(tenantCode, sourceSystem, type, actionDescription),
+            actionDescription
+        );
+    }
+
+    public IntegrationConnector requireEnabledConnector(IntegrationConnector connector,
+                                                        String actionDescription) {
         return requireEnabled(connector, actionDescription);
     }
 
