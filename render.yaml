@@ -65,7 +65,7 @@ services:
       - key: VITE_API_URL
         value: https://synapscore-3.onrender.com
       - key: VITE_WS_URL
-        value: wss://synapscore-3.onrender.com/ws
+        value: https://synapscore-3.onrender.com/ws
       - key: VITE_APP_BUILD_VERSION
         value: 0.0.1
       - key: VITE_APP_BUILD_COMMIT

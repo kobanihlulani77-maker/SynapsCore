@@ -6,10 +6,6 @@ export const postAuthRedirectStorageKey = 'synapsecore.postAuthRedirect'
 export const trimTrailingSlash = (value = '') => value.replace(/\/+$/, '')
 export const isLocalHostname = (hostname = '') => ['localhost', '127.0.0.1', '0.0.0.0'].includes((hostname || '').toLowerCase())
 export const isExplicitNativeRealtimeUrl = (value = '') => /^wss?:/i.test(String(value).trim())
-export const isHostedHostname = (hostname = '') => {
-  const normalizedHostname = (hostname || '').toLowerCase()
-  return Boolean(normalizedHostname) && !isLocalHostname(normalizedHostname)
-}
 
 export const normalizeAbsoluteUrl = (value) => {
   if (!value || !String(value).trim()) return ''
@@ -54,16 +50,6 @@ export const resolveRealtimeUrl = (configuredUrl, apiBaseUrl, preferredProtocol)
   }
 }
 
-export const isHostedRealtimeCandidate = (value) => {
-  if (!value || !String(value).trim()) return false
-  try {
-    const parsedUrl = new URL(String(value).trim(), globalThis.location?.origin || undefined)
-    return isHostedHostname(parsedUrl.hostname)
-  } catch {
-    return /^https?:\/\//i.test(String(value).trim())
-  }
-}
-
 export const readStoredJson = (storage, key, fallbackValue) => {
   try {
     const rawValue = storage?.getItem?.(key)
@@ -92,23 +78,16 @@ export const removeStoredValue = (storage, key) => {
 export const rememberedWorkspacePreference = readStoredJson(globalThis.localStorage, workspacePreferenceStorageKey, null)
 export const configuredRealtimeUrl = runtimeConfig.wsUrl || import.meta.env.VITE_WS_URL || ''
 export const apiUrl = resolveApiBaseUrl()
-const resolvedNativeRealtimeUrl = resolveRealtimeUrl(configuredRealtimeUrl, apiUrl, 'ws')
-const hostedRealtimeCandidate = configuredRealtimeUrl || apiUrl
-// Prefer native WebSocket on hosted deployments where the backend exposes /ws directly, while
-// keeping the SockJS endpoint available as a fallback transport.
-export const websocketBrokerUrl = (
-  isExplicitNativeRealtimeUrl(configuredRealtimeUrl)
-    || isHostedRealtimeCandidate(hostedRealtimeCandidate)
-)
-  ? resolvedNativeRealtimeUrl
-  : ''
 export const sockJsUrl = resolveRealtimeUrl(configuredRealtimeUrl, apiUrl, 'http')
+// Spring registers /ws as a SockJS endpoint. Use native STOMP only when the runtime config
+// explicitly provides a ws:// or wss:// broker endpoint that is known to be raw WebSocket.
+export const websocketBrokerUrl = isExplicitNativeRealtimeUrl(configuredRealtimeUrl)
+  ? resolveRealtimeUrl(configuredRealtimeUrl, apiUrl, 'ws')
+  : ''
 export const wsUrl = websocketBrokerUrl || sockJsUrl
-export const realtimeTransportLabel = websocketBrokerUrl && sockJsUrl
-  ? 'Native WebSocket / STOMP (SockJS fallback available)'
-  : websocketBrokerUrl
-    ? 'Native WebSocket / STOMP'
-    : (sockJsUrl ? 'SockJS / STOMP' : 'Realtime not configured')
+export const realtimeTransportLabel = websocketBrokerUrl
+  ? 'Native WebSocket / STOMP'
+  : (sockJsUrl ? 'SockJS / STOMP' : 'Realtime not configured')
 export const frontendBuildVersion = runtimeConfig.appBuildVersion || import.meta.env.VITE_APP_BUILD_VERSION || 'local-dev'
 export const frontendBuildCommit = runtimeConfig.appBuildCommit || import.meta.env.VITE_APP_BUILD_COMMIT || 'local-dev'
 export const frontendBuildTime = runtimeConfig.appBuildTime || import.meta.env.VITE_APP_BUILD_TIME || 'untracked'

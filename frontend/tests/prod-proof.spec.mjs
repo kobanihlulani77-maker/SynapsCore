@@ -274,6 +274,64 @@ async function waitForDashboardSnapshotReady(page, options = {}) {
   }).toBe('ready')
 }
 
+async function readRealtimeDiagnostics(page) {
+  return page.evaluate(async () => {
+    const textOrEmpty = (selector) => {
+      const element = globalThis.document?.querySelector?.(selector)
+      return element?.textContent?.trim?.() || ''
+    }
+
+    const debugState = globalThis.__SYNAPSE_REALTIME_DEBUG__ || null
+    const runtimeConfig = globalThis.__SYNAPSE_RUNTIME_CONFIG__ || {}
+    const apiBaseUrl = runtimeConfig.apiUrl || ''
+    const realtimeBaseUrl = runtimeConfig.wsUrl || ''
+    let authSession = null
+    let wsInfo = null
+
+    if (apiBaseUrl) {
+      try {
+        const response = await fetch(`${apiBaseUrl}/api/auth/session`, {
+          credentials: 'include',
+        })
+        authSession = {
+          status: response.status,
+          payload: await response.json().catch(() => null),
+        }
+      } catch (error) {
+        authSession = {
+          error: error?.message || String(error),
+        }
+      }
+
+      try {
+        const wsInfoResponse = await fetch(`${apiBaseUrl}/ws/info?t=${Date.now()}`, {
+          credentials: 'include',
+        })
+        wsInfo = {
+          status: wsInfoResponse.status,
+          payload: await wsInfoResponse.json().catch(() => null),
+        }
+      } catch (error) {
+        wsInfo = {
+          error: error?.message || String(error),
+        }
+      }
+    }
+
+    return {
+      pageUrl: globalThis.location?.href || '',
+      realtimeBaseUrl,
+      connectionBanner: textOrEmpty('#workspace-trust-rail .utility-state'),
+      connectionSummary: textOrEmpty('#workspace-trust-rail strong'),
+      snapshotStatus: textOrEmpty('#workspace-trust-rail .muted-text'),
+      topbarStatus: textOrEmpty('.workspace-status-strip .workspace-status-pill.status-live, .workspace-status-strip .workspace-status-pill.status-connecting, .workspace-status-strip .workspace-status-pill.status-reconnecting, .workspace-status-strip .workspace-status-pill.status-degraded'),
+      debugState,
+      authSession,
+      wsInfo,
+    }
+  })
+}
+
 async function waitForRealtimeConnectionLive(page, options = {}) {
   const { timeoutMs = 90_000 } = options
   await waitForDashboardSnapshotReady(page, { timeoutMs })
@@ -284,21 +342,25 @@ async function waitForRealtimeConnectionLive(page, options = {}) {
     page.locator('.utility-state.utility-live').first(),
   ]
   const snapshotLoadError = page.locator('.error-text:visible').filter({ hasText: /Snapshot load issue:/ }).first()
+  const startedAt = Date.now()
 
-  await expect.poll(async () => {
+  while (Date.now() - startedAt < timeoutMs) {
     if (await snapshotLoadError.isVisible().catch(() => false)) {
-      return 'error'
+      const diagnostics = await readRealtimeDiagnostics(page)
+      throw new Error(`Hosted dashboard surfaced a snapshot load issue while waiting for realtime live state. Diagnostics: ${JSON.stringify(diagnostics)}`)
     }
+
     for (const indicator of liveIndicators) {
       if (await indicator.isVisible().catch(() => false)) {
-        return 'live'
+        return
       }
     }
-    return 'waiting'
-  }, {
-    timeout: timeoutMs,
-    message: 'Expected the hosted dashboard to report a live realtime connection before websocket proof mutates backend state.',
-  }).toBe('live')
+
+    await page.waitForTimeout(1_000)
+  }
+
+  const diagnostics = await readRealtimeDiagnostics(page)
+  throw new Error(`Expected the hosted dashboard to report a live realtime connection before websocket proof mutates backend state. Diagnostics: ${JSON.stringify(diagnostics)}`)
 }
 
 async function findVisibleIntegrationConnector(page, connectors) {

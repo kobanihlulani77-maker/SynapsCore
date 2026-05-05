@@ -62,11 +62,14 @@ SYNAPSECORE_RATE_LIMIT_INTEGRATION_MUTATION_MAX_ATTEMPTS=<count per window>
 
 ```text
 VITE_API_URL=https://synapscore-3.onrender.com
-VITE_WS_URL=wss://synapscore-3.onrender.com/ws
+VITE_WS_URL=https://synapscore-3.onrender.com/ws
 VITE_APP_BUILD_VERSION=<release-version>
 VITE_APP_BUILD_COMMIT=<git-sha>
 VITE_APP_BUILD_TIME=<utc-timestamp>
 ```
+
+Hosted Render should use the SockJS endpoint URL above, not a raw `wss://.../ws` broker URL.
+The frontend will use STOMP over SockJS and allow websocket, xhr-streaming, and xhr-polling transports so realtime can still recover on constrained or slow proxy paths.
 
 The frontend service must keep SPA rewrite routing:
 

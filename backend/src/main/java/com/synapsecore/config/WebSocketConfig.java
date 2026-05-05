@@ -4,6 +4,8 @@ import com.synapsecore.auth.AuthSessionService;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.server.ServerHttpRequest;
@@ -27,6 +29,7 @@ import org.springframework.web.socket.server.HandshakeInterceptor;
 public class WebSocketConfig implements WebSocketMessageBrokerConfigurer {
 
     private static final String SESSION_TENANT_CODE_ATTRIBUTE = "synapsecoreTenantCode";
+    private static final Logger log = LoggerFactory.getLogger(WebSocketConfig.class);
 
     private final List<String> allowedOrigins;
     private final SynapseAccessProperties accessProperties;
@@ -73,7 +76,10 @@ public class WebSocketConfig implements WebSocketMessageBrokerConfigurer {
             endpoint.addInterceptors(new AuthenticatedTenantHandshakeInterceptor(authSessionService));
         }
 
-        endpoint.withSockJS();
+        var sockJsRegistration = endpoint.withSockJS();
+        if (!accessProperties.isAllowHeaderFallback()) {
+            sockJsRegistration.setSessionCookieNeeded(true);
+        }
     }
 
     @Override
@@ -97,18 +103,23 @@ public class WebSocketConfig implements WebSocketMessageBrokerConfigurer {
                                        org.springframework.web.socket.WebSocketHandler wsHandler,
                                        Map<String, Object> attributes) {
             if (!(request instanceof ServletServerHttpRequest servletRequest)) {
+                log.warn("Realtime handshake rejected because the request was not servlet-backed: {}", request.getURI());
                 response.setStatusCode(HttpStatus.FORBIDDEN);
                 return false;
             }
 
             var session = servletRequest.getServletRequest().getSession(false);
             if (session == null || !authSessionService.hasSessionIdentity(session)) {
+                log.warn("Realtime handshake rejected because no authenticated HTTP session was available for {}", request.getURI());
                 response.setStatusCode(HttpStatus.FORBIDDEN);
                 return false;
             }
 
             return authSessionService.resolveAuthenticatedSession(session)
                 .map(authenticatedSession -> {
+                    log.info("Realtime handshake accepted for tenant {} from origin {}",
+                        authenticatedSession.tenant().getCode(),
+                        servletRequest.getHeaders().getOrigin());
                     attributes.put(
                         SESSION_TENANT_CODE_ATTRIBUTE,
                         authenticatedSession.tenant().getCode().trim().toUpperCase(Locale.ROOT)
@@ -116,6 +127,7 @@ public class WebSocketConfig implements WebSocketMessageBrokerConfigurer {
                     return true;
                 })
                 .orElseGet(() -> {
+                    log.warn("Realtime handshake rejected because the authenticated session could not be resolved for {}", request.getURI());
                     response.setStatusCode(HttpStatus.FORBIDDEN);
                     return false;
                 });
@@ -126,6 +138,9 @@ public class WebSocketConfig implements WebSocketMessageBrokerConfigurer {
                                    ServerHttpResponse response,
                                    org.springframework.web.socket.WebSocketHandler wsHandler,
                                    Exception exception) {
+            if (exception != null) {
+                log.warn("Realtime handshake completed with exception for {}: {}", request.getURI(), exception.getMessage());
+            }
         }
     }
 
@@ -148,6 +163,7 @@ public class WebSocketConfig implements WebSocketMessageBrokerConfigurer {
                 : (String) sessionAttributes.get(SESSION_TENANT_CODE_ATTRIBUTE);
 
             if (tenantCode == null || tenantCode.isBlank()) {
+                log.warn("Realtime subscription rejected because no signed-in tenant was attached to the STOMP session.");
                 throw new IllegalArgumentException("A signed-in tenant session is required for realtime subscriptions.");
             }
 
@@ -160,6 +176,9 @@ public class WebSocketConfig implements WebSocketMessageBrokerConfigurer {
             String normalizedDestination = destination.trim().toUpperCase(Locale.ROOT);
             if (normalizedDestination.startsWith("/TOPIC/TENANT/")
                 && !normalizedDestination.startsWith(expectedPrefix.toUpperCase(Locale.ROOT))) {
+                log.warn("Realtime subscription rejected for tenant {} because destination {} escaped the tenant scope.",
+                    tenantCode,
+                    destination);
                 throw new IllegalArgumentException(
                     "Realtime subscriptions are limited to the signed-in tenant context."
                 );

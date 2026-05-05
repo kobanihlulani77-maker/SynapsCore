@@ -210,7 +210,7 @@ export default async function globalSetup() {
         const response = await backend.get(`/ws/info?t=${Date.now()}`)
         const payload = await response.json().catch(() => null)
         return {
-          detail: `HTTP ${response.status()} websocket=${payload?.websocket}`,
+          detail: `HTTP ${response.status()} websocket=${payload?.websocket} cookie_needed=${payload?.cookie_needed}`,
           status: response.status(),
           payload,
         }

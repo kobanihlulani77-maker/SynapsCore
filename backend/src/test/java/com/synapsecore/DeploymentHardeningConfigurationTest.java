@@ -24,6 +24,8 @@ class DeploymentHardeningConfigurationTest {
         assertThat(renderConfig).contains("value: synapsecore:sessions");
         assertThat(renderConfig).contains("value: REDIS_PUBSUB");
         assertThat(renderConfig).contains("value: validate");
+        assertThat(renderConfig).contains("value: https://synapscore-3.onrender.com/ws");
+        assertThat(renderConfig).doesNotContain("value: wss://synapscore-3.onrender.com/ws");
         assertThat(renderConfig).doesNotContain("value: SIMPLE_IN_MEMORY");
         assertThat(renderConfig).doesNotContain("value: update");
     }
