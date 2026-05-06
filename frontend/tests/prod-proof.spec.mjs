@@ -517,6 +517,7 @@ async function readReplayPageDiagnostics(page, replayFixture) {
     note: `Replay connector diagnostics for ${replayFixture.sourceSystem}.`,
   })
   const backendReplayOutcome = await readReplayOutcome(replayFixture.api, replayFixture.externalOrderId)
+  const exactReplayAction = await readExactReplayActionState(page, replayFixture)
 
   const pageDiagnostics = await page.evaluate(async ({ externalOrderId, sourceSystem }) => {
     const textOrEmpty = (selector) => {
@@ -607,7 +608,134 @@ async function readReplayPageDiagnostics(page, replayFixture) {
       connector.sourceSystem === replayFixture.sourceSystem && connector.type === 'CSV_ORDER_IMPORT'
     )) || null,
     page: pageDiagnostics,
+    exactReplayAction,
   }
+}
+
+async function readExactReplayActionState(page, replayFixture) {
+  return page.evaluate(({ externalOrderId, sourceSystem }) => {
+    const normalizeText = (value) => value?.replace?.(/\s+/g, ' ')?.trim?.() || ''
+    const replayRows = [...(globalThis.document?.querySelectorAll?.('.signal-list-item.selectable-card') || [])]
+    const exactReplayRow = replayRows.find((row) => (
+      row.textContent?.includes?.(externalOrderId) && row.textContent?.includes?.(sourceSystem)
+    )) || replayRows.find((row) => row.textContent?.includes?.(externalOrderId)) || null
+    const replayDetails = [...(globalThis.document?.querySelectorAll?.('.section-card') || [])]
+    const exactReplayDetail = replayDetails.find((card) => (
+      card.textContent?.includes?.('Recovery detail')
+        && card.textContent?.includes?.(externalOrderId)
+        && card.textContent?.includes?.(sourceSystem)
+    )) || replayDetails.find((card) => (
+      card.textContent?.includes?.('Recovery detail') && card.textContent?.includes?.(externalOrderId)
+    )) || replayDetails.find((card) => card.textContent?.includes?.('Recovery detail')) || null
+    const exactReplayButton = [...(exactReplayDetail?.querySelectorAll?.('button') || [])]
+      .find((button) => normalizeText(button.textContent) === 'Replay Into Live Flow') || null
+    const buttonStyle = exactReplayButton ? globalThis.getComputedStyle(exactReplayButton) : null
+    const buttonRect = exactReplayButton?.getBoundingClientRect?.() || null
+    const buttonCenter = buttonRect && buttonRect.width > 0 && buttonRect.height > 0
+      ? {
+          x: buttonRect.left + (buttonRect.width / 2),
+          y: buttonRect.top + (buttonRect.height / 2),
+        }
+      : null
+    const overlayElement = buttonCenter
+      ? globalThis.document?.elementFromPoint?.(buttonCenter.x, buttonCenter.y) || null
+      : null
+    const overlayStyle = overlayElement ? globalThis.getComputedStyle(overlayElement) : null
+    const overlayChain = []
+    let currentOverlay = overlayElement
+    while (currentOverlay && overlayChain.length < 4) {
+      overlayChain.push({
+        tagName: currentOverlay.tagName?.toLowerCase?.() || '',
+        className: typeof currentOverlay.className === 'string' ? currentOverlay.className : '',
+        text: normalizeText(currentOverlay.textContent).slice(0, 160),
+      })
+      currentOverlay = currentOverlay.parentElement
+    }
+    const detailText = normalizeText(exactReplayDetail?.textContent)
+    const buttonDisabledAttribute = exactReplayButton?.getAttribute?.('disabled')
+    const buttonAriaDisabled = exactReplayButton?.getAttribute?.('aria-disabled') || ''
+    const buttonVisible = Boolean(
+      exactReplayButton
+        && buttonRect
+        && buttonRect.width > 0
+        && buttonRect.height > 0
+        && buttonStyle
+        && buttonStyle.display !== 'none'
+        && buttonStyle.visibility !== 'hidden'
+        && buttonStyle.opacity !== '0'
+    )
+    const domEnabled = Boolean(
+      exactReplayButton
+        && exactReplayButton.disabled === false
+        && buttonDisabledAttribute == null
+        && buttonAriaDisabled !== 'true'
+    )
+
+    return {
+      rowFound: Boolean(exactReplayRow),
+      rowText: normalizeText(exactReplayRow?.textContent),
+      detailFound: Boolean(exactReplayDetail),
+      detailText,
+      detailHtml: exactReplayDetail?.outerHTML?.slice?.(0, 2_000) || '',
+      buttonFound: Boolean(exactReplayButton),
+      buttonText: normalizeText(exactReplayButton?.textContent),
+      buttonDisabled: exactReplayButton?.disabled ?? null,
+      buttonDisabledAttribute,
+      buttonAriaDisabled,
+      buttonConnected: exactReplayButton?.isConnected ?? null,
+      buttonVisible,
+      buttonPointerEvents: buttonStyle?.pointerEvents || '',
+      buttonDisplay: buttonStyle?.display || '',
+      buttonVisibility: buttonStyle?.visibility || '',
+      buttonOpacity: buttonStyle?.opacity || '',
+      buttonBoundingBox: buttonRect ? {
+        x: buttonRect.x,
+        y: buttonRect.y,
+        width: buttonRect.width,
+        height: buttonRect.height,
+      } : null,
+      buttonCenter,
+      overlay: overlayElement ? {
+        tagName: overlayElement.tagName?.toLowerCase?.() || '',
+        className: typeof overlayElement.className === 'string' ? overlayElement.className : '',
+        text: normalizeText(overlayElement.textContent).slice(0, 200),
+        pointerEvents: overlayStyle?.pointerEvents || '',
+        display: overlayStyle?.display || '',
+        visibility: overlayStyle?.visibility || '',
+        opacity: overlayStyle?.opacity || '',
+        html: overlayElement.outerHTML?.slice?.(0, 1_000) || '',
+      } : null,
+      overlayChain,
+      domEnabled,
+    }
+  }, {
+    externalOrderId: replayFixture.externalOrderId,
+    sourceSystem: replayFixture.sourceSystem,
+  })
+}
+
+async function focusReplayRecord(page, replayFixture) {
+  return page.evaluate(({ externalOrderId, sourceSystem }) => {
+    const replayRows = [...(globalThis.document?.querySelectorAll?.('.signal-list-item.selectable-card') || [])]
+    const exactReplayRow = replayRows.find((row) => (
+      row.textContent?.includes?.(externalOrderId) && row.textContent?.includes?.(sourceSystem)
+    )) || replayRows.find((row) => row.textContent?.includes?.(externalOrderId)) || null
+    if (!exactReplayRow) {
+      return {
+        clicked: false,
+        rowText: '',
+      }
+    }
+    exactReplayRow.scrollIntoView({ block: 'center', inline: 'nearest' })
+    exactReplayRow.click()
+    return {
+      clicked: true,
+      rowText: exactReplayRow.textContent?.trim?.() || '',
+    }
+  }, {
+    externalOrderId: replayFixture.externalOrderId,
+    sourceSystem: replayFixture.sourceSystem,
+  })
 }
 
 async function waitForReplayButtonReady(page, replayFixture) {
@@ -633,22 +761,11 @@ async function waitForReplayButtonReady(page, replayFixture) {
     if (await replayQueueRecord.isVisible().catch(() => false)) {
       await replayQueueRecord.click().catch(() => {})
     }
+    await focusReplayRecord(page, replayFixture).catch(() => {})
 
-    const replayDetail = page.locator('.section-card')
-      .filter({ hasText: 'Recovery detail' })
-      .filter({ hasText: replayFixture.externalOrderId })
-      .last()
-    const replayButton = replayDetail.getByRole('button', { name: 'Replay Into Live Flow' }).first()
-
-    if (await replayDetail.isVisible().catch(() => false) && await replayButton.isVisible().catch(() => false)) {
-      const buttonState = await replayButton.evaluate((button) => ({
-        disabled: button.disabled,
-        ariaDisabled: button.getAttribute('aria-disabled') || '',
-      })).catch(() => null)
-
-      if (buttonState && buttonState.disabled === false && buttonState.ariaDisabled !== 'true') {
-        return replayButton
-      }
+    const actionState = await readExactReplayActionState(page, replayFixture)
+    if (actionState.domEnabled) {
+      return actionState
     }
 
     await page.waitForTimeout(500)
@@ -656,6 +773,60 @@ async function waitForReplayButtonReady(page, replayFixture) {
 
   const diagnostics = await readReplayPageDiagnostics(page, replayFixture)
   throw new Error(`Expected Replay Into Live Flow to become enabled after connector ${replayFixture.sourceSystem} was re-enabled and the replay queue refreshed. Diagnostics: ${JSON.stringify(diagnostics)}`)
+}
+
+async function clickExactReplayButton(page, replayFixture) {
+  const clickResult = await page.evaluate(({ externalOrderId, sourceSystem }) => {
+    const normalizeText = (value) => value?.replace?.(/\s+/g, ' ')?.trim?.() || ''
+    const replayDetails = [...(globalThis.document?.querySelectorAll?.('.section-card') || [])]
+    const exactReplayDetail = replayDetails.find((card) => (
+      card.textContent?.includes?.('Recovery detail')
+        && card.textContent?.includes?.(externalOrderId)
+        && card.textContent?.includes?.(sourceSystem)
+    )) || replayDetails.find((card) => (
+      card.textContent?.includes?.('Recovery detail') && card.textContent?.includes?.(externalOrderId)
+    )) || null
+    const exactReplayButton = [...(exactReplayDetail?.querySelectorAll?.('button') || [])]
+      .find((button) => normalizeText(button.textContent) === 'Replay Into Live Flow') || null
+
+    if (!exactReplayDetail || !exactReplayButton) {
+      return {
+        clicked: false,
+        reason: 'missing-target',
+        detailHtml: exactReplayDetail?.outerHTML?.slice?.(0, 2_000) || '',
+        buttonHtml: exactReplayButton?.outerHTML?.slice?.(0, 1_000) || '',
+      }
+    }
+
+    const disabledAttribute = exactReplayButton.getAttribute('disabled')
+    const ariaDisabled = exactReplayButton.getAttribute('aria-disabled') || ''
+    if (exactReplayButton.disabled || disabledAttribute != null || ariaDisabled === 'true') {
+      return {
+        clicked: false,
+        reason: 'dom-disabled',
+        detailHtml: exactReplayDetail.outerHTML?.slice?.(0, 2_000) || '',
+        buttonHtml: exactReplayButton.outerHTML?.slice?.(0, 1_000) || '',
+        disabled: exactReplayButton.disabled,
+        disabledAttribute,
+        ariaDisabled,
+      }
+    }
+
+    exactReplayButton.scrollIntoView({ block: 'center', inline: 'nearest' })
+    exactReplayButton.click()
+    return {
+      clicked: true,
+      buttonHtml: exactReplayButton.outerHTML?.slice?.(0, 1_000) || '',
+    }
+  }, {
+    externalOrderId: replayFixture.externalOrderId,
+    sourceSystem: replayFixture.sourceSystem,
+  })
+
+  if (!clickResult.clicked) {
+    const diagnostics = await readReplayPageDiagnostics(page, replayFixture)
+    throw new Error(`Expected to click the exact replay action for ${replayFixture.externalOrderId} after DOM readiness was confirmed. Click result: ${JSON.stringify(clickResult)} Diagnostics: ${JSON.stringify(diagnostics)}`)
+  }
 }
 
 async function waitForUsersPageReady(page, expectedOperatorName, expectedUserFullName) {
@@ -1192,7 +1363,10 @@ test('replay recovery, scenario approval, execution, and browser role gating wor
       await expect(replayQueueRecord).toBeVisible()
       await replayQueueRecord.click()
 
-      const replayDetail = page.locator('.section-card').filter({ hasText: 'Recovery detail' }).first()
+      const replayDetail = page.locator('.section-card')
+        .filter({ hasText: 'Recovery detail' })
+        .filter({ hasText: replayFixture.externalOrderId })
+        .last()
       await expect(replayDetail.getByText(replayFixture.externalOrderId).first()).toBeVisible()
 
       await replayFixture.enableConnector()
@@ -1204,17 +1378,16 @@ test('replay recovery, scenario approval, execution, and browser role gating wor
         message: `Expected ${replayFixture.externalOrderId} to remain queued for manual replay after enabling the replay connector.`,
       }).toBe('queued:PENDING')
 
-      const replayButton = await waitForReplayButtonReady(page, replayFixture)
+      await waitForReplayButtonReady(page, replayFixture)
 
       const replayResponsePromise = page.waitForResponse((response) => (
         response.request().method() === 'POST'
           && /\/api\/integrations\/orders\/replay\/\d+$/i.test(response.url())
       ), { timeout: 20_000 })
 
-      await replayButton.scrollIntoViewIfNeeded()
       const [replayResponse] = await Promise.all([
         replayResponsePromise,
-        replayButton.click(),
+        clickExactReplayButton(page, replayFixture),
       ])
 
       const replayResponseText = await replayResponse.text()
