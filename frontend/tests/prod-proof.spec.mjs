@@ -507,6 +507,135 @@ async function waitForReplayResolution(api, externalOrderId, timeout, message) {
   }).toBe('replayed')
 }
 
+async function readReplayPageDiagnostics(page, replayFixture) {
+  const backendConnectors = await readJson(await replayFixture.api.get('/api/integrations/orders/connectors'), {
+    method: 'GET',
+    url: '/api/integrations/orders/connectors',
+    requestPayload: {
+      sourceSystem: replayFixture.sourceSystem,
+    },
+    note: `Replay connector diagnostics for ${replayFixture.sourceSystem}.`,
+  })
+  const backendReplayOutcome = await readReplayOutcome(replayFixture.api, replayFixture.externalOrderId)
+
+  const pageDiagnostics = await page.evaluate(async ({ externalOrderId, sourceSystem }) => {
+    const textOrEmpty = (selector) => {
+      const element = globalThis.document?.querySelector?.(selector)
+      return element?.textContent?.trim?.() || ''
+    }
+
+    const replayCards = [...(globalThis.document?.querySelectorAll?.('.signal-list-item.selectable-card') || [])]
+    const replayRow = replayCards.find((card) => card.textContent?.includes?.(externalOrderId)) || null
+    const replayDetail = [...(globalThis.document?.querySelectorAll?.('.section-card') || [])]
+      .find((card) => card.textContent?.includes?.('Recovery detail')) || null
+    const replayButton = [...(replayDetail?.querySelectorAll?.('button') || [])]
+      .find((button) => button.textContent?.trim?.() === 'Replay Into Live Flow') || null
+    const replayMutedLines = [...(replayDetail?.querySelectorAll?.('.muted-text') || [])]
+      .map((element) => element.textContent?.trim?.())
+      .filter(Boolean)
+    const runtimeConfig = globalThis.__SYNAPSE_RUNTIME_CONFIG__ || {}
+    const apiBaseUrl = runtimeConfig.apiUrl || ''
+
+    let authSession = null
+    let snapshotConnector = null
+    let snapshotReplayRecord = null
+
+    if (apiBaseUrl) {
+      try {
+        const sessionResponse = await fetch(`${apiBaseUrl}/api/auth/session`, {
+          credentials: 'include',
+        })
+        authSession = {
+          status: sessionResponse.status,
+          payload: await sessionResponse.json().catch(() => null),
+        }
+      } catch (error) {
+        authSession = {
+          error: error?.message || String(error),
+        }
+      }
+
+      try {
+        const snapshotResponse = await fetch(`${apiBaseUrl}/api/dashboard/snapshot`, {
+          credentials: 'include',
+        })
+        const snapshotPayload = await snapshotResponse.json().catch(() => null)
+        snapshotConnector = snapshotPayload?.integrationConnectors?.find?.((connector) => (
+          connector.sourceSystem === sourceSystem && connector.type === 'CSV_ORDER_IMPORT'
+        )) || null
+        snapshotReplayRecord = snapshotPayload?.integrationReplayQueue?.find?.((record) => (
+          record.externalOrderId === externalOrderId
+        )) || null
+      } catch (error) {
+        snapshotConnector = {
+          error: error?.message || String(error),
+        }
+      }
+    }
+
+    return {
+      pageUrl: globalThis.location?.href || '',
+      connectionState: textOrEmpty('.workspace-status-strip .workspace-status-pill.status-live, .workspace-status-strip .workspace-status-pill.status-connecting, .workspace-status-strip .workspace-status-pill.status-reconnecting, .workspace-status-strip .workspace-status-pill.status-degraded'),
+      replayRowText: replayRow?.textContent?.trim?.() || '',
+      replayButtonDisabled: replayButton?.disabled ?? null,
+      replayButtonAriaDisabled: replayButton?.getAttribute?.('aria-disabled') || '',
+      replayMutedLines,
+      authSession,
+      snapshotConnector,
+      snapshotReplayRecord,
+      realtimeDebug: globalThis.__SYNAPSE_REALTIME_DEBUG__ || null,
+    }
+  }, {
+    externalOrderId: replayFixture.externalOrderId,
+    sourceSystem: replayFixture.sourceSystem,
+  })
+
+  return {
+    backendReplayOutcome,
+    backendConnector: backendConnectors.find((connector) => (
+      connector.sourceSystem === replayFixture.sourceSystem && connector.type === 'CSV_ORDER_IMPORT'
+    )) || null,
+    page: pageDiagnostics,
+  }
+}
+
+async function waitForReplayButtonReady(page, replayFixture) {
+  const replayQueueRecord = page.locator('.signal-list-item.selectable-card').filter({
+    hasText: replayFixture.externalOrderId,
+  }).first()
+  const replayDetail = page.locator('.section-card').filter({ hasText: 'Recovery detail' }).first()
+  const replayButton = replayDetail.getByRole('button', { name: 'Replay Into Live Flow' })
+
+  const startedAt = Date.now()
+  let lastRefreshAt = 0
+
+  while (Date.now() - startedAt < 30_000) {
+    const replayOutcome = await readReplayOutcome(replayFixture.api, replayFixture.externalOrderId)
+    if (describeReplayOutcome(replayOutcome) !== 'queued:PENDING') {
+      const diagnostics = await readReplayPageDiagnostics(page, replayFixture)
+      throw new Error(`Expected ${replayFixture.externalOrderId} to remain manually replayable while waiting for the replay button to enable. Diagnostics: ${JSON.stringify(diagnostics)}`)
+    }
+
+    if (Date.now() - lastRefreshAt >= 2_500) {
+      lastRefreshAt = Date.now()
+      await refreshWorkspace(page)
+    }
+
+    if (await replayQueueRecord.isVisible().catch(() => false)) {
+      await replayQueueRecord.click().catch(() => {})
+    }
+
+    if (await replayButton.isVisible().catch(() => false) && await replayButton.isEnabled().catch(() => false)) {
+      return replayButton
+    }
+
+    await page.waitForTimeout(500)
+  }
+
+  const diagnostics = await readReplayPageDiagnostics(page, replayFixture)
+  throw new Error(`Expected Replay Into Live Flow to become enabled after connector ${replayFixture.sourceSystem} was re-enabled and the replay queue refreshed. Diagnostics: ${JSON.stringify(diagnostics)}`)
+}
+
 async function createReplayFixture() {
   const inventoryAdmin = await createApiContext(users.operationsLead)
   const api = await createApiContext(users.operationsLead)
@@ -1043,9 +1172,7 @@ test('replay recovery, scenario approval, execution, and browser role gating wor
         message: `Expected ${replayFixture.externalOrderId} to remain queued for manual replay after enabling the replay connector.`,
       }).toBe('queued:PENDING')
 
-      const replayButton = replayDetail.getByRole('button', { name: 'Replay Into Live Flow' })
-      await expect(replayButton).toBeVisible()
-      await expect(replayButton).toBeEnabled()
+      const replayButton = await waitForReplayButtonReady(page, replayFixture)
 
       const replayResponsePromise = page.waitForResponse((response) => (
         response.request().method() === 'POST'
