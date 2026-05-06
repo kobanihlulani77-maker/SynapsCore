@@ -528,9 +528,16 @@ async function readReplayPageDiagnostics(page, replayFixture) {
     const replayRow = replayCards.find((card) => card.textContent?.includes?.(externalOrderId)) || null
     const replayDetail = [...(globalThis.document?.querySelectorAll?.('.section-card') || [])]
       .find((card) => card.textContent?.includes?.('Recovery detail')) || null
+    const exactReplayDetail = [...(globalThis.document?.querySelectorAll?.('.section-card') || [])]
+      .find((card) => card.textContent?.includes?.('Recovery detail') && card.textContent?.includes?.(externalOrderId)) || null
     const replayButton = [...(replayDetail?.querySelectorAll?.('button') || [])]
       .find((button) => button.textContent?.trim?.() === 'Replay Into Live Flow') || null
+    const exactReplayButton = [...(exactReplayDetail?.querySelectorAll?.('button') || [])]
+      .find((button) => button.textContent?.trim?.() === 'Replay Into Live Flow') || null
     const replayMutedLines = [...(replayDetail?.querySelectorAll?.('.muted-text') || [])]
+      .map((element) => element.textContent?.trim?.())
+      .filter(Boolean)
+    const exactReplayMutedLines = [...(exactReplayDetail?.querySelectorAll?.('.muted-text') || [])]
       .map((element) => element.textContent?.trim?.())
       .filter(Boolean)
     const runtimeConfig = globalThis.__SYNAPSE_RUNTIME_CONFIG__ || {}
@@ -579,7 +586,11 @@ async function readReplayPageDiagnostics(page, replayFixture) {
       replayRowText: replayRow?.textContent?.trim?.() || '',
       replayButtonDisabled: replayButton?.disabled ?? null,
       replayButtonAriaDisabled: replayButton?.getAttribute?.('aria-disabled') || '',
+      exactReplayDetailText: exactReplayDetail?.textContent?.trim?.() || '',
+      exactReplayButtonDisabled: exactReplayButton?.disabled ?? null,
+      exactReplayButtonAriaDisabled: exactReplayButton?.getAttribute?.('aria-disabled') || '',
       replayMutedLines,
+      exactReplayMutedLines,
       authSession,
       snapshotConnector,
       snapshotReplayRecord,
@@ -603,8 +614,6 @@ async function waitForReplayButtonReady(page, replayFixture) {
   const replayQueueRecord = page.locator('.signal-list-item.selectable-card').filter({
     hasText: replayFixture.externalOrderId,
   }).first()
-  const replayDetail = page.locator('.section-card').filter({ hasText: 'Recovery detail' }).first()
-  const replayButton = replayDetail.getByRole('button', { name: 'Replay Into Live Flow' })
 
   const startedAt = Date.now()
   let lastRefreshAt = 0
@@ -625,8 +634,21 @@ async function waitForReplayButtonReady(page, replayFixture) {
       await replayQueueRecord.click().catch(() => {})
     }
 
-    if (await replayButton.isVisible().catch(() => false) && await replayButton.isEnabled().catch(() => false)) {
-      return replayButton
+    const replayDetail = page.locator('.section-card')
+      .filter({ hasText: 'Recovery detail' })
+      .filter({ hasText: replayFixture.externalOrderId })
+      .last()
+    const replayButton = replayDetail.getByRole('button', { name: 'Replay Into Live Flow' }).first()
+
+    if (await replayDetail.isVisible().catch(() => false) && await replayButton.isVisible().catch(() => false)) {
+      const buttonState = await replayButton.evaluate((button) => ({
+        disabled: button.disabled,
+        ariaDisabled: button.getAttribute('aria-disabled') || '',
+      })).catch(() => null)
+
+      if (buttonState && buttonState.disabled === false && buttonState.ariaDisabled !== 'true') {
+        return replayButton
+      }
     }
 
     await page.waitForTimeout(500)
@@ -634,6 +656,16 @@ async function waitForReplayButtonReady(page, replayFixture) {
 
   const diagnostics = await readReplayPageDiagnostics(page, replayFixture)
   throw new Error(`Expected Replay Into Live Flow to become enabled after connector ${replayFixture.sourceSystem} was re-enabled and the replay queue refreshed. Diagnostics: ${JSON.stringify(diagnostics)}`)
+}
+
+async function waitForUsersPageReady(page, expectedOperatorName, expectedUserFullName) {
+  const operatorLane = page.locator('.section-card').filter({ hasText: 'Operator lanes' }).first()
+  const userRoster = page.locator('.section-card').filter({ hasText: 'User roster' }).first()
+
+  await expect(operatorLane).toBeVisible()
+  await expect(userRoster).toBeVisible()
+  await expect(operatorLane.getByText(expectedOperatorName).first()).toBeVisible({ timeout: 30_000 })
+  await expect(userRoster.getByText(expectedUserFullName).first()).toBeVisible({ timeout: 30_000 })
 }
 
 async function createReplayFixture() {
@@ -1294,6 +1326,16 @@ test('alerts, recommendations, orders, inventory, integrations, users, profile, 
     expect(accessUsers.length).toBeGreaterThan(0)
     expect(connectorCandidates.length).toBeGreaterThan(0)
 
+    const expectedVisibleOperator = operators
+      .slice(0, 5)
+      .find((operator) => ['Operations Lead', 'Operations Planner', 'Integration Lead'].includes(operator.displayName))
+    const expectedVisibleUser = accessUsers
+      .slice(0, 5)
+      .find((user) => ['Hosted Verification Planner', 'Hosted Verification Integration Admin'].includes(user.fullName))
+
+    expect(expectedVisibleOperator).toBeTruthy()
+    expect(expectedVisibleUser).toBeTruthy()
+
     await loginViaUi(page, users.operationsLead)
 
     await navigateWithinApp(page, '/alerts')
@@ -1349,8 +1391,7 @@ test('alerts, recommendations, orders, inventory, integrations, users, profile, 
 
     await navigateWithinApp(page, '/users')
     await expect(page.getByRole('heading', { level: 1, name: 'Users and access control' })).toBeVisible()
-    await expect(page.getByText(operators[0].displayName).first()).toBeVisible()
-    await expect(page.getByText(accessUsers[0].fullName).first()).toBeVisible()
+    await waitForUsersPageReady(page, expectedVisibleOperator.displayName, expectedVisibleUser.fullName)
 
     await navigateWithinApp(page, '/profile')
     await expect(page.getByRole('heading', { level: 1, name: 'Personal profile and session controls' })).toBeVisible()
