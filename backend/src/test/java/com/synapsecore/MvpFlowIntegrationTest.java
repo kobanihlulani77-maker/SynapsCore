@@ -3949,7 +3949,7 @@ class MvpFlowIntegrationTest {
     }
 
     @Test
-    void automatedReplayFailureUsesReplayRecordTenantWithoutRequestContext() throws Exception {
+    void automatedReplaySkipsDisabledConnectorRecordsAndKeepsManualRecoveryVisible() throws Exception {
         mockMvc.perform(post("/api/integrations/orders/connectors")
                 .with(accessHeaders("Integration Lead", "INTEGRATION_ADMIN"))
                 .header("X-Synapse-Tenant", "STARTER-OPS")
@@ -4000,12 +4000,131 @@ class MvpFlowIntegrationTest {
             .findFirst()
             .orElseThrow();
         assertThat(replayRecord.getTenantCode()).isEqualTo("STARTER-OPS");
-        assertThat(replayRecord.getStatus()).isEqualTo(com.synapsecore.domain.entity.IntegrationReplayStatus.REPLAY_FAILED);
+        assertThat(replayRecord.getStatus()).isEqualTo(com.synapsecore.domain.entity.IntegrationReplayStatus.PENDING);
         assertThat(replayRecord.getFailureCode()).isEqualTo(com.synapsecore.integration.IntegrationFailureCode.CONNECTOR_DISABLED);
-        assertThat(businessEventRepository.findTop20ByOrderByCreatedAtDesc()).anyMatch(event ->
+        assertThat(replayRecord.getReplayAttemptCount()).isZero();
+        mockMvc.perform(get("/api/integrations/orders/replay-queue")
+                .with(accessHeaders("Operations Lead", "TENANT_ADMIN"))
+                .header("X-Synapse-Tenant", "STARTER-OPS"))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$[?(@.externalOrderId == 'CSV-AUTO-1001')].status")
+                .value(org.hamcrest.Matchers.hasItem("PENDING")));
+        mockMvc.perform(get("/api/dashboard/snapshot")
+                .with(accessHeaders("Operations Lead", "TENANT_ADMIN"))
+                .header("X-Synapse-Tenant", "STARTER-OPS"))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.integrationReplayQueue[?(@.externalOrderId == 'CSV-AUTO-1001')].status")
+                .value(org.hamcrest.Matchers.hasItem("PENDING")));
+        assertThat(businessEventRepository.findTop20ByOrderByCreatedAtDesc()).noneMatch(event ->
             event.getEventType() == BusinessEventType.INTEGRATION_REPLAY_FAILED
                 && "STARTER-OPS".equalsIgnoreCase(event.getTenantCode())
+                && event.getPayloadSummary() != null
+                && event.getPayloadSummary().contains("CSV-AUTO-1001")
         );
+    }
+
+    @Test
+    void disabledConnectorReplayRemainsManualAfterEnableAndDoesNotDoubleProcess() throws Exception {
+        mockMvc.perform(post("/api/integrations/orders/connectors")
+                .with(accessHeaders("Integration Lead", "INTEGRATION_ADMIN"))
+                .header("X-Synapse-Tenant", "STARTER-OPS")
+                .contentType(APPLICATION_JSON)
+                .content("""
+                    {
+                      "sourceSystem": "erp_batch_manual",
+                      "type": "CSV_ORDER_IMPORT",
+                      "displayName": "ERP Batch Manual Replay",
+                      "enabled": false,
+                      "syncMode": "BATCH_FILE_DROP",
+                      "validationPolicy": "RELAXED",
+                      "transformationPolicy": "NORMALIZE_CODES",
+                      "allowDefaultWarehouseFallback": false,
+                      "notes": "Disabled for deterministic manual replay verification."
+                    }
+                    """))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.enabled").value(false));
+
+        MockMultipartFile file = new MockMultipartFile(
+            "file",
+            "manual-replay-orders.csv",
+            "text/csv",
+            """
+                sourceSystem,externalOrderId,warehouseCode,productSku,quantity,unitPrice
+                erp_batch_manual,CSV-MANUAL-1001,WH-NORTH,SKU-RPL-778,3,88.00
+                """.getBytes(StandardCharsets.UTF_8)
+        );
+
+        mockMvc.perform(multipart("/api/integrations/orders/csv-import")
+                .file(file)
+                .header("X-Synapse-Tenant", "STARTER-OPS")
+                .param("sourceSystem", "erp_batch_manual"))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.ordersImported").value(0))
+            .andExpect(jsonPath("$.ordersFailed").value(1))
+            .andExpect(jsonPath("$.failedOrders[0].failureCode").value("CONNECTOR_DISABLED"));
+
+        RequestContextHolder.resetRequestAttributes();
+        assertThat(integrationReplayService.processAutomatedReplayBatch(10)).isZero();
+
+        var replayRecord = integrationReplayRecordRepository.findAll().stream()
+            .filter(record -> "CSV-MANUAL-1001".equals(record.getExternalOrderId()))
+            .findFirst()
+            .orElseThrow();
+        assertThat(replayRecord.getStatus()).isEqualTo(com.synapsecore.domain.entity.IntegrationReplayStatus.PENDING);
+        assertThat(replayRecord.getReplayAttemptCount()).isZero();
+
+        Product replayProduct = createTenantProduct("WH-NORTH", "SKU-RPL-778", "Replay Manual Rotor", "Recovery");
+        var replayWarehouse = warehouseRepository.findByCode("WH-NORTH").orElseThrow();
+        inventoryRepository.save(Inventory.builder()
+            .tenant(replayWarehouse.getTenant())
+            .product(replayProduct)
+            .warehouse(replayWarehouse)
+            .quantityOnHand(14L)
+            .quantityReserved(0L)
+            .quantityInbound(0L)
+            .quantityAvailable(14L)
+            .reorderThreshold(4L)
+            .build());
+
+        mockMvc.perform(post("/api/integrations/orders/connectors")
+                .with(accessHeaders("Integration Lead", "INTEGRATION_ADMIN"))
+                .header("X-Synapse-Tenant", "STARTER-OPS")
+                .contentType(APPLICATION_JSON)
+                .content("""
+                    {
+                      "sourceSystem": "erp_batch_manual",
+                      "type": "CSV_ORDER_IMPORT",
+                      "displayName": "ERP Batch Manual Replay",
+                      "enabled": true,
+                      "syncMode": "BATCH_FILE_DROP",
+                      "validationPolicy": "RELAXED",
+                      "transformationPolicy": "NORMALIZE_CODES",
+                      "allowDefaultWarehouseFallback": false,
+                      "notes": "Enabled for deterministic manual replay verification."
+                    }
+                    """))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.enabled").value(true));
+
+        RequestContextHolder.resetRequestAttributes();
+        assertThat(integrationReplayService.processAutomatedReplayBatch(10)).isZero();
+
+        mockMvc.perform(post("/api/integrations/orders/replay/" + replayRecord.getId())
+                .with(accessHeaders("Integration Operator", "INTEGRATION_OPERATOR"))
+                .header("X-Synapse-Tenant", "STARTER-OPS"))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.replay.status").value("REPLAYED"))
+            .andExpect(jsonPath("$.order.externalOrderId").value("CSV-MANUAL-1001"));
+
+        RequestContextHolder.resetRequestAttributes();
+        assertThat(integrationReplayService.processAutomatedReplayBatch(10)).isZero();
+
+        var updatedReplayRecord = integrationReplayRecordRepository.findById(replayRecord.getId()).orElseThrow();
+        assertThat(updatedReplayRecord.getStatus()).isEqualTo(com.synapsecore.domain.entity.IntegrationReplayStatus.REPLAYED);
+        assertThat(customerOrderRepository.findAll().stream()
+            .filter(order -> "CSV-MANUAL-1001".equals(order.getExternalOrderId()))
+            .count()).isEqualTo(1);
     }
 
     @Test

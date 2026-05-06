@@ -22,6 +22,7 @@ import com.synapsecore.observability.OperationalAlertHookService;
 import com.synapsecore.observability.OperationalMetricsService;
 import com.synapsecore.tenant.TenantContextService;
 import java.time.Instant;
+import java.util.EnumSet;
 import java.util.List;
 import lombok.extern.slf4j.Slf4j;
 import lombok.RequiredArgsConstructor;
@@ -40,6 +41,8 @@ public class IntegrationReplayService {
 
     private static final int DEFAULT_QUEUE_LIMIT = 12;
     private static final String AUTO_REPLAY_ACTOR = "system-replay";
+    private static final EnumSet<IntegrationFailureCode> MANUAL_ONLY_AUTOMATION_FAILURE_CODES =
+        EnumSet.of(IntegrationFailureCode.CONNECTOR_DISABLED);
 
     private final IntegrationReplayRecordRepository integrationReplayRecordRepository;
     private final AccessDirectoryService accessDirectoryService;
@@ -136,7 +139,7 @@ public class IntegrationReplayService {
     @Transactional
     public IntegrationReplayResultResponse replay(Long replayRecordId, String actorName) {
         String tenantCode = tenantContextService.getCurrentTenantCodeOrDefault();
-        IntegrationReplayRecord record = integrationReplayRecordRepository.findByTenantCodeIgnoreCaseAndId(
+        IntegrationReplayRecord record = integrationReplayRecordRepository.findByTenantCodeIgnoreCaseAndIdForUpdate(
                 tenantCode,
                 replayRecordId)
             .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND,
@@ -173,6 +176,7 @@ public class IntegrationReplayService {
         return integrationReplayRecordRepository.findEligibleForAutomatedReplay(
                 List.of(IntegrationReplayStatus.PENDING, IntegrationReplayStatus.REPLAY_FAILED),
                 now,
+                MANUAL_ONLY_AUTOMATION_FAILURE_CODES,
                 PageRequest.of(0, Math.max(batchSize, 1)))
             .stream()
             .mapToInt(record -> attemptAutomatedReplay(record, now))
@@ -182,6 +186,9 @@ public class IntegrationReplayService {
     private int attemptAutomatedReplay(IntegrationReplayRecord record, Instant attemptedAt) {
         if (record.getTenantCode() == null || record.getTenantCode().isBlank()) {
             orphanReplayRecord(record, attemptedAt);
+            return 0;
+        }
+        if (isManualOnlyAutomatedReplayRecord(record)) {
             return 0;
         }
         OrderCreateRequest request = deserializeRequest(record);
@@ -393,6 +400,11 @@ public class IntegrationReplayService {
             "Replay record " + record.getId() + " is missing tenant context and was dead-lettered before automated replay."
         );
         log.error("Integration replay {} is missing tenant context and was dead-lettered before automated replay.", record.getId());
+    }
+
+    private boolean isManualOnlyAutomatedReplayRecord(IntegrationReplayRecord record) {
+        return record.getFailureCode() != null
+            && MANUAL_ONLY_AUTOMATION_FAILURE_CODES.contains(record.getFailureCode());
     }
 
     private OrderCreateRequest deserializeRequest(IntegrationReplayRecord record) {

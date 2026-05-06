@@ -6,6 +6,7 @@ import com.synapsecore.auth.FastAuthFailureException;
 import com.synapsecore.domain.service.CatalogWriteConflictResolver;
 import com.synapsecore.observability.OperationalAlertHookService;
 import com.synapsecore.observability.OperationalMetricsService;
+import org.apache.catalina.connector.ClientAbortException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.persistence.LockTimeoutException;
 import jakarta.persistence.PessimisticLockException;
@@ -115,9 +116,28 @@ public class ApiExceptionHandler {
         ));
     }
 
+    @ExceptionHandler(ClientAbortException.class)
+    public ResponseEntity<ApiErrorResponse> handleClientAbort(ClientAbortException exception,
+                                                              HttpServletRequest request) {
+        log.debug("Client disconnected during {} {} [{}]: {}",
+            request.getMethod(),
+            request.getRequestURI(),
+            requestTraceContext.getRequiredRequestId(),
+            exception.getMessage());
+        return ResponseEntity.status(HttpStatus.NO_CONTENT).build();
+    }
+
     @ExceptionHandler(Throwable.class)
     public ResponseEntity<ApiErrorResponse> handleUnexpected(Throwable exception,
                                                              HttpServletRequest request) {
+        if (isClientAbort(exception)) {
+            log.debug("Client disconnected during {} {} [{}]: {}",
+                request.getMethod(),
+                request.getRequestURI(),
+                requestTraceContext.getRequiredRequestId(),
+                exception.getMessage());
+            return ResponseEntity.status(HttpStatus.NO_CONTENT).build();
+        }
         HttpStatus status = HttpStatus.INTERNAL_SERVER_ERROR;
         String message = isProductCatalogRequest(request)
             ? catalogWriteConflictResolver.describe(exception, null)
@@ -178,5 +198,26 @@ public class ApiExceptionHandler {
         return status == HttpStatus.UNAUTHORIZED
             && "POST".equalsIgnoreCase(request.getMethod())
             && "/api/auth/session/login".equals(request.getRequestURI());
+    }
+
+    private boolean isClientAbort(Throwable exception) {
+        Throwable current = exception;
+        while (current != null) {
+            if (current instanceof ClientAbortException) {
+                return true;
+            }
+            String message = current.getMessage();
+            if (message != null) {
+                String normalized = message.toLowerCase();
+                if (normalized.contains("broken pipe")
+                    || normalized.contains("connection reset by peer")
+                    || normalized.contains("an existing connection was forcibly closed")
+                    || normalized.contains("an established connection was aborted")) {
+                    return true;
+                }
+            }
+            current = current.getCause();
+        }
+        return false;
     }
 }
