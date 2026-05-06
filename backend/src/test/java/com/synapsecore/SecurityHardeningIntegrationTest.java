@@ -3,6 +3,7 @@ package com.synapsecore;
 import static org.springframework.http.MediaType.APPLICATION_JSON;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -107,6 +108,23 @@ class SecurityHardeningIntegrationTest {
         org.assertj.core.api.Assertions.assertThat(auditLogRepository.count())
             .as("Invalid sign-in attempts should not block on audit-log persistence or inflate the audit table.")
             .isEqualTo(auditCountBefore);
+    }
+
+    @Test
+    void disallowedOriginDoesNotReceiveCorsHeadersOnAuthFailure() throws Exception {
+        mockMvc.perform(post("/api/auth/session/login")
+                .header("Origin", "https://evil.example")
+                .contentType(APPLICATION_JSON)
+                .content("""
+                    {
+                      "tenantCode": "PILOT-TENANT",
+                      "username": "admin.pilot",
+                      "password": "wrong-password"
+                    }
+                    """))
+            .andExpect(status().isForbidden())
+            .andExpect(header().doesNotExist("Access-Control-Allow-Origin"))
+            .andExpect(header().doesNotExist("Access-Control-Allow-Credentials"));
     }
 
     @Test

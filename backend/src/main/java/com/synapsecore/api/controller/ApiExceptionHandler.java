@@ -14,12 +14,16 @@ import java.time.Instant;
 import org.springframework.dao.CannotAcquireLockException;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.dao.DeadlockLoserDataAccessException;
+import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.springframework.dao.PessimisticLockingFailureException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.MethodArgumentNotValidException;
+import org.springframework.web.bind.MissingServletRequestParameterException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
+import org.springframework.web.multipart.MaxUploadSizeExceededException;
+import org.springframework.web.multipart.support.MissingServletRequestPartException;
 import org.springframework.web.server.ResponseStatusException;
 
 @RestControllerAdvice
@@ -72,6 +76,62 @@ public class ApiExceptionHandler {
             Instant.now(),
             HttpStatus.BAD_REQUEST.value(),
             HttpStatus.BAD_REQUEST.getReasonPhrase(),
+            message,
+            requestTraceContext.getRequiredRequestId()
+        ));
+    }
+
+    @ExceptionHandler(HttpMessageNotReadableException.class)
+    public ResponseEntity<ApiErrorResponse> handleUnreadableBody(HttpMessageNotReadableException exception,
+                                                                 HttpServletRequest request) {
+        String message = "Request body is malformed or contains invalid values.";
+        auditFailureSafely(request, HttpStatus.BAD_REQUEST, message);
+        return ResponseEntity.badRequest().body(new ApiErrorResponse(
+            Instant.now(),
+            HttpStatus.BAD_REQUEST.value(),
+            HttpStatus.BAD_REQUEST.getReasonPhrase(),
+            message,
+            requestTraceContext.getRequiredRequestId()
+        ));
+    }
+
+    @ExceptionHandler(MissingServletRequestParameterException.class)
+    public ResponseEntity<ApiErrorResponse> handleMissingParameter(MissingServletRequestParameterException exception,
+                                                                   HttpServletRequest request) {
+        String message = "Required request parameter is missing: " + exception.getParameterName() + ".";
+        auditFailureSafely(request, HttpStatus.BAD_REQUEST, message);
+        return ResponseEntity.badRequest().body(new ApiErrorResponse(
+            Instant.now(),
+            HttpStatus.BAD_REQUEST.value(),
+            HttpStatus.BAD_REQUEST.getReasonPhrase(),
+            message,
+            requestTraceContext.getRequiredRequestId()
+        ));
+    }
+
+    @ExceptionHandler(MissingServletRequestPartException.class)
+    public ResponseEntity<ApiErrorResponse> handleMissingPart(MissingServletRequestPartException exception,
+                                                              HttpServletRequest request) {
+        String message = "Required multipart field is missing: " + exception.getRequestPartName() + ".";
+        auditFailureSafely(request, HttpStatus.BAD_REQUEST, message);
+        return ResponseEntity.badRequest().body(new ApiErrorResponse(
+            Instant.now(),
+            HttpStatus.BAD_REQUEST.value(),
+            HttpStatus.BAD_REQUEST.getReasonPhrase(),
+            message,
+            requestTraceContext.getRequiredRequestId()
+        ));
+    }
+
+    @ExceptionHandler(MaxUploadSizeExceededException.class)
+    public ResponseEntity<ApiErrorResponse> handleUploadTooLarge(MaxUploadSizeExceededException exception,
+                                                                 HttpServletRequest request) {
+        String message = "Uploaded file exceeds the configured SynapseCore size limit.";
+        auditFailureSafely(request, HttpStatus.PAYLOAD_TOO_LARGE, message);
+        return ResponseEntity.status(HttpStatus.PAYLOAD_TOO_LARGE).body(new ApiErrorResponse(
+            Instant.now(),
+            HttpStatus.PAYLOAD_TOO_LARGE.value(),
+            HttpStatus.PAYLOAD_TOO_LARGE.getReasonPhrase(),
             message,
             requestTraceContext.getRequiredRequestId()
         ));
