@@ -38,6 +38,7 @@ import java.util.HexFormat;
 import java.util.List;
 import java.util.Locale;
 import lombok.RequiredArgsConstructor;
+import org.hibernate.LazyInitializationException;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -168,7 +169,7 @@ public class IntegrationConnectorService {
                                                                     String actionDescription) {
         String normalizedSourceSystem = normalizeSourceSystem(sourceSystem);
         return integrationConnectorRepository
-            .findByTenant_CodeIgnoreCaseAndSourceSystemIgnoreCaseAndType(tenantCode, normalizedSourceSystem, type)
+            .findByTenantCodeAndSourceSystemAndTypeWithTenant(tenantCode, normalizedSourceSystem, type)
             .orElseThrow(() -> IntegrationFailureCodes.status(HttpStatus.NOT_FOUND,
                 IntegrationFailureCode.CONNECTOR_NOT_CONFIGURED,
                 "Integration connector not configured for sourceSystem " + normalizedSourceSystem + " and type " + type));
@@ -196,11 +197,36 @@ public class IntegrationConnectorService {
         String normalizedSourceSystem = normalizeSourceSystem(sourceSystem);
         String tokenHash = hashInboundAccessToken(inboundAccessToken);
         IntegrationConnector connector = integrationConnectorRepository
-            .findBySourceSystemIgnoreCaseAndTypeAndInboundAccessTokenHash(normalizedSourceSystem, type, tokenHash)
+            .findBySourceSystemIgnoreCaseAndTypeAndInboundAccessTokenHashWithTenant(normalizedSourceSystem, type, tokenHash)
             .orElseThrow(() -> IntegrationFailureCodes.status(HttpStatus.UNAUTHORIZED,
                 IntegrationFailureCode.INVALID_CONNECTOR_TOKEN,
                 "Connector token is invalid for sourceSystem " + normalizedSourceSystem + " and type " + type + "."));
         return requireEnabled(connector, actionDescription);
+    }
+
+    public String resolveTenantCode(IntegrationConnector connector) {
+        if (connector == null) {
+            throw new ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR,
+                "Integration connector context is required to resolve tenant ownership.");
+        }
+
+        String tenantCode = extractTenantCode(connector);
+        if (tenantCode != null) {
+            return tenantCode;
+        }
+
+        if (connector.getId() != null) {
+            IntegrationConnector hydratedConnector = integrationConnectorRepository.findByIdWithTenant(connector.getId())
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND,
+                    "Integration connector not found for id " + connector.getId()));
+            tenantCode = extractTenantCode(hydratedConnector);
+            if (tenantCode != null) {
+                return tenantCode;
+            }
+        }
+
+        throw new ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR,
+            "Connector " + connector.getSourceSystem() + " is missing tenant ownership.");
     }
 
     @Transactional
@@ -298,6 +324,14 @@ public class IntegrationConnectorService {
             return null;
         }
         return value.trim();
+    }
+
+    private String extractTenantCode(IntegrationConnector connector) {
+        try {
+            return connector.getTenant() == null ? null : normalizeOptional(connector.getTenant().getCode());
+        } catch (LazyInitializationException exception) {
+            return null;
+        }
     }
 
     public static String hashInboundAccessToken(String inboundAccessToken) {

@@ -76,21 +76,21 @@ public class ExternalOrderCsvImportService {
             Long inboundRecordId = null;
             String tenantCode = requestTraceContext.getCurrentTenant()
                 .filter(currentTenant -> !RequestTraceContext.MISSING_TENANT_CONTEXT.equalsIgnoreCase(currentTenant))
-                .orElse(authenticatedConnector != null ? authenticatedConnector.getTenant().getCode() : null);
+                .orElse(authenticatedConnector != null ? integrationConnectorService.resolveTenantCode(authenticatedConnector) : null);
             try {
-                if (authenticatedConnector != null
-                    && !authenticatedConnector.getSourceSystem().equalsIgnoreCase(key.sourceSystem())) {
-                    throw IntegrationFailureCodes.badRequest(IntegrationFailureCode.CONNECTOR_SOURCE_MISMATCH,
-                        "Connector-authenticated CSV imports may only submit orders for sourceSystem "
-                            + authenticatedConnector.getSourceSystem() + ".");
-                }
                 var connector = authenticatedConnector != null
                     ? authenticatedConnector
                     : integrationConnectorService.requireConfiguredConnector(
                         key.sourceSystem(),
                         IntegrationConnectorType.CSV_ORDER_IMPORT,
                         "accept CSV imports");
-                tenantCode = connector.getTenant().getCode();
+                if (authenticatedConnector != null
+                    && !connector.getSourceSystem().equalsIgnoreCase(key.sourceSystem())) {
+                    throw IntegrationFailureCodes.badRequest(IntegrationFailureCode.CONNECTOR_SOURCE_MISMATCH,
+                        "Connector-authenticated CSV imports may only submit orders for sourceSystem "
+                            + connector.getSourceSystem() + ".");
+                }
+                tenantCode = integrationConnectorService.resolveTenantCode(connector);
                 inboundRecordId = integrationInboundRecordService.recordReceived(
                     tenantCode,
                     connector.getSourceSystem(),

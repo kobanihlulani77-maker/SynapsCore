@@ -17,11 +17,38 @@ public interface IntegrationConnectorRepository extends JpaRepository<Integratio
                                                                                                String sourceSystem,
                                                                                                IntegrationConnectorType type);
 
+    @Query("""
+        select connector
+        from IntegrationConnector connector
+        join fetch connector.tenant tenant
+        where lower(tenant.code) = lower(:tenantCode)
+          and lower(connector.sourceSystem) = lower(:sourceSystem)
+          and connector.type = :type
+        """)
+    Optional<IntegrationConnector> findByTenantCodeAndSourceSystemAndTypeWithTenant(@Param("tenantCode") String tenantCode,
+                                                                                     @Param("sourceSystem") String sourceSystem,
+                                                                                     @Param("type") IntegrationConnectorType type);
+
     Optional<IntegrationConnector> findBySourceSystemIgnoreCaseAndTypeAndInboundAccessTokenHash(String sourceSystem,
                                                                                                  IntegrationConnectorType type,
                                                                                                  String inboundAccessTokenHash);
 
+    @Query("""
+        select connector
+        from IntegrationConnector connector
+        join fetch connector.tenant tenant
+        where lower(connector.sourceSystem) = lower(:sourceSystem)
+          and connector.type = :type
+          and connector.inboundAccessTokenHash = :inboundAccessTokenHash
+        """)
+    Optional<IntegrationConnector> findBySourceSystemIgnoreCaseAndTypeAndInboundAccessTokenHashWithTenant(@Param("sourceSystem") String sourceSystem,
+                                                                                                           @Param("type") IntegrationConnectorType type,
+                                                                                                           @Param("inboundAccessTokenHash") String inboundAccessTokenHash);
+
     Optional<IntegrationConnector> findByTenant_CodeIgnoreCaseAndId(String tenantCode, Long id);
+
+    @Query("select connector from IntegrationConnector connector join fetch connector.tenant where connector.id = :id")
+    Optional<IntegrationConnector> findByIdWithTenant(@Param("id") Long id);
 
     List<IntegrationConnector> findAllByOrderByTypeAscSourceSystemAsc();
 

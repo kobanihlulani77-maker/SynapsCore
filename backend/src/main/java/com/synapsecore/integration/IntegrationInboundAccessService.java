@@ -53,7 +53,7 @@ public class IntegrationInboundAccessService {
     }
 
     private void applyConnectorTrace(IntegrationConnector connector) {
-        String tenantCode = connector.getTenant() == null ? null : connector.getTenant().getCode();
+        String tenantCode = integrationConnectorService.resolveTenantCode(connector);
         if (tenantCode == null || tenantCode.isBlank()) {
             throw new ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR,
                 "Connector " + connector.getSourceSystem() + " is missing tenant ownership.");

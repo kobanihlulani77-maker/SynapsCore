@@ -41,7 +41,7 @@ public class ExternalOrderWebhookService {
         Long inboundRecordId = null;
         String tenantCode = requestTraceContext.getCurrentTenant()
             .filter(currentTenant -> !RequestTraceContext.MISSING_TENANT_CONTEXT.equalsIgnoreCase(currentTenant))
-            .orElse(authenticatedConnector != null ? authenticatedConnector.getTenant().getCode() : null);
+            .orElse(authenticatedConnector != null ? integrationConnectorService.resolveTenantCode(authenticatedConnector) : null);
 
         try {
             var connector = authenticatedConnector != null
@@ -50,7 +50,7 @@ public class ExternalOrderWebhookService {
                     sourceSystem,
                     IntegrationConnectorType.WEBHOOK_ORDER,
                     "accept webhook orders");
-            tenantCode = connector.getTenant().getCode();
+            tenantCode = integrationConnectorService.resolveTenantCode(connector);
             sourceSystem = connector.getSourceSystem();
             inboundRecordId = integrationInboundRecordService.recordReceived(
                 tenantCode,

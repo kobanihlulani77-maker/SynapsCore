@@ -41,6 +41,7 @@ import com.synapsecore.domain.repository.TenantRepository;
 import com.synapsecore.domain.repository.WarehouseRepository;
 import com.synapsecore.domain.service.SeedService;
 import com.synapsecore.event.OperationalUpdateType;
+import jakarta.persistence.EntityManager;
 import java.nio.charset.StandardCharsets;
 import java.time.Instant;
 import java.time.Duration;
@@ -130,6 +131,12 @@ class MvpFlowIntegrationTest {
 
     @Autowired
     private com.synapsecore.integration.IntegrationReplayService integrationReplayService;
+
+    @Autowired
+    private com.synapsecore.integration.ExternalOrderCsvImportService externalOrderCsvImportService;
+
+    @Autowired
+    private EntityManager entityManager;
 
     @Test
     void orderIngestionDeductsInventoryAndCreatesOperationalResponses() throws Exception {
@@ -3878,6 +3885,67 @@ class MvpFlowIntegrationTest {
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.integrationReplayQueue[?(@.externalOrderId == 'CSV-DISABLED-1001')].failureCode")
                 .value(org.hamcrest.Matchers.hasItem("CONNECTOR_DISABLED")));
+    }
+
+    @Test
+    void detachedDisabledCsvConnectorStillReturnsStructuredReplayFailure() throws Exception {
+        mockMvc.perform(post("/api/integrations/orders/connectors")
+                .with(accessHeaders("Integration Lead", "INTEGRATION_ADMIN"))
+                .header("X-Synapse-Tenant", "STARTER-OPS")
+                .contentType(APPLICATION_JSON)
+                .content("""
+                    {
+                      "sourceSystem": "erp_batch_detached",
+                      "type": "CSV_ORDER_IMPORT",
+                      "displayName": "ERP Batch Detached CSV Feed",
+                      "enabled": false,
+                      "syncMode": "BATCH_FILE_DROP",
+                      "validationPolicy": "RELAXED",
+                      "transformationPolicy": "NORMALIZE_CODES",
+                      "allowDefaultWarehouseFallback": false,
+                      "notes": "Disabled for detached connector replay verification."
+                    }
+                    """))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.enabled").value(false));
+
+        var detachedConnector = integrationConnectorRepository
+            .findByTenant_CodeIgnoreCaseAndSourceSystemIgnoreCaseAndType(
+                "STARTER-OPS",
+                "erp_batch_detached",
+                com.synapsecore.domain.entity.IntegrationConnectorType.CSV_ORDER_IMPORT
+            )
+            .orElseThrow();
+        entityManager.clear();
+        RequestContextHolder.resetRequestAttributes();
+
+        MockMultipartFile file = new MockMultipartFile(
+            "file",
+            "detached-disabled-replay-orders.csv",
+            "text/csv",
+            """
+                sourceSystem,externalOrderId,warehouseCode,productSku,quantity,unitPrice
+                erp_batch_detached,CSV-DETACHED-1001,WH-NORTH,SKU-FLX-100,2,88.00
+                """.getBytes(StandardCharsets.UTF_8)
+        );
+
+        var response = externalOrderCsvImportService.ingest(file, "erp_batch_detached", detachedConnector);
+
+        assertThat(response.ordersImported()).isZero();
+        assertThat(response.ordersFailed()).isEqualTo(1);
+        assertThat(response.failedOrders()).singleElement().satisfies(failure -> {
+            assertThat(failure.sourceSystem()).isEqualTo("erp_batch_detached");
+            assertThat(failure.externalOrderId()).isEqualTo("CSV-DETACHED-1001");
+            assertThat(failure.failureCode()).isEqualTo(com.synapsecore.integration.IntegrationFailureCode.CONNECTOR_DISABLED);
+        });
+
+        var replayRecord = integrationReplayRecordRepository.findAll().stream()
+            .filter(record -> "CSV-DETACHED-1001".equals(record.getExternalOrderId()))
+            .findFirst()
+            .orElseThrow();
+        assertThat(replayRecord.getTenantCode()).isEqualTo("STARTER-OPS");
+        assertThat(replayRecord.getFailureCode()).isEqualTo(com.synapsecore.integration.IntegrationFailureCode.CONNECTOR_DISABLED);
+        assertThat(replayRecord.getStatus()).isEqualTo(com.synapsecore.domain.entity.IntegrationReplayStatus.PENDING);
     }
 
     @Test

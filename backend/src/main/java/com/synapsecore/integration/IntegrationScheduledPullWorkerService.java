@@ -34,6 +34,7 @@ public class IntegrationScheduledPullWorkerService {
 
     private final IntegrationConnectorRepository integrationConnectorRepository;
     private final ExternalOrderWebhookService externalOrderWebhookService;
+    private final IntegrationConnectorService integrationConnectorService;
     private final IntegrationImportRunService integrationImportRunService;
     private final ObjectMapper objectMapper;
     private final RequestTraceContext requestTraceContext;
@@ -117,11 +118,12 @@ public class IntegrationScheduledPullWorkerService {
     }
 
     private String fetchConnectorPayload(IntegrationConnector connector) throws IOException, InterruptedException {
+        String tenantCode = integrationConnectorService.resolveTenantCode(connector);
         HttpRequest request = HttpRequest.newBuilder(URI.create(connector.getPullEndpointUrl().trim()))
             .GET()
             .timeout(Duration.ofSeconds(Math.max(fetchTimeoutSeconds, 1)))
             .header("Accept", "application/json")
-            .header("X-SynapseCore-Tenant", connector.getTenant().getCode())
+            .header("X-SynapseCore-Tenant", tenantCode)
             .header("X-SynapseCore-Connector", connector.getSourceSystem())
             .build();
         HttpResponse<String> response = httpClient.send(request, HttpResponse.BodyHandlers.ofString());
@@ -163,10 +165,11 @@ public class IntegrationScheduledPullWorkerService {
 
     private boolean ingestOrder(IntegrationConnector connector,
                                 ExternalOrderWebhookRequest order) {
+        String tenantCode = integrationConnectorService.resolveTenantCode(connector);
         try {
             requestTraceContext.setCurrentRequestId("scheduled-pull-" + connector.getId() + "-" + Instant.now().toEpochMilli());
             requestTraceContext.setCurrentActor(WORKER_ACTOR);
-            requestTraceContext.setCurrentTenant(connector.getTenant().getCode());
+            requestTraceContext.setCurrentTenant(tenantCode);
             externalOrderWebhookService.ingest(order, connector);
             return true;
         } catch (ResponseStatusException exception) {
@@ -205,10 +208,11 @@ public class IntegrationScheduledPullWorkerService {
     }
 
     private void recordPullFailure(IntegrationConnector connector, Exception exception) {
+        String tenantCode = integrationConnectorService.resolveTenantCode(connector);
         try {
             requestTraceContext.setCurrentRequestId("scheduled-pull-" + connector.getId() + "-" + Instant.now().toEpochMilli());
             requestTraceContext.setCurrentActor(WORKER_ACTOR);
-            requestTraceContext.setCurrentTenant(connector.getTenant().getCode());
+            requestTraceContext.setCurrentTenant(tenantCode);
             integrationImportRunService.recordRun(
                 connector.getSourceSystem(),
                 connector.getType(),
