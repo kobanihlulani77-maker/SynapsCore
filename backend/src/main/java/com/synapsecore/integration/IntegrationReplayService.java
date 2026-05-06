@@ -101,7 +101,8 @@ public class IntegrationReplayService {
             .build());
         integrationInboundRecordService.markReplayQueued(inboundRecordId, record.getId(), failureCode, failureMessage);
 
-        businessEventService.record(
+        businessEventService.recordForTenant(
+            tenantCode,
             BusinessEventType.INTEGRATION_REPLAY_QUEUED,
             "integration-replay",
             "Queued failed " + connectorType + " order " + request.externalOrderId() + " from " + sourceSystem
@@ -179,6 +180,10 @@ public class IntegrationReplayService {
     }
 
     private int attemptAutomatedReplay(IntegrationReplayRecord record, Instant attemptedAt) {
+        if (record.getTenantCode() == null || record.getTenantCode().isBlank()) {
+            orphanReplayRecord(record, attemptedAt);
+            return 0;
+        }
         OrderCreateRequest request = deserializeRequest(record);
         String previousRequestId = requestTraceContext.getCurrentRequestId().orElse(null);
         String previousActor = requestTraceContext.getCurrentActor().orElse(null);
@@ -238,7 +243,8 @@ public class IntegrationReplayService {
             record = integrationReplayRecordRepository.save(record);
             integrationInboundRecordService.markReplayed(record.getInboundRecordId(), order.externalOrderId());
 
-            businessEventService.record(
+            businessEventService.recordForTenant(
+                tenantCode,
                 BusinessEventType.INTEGRATION_REPLAY_COMPLETED,
                 "integration-replay",
                 "Replayed failed " + record.getConnectorType() + " order " + record.getExternalOrderId()
@@ -283,7 +289,8 @@ public class IntegrationReplayService {
                 );
             }
 
-            businessEventService.record(
+            businessEventService.recordForTenant(
+                tenantCode,
                 BusinessEventType.INTEGRATION_REPLAY_FAILED,
                 "integration-replay",
                 "Replay failed for " + record.getExternalOrderId() + " from " + record.getSourceSystem()
@@ -334,7 +341,8 @@ public class IntegrationReplayService {
                 );
             }
 
-            businessEventService.record(
+            businessEventService.recordForTenant(
+                tenantCode,
                 BusinessEventType.INTEGRATION_REPLAY_FAILED,
                 "integration-replay",
                 "Replay failed for " + record.getExternalOrderId() + " from " + record.getSourceSystem()
@@ -360,6 +368,31 @@ public class IntegrationReplayService {
         if (value != null && !value.isBlank()) {
             setter.accept(value);
         }
+    }
+
+    private void orphanReplayRecord(IntegrationReplayRecord record, Instant attemptedAt) {
+        record.setReplayAttemptCount(record.getReplayAttemptCount() + 1);
+        record.setLastAttemptedAt(attemptedAt);
+        record.setFailureCode(IntegrationFailureCode.UNKNOWN);
+        record.setStatus(IntegrationReplayStatus.DEAD_LETTERED);
+        record.setDeadLetteredAt(attemptedAt);
+        record.setNextEligibleAt(null);
+        record.setLastReplayMessage(limit("Replay record is missing tenant context and cannot be processed automatically."));
+        integrationReplayRecordRepository.save(record);
+        operationalAlertHookService.emit(
+            "INTEGRATION_REPLAY_ORPHANED",
+            "HIGH",
+            "Integration replay " + record.getId() + " is missing tenant context.",
+            "Source " + record.getSourceSystem() + " order " + record.getExternalOrderId()
+                + " cannot be processed automatically because the replay record has no tenant code."
+        );
+        businessEventService.recordForTenant(
+            RequestTraceContext.MISSING_TENANT_CONTEXT,
+            BusinessEventType.INTEGRATION_REPLAY_FAILED,
+            "integration-replay",
+            "Replay record " + record.getId() + " is missing tenant context and was dead-lettered before automated replay."
+        );
+        log.error("Integration replay {} is missing tenant context and was dead-lettered before automated replay.", record.getId());
     }
 
     private OrderCreateRequest deserializeRequest(IntegrationReplayRecord record) {

@@ -597,6 +597,17 @@ class ProductionHardeningIntegrationTest {
     }
 
     @Test
+    void rootStatusEndpointReturnsSafeServiceMetadataWithoutAuthentication() throws Exception {
+        mockMvc.perform(get("/"))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.service").value("synapsecore-backend"))
+            .andExpect(jsonPath("$.status").value("ok"))
+            .andExpect(jsonPath("$.health.liveness").value("/actuator/health/liveness"))
+            .andExpect(jsonPath("$.health.readiness").value("/actuator/health/readiness"))
+            .andExpect(jsonPath("$.health.runtime").value("/api/system/runtime"));
+    }
+
+    @Test
     void prodProfileRequiresBootstrapTokenForFirstTenantCreation() throws Exception {
         mockMvc.perform(post("/api/access/tenants")
                 .contentType(APPLICATION_JSON)

@@ -34,7 +34,7 @@ server:
 synapsecore:
   build:
     version: ${SYNAPSECORE_BUILD_VERSION:0.0.1-SNAPSHOT}
-    commit: ${SYNAPSECORE_BUILD_COMMIT:local-dev}
+    commit: ${SYNAPSECORE_BUILD_COMMIT:${RENDER_GIT_COMMIT:local-dev}}
     time: ${SYNAPSECORE_BUILD_TIME:untracked}
   bootstrap:
     initial-token: ${SYNAPSECORE_BOOTSTRAP_INITIAL_TOKEN:}

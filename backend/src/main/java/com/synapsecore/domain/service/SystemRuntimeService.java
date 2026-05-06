@@ -82,6 +82,21 @@ public class SystemRuntimeService {
     @Value("${synapsecore.build.time:untracked}")
     private String buildTime;
 
+    @Value("${RENDER:false}")
+    private boolean renderRuntime;
+
+    @Value("${RENDER_GIT_BRANCH:}")
+    private String renderGitBranch;
+
+    @Value("${RENDER_SERVICE_NAME:}")
+    private String renderServiceName;
+
+    @Value("${RENDER_SERVICE_ID:}")
+    private String renderServiceId;
+
+    @Value("${RENDER_INSTANCE_ID:}")
+    private String renderInstanceId;
+
     @Value("${synapsecore.public.app-url:}")
     private String publicAppUrl;
 
@@ -108,7 +123,16 @@ public class SystemRuntimeService {
 
         return new SystemRuntimeResponse(
             applicationName,
-            new SystemBuildInfo(buildVersion, buildCommit, buildTime),
+            new SystemBuildInfo(
+                buildVersion,
+                buildCommit,
+                buildTime,
+                emptyToNull(renderGitBranch),
+                renderRuntime ? "render" : "local",
+                emptyToNull(renderServiceName),
+                emptyToNull(renderServiceId),
+                emptyToNull(renderInstanceId)
+            ),
             activeProfiles,
             healthEndpoint.health().getStatus().getCode(),
             applicationAvailability.getLivenessState().name(),
@@ -125,6 +149,13 @@ public class SystemRuntimeService {
             buildConnectorDiagnostics(),
             Instant.now()
         );
+    }
+
+    private String emptyToNull(String value) {
+        if (value == null || value.isBlank()) {
+            return null;
+        }
+        return value.trim();
     }
 
     private SystemTelemetrySummary buildTelemetrySummary() {

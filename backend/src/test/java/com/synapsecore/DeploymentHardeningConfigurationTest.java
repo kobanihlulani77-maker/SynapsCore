@@ -19,12 +19,16 @@ class DeploymentHardeningConfigurationTest {
     @Test
     void renderDeploymentUsesDistributedRealtimeAndValidateMode() throws IOException {
         String renderConfig = Files.readString(Path.of("..", "render.yaml"));
+        String baseConfig = Files.readString(Path.of("src/main/resources/application.yml"));
         assertThat(renderConfig).contains("healthCheckPath: /actuator/health/liveness");
         assertThat(renderConfig).contains("key: SPRING_SESSION_REDIS_NAMESPACE");
         assertThat(renderConfig).contains("value: synapsecore:sessions");
         assertThat(renderConfig).contains("value: REDIS_PUBSUB");
         assertThat(renderConfig).contains("value: validate");
         assertThat(renderConfig).contains("value: https://synapscore-3.onrender.com/ws");
+        assertThat(baseConfig).contains("commit: ${SYNAPSECORE_BUILD_COMMIT:${RENDER_GIT_COMMIT:local-dev}}");
+        assertThat(renderConfig).doesNotContain("key: SYNAPSECORE_BUILD_COMMIT");
+        assertThat(renderConfig).doesNotContain("key: SYNAPSECORE_BUILD_TIME");
         assertThat(renderConfig).doesNotContain("value: wss://synapscore-3.onrender.com/ws");
         assertThat(renderConfig).doesNotContain("value: SIMPLE_IN_MEMORY");
         assertThat(renderConfig).doesNotContain("value: update");
