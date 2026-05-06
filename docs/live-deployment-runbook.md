@@ -1,22 +1,13 @@
 # Live Deployment Runbook
 
-This runbook is the practical operating path for deploying SynapseCore onto a real host.
+This runbook is the practical operating path for deploying SynapseCore onto a real host and keeping the hosted proof deterministic.
 
 ## Recommended Baseline
 
 - Ubuntu `24.04 LTS`
-- `2 vCPU / 4 GB RAM` minimum for single-node rollout
-- public DNS for separate app and API origins
-
-## Host Preparation
-
-Install:
-
-- Docker Engine
-- Docker Compose plugin
-- Git
-
-Clone the repo to a stable path such as `/opt/synapsecore/synapsecore`.
+- `2 vCPU / 4 GB RAM` minimum for a single-node rollout
+- separate public app and API origins
+- Redis available for realtime fanout and browser session storage
 
 ## Environment Preparation
 
@@ -33,12 +24,12 @@ Key backend truths:
 - `SESSION_COOKIE_SECURE=true`
 - authenticated browser sessions should be Redis-backed in production so node restarts do not drop live operator access
 - `SYNAPSECORE_REALTIME_BROKER_MODE=REDIS_PUBSUB`
-- `SPRING_JPA_HIBERNATE_DDL_AUTO=validate`; Flyway baseline coverage is active and startup fails on schema mismatch
+- `SPRING_JPA_HIBERNATE_DDL_AUTO=validate`; Flyway startup validation is part of the production posture
 
 Key frontend truths:
 
 - `VITE_API_URL` must point at the real API origin
-- `VITE_WS_URL` must point at the real `/ws` path
+- `VITE_WS_URL` must point at the real `/ws` SockJS endpoint
 
 ## Tenant Provisioning Truth
 
@@ -48,14 +39,9 @@ Production tenant creation is intentionally strict:
 - later tenant creation: platform-admin token lane
 - signed-in tenant admins do not create new tenant workspaces in production
 
-## Hosted Verification Credentials
+## Hosted Proof Credential Flow
 
 Hosted browser proof must use real tenant accounts created or reset through production APIs.
-
-If hosted proof catalog preparation fails, treat the returned product-write message as authoritative:
-
-- duplicate or legacy-hidden SKU message: rerunnable proof catalog conflict
-- `business_events` / `audit_logs` / `operational_dispatch_work_items` message: side-effect write path needs repair before proof can continue
 
 Required env values:
 
@@ -78,65 +64,109 @@ Preparation command:
 powershell -ExecutionPolicy Bypass -File scripts\prepare-hosted-proof.ps1
 ```
 
+Browser proof:
+
+```powershell
+cd frontend
+npm.cmd run test:e2e:prod
+```
+
 Current truth:
 
 - the proof pack is real
 - user provisioning is real
-- the hosted proof passed end to end on Render
-
-## Realtime Truth
-
-Current broker truth:
-
-- development can still use `SIMPLE_IN_MEMORY`
-- current Render rollout uses `REDIS_PUBSUB`
-- distributed publisher fanout is covered by automated proof
-
-Optional later topology shift:
-
-- validate Redis pub/sub or deploy STOMP relay across multiple backend nodes
-- switch to `STOMP_RELAY` if relay infrastructure is chosen
-- re-run browser and runtime verification after the change
-
-## Schema Migration Truth
-
-Current rollout posture no longer mutates schema implicitly at startup. It relies on explicit Flyway migrations plus JPA validation. See:
-
-- [schema-migration-roadmap.md](schema-migration-roadmap.md)
+- the hosted proof passed twice end to end on Render
 
 ## Verification Order
 
-1. warm the live deployment first:
+1. Warm the live deployment first:
+   - `GET /`
    - `GET /actuator/health/liveness`
    - `GET /actuator/health/readiness`
    - `GET /api/auth/session`
    - `GET /ws/info`
    - open `/sign-in` on the frontend origin
-2. run hosted proof preparation
-3. run browser proof
-4. verify replay and runtime trust surfaces
+2. Run hosted proof preparation.
+3. Run the browser proof.
+4. Verify runtime, incidents, replay, and audit trust surfaces.
 
 ## Cold Start And Warm-up
 
 Render free-instance cold starts can accept traffic before the whole proof lane is stable enough for a first browser pass.
 
-The official hosted-proof order is:
+The repo now hardens the official order in two places:
 
-1. readiness check
-2. hosted proof prep
-3. E2E proof
+- [prepare-hosted-proof.ps1](../scripts/prepare-hosted-proof.ps1) waits for backend readiness, unauthenticated session bootstrap, realtime SockJS availability, the frontend sign-in shell, and then verifies authenticated dashboard, runtime, and snapshot traffic
+- the Playwright hosted proof has a global warm-up gate before test `1` starts and will not continue until the authenticated dashboard lane is reachable
 
-The repo now hardens that order in two places:
+## Replay And Recovery Rules
 
-- [prepare-hosted-proof.ps1](../scripts/prepare-hosted-proof.ps1) waits for backend readiness, unauthenticated session bootstrap, realtime SockJS availability, the frontend sign-in shell, and then verifies authenticated dashboard/runtime traffic
-- the Playwright hosted proof has a global warm-up gate before test `1` starts and will not continue until an authenticated dashboard snapshot is reachable
+Current replay eligibility rules matter operationally:
 
-Operational note:
+- a disabled connector CSV import must return `CONNECTOR_DISABLED` instead of a generic `500`
+- that failed import must create a replay record immediately
+- automated replay does not own or mutate manual-only disabled-connector records while the connector is still disabled
+- the replay record stays visible to the UI
+- an operator can enable the connector and perform manual replay intentionally
+- locking prevents manual and automated replay from double-processing the same record
 
-- the auth rate-limit proof intentionally ends by hitting a real `429`
-- the next proof run must allow that bucket window to cool before negative-auth proof starts again
-- the hosted proof now records that cooldown locally and waits it out automatically on the next run instead of relying on human reruns
-- Render health checks should target liveness, while hosted proof should still wait on readiness before sending browser traffic
+If these rules stop being true, treat the deployment as untrustworthy even if health checks still say `UP`.
+
+## Daily Operating Checks
+
+- no unexplained active incidents
+- replay backlog is stable or empty
+- disabled connectors are intentional
+- dispatch queue backlog is not growing unexpectedly
+- runtime broker mode still reports `REDIS_PUBSUB`
+- wrong-password login still rejects quickly
+- the latest hosted-proof tenant can still sign in and load dashboard, runtime, catalog, integrations, and replay surfaces
+
+## Recovery Procedure
+
+Use recovery when the deployment is correct but operations are degraded.
+
+- replay backlog growth:
+  - confirm connector is enabled
+  - confirm the record is eligible for manual or automated recovery
+  - inspect replay queue in the UI
+  - replay eligible records
+  - investigate dead-lettered or orphaned records before clearing them
+- realtime degradation:
+  - confirm broker mode in runtime
+  - verify Redis availability
+  - if the UI falls back to degraded snapshot polling, treat that as degraded service, not normal steady state
+- inventory contention:
+  - check recent lock-conflict surfaces
+  - confirm no oversell occurred
+  - reduce import or replay pressure before resuming high-volume operations if contention spikes
+
+## Rollback Procedure
+
+Use rollback when the deployment is healthy enough to answer traffic but no longer safe to trust.
+
+1. Stop further rollout and freeze connector changes.
+2. Identify the last known good frontend and backend build fingerprints.
+3. Redeploy the last known good versions.
+4. Re-run:
+   - `/`
+   - `/actuator/health/liveness`
+   - `/actuator/health/readiness`
+   - `powershell -ExecutionPolicy Bypass -File scripts\prepare-hosted-proof.ps1`
+   - `npm.cmd run test:e2e:prod`
+5. If rollback does not restore integrity and the issue is data or schema related, restore PostgreSQL from the most recent good backup.
+
+Do not attempt to repair forward blindly if runtime, replay, or catalog writes are untrustworthy.
+
+## Operational Noise Classification
+
+`Broken pipe` and `ClientAbortException` lines are operational noise when:
+
+- they happen during browser navigation or teardown
+- they do not line up with a failing hosted-proof step
+- there is no matching requestId-backed application failure
+
+Treat them as real incidents only when they cluster around user-visible failures or concrete API errors.
 
 ## Bottom Line
 
@@ -145,3 +175,5 @@ Use this runbook as a real operational deployment guide, not a demo walkthrough.
 For exact pilot operating, rollback, recovery, and security handling, use:
 
 - [pilot-operations-runbook.md](pilot-operations-runbook.md)
+- [hosted-proof.md](hosted-proof.md)
+- [replay-recovery.md](replay-recovery.md)

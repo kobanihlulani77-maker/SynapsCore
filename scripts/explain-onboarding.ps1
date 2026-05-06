@@ -9,79 +9,55 @@ Write-Host "=================================================="
 Write-Host "Repo root: $rootDir"
 Write-Host ""
 @'
-This explainer covers how a real company gets started in SynapseCore.
+REAL TENANT ONBOARDING FLOW
 
-1. CREATE THE WORKSPACE
-- create a tenant
-- define tenant code and tenant name
-- create the initial tenant admin
+1. Create the workspace through the correct production lane:
+   - bootstrap token for the very first tenant on an empty production database
+   - platform-admin token for later tenant provisioning
 
-2. DEFINE THE OPERATING SHAPE
-- create warehouses or locations
-- define operator lanes
-- assign roles
-- assign warehouse scopes
+2. Define the operating footprint:
+   - warehouses
+   - operators
+   - warehouse scopes
+   - approval and support ownership
 
-3. CREATE PEOPLE
-- create operators
-- create user accounts
-- map users to operators
-- confirm password and session policy
+3. Create real users:
+   - tenant admin
+   - planner / reviewer
+   - integration admin or operator
+   - map each user to the correct operator lane
 
-4. CONNECT REAL INPUTS
-- configure connectors
-- choose sync mode
-- choose validation policy
-- choose transformation policy
-- define default warehouse fallback if the business needs it
+4. Configure real inputs:
+   - connector source system
+   - validation policy
+   - transformation policy
+   - default warehouse fallback only when the business truly needs it
 
-5. PREPARE TRUST AND SUPPORT
-- review workspace settings
-- review support ownership for connectors
-- review runtime and incident visibility
-- review who can replay, approve, and administer
+5. Verify trust surfaces:
+   - dashboard
+   - runtime
+   - incidents
+   - integrations
+   - replay queue
+   - users and settings
 
-6. START THE FIRST LIVE DAY
-- sign in as tenant admin
-- inspect dashboard, runtime, and integrations
-- create or receive the first order/event
-- verify alerts, recommendations, and fulfillment updates appear
+6. Run hosted proof:
+   - prepare-hosted-proof.ps1
+   - frontend hosted Playwright proof
 
-7. TRAIN THE TEAM BY ROLE
-- operators: orders, inventory, fulfillment, alerts, replay
-- reviewers/approvers: scenarios, approvals, escalations
-- admins: users, settings, connectors, trust surfaces
+WHAT MUST BE TRUE BEFORE FIRST LIVE DAY
 
-8. DAILY OPERATING MOTION
-- open dashboard in the morning
-- work the alerts and recommendations
-- follow fulfillment and location pressure
-- use scenarios for risky changes
-- use replay and runtime pages when systems fail
+- the tenant can sign in cleanly
+- warehouse scopes match real responsibilities
+- connector support ownership is defined
+- disabled connector failures create replay records instead of silent gaps
+- manual recovery can be performed after connector repair
+- dashboard, runtime, alerts, and audit views load for the real tenant
 
-9. WHAT A COMPANY SHOULD HAVE BEFORE GO-LIVE
-- real tenant settings
-- real users and scoped operators
-- real connector policy
-- known warehouses/locations
-- tested inbound lanes
-- approval ownership defined
-- incident and replay handling understood
+MOST IMPORTANT DOCS
 
-10. WHAT SUCCESS LOOKS LIKE
-
-A company is onboarded correctly when:
-- the right people can sign in
-- the right pages are visible
-- live business activity changes the control center
-- alerts and recommendations show up meaningfully
-- failures can be seen and replayed safely
-- approvals and escalations route correctly
-
-BEST WAY TO READ THIS WITH THE REPO
-
-Use this explainer with:
-- docs/deployment.md
-- docs/system-flow.md
-- scripts/verify-company-readiness.ps1
+- docs\onboarding-playbook.md
+- docs\hosted-proof.md
+- docs\replay-recovery.md
+- docs\company-fit-playbook.md
 '@ | Write-Host

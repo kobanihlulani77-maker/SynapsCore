@@ -519,6 +519,15 @@ Warehouse scope rules:
 
 ## Runtime Trust
 
+### `GET /`
+
+Returns a safe service-status response for quick human or platform verification.
+
+Use this as:
+
+- a basic service-reachable check
+- a quick confirmation that the backend is answering with a safe status payload instead of a generic `500`
+
 ### `GET /api/system/runtime`
 
 Returns a safe runtime/trust snapshot for the control center.
@@ -586,6 +595,11 @@ The response includes:
   - deadLetterCount
   - oldestPendingReplayAgeSeconds
 - observedAt
+
+Operational trust note:
+
+- backend build identity can resolve from `SYNAPSECORE_BUILD_COMMIT` or Render's `RENDER_GIT_COMMIT`
+- isolated browser disconnect logs such as `Broken pipe` or `ClientAbortException` are operational noise unless they line up with a failing request or proof step
 
 ### `GET /api/system/incidents`
 
@@ -678,6 +692,13 @@ Connector policy behavior:
 - `validationPolicy=RELAXED` consolidates duplicate product lines inside the same grouped external order before the live order is created
 - CSV rows may leave `warehouseCode` blank only when the connector allows default-warehouse fallback and has a default warehouse configured
 
+Disabled connector recovery behavior:
+
+- a disabled connector CSV import must return a structured failed-order response rather than a generic `500`
+- the failed row should include `failureCode=CONNECTOR_DISABLED`
+- a replay record is created immediately for that failed order
+- the record remains available for operational recovery after the connector is repaired
+
 ### `GET /api/integrations/orders/connectors`
 
 Returns the currently configured inbound connectors.
@@ -763,6 +784,12 @@ Each run includes:
 
 Returns unresolved failed inbound orders that can be replayed after the operational problem is fixed.
 
+Replay-queue rules that matter operationally:
+
+- manual-only failures such as `CONNECTOR_DISABLED` remain visible in the queue while the connector is still disabled
+- automated replay does not steal those records before the UI can present them to an operator
+- queue visibility is warehouse-aware and tenant-aware
+
 Each replay record includes:
 
 - sourceSystem
@@ -786,6 +813,12 @@ Returns:
 - replay record with updated replay status
 - created internal order response when the replay succeeds
 - replay timestamp
+
+Manual replay semantics:
+
+- manual replay is the intended ownership path for manual-only failures such as `CONNECTOR_DISABLED`
+- the connector should be repaired or re-enabled before replay is attempted
+- replay uses locking so manual and automated processing do not double-process the same record
 
 Access:
 

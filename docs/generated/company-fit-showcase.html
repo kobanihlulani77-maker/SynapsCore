@@ -1,0 +1,594 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>SynapseCore Company Fit Report</title>
+  <style>
+    :root {
+      color-scheme: light;
+      --bg: #f4f1ea;
+      --panel: #fffdfa;
+      --ink: #182128;
+      --muted: #51606b;
+      --line: #d3c6b5;
+      --accent: #0c6d63;
+      --accent-soft: #e2f3f1;
+    }
+    body {
+      margin: 0;
+      font-family: "Segoe UI", "Helvetica Neue", Arial, sans-serif;
+      color: var(--ink);
+      background: linear-gradient(180deg, #f3eee5 0%, #f8f6f1 100%);
+      line-height: 1.55;
+    }
+    main {
+      max-width: 1100px;
+      margin: 0 auto;
+      padding: 40px 24px 80px;
+    }
+    header, article {
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: 20px;
+      box-shadow: 0 18px 40px rgba(24, 33, 40, 0.08);
+    }
+    header {
+      padding: 32px;
+      margin-bottom: 28px;
+    }
+    article {
+      padding: 28px;
+      margin-bottom: 24px;
+    }
+    h1, h2 {
+      margin-top: 0;
+      letter-spacing: -0.02em;
+    }
+    h1 {
+      font-size: 2.3rem;
+    }
+    h2 {
+      font-size: 1.65rem;
+      border-bottom: 1px solid var(--line);
+      padding-bottom: 10px;
+    }
+    h3 {
+      font-size: 1rem;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      color: var(--accent);
+      margin-bottom: 8px;
+    }
+    p, li {
+      color: var(--ink);
+    }
+    .muted {
+      color: var(--muted);
+    }
+    .grid {
+      display: grid;
+      gap: 18px;
+      grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+    }
+    .card {
+      background: var(--accent-soft);
+      border-radius: 14px;
+      padding: 16px;
+    }
+    .headline {
+      font-size: 1.05rem;
+      color: var(--muted);
+    }
+    .scenario {
+      border-left: 4px solid var(--accent);
+      padding-left: 14px;
+      margin-bottom: 14px;
+    }
+  </style>
+</head>
+<body>
+  <main>
+    <header>
+      <h1>SynapseCore Company Fit Report</h1>
+      <p class="muted">Generated at 2026-05-06T17:47:17.108Z</p>
+      <p>SynapseCore should be positioned as an operational control platform for the lanes it actually proves today: tenant-safe access, warehouse-aware catalog and inventory control, inbound order ingestion, deterministic replay and recovery, scenario governance, realtime operations, and runtime trust surfaces.</p>
+      <div class="grid">
+        <div class="card">
+          <h3>Current Supported Scope</h3>
+          <ul><li>tenant-explicit auth, session control, and operator lane scoping</li><li>catalog onboarding and warehouse-aware inventory control</li><li>order ingestion through webhook, CSV, and scheduled pull</li><li>alerts, recommendations, scenario approvals, and execution governance</li><li>integration replay and recovery with manual-versus-automated eligibility rules</li><li>tenant-scoped realtime visibility backed by Redis pub/sub on Render</li><li>runtime, incident, audit, and event-tracing trust surfaces</li><li>rate-limited auth and integration mutation paths</li></ul>
+        </div>
+        <div class="card">
+          <h3>Fit Signals</h3>
+          <ul><li>multiple operational systems feeding the same fulfillment or control process</li><li>warehouse, fleet, fulfillment, field, or approval teams that need a shared operating picture</li><li>teams that lose time reconciling spreadsheets, inboxes, exports, and delayed integration failures</li><li>companies that need incident recovery and audit traceability without rebuilding their whole stack at once</li></ul>
+        </div>
+        <div class="card">
+          <h3>Proof Highlights</h3>
+          <ul><li>full hosted proof passed end to end on Render twice in a row</li><li>disabled connector CSV failures return structured CONNECTOR_DISABLED rows and create replay records</li><li>manual replay records are not stolen by automated replay while the connector remains disabled</li><li>dashboard, replay, scenario approval, role gating, and auth rate limiting are all browser-proven live</li></ul>
+        </div>
+      </div>
+    </header>
+    
+    <article class="profile">
+      <h2>Logistics Companies</h2>
+      <p class="headline">Best fit when dispatch, warehouse, fulfillment, and exception handling are split across tools and teams.</p>
+      <section><h3>Operational Pain</h3><p>Orders, shipment promises, dispatch changes, and exceptions move faster than operators can reconcile them manually.</p></section>
+      <section><h3>Fragmented Systems Usually Look Like</h3><p>TMS, spreadsheet lane boards, carrier portals, email escalations, and a separate stock or warehouse tool.</p></section>
+      <section><h3>Where Delays And Failures Happen</h3><p>Dispatch changes arrive late, exception ownership is unclear, and failed imports are noticed after downstream teams have already reacted.</p></section>
+      <section><h3>Why Visibility Breaks</h3><p>Control teams see status snapshots after the fact instead of live pressure building by warehouse, connector, or order lane.</p></section>
+      <section><h3>Where Approvals Become Bottlenecks</h3><p>Risky reallocations and promise changes wait for managers who have incomplete context or no shared review lane.</p></section>
+      <section><h3>Where Integrations Fail</h3><p>Carrier or partner feeds fail silently, CSV handoffs break, and support teams discover the gap only after customers escalate.</p></section>
+      <section><h3>Where Inventory Or Order Mismatch Appears</h3><p>What sales promised, what the warehouse can actually ship, and what the dispatch board shows stop matching.</p></section>
+      <section><h3>How Replay And Recovery Help</h3><p>Replay records let operations recover failed inbound orders after connector issues are fixed instead of rekeying them from scratch.</p></section>
+      <section><h3>How Realtime Visibility Changes Operations</h3><p>Live connector, alert, and inventory pressure changes help operations re-route before SLA breaches spread.</p></section>
+      <section><h3>How Audit And Event Tracing Help</h3><p>Runtime, incidents, audit, and business events show which lane failed, who replayed it, and what changed after recovery.</p></section>
+      <section><h3>Why Tenant Isolation Matters</h3><p>Useful when one platform team supports multiple logistics clients or brands without mixing their operators or inbound records.</p></section>
+      <section><h3>Metrics That Matter Most</h3><ul><li>replay queue depth</li><li>connector failure rate</li><li>fulfillment backlog count</li><li>delayed fulfillment count</li><li>dispatch queue backlog</li><li>orders ingested per hour</li></ul></section>
+      <section><h3>Dashboard Views That Matter Most</h3><ul><li>live operations dashboard</li><li>connector diagnostics and replay queue</li><li>runtime and incident inbox</li><li>warehouse inventory posture</li></ul></section>
+      <section><h3>Alerts And Recommendations That Matter Most</h3><ul><li>connector disabled or degraded</li><li>backlog growth by lane</li><li>inventory risk on committed orders</li><li>delayed fulfillment escalation</li></ul></section>
+      <section><h3>ROI And Operational Value</h3><ul><li>less manual exception chasing</li><li>faster recovery after ingestion failure</li><li>fewer avoidable SLA misses</li><li>clearer operational ownership during incidents</li></ul></section>
+      <section>
+        <h3>Realistic Scenarios</h3>
+        
+    <section class="scenario">
+      <h3>Carrier CSV lane pauses before shift change</h3>
+      <p><strong>Before:</strong> Teams discover the missing loads only after the warehouse asks why work dried up.</p>
+      <p><strong>After:</strong> Connector health, replay queue, and dashboard incidents surface the break quickly, then manual replay restores the lane after the connector is re-enabled.</p>
+    </section>
+  
+    <section class="scenario">
+      <h3>Urgent allocation change needs approval</h3>
+      <p><strong>Before:</strong> Managers review partial screenshots and messages with no shared audit trail.</p>
+      <p><strong>After:</strong> Scenario approval and execution keep the review, decision, and result in one governed path.</p>
+    </section>
+  
+      </section>
+    </article>
+  
+
+    <article class="profile">
+      <h2>Warehouses</h2>
+      <p class="headline">Best fit when warehouse teams need one control surface for inventory risk, inbound failures, and operator actions.</p>
+      <section><h3>Operational Pain</h3><p>Warehouse teams juggle receiving, picking, replenishment, and low-stock response while updates arrive from disconnected systems.</p></section>
+      <section><h3>Fragmented Systems Usually Look Like</h3><p>WMS exports, spreadsheet replenishment trackers, radio calls, and inbox-based exception handling.</p></section>
+      <section><h3>Where Delays And Failures Happen</h3><p>Receiving or order imports stall while floor teams keep working from stale priorities.</p></section>
+      <section><h3>Why Visibility Breaks</h3><p>Supervisors cannot see which shortages are real, which are data lag, and which are connector failures.</p></section>
+      <section><h3>Where Approvals Become Bottlenecks</h3><p>Reallocation and exception approval depend on supervisors reconstructing the event chain manually.</p></section>
+      <section><h3>Where Integrations Fail</h3><p>Inbound order or receiving updates fail without a shared recovery queue.</p></section>
+      <section><h3>Where Inventory Or Order Mismatch Appears</h3><p>Available, reserved, and reorder-driven views drift apart, causing wasted picks or stockout surprises.</p></section>
+      <section><h3>How Replay And Recovery Help</h3><p>Failed inbound records stay visible until operators can intentionally recover them.</p></section>
+      <section><h3>How Realtime Visibility Changes Operations</h3><p>Low-stock signals and dashboard risk changes update without refresh when the floor situation changes.</p></section>
+      <section><h3>How Audit And Event Tracing Help</h3><p>Teams can see when inventory changed, what replayed, and who executed or approved a risky scenario.</p></section>
+      <section><h3>Why Tenant Isolation Matters</h3><p>Matters when 3PL or shared-service warehouse teams support multiple client workspaces.</p></section>
+      <section><h3>Metrics That Matter Most</h3><ul><li>active low-stock alerts</li><li>inventory reservation pressure</li><li>replay queue depth by warehouse</li><li>failed dispatch count</li><li>orders delayed by stock posture</li></ul></section>
+      <section><h3>Dashboard Views That Matter Most</h3><ul><li>inventory and low-stock dashboard</li><li>warehouse-scoped replay queue</li><li>runtime incident inbox</li></ul></section>
+      <section><h3>Alerts And Recommendations That Matter Most</h3><ul><li>threshold breach</li><li>connector-disabled inbound lane</li><li>warehouse-specific backlog spike</li></ul></section>
+      <section><h3>ROI And Operational Value</h3><ul><li>fewer manual recount and reconciliation loops</li><li>earlier shortage response</li><li>less time lost chasing missing inbound records</li></ul></section>
+      <section>
+        <h3>Realistic Scenarios</h3>
+        
+    <section class="scenario">
+      <h3>Inbound connector disabled during morning receiving</h3>
+      <p><strong>Before:</strong> Warehouse staff stop trusting the queue and switch to ad hoc manual notes.</p>
+      <p><strong>After:</strong> The failed CSV row is classified, queued, and held for manual recovery once the connector is enabled.</p>
+    </section>
+  
+    <section class="scenario">
+      <h3>Low stock threatens multiple active orders</h3>
+      <p><strong>Before:</strong> Operators refresh several tools to guess the real impact.</p>
+      <p><strong>After:</strong> Realtime dashboard risk and recommendations update immediately as inventory changes.</p>
+    </section>
+  
+      </section>
+    </article>
+  
+
+    <article class="profile">
+      <h2>Retail Chains</h2>
+      <p class="headline">Best fit when store, warehouse, and central operations need one tenant-safe control center instead of scattered spreadsheets and delayed reports.</p>
+      <section><h3>Operational Pain</h3><p>Store-level demand changes faster than central teams can rebalance stock and respond to fulfillment risk.</p></section>
+      <section><h3>Fragmented Systems Usually Look Like</h3><p>POS reports, store spreadsheets, email approvals, warehouse inventory views, and separate support inboxes.</p></section>
+      <section><h3>Where Delays And Failures Happen</h3><p>Store replenishment issues surface after shelves are already empty or store teams escalate manually.</p></section>
+      <section><h3>Why Visibility Breaks</h3><p>Central ops see reports, not live operational pressure across stores and warehouse lanes.</p></section>
+      <section><h3>Where Approvals Become Bottlenecks</h3><p>Transfers, substitutions, and urgent procurement waits for informal approval chains.</p></section>
+      <section><h3>Where Integrations Fail</h3><p>Store or partner order feeds fail without visible ownership.</p></section>
+      <section><h3>Where Inventory Or Order Mismatch Appears</h3><p>Store-facing availability and warehouse reality drift apart.</p></section>
+      <section><h3>How Replay And Recovery Help</h3><p>Failed store or partner imports can be recovered deliberately rather than reentered from scratch.</p></section>
+      <section><h3>How Realtime Visibility Changes Operations</h3><p>Central dashboards show fresh risk posture while inventory and inbound data change.</p></section>
+      <section><h3>How Audit And Event Tracing Help</h3><p>Useful for tracing who approved reallocation, who replayed inbound data, and when the state changed.</p></section>
+      <section><h3>Why Tenant Isolation Matters</h3><p>Supports brand or franchise separation without shared-user leakage.</p></section>
+      <section><h3>Metrics That Matter Most</h3><ul><li>stockout risk by warehouse</li><li>replay backlog by source system</li><li>active recommendation count</li><li>store-impacting alert count</li></ul></section>
+      <section><h3>Dashboard Views That Matter Most</h3><ul><li>central dashboard summary</li><li>catalog and inventory management</li><li>alerts and recommendations</li></ul></section>
+      <section><h3>Alerts And Recommendations That Matter Most</h3><ul><li>inventory below threshold</li><li>connector degraded for a retail feed</li><li>delayed fulfillment with store impact</li></ul></section>
+      <section><h3>ROI And Operational Value</h3><ul><li>fewer lost sales from invisible stock pressure</li><li>faster store-operations response</li><li>better cross-store transfer governance</li></ul></section>
+      <section>
+        <h3>Realistic Scenarios</h3>
+        
+    <section class="scenario">
+      <h3>Promoted SKU falls below safe threshold</h3>
+      <p><strong>Before:</strong> Store teams find out after service complaints and manual phone calls.</p>
+      <p><strong>After:</strong> Central operations sees the risk live, reviews scenario options, and executes an approved response path.</p>
+    </section>
+  
+    <section class="scenario">
+      <h3>Store-import lane fails overnight</h3>
+      <p><strong>Before:</strong> Morning teams manually compare exports and assume missing orders are already handled.</p>
+      <p><strong>After:</strong> Replay queue and incidents make the gap visible before store teams promise against bad data.</p>
+    </section>
+  
+      </section>
+    </article>
+  
+
+    <article class="profile">
+      <h2>Ecommerce Fulfillment</h2>
+      <p class="headline">Best fit when order velocity and SLA pressure make integration failures and stale dashboard data expensive.</p>
+      <section><h3>Operational Pain</h3><p>High-volume fulfillment teams cannot afford silent import failures or lag between stock posture and order commitments.</p></section>
+      <section><h3>Fragmented Systems Usually Look Like</h3><p>Commerce platform exports, marketplace feeds, shipping dashboards, warehouse notes, and support escalations.</p></section>
+      <section><h3>Where Delays And Failures Happen</h3><p>Failed order ingestion or delayed updates ripple into customer-facing promise misses quickly.</p></section>
+      <section><h3>Why Visibility Breaks</h3><p>Operators cannot distinguish a real demand spike from a broken feed fast enough.</p></section>
+      <section><h3>Where Approvals Become Bottlenecks</h3><p>Rush substitutions or inventory overrides move through chat rather than governed review.</p></section>
+      <section><h3>Where Integrations Fail</h3><p>Marketplace CSV and webhook lanes fail at the worst possible times and need visible recovery.</p></section>
+      <section><h3>Where Inventory Or Order Mismatch Appears</h3><p>Oversell risk rises when commitments outrun visible stock posture.</p></section>
+      <section><h3>How Replay And Recovery Help</h3><p>Replay keeps failed inbound orders recoverable with traceability instead of forcing ad hoc reentry.</p></section>
+      <section><h3>How Realtime Visibility Changes Operations</h3><p>Live dashboard updates change triage speed when order pressure or stock risk shifts.</p></section>
+      <section><h3>How Audit And Event Tracing Help</h3><p>Critical for proving whether an order failed to ingest, was replayed, and when the promise-relevant state changed.</p></section>
+      <section><h3>Why Tenant Isolation Matters</h3><p>Useful for agencies or operators running multiple commerce brands in one platform.</p></section>
+      <section><h3>Metrics That Matter Most</h3><ul><li>orders ingested total</li><li>fulfillment backlog</li><li>delayed fulfillment count</li><li>replay attempts</li><li>recent import issues</li></ul></section>
+      <section><h3>Dashboard Views That Matter Most</h3><ul><li>dashboard summary</li><li>orders and fulfillment surfaces</li><li>integrations and replay</li></ul></section>
+      <section><h3>Alerts And Recommendations That Matter Most</h3><ul><li>connector disabled</li><li>inventory shortage against active demand</li><li>fulfillment delay escalation</li></ul></section>
+      <section><h3>ROI And Operational Value</h3><ul><li>fewer missed customer promises</li><li>faster operator triage</li><li>less time reconciling order-import exceptions</li></ul></section>
+      <section>
+        <h3>Realistic Scenarios</h3>
+        
+    <section class="scenario">
+      <h3>Marketplace CSV lane fails mid-campaign</h3>
+      <p><strong>Before:</strong> Support sees angry customers before operations sees the broken feed.</p>
+      <p><strong>After:</strong> The failed rows are classified, queued, and recovered through a visible replay lane.</p>
+    </section>
+  
+    <section class="scenario">
+      <h3>Warehouse stock drops during flash demand</h3>
+      <p><strong>Before:</strong> Teams refresh different tools and act on lagging numbers.</p>
+      <p><strong>After:</strong> Realtime dashboard risk and recommendations update immediately.</p>
+    </section>
+  
+      </section>
+    </article>
+  
+
+    <article class="profile">
+      <h2>Distributors</h2>
+      <p class="headline">Best fit when multi-customer stock movement and inbound partner feeds create constant reconciliation work.</p>
+      <section><h3>Operational Pain</h3><p>Distribution teams need clean views across customer demand, warehouse availability, and inbound supplier or sales feeds.</p></section>
+      <section><h3>Fragmented Systems Usually Look Like</h3><p>ERP extracts, partner CSVs, warehouse tools, and coordinator spreadsheets.</p></section>
+      <section><h3>Where Delays And Failures Happen</h3><p>Inbound orders or transfers fail quietly, then downstream teams overreact or duplicate work.</p></section>
+      <section><h3>Why Visibility Breaks</h3><p>Distribution managers cannot see which warehouse or connector issue is actually driving backlog.</p></section>
+      <section><h3>Where Approvals Become Bottlenecks</h3><p>High-impact moves such as reallocations and priority changes depend on ad hoc approval threads.</p></section>
+      <section><h3>Where Integrations Fail</h3><p>Partner source systems send inconsistent files that need clear failure codes and recovery paths.</p></section>
+      <section><h3>Where Inventory Or Order Mismatch Appears</h3><p>Warehouse-on-hand, committed stock, and replenishment plans drift apart.</p></section>
+      <section><h3>How Replay And Recovery Help</h3><p>Operators can keep failed partner orders in view until the feed or connector issue is corrected.</p></section>
+      <section><h3>How Realtime Visibility Changes Operations</h3><p>Live operational summaries help distribution teams rebalance work faster.</p></section>
+      <section><h3>How Audit And Event Tracing Help</h3><p>Needed when customer operations asks why a lane fell behind and who changed the recovery plan.</p></section>
+      <section><h3>Why Tenant Isolation Matters</h3><p>Useful when one shared-service team manages multiple customer workspaces or business units.</p></section>
+      <section><h3>Metrics That Matter Most</h3><ul><li>warehouse-specific backlog</li><li>connector health by source system</li><li>inventory risk level</li><li>replay queue depth</li></ul></section>
+      <section><h3>Dashboard Views That Matter Most</h3><ul><li>distribution dashboard</li><li>connector health rows</li><li>inventory posture by warehouse</li></ul></section>
+      <section><h3>Alerts And Recommendations That Matter Most</h3><ul><li>degraded connector</li><li>rising replay queue</li><li>stockout risk on priority SKUs</li></ul></section>
+      <section><h3>ROI And Operational Value</h3><ul><li>less time spent reconciling partner feeds</li><li>better warehouse balancing decisions</li><li>fewer missed commitments</li></ul></section>
+      <section>
+        <h3>Realistic Scenarios</h3>
+        
+    <section class="scenario">
+      <h3>Partner import fails on disabled connector</h3>
+      <p><strong>Before:</strong> Teams retype the order or wait for support to investigate.</p>
+      <p><strong>After:</strong> The import comes back with CONNECTOR_DISABLED, creates a replay record, and stays ready for manual recovery.</p>
+    </section>
+  
+    <section class="scenario">
+      <h3>Distribution center backlog spikes</h3>
+      <p><strong>Before:</strong> Managers piece together exports from different systems.</p>
+      <p><strong>After:</strong> Runtime, alerts, and dashboard surfaces show which lane is driving the pressure.</p>
+    </section>
+  
+      </section>
+    </article>
+  
+
+    <article class="profile">
+      <h2>Manufacturers</h2>
+      <p class="headline">Best fit when materials, internal approvals, and fulfillment risk need one governed control center.</p>
+      <section><h3>Operational Pain</h3><p>Manufacturing operations lose time when material availability, production commitments, and downstream order promises diverge.</p></section>
+      <section><h3>Fragmented Systems Usually Look Like</h3><p>MRP or ERP modules, local planners' spreadsheets, warehouse tools, and approval email chains.</p></section>
+      <section><h3>Where Delays And Failures Happen</h3><p>Changes to component availability and inbound demand do not reach planners quickly enough.</p></section>
+      <section><h3>Why Visibility Breaks</h3><p>Teams cannot see whether a production risk is stock, approval, or connector driven.</p></section>
+      <section><h3>Where Approvals Become Bottlenecks</h3><p>Production-plan or substitution changes wait for approvals with no shared operational context.</p></section>
+      <section><h3>Where Integrations Fail</h3><p>Inbound schedules or order feeds fail without a recovery-first operator path.</p></section>
+      <section><h3>Where Inventory Or Order Mismatch Appears</h3><p>Raw material, finished goods, and promised delivery views drift apart.</p></section>
+      <section><h3>How Replay And Recovery Help</h3><p>Failed inbound schedules or orders remain recoverable after connector repairs.</p></section>
+      <section><h3>How Realtime Visibility Changes Operations</h3><p>Live risk posture helps planners act before shortages cascade into late delivery.</p></section>
+      <section><h3>How Audit And Event Tracing Help</h3><p>Supports post-incident traceability around decisions, escalations, and replays.</p></section>
+      <section><h3>Why Tenant Isolation Matters</h3><p>Useful for contract manufacturers supporting multiple brands or customer programs.</p></section>
+      <section><h3>Metrics That Matter Most</h3><ul><li>material-linked low-stock alerts</li><li>replay backlog tied to inbound schedules</li><li>scenario approval age</li><li>delayed fulfillment count</li></ul></section>
+      <section><h3>Dashboard Views That Matter Most</h3><ul><li>inventory and recommendation views</li><li>scenario approval surfaces</li><li>runtime and incidents</li></ul></section>
+      <section><h3>Alerts And Recommendations That Matter Most</h3><ul><li>material shortage risk</li><li>connector-disabled inbound lane</li><li>approval escalation</li></ul></section>
+      <section><h3>ROI And Operational Value</h3><ul><li>better production exception handling</li><li>fewer surprises between material and fulfillment teams</li><li>stronger auditability around change approval</li></ul></section>
+      <section>
+        <h3>Realistic Scenarios</h3>
+        
+    <section class="scenario">
+      <h3>Component shortage threatens committed orders</h3>
+      <p><strong>Before:</strong> Planners argue from stale exports and chat threads.</p>
+      <p><strong>After:</strong> Recommendations, approvals, and audit traces keep the response governed.</p>
+    </section>
+  
+    <section class="scenario">
+      <h3>Inbound schedule import fails</h3>
+      <p><strong>Before:</strong> Operators manually reconstruct the day from spreadsheets.</p>
+      <p><strong>After:</strong> The failed inbound record stays recoverable through replay.</p>
+    </section>
+  
+      </section>
+    </article>
+  
+
+    <article class="profile">
+      <h2>Procurement-Heavy Businesses</h2>
+      <p class="headline">Best fit when approvals and stock visibility are central to protecting margin and service levels.</p>
+      <section><h3>Operational Pain</h3><p>Procurement and operations teams need tighter visibility between stock posture, demand changes, and approval decisions.</p></section>
+      <section><h3>Fragmented Systems Usually Look Like</h3><p>Procurement sheets, ERP extracts, inbox approvals, and warehouse updates that land too late.</p></section>
+      <section><h3>Where Delays And Failures Happen</h3><p>Purchase or replenishment decisions happen after stock pressure is already hurting execution.</p></section>
+      <section><h3>Why Visibility Breaks</h3><p>Teams struggle to see which SKUs need action first and which issues come from bad data versus real demand.</p></section>
+      <section><h3>Where Approvals Become Bottlenecks</h3><p>Buy/no-buy and transfer decisions queue up without shared operational context.</p></section>
+      <section><h3>Where Integrations Fail</h3><p>Inbound vendor or order feeds fail with no visible queue for recovery.</p></section>
+      <section><h3>Where Inventory Or Order Mismatch Appears</h3><p>Demand and on-hand posture drift, creating either excess stock or missed commitments.</p></section>
+      <section><h3>How Replay And Recovery Help</h3><p>Recovery keeps failed inbound orders visible so procurement is not planning against missing demand.</p></section>
+      <section><h3>How Realtime Visibility Changes Operations</h3><p>Live stock-risk changes help prioritize the right approvals and replenishment moves.</p></section>
+      <section><h3>How Audit And Event Tracing Help</h3><p>Shows who approved a move and what risk signal existed at the time.</p></section>
+      <section><h3>Why Tenant Isolation Matters</h3><p>Supports holding-company or business-unit separation when teams share a platform.</p></section>
+      <section><h3>Metrics That Matter Most</h3><ul><li>active recommendation count</li><li>inventory risk severity</li><li>approval backlog</li><li>connector failure count</li></ul></section>
+      <section><h3>Dashboard Views That Matter Most</h3><ul><li>recommendations</li><li>inventory and risk summary</li><li>approval work surfaces</li></ul></section>
+      <section><h3>Alerts And Recommendations That Matter Most</h3><ul><li>urgent replenishment need</li><li>approval aging</li><li>disabled connector blocking demand visibility</li></ul></section>
+      <section><h3>ROI And Operational Value</h3><ul><li>better prioritization of scarce budget and stock</li><li>less planning against incomplete demand data</li><li>more defensible approval records</li></ul></section>
+      <section>
+        <h3>Realistic Scenarios</h3>
+        
+    <section class="scenario">
+      <h3>High-value SKU demand disappears from import lane</h3>
+      <p><strong>Before:</strong> Procurement under-buys because the demand feed failed silently.</p>
+      <p><strong>After:</strong> Runtime and replay surfaces show the failure before planning decisions lock in.</p>
+    </section>
+  
+    <section class="scenario">
+      <h3>Replenishment approval stalls</h3>
+      <p><strong>Before:</strong> Ops teams escalate by email with no shared evidence trail.</p>
+      <p><strong>After:</strong> Scenario approval keeps the decision, escalation, and execution connected.</p>
+    </section>
+  
+      </section>
+    </article>
+  
+
+    <article class="profile">
+      <h2>Operations Centers</h2>
+      <p class="headline">Best fit when a central command team needs one tenant-safe console across alerts, incidents, replay, approvals, and live operational change.</p>
+      <section><h3>Operational Pain</h3><p>Central operations teams are expected to coordinate everything, but the signals arrive in different systems with different owners.</p></section>
+      <section><h3>Fragmented Systems Usually Look Like</h3><p>Monitoring tools, dashboards, spreadsheets, emails, chat, and separate business applications.</p></section>
+      <section><h3>Where Delays And Failures Happen</h3><p>Exception detection is fast in one tool and slow in another, so action starts late.</p></section>
+      <section><h3>Why Visibility Breaks</h3><p>The center sees alerts but not the business context needed to act.</p></section>
+      <section><h3>Where Approvals Become Bottlenecks</h3><p>Escalations stall because ownership and impact are unclear.</p></section>
+      <section><h3>Where Integrations Fail</h3><p>Inbound failures surface as symptoms rather than a visible queue with recovery actions.</p></section>
+      <section><h3>Where Inventory Or Order Mismatch Appears</h3><p>Central teams are forced to mediate stock disputes without a shared state source.</p></section>
+      <section><h3>How Replay And Recovery Help</h3><p>Replay turns broken inbound orders into deliberate operational actions instead of mystery gaps.</p></section>
+      <section><h3>How Realtime Visibility Changes Operations</h3><p>Live dashboard updates help the center coordinate quickly across teams.</p></section>
+      <section><h3>How Audit And Event Tracing Help</h3><p>Post-incident review becomes practical because events, approvals, and replays are all traceable.</p></section>
+      <section><h3>Why Tenant Isolation Matters</h3><p>Useful for platform operations centers serving several customers or business units.</p></section>
+      <section><h3>Metrics That Matter Most</h3><ul><li>active incidents</li><li>connector diagnostics</li><li>replay queue depth</li><li>dispatch failures</li><li>latest failure age</li></ul></section>
+      <section><h3>Dashboard Views That Matter Most</h3><ul><li>runtime and incidents</li><li>dashboard summary</li><li>integrations and replay</li></ul></section>
+      <section><h3>Alerts And Recommendations That Matter Most</h3><ul><li>connector disabled</li><li>replay backlog growth</li><li>business-event failure spike</li></ul></section>
+      <section><h3>ROI And Operational Value</h3><ul><li>faster cross-team incident response</li><li>better shared understanding of active risk</li><li>less time spent building manual status decks</li></ul></section>
+      <section>
+        <h3>Realistic Scenarios</h3>
+        
+    <section class="scenario">
+      <h3>Control center sees replay backlog growth</h3>
+      <p><strong>Before:</strong> Teams wait for support to diagnose whether the lane is safe to ignore.</p>
+      <p><strong>After:</strong> Connector diagnostics, incidents, and replay state show whether action is needed now.</p>
+    </section>
+  
+    <section class="scenario">
+      <h3>Approval escalation overlaps with inbound failure</h3>
+      <p><strong>Before:</strong> Managers chase two disconnected workflows with no shared timeline.</p>
+      <p><strong>After:</strong> Runtime, scenarios, and audit surfaces keep the incident narrative coherent.</p>
+    </section>
+  
+      </section>
+    </article>
+  
+
+    <article class="profile">
+      <h2>Supply Chain Coordinators</h2>
+      <p class="headline">Best fit when coordination is the job and the pain comes from bad handoffs, delayed data, and unclear ownership.</p>
+      <section><h3>Operational Pain</h3><p>Coordinators spend their day reconciling what vendors, warehouses, and customer-facing teams believe is true.</p></section>
+      <section><h3>Fragmented Systems Usually Look Like</h3><p>ERP exports, vendor spreadsheets, email chains, WMS or order portals, and support tickets.</p></section>
+      <section><h3>Where Delays And Failures Happen</h3><p>By the time a coordinator sees the real problem, downstream plans are already moving.</p></section>
+      <section><h3>Why Visibility Breaks</h3><p>There is no single view tying connector state, inventory posture, and approvals together.</p></section>
+      <section><h3>Where Approvals Become Bottlenecks</h3><p>Coordinators gather evidence for decisions instead of working from a governed review lane.</p></section>
+      <section><h3>Where Integrations Fail</h3><p>File-based and token-based imports fail without a clean operational queue.</p></section>
+      <section><h3>Where Inventory Or Order Mismatch Appears</h3><p>Demand plans and warehouse reality diverge, especially during disruptions.</p></section>
+      <section><h3>How Replay And Recovery Help</h3><p>Replay keeps failed inbound demand recoverable and visible until corrected.</p></section>
+      <section><h3>How Realtime Visibility Changes Operations</h3><p>Live changes reduce the lag between event and response.</p></section>
+      <section><h3>How Audit And Event Tracing Help</h3><p>Helps answer what failed, when it was replayed, and who approved the downstream action.</p></section>
+      <section><h3>Why Tenant Isolation Matters</h3><p>Useful where one coordination team serves multiple tenants, brands, or customers.</p></section>
+      <section><h3>Metrics That Matter Most</h3><ul><li>connector incident count</li><li>inventory risk hotspots</li><li>approval turnaround</li><li>replay queue age</li></ul></section>
+      <section><h3>Dashboard Views That Matter Most</h3><ul><li>dashboard summary</li><li>runtime and incidents</li><li>scenario review</li></ul></section>
+      <section><h3>Alerts And Recommendations That Matter Most</h3><ul><li>degraded inbound lane</li><li>urgent stock risk</li><li>stale replay backlog</li></ul></section>
+      <section><h3>ROI And Operational Value</h3><ul><li>less manual reconciliation</li><li>better timing on interventions</li><li>cleaner traceability for cross-team decisions</li></ul></section>
+      <section>
+        <h3>Realistic Scenarios</h3>
+        
+    <section class="scenario">
+      <h3>Supplier file lands with disabled connector</h3>
+      <p><strong>Before:</strong> Coordinator manually checks whether orders were lost.</p>
+      <p><strong>After:</strong> Structured failure plus replay queue keeps the gap visible and actionable.</p>
+    </section>
+  
+    <section class="scenario">
+      <h3>Warehouse pressure changes mid-day</h3>
+      <p><strong>Before:</strong> Coordinators wait for refreshes or calls from the floor.</p>
+      <p><strong>After:</strong> Realtime dashboard updates the risk posture immediately.</p>
+    </section>
+  
+      </section>
+    </article>
+  
+
+    <article class="profile">
+      <h2>Multi-Warehouse Businesses</h2>
+      <p class="headline">Best fit when visibility and replay must stay warehouse-aware instead of blending every lane together.</p>
+      <section><h3>Operational Pain</h3><p>Multiple warehouses create different risk profiles, but many systems flatten the view until problems are already expensive.</p></section>
+      <section><h3>Fragmented Systems Usually Look Like</h3><p>Warehouse-specific tools, central reporting, manual transfer sheets, and connector feeds with uneven quality.</p></section>
+      <section><h3>Where Delays And Failures Happen</h3><p>One location's connector or stock issue spreads confusion across the whole network.</p></section>
+      <section><h3>Why Visibility Breaks</h3><p>Teams cannot tell which warehouse is actually constrained or which lane still has capacity.</p></section>
+      <section><h3>Where Approvals Become Bottlenecks</h3><p>Transfers and priority changes need warehouse-aware approvals, not generic signoff.</p></section>
+      <section><h3>Where Integrations Fail</h3><p>A single warehouse-bound feed can fail and disappear into noise.</p></section>
+      <section><h3>Where Inventory Or Order Mismatch Appears</h3><p>On-hand versus committed posture differs sharply by warehouse, but teams act on blended totals.</p></section>
+      <section><h3>How Replay And Recovery Help</h3><p>Replay records remain visible with warehouse context so the right lane can recover them.</p></section>
+      <section><h3>How Realtime Visibility Changes Operations</h3><p>Warehouse-specific dashboard changes drive faster balancing decisions.</p></section>
+      <section><h3>How Audit And Event Tracing Help</h3><p>Useful for reviewing why inventory or transfer actions changed by location.</p></section>
+      <section><h3>Why Tenant Isolation Matters</h3><p>Tenant safety matters when the same platform supports multiple warehouse networks.</p></section>
+      <section><h3>Metrics That Matter Most</h3><ul><li>risk by warehouse</li><li>replay backlog by warehouse</li><li>transfer-related approval count</li><li>connector failures by source</li></ul></section>
+      <section><h3>Dashboard Views That Matter Most</h3><ul><li>warehouse inventory view</li><li>replay queue with warehouse context</li><li>alerts and recommendations</li></ul></section>
+      <section><h3>Alerts And Recommendations That Matter Most</h3><ul><li>warehouse-specific low stock</li><li>connector disabled for one lane</li><li>fulfillment delay tied to one location</li></ul></section>
+      <section><h3>ROI And Operational Value</h3><ul><li>better rebalancing decisions</li><li>less confusion caused by blended reporting</li><li>faster warehouse-specific recovery</li></ul></section>
+      <section>
+        <h3>Realistic Scenarios</h3>
+        
+    <section class="scenario">
+      <h3>WH-NORTH import fails while WH-SOUTH stays healthy</h3>
+      <p><strong>Before:</strong> Central teams overreact across both sites.</p>
+      <p><strong>After:</strong> Replay queue and incidents isolate the failing lane and keep the healthy one moving.</p>
+    </section>
+  
+    <section class="scenario">
+      <h3>Transfer approval affects a live shortage</h3>
+      <p><strong>Before:</strong> Decision history is scattered across messages.</p>
+      <p><strong>After:</strong> Scenario approval and audit keep the warehouse-specific rationale visible.</p>
+    </section>
+  
+      </section>
+    </article>
+  
+
+    <article class="profile">
+      <h2>Transport and Fleet Operations</h2>
+      <p class="headline">Best fit when dispatch visibility, operational incidents, and cross-team coordination matter more than generic dashboards.</p>
+      <section><h3>Operational Pain</h3><p>Fleet teams need to coordinate dispatch, exceptions, and fulfillment consequences in real time.</p></section>
+      <section><h3>Fragmented Systems Usually Look Like</h3><p>Dispatch tools, status spreadsheets, support inboxes, carrier portals, and manual alert escalation.</p></section>
+      <section><h3>Where Delays And Failures Happen</h3><p>A late or missing inbound event changes downstream routing before central ops knows it.</p></section>
+      <section><h3>Why Visibility Breaks</h3><p>Teams see transport symptoms but not the upstream connector or inventory cause.</p></section>
+      <section><h3>Where Approvals Become Bottlenecks</h3><p>Route or priority changes wait for signoff without a shared incident view.</p></section>
+      <section><h3>Where Integrations Fail</h3><p>Transport or delivery-import lanes fail and operators have no clean recovery queue.</p></section>
+      <section><h3>Where Inventory Or Order Mismatch Appears</h3><p>Fleet plans may be built on orders or allocations that no longer match warehouse reality.</p></section>
+      <section><h3>How Replay And Recovery Help</h3><p>Replay gives transport ops a governed recovery path when inbound orders failed before dispatch.</p></section>
+      <section><h3>How Realtime Visibility Changes Operations</h3><p>Live dashboard state makes it easier to coordinate with warehouse and customer teams.</p></section>
+      <section><h3>How Audit And Event Tracing Help</h3><p>Supports operational review when service failures span systems.</p></section>
+      <section><h3>Why Tenant Isolation Matters</h3><p>Useful for fleet operators serving multiple customers or contracts.</p></section>
+      <section><h3>Metrics That Matter Most</h3><ul><li>dispatch backlog</li><li>failed dispatch count</li><li>connector incident count</li><li>replay queue age</li></ul></section>
+      <section><h3>Dashboard Views That Matter Most</h3><ul><li>runtime and incidents</li><li>orders and dispatch surfaces</li><li>replay queue</li></ul></section>
+      <section><h3>Alerts And Recommendations That Matter Most</h3><ul><li>dispatch queue failure</li><li>connector-disabled inbound lane</li><li>delayed fulfillment with transport impact</li></ul></section>
+      <section><h3>ROI And Operational Value</h3><ul><li>faster incident triage across transport and warehouse teams</li><li>cleaner recovery after inbound failure</li><li>less route churn caused by bad upstream state</li></ul></section>
+      <section>
+        <h3>Realistic Scenarios</h3>
+        
+    <section class="scenario">
+      <h3>Inbound order feed pauses before dispatch planning</h3>
+      <p><strong>Before:</strong> Dispatch plans against incomplete demand and discovers the gap later.</p>
+      <p><strong>After:</strong> The replay queue keeps the missing orders visible until recovery is performed.</p>
+    </section>
+  
+    <section class="scenario">
+      <h3>Priority reroute needs approval</h3>
+      <p><strong>Before:</strong> Approvals happen in chat with no durable decision record.</p>
+      <p><strong>After:</strong> Scenario review keeps the action governed and traceable.</p>
+    </section>
+  
+      </section>
+    </article>
+  
+
+    <article class="profile">
+      <h2>Field Operations</h2>
+      <p class="headline">Best fit when crews, inventory, and inbound work updates need a coordinated control layer rather than disconnected admin tools.</p>
+      <section><h3>Operational Pain</h3><p>Field teams suffer when central operations and local crews are working from different assumptions about stock, work intake, and approvals.</p></section>
+      <section><h3>Fragmented Systems Usually Look Like</h3><p>Ticketing, spreadsheets, warehouse views, crew notes, and manual dispatch coordination.</p></section>
+      <section><h3>Where Delays And Failures Happen</h3><p>Crew-impacting work arrives late or not at all because inbound lanes fail quietly.</p></section>
+      <section><h3>Why Visibility Breaks</h3><p>Central teams cannot see whether a field issue is stock, dispatch, or integration related.</p></section>
+      <section><h3>Where Approvals Become Bottlenecks</h3><p>Urgent changes need governed review but usually move through informal channels.</p></section>
+      <section><h3>Where Integrations Fail</h3><p>Imports fail and crews learn about it only when work packs are incomplete.</p></section>
+      <section><h3>Where Inventory Or Order Mismatch Appears</h3><p>Field stock and central inventory assumptions drift apart.</p></section>
+      <section><h3>How Replay And Recovery Help</h3><p>Replay helps restore failed inbound work instructions without retyping them.</p></section>
+      <section><h3>How Realtime Visibility Changes Operations</h3><p>Live dashboard state helps central teams react while crews are still executing.</p></section>
+      <section><h3>How Audit And Event Tracing Help</h3><p>Supports after-action review and customer communication.</p></section>
+      <section><h3>Why Tenant Isolation Matters</h3><p>Useful for service providers operating multiple contracts or customer tenants.</p></section>
+      <section><h3>Metrics That Matter Most</h3><ul><li>work intake failures</li><li>replay backlog</li><li>inventory risk on field-critical SKUs</li><li>approval turnaround</li></ul></section>
+      <section><h3>Dashboard Views That Matter Most</h3><ul><li>dashboard summary</li><li>inventory and alerts</li><li>runtime and replay</li></ul></section>
+      <section><h3>Alerts And Recommendations That Matter Most</h3><ul><li>failed inbound work import</li><li>critical field stock risk</li><li>approval escalation</li></ul></section>
+      <section><h3>ROI And Operational Value</h3><ul><li>less field downtime caused by central data failures</li><li>better control over urgent changes</li><li>clearer service traceability</li></ul></section>
+      <section>
+        <h3>Realistic Scenarios</h3>
+        
+    <section class="scenario">
+      <h3>Field work order CSV import fails</h3>
+      <p><strong>Before:</strong> Dispatch manually re-enters requests or delays crews.</p>
+      <p><strong>After:</strong> The failed import is classified and held for manual recovery.</p>
+    </section>
+  
+    <section class="scenario">
+      <h3>Critical part stock changes mid-day</h3>
+      <p><strong>Before:</strong> Crews get stale commitments from central ops.</p>
+      <p><strong>After:</strong> Realtime updates keep the control center current.</p>
+    </section>
+  
+      </section>
+    </article>
+  
+
+    <article class="profile">
+      <h2>Enterprise Admin Teams</h2>
+      <p class="headline">Best fit when the real pain is access governance, tenant separation, connector administration, and operational trust surfaces.</p>
+      <section><h3>Operational Pain</h3><p>Admin teams have to keep operations moving without letting access, settings, or connector mistakes create hidden risk.</p></section>
+      <section><h3>Fragmented Systems Usually Look Like</h3><p>Identity admin, spreadsheets, operations tools, support tickets, and disconnected audit sources.</p></section>
+      <section><h3>Where Delays And Failures Happen</h3><p>Bad connector or user-state changes are discovered only after operators complain or proof flows fail.</p></section>
+      <section><h3>Why Visibility Breaks</h3><p>Admins lack one runtime view combining session, connector, replay, and incident posture.</p></section>
+      <section><h3>Where Approvals Become Bottlenecks</h3><p>Sensitive changes have no shared operational context when different teams approve them.</p></section>
+      <section><h3>Where Integrations Fail</h3><p>Connector misconfiguration causes business failures that look like user error until traced properly.</p></section>
+      <section><h3>Where Inventory Or Order Mismatch Appears</h3><p>Admin teams may not own stock directly, but they still need to understand the impact of access or connector changes on downstream inventory truth.</p></section>
+      <section><h3>How Replay And Recovery Help</h3><p>Manual replay remains available to authorized operators after admins correct connector posture.</p></section>
+      <section><h3>How Realtime Visibility Changes Operations</h3><p>Admins can confirm whether the control center is live, reconnecting, or degraded.</p></section>
+      <section><h3>How Audit And Event Tracing Help</h3><p>Critical for explaining who changed a connector, who reset access, and what impact followed.</p></section>
+      <section><h3>Why Tenant Isolation Matters</h3><p>This is a core fit area when one admin team supports multiple tenants, clients, or operating units.</p></section>
+      <section><h3>Metrics That Matter Most</h3><ul><li>recent audit failures</li><li>disabled connector count</li><li>replay queue depth</li><li>active incident count</li><li>auth and mutation rate-limit signals</li></ul></section>
+      <section><h3>Dashboard Views That Matter Most</h3><ul><li>runtime</li><li>incidents</li><li>users and access</li><li>integrations</li></ul></section>
+      <section><h3>Alerts And Recommendations That Matter Most</h3><ul><li>connector disabled</li><li>auth rate-limit pressure</li><li>audit or runtime failure spike</li></ul></section>
+      <section><h3>ROI And Operational Value</h3><ul><li>safer administration of live operations</li><li>better incident explanation and change accountability</li><li>cleaner tenant separation</li></ul></section>
+      <section>
+        <h3>Realistic Scenarios</h3>
+        
+    <section class="scenario">
+      <h3>Connector disabled during support change</h3>
+      <p><strong>Before:</strong> Admins learn about business impact from downstream complaints.</p>
+      <p><strong>After:</strong> Runtime, incidents, and replay queue show the exact operational consequence immediately.</p>
+    </section>
+  
+    <section class="scenario">
+      <h3>User access needs role-gated verification</h3>
+      <p><strong>Before:</strong> Teams rely on screenshots or assumptions about who can see what.</p>
+      <p><strong>After:</strong> Hosted proof and role-gated UI behavior prove the access model live.</p>
+    </section>
+  
+      </section>
+    </article>
+  
+  </main>
+</body>
+</html>

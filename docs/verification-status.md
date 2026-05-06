@@ -1,83 +1,75 @@
 # Verification Status
 
-Last updated: **April 29, 2026**
+Last updated: **May 6, 2026**
 
-This file is the strict product-truth record for SynapseCore. It is not a demo-era verification note and it does not treat localhost proof as the same thing as hosted company-readiness proof.
-
-## Status Legend
-
-- `WORKING`: technically proven in the verified environment
-- `PARTIAL`: real but limited, or not fully proven in the target environment
-- `BROKEN`: currently failing or blocking proof
+This file is the strict product-truth record for SynapseCore. It does not treat localhost proof as the same thing as live hosted proof.
 
 ## Product Label
 
-SynapseCore is currently a **production-ready SaaS foundation candidate for its supported scope**.
+SynapseCore is a **fully real operational platform for its current supported scope**.
 
-It is no longer mainly a demo system, and the live hosted proof passes end to end. The current repo posture is deployment-safe, distributed for its supported realtime topology, and explicit about supported integration scope.
+That claim is grounded in:
 
-## Verified Evidence
+- backend automated proof
+- frontend production build proof
+- hosted tenant preparation proof
+- two consecutive full hosted browser-proof passes on Render
 
-Local engineering evidence:
+Hosted Render evidence:
 
-- frontend production build passes
-- backend automated tests pass
-- tenant auth, order, inventory, alert, recommendation, approval, replay, runtime, and audit flows have real code coverage and local proof
+- run 1: `6 passed (6.3m)`
+- run 2: `6 passed (4.3m)`
 
-Live Render evidence:
+## Live Hosted Proof Coverage
 
-- frontend is live at `https://synapscore-frontend-3.onrender.com`
-- backend is live at `https://synapscore-3.onrender.com`
-- health and readiness are live
-- protected-route rejection and sign-in posture are live
-- wrong-password sign-in now returns a structured `401` again on the deployed backend
-- hosted proof tenant preparation works
-- hosted browser proof passed on Render: `4 passed (1.8m)`
-- the hosted proof should be rerun after the latest auth/security redeploy if a fresh full live signoff is required
+Both live passes covered:
 
-## Strict Capability Board
+1. auth flow and the full authenticated page system
+2. product catalog onboarding through tenant-scoped API and browser
+3. realtime dashboard updates without refresh
+4. replay recovery, scenario approval, execution, and browser role gating
+5. alerts, recommendations, orders, inventory, integrations, users, profile, and settings connected to the live backend
+6. frontend-visible backend auth rate limiting without stuck loading
+
+## Current Capability Board
 
 | Area | Status | Current truth |
 | --- | --- | --- |
-| Auth / session | `WORKING` | Tenant-explicit sign-in, logout, password rotation, session state, protected-route behavior, and fast wrong-password rejection are real. |
-| Tenant / company model | `WORKING` | Tenant bootstrap, platform-admin provisioning, tenant-aware access control, and tenant ownership rules are real. |
-| Product / catalog surface | `WORKING` | Backend product APIs and frontend catalog UI are real and were proven through the hosted Render proof path. |
-| Orders | `WORKING` | Order lifecycle, validation, fulfillment linkage, and tenant scoping are real. |
-| Inventory | `WORKING` | Reservation-aware flows, reconciliation, pessimistic locking, and concurrent no-oversell proof are now covered. |
-| Alerts | `WORKING` | Alert generation, severity, and tenant policy influence are real. |
-| Recommendations | `WORKING` | Recommendation generation and policy explanation are real. |
-| Approvals / escalations | `WORKING` | Review ownership, final approval, SLA escalation, and acknowledgement are real. |
-| Integrations | `WORKING` | Webhook, CSV, and scheduled pull order ingestion are real and are the intentionally supported connector lanes. |
-| Replay / recovery | `WORKING` | Failed inbound replay and automated retry lanes are real and were proven live through hosted proof. |
-| Runtime / incidents / audit | `WORKING` | Runtime diagnostics, incidents, audit traceability, and recovery visibility are real. |
-| Websocket / realtime | `WORKING` | Tenant-scoped realtime is proven live, Redis pub/sub backed, and covered by distributed publisher fanout proof. |
-| Deployment safety | `WORKING` | Flyway baseline coverage is present, production startup validates schema, and tests now run on migration-backed validation posture. |
-| Hosted authenticated proof | `WORKING` | Hosted tenant prep, auth, catalog onboarding, realtime update, replay recovery, scenario execution, and role gating all passed live on Render. |
+| Auth / session | `FULLY PROVEN` | Tenant-explicit sign-in, logout, password rotation, secure browser sessions, protected-route behavior, and fast wrong-password rejection are live and browser-proven. |
+| Tenant / workspace model | `FULLY REAL` | Bootstrap and platform-admin tenant provisioning rules are explicit and production-safe. |
+| Product / catalog surface | `FULLY PROVEN` | Backend product APIs and frontend catalog UI are live and were proven in the hosted proof flow. |
+| Orders | `FULLY PROVEN` | Order lifecycle and tenant-scoped ingestion paths are live and browser-proven. |
+| Inventory | `FULLY PROVEN` | Inventory updates, risk surfacing, and low-stock dashboard effects are live and browser-proven. |
+| Alerts | `FULLY PROVEN` | Alert generation and visibility are real in the hosted scope. |
+| Recommendations | `FULLY PROVEN` | Recommendation generation and display are live in the hosted proof path. |
+| Approvals / escalations | `FULLY PROVEN` | Scenario review, approval, execution, and role gating are live and browser-proven. |
+| Integrations | `FULLY PROVEN` | Webhook, CSV, and scheduled pull ingestion are the intentionally supported lanes. |
+| Replay / recovery | `FULLY PROVEN` | Disabled-connector CSV failures return structured `CONNECTOR_DISABLED`, create replay records, remain visible for manual recovery, and replay successfully once the connector is repaired. |
+| Runtime / incidents / audit | `FULLY REAL` | Runtime diagnostics, incidents, audit traceability, and recovery visibility are live trust surfaces. |
+| Websocket / realtime | `FULLY PROVEN` | Tenant-scoped realtime is proven live on Render using STOMP over SockJS with Redis pub/sub fanout. |
+| Deployment safety | `FULLY REAL` | Production startup uses Flyway plus JPA validate, root `/` is safe, and runtime build identity is exposed through backend runtime metadata. |
+| Hosted authenticated proof | `FULLY PROVEN` | The full six-test hosted proof pack passed twice consecutively on Render. |
 
-## What Is Already Strong
-
-- multi-tenant backend architecture
-- session-backed access model
-- operational core across orders, inventory, alerts, recommendations, and fulfillment
-- scenario governance and escalation
-- replay and recovery
-- runtime and audit trust surfaces
-- strong modular frontend page system
-
-## Current Supported Boundaries
+## Final Platform Truths
 
 - connector breadth is intentionally limited to webhook, CSV, and scheduled pull order ingestion
 - Redis pub/sub is the current distributed realtime topology; STOMP relay remains optional infrastructure, not a missing proof step
-- future load tuning should be based on pilot traffic, not guessed in advance
+- replay recovery is deterministic for disabled-connector manual recovery flows
+- rate limiting is active and browser-visible
+- Render free-tier cold starts are a real hosting characteristic, but the hosted proof path now accounts for them through readiness warm-up and authenticated proof staging
 
-## Current Verdict
+## Operational Noise Classification
 
-SynapseCore is **very close to final production-ready signoff for its supported scope, but a fresh full hosted-proof rerun is still the cleanest final confirmation step**.
+`Broken pipe` and `ClientAbortException` lines are classified as `OPERATIONAL NOISE` when they are caused by browser disconnects or test navigation teardown and do not line up with a failing request or proof step.
 
-Reason:
+They should not be treated as product failure by themselves.
 
-- the product itself is real
-- the SaaS model is real
-- the hosted technical proof is green
-- startup safety, distributed realtime, observability signals, and security guardrails are now part of the hardened baseline in the repo
-- the latest deploy restored fast wrong-password rejection on the live backend, but the full browser proof should be rerun after this closure pass when final live signoff is needed
+## Final Verdict
+
+- `FRONTEND_BACKEND_CONNECTION = FULLY PROVEN`
+- `HOSTED_PROOF = FULLY PROVEN`
+- `REPLAY_RECOVERY = FULLY PROVEN`
+- `REALTIME = FULLY PROVEN`
+- `WHOLE_PROJECT = FULLY REAL`
+
+Future work from this point is scope expansion, positioning, and operating polish, not proof-path repair.

@@ -9,82 +9,50 @@ Write-Host "=================================================="
 Write-Host "Repo root: $rootDir"
 Write-Host ""
 @'
-DEPLOYMENT SHAPE
+FINAL REAL DEPLOYMENT SHAPE
 
-SynapseCore supports:
-- local development stack
-- production-shaped self-hosted stack
-- public domain deployment with built-in Caddy edge routing
-- release-readiness and config-gated deployment flow
+SynapseCore now runs as a real hosted operational platform for its supported scope.
 
-MAIN OPERATIONS SCRIPTS
+Current live truths:
+- backend profile: prod
+- schema posture: Flyway-backed startup with Hibernate validate
+- realtime posture on Render: REDIS_PUBSUB
+- browser sessions: Redis-backed in production
+- hosted proof path: deterministic and browser-proven twice end to end
 
-- powershell -ExecutionPolicy Bypass -File scripts\check-prod-config.ps1
-- powershell -ExecutionPolicy Bypass -File scripts\release-readiness.ps1
-- powershell -ExecutionPolicy Bypass -File scripts\prepare-prod-envs.ps1
-- bash scripts/prepare-free-test-envs.sh
-- powershell -ExecutionPolicy Bypass -File scripts\prepare-free-test-envs.ps1
-- bash scripts/start-prod.sh
-- powershell -ExecutionPolicy Bypass -File scripts\start-prod.ps1
-- bash scripts/start-public-prod.sh
-- powershell -ExecutionPolicy Bypass -File scripts\start-public-prod.ps1
-- powershell -ExecutionPolicy Bypass -File scripts\verify-deployment.ps1
-- bash scripts/backup-postgres.sh
-- bash scripts/restore-postgres.sh --file backups/<backup>.sql --yes
+OFFICIAL HOSTED PROOF ORDER
 
-HOW TO PREPARE FOR GO-LIVE
+1. powershell -ExecutionPolicy Bypass -File scripts\prepare-hosted-proof.ps1
+2. cd frontend
+3. npm.cmd run test:e2e:prod
 
-1. Generate real env targets
-2. Fill in backend, frontend, and edge production env values
-3. Run the production config gate
-4. Run release readiness
-5. Start either the self-hosted stack or the public domain stack
-6. Run deployment smoke verification
-7. Confirm auth, dashboard, integrations, planning, and trust surfaces
+WHAT THAT PROOF NOW COVERS
 
-WHAT MUST BE VERIFIED AFTER DEPLOYMENT
+- auth and session behavior
+- catalog onboarding
+- realtime dashboard updates
+- replay recovery and scenario approval
+- runtime, integrations, users, settings, inventory, orders, alerts, and recommendations
+- frontend-visible auth rate limiting
 
-- frontend loads
-- backend readiness is UP
-- runtime and incidents load
-- websocket/realtime path works
-- tenant sign-in works
-- dashboard snapshot works
-- integrations can ingest
-- replay queue behaves correctly
-- scenarios and approvals behave correctly
-- release fingerprint matches the deployment
+REPLAY AND RECOVERY TRUTH
 
-WHAT SAFE OPERATIONS LOOK LIKE
+- disabled connector CSV imports return structured CONNECTOR_DISABLED failures
+- those failures create replay records immediately
+- automated replay does not steal manual-only disabled-connector records
+- operators can enable the connector and recover the order intentionally through manual replay
 
-SynapseCore is designed to be operated with:
-- explicit env files
-- deployment gates
-- smoke verification
-- runtime trust surfaces
-- metrics exposure
-- backup and restore helpers
+OPERATIONAL NOISE CLASSIFICATION
 
-WHAT FAILURE OPERATIONS LOOK LIKE
+Broken pipe and ClientAbortException lines during browser navigation are treated as client disconnect noise.
+They should not be read as new business-path breakage unless they line up with a failing proof step or a real requestId-backed server error.
 
-When something breaks, the intended operator path is:
-- inspect runtime and incidents
-- inspect integrations or replay queue
-- inspect audit and events
-- recover through replay, corrected config, or restore if needed
+MOST IMPORTANT DOCS
 
-FREE PUBLIC TEST DEPLOYMENT
-
-SynapseCore also now supports a zero-domain-cost public test lane:
-- use a free Ubuntu VM like Oracle Cloud Always Free
-- run prepare-free-test-envs with the VM public IP and ACME email
-- get app/api hostnames generated from sslip.io or nip.io
-- launch the same public Caddy stack for real browser testing
-
-BEST SHORT DESCRIPTION
-
-SynapseCore already includes a strong launch and recovery pack. The safe path is:
-prepare envs, gate config, summarize release readiness, deploy the right stack
-for self-hosted or public rollout, smoke-check it, then operate with runtime trust,
-replay, backup, and restore.
+- docs\deployment.md
+- docs\render-deployment.md
+- docs\live-deployment-runbook.md
+- docs\hosted-proof.md
+- docs\runtime-observability.md
+- docs\replay-recovery.md
 '@ | Write-Host

@@ -1,6 +1,6 @@
 # Pilot Operations Runbook
 
-This runbook is the strict operating guide for controlled SynapseCore production use. It assumes the hosted proof is already green and focuses on repeatable operation, rollback, and security handling.
+This runbook is the strict operating guide for controlled SynapseCore production use. It assumes the hosted proof is already green and focuses on repeatable operation, rollback, and recovery.
 
 ## Supported Pilot Scope
 
@@ -33,7 +33,7 @@ Current scope boundaries still matter:
 
 1. Validate env files and secrets.
 2. Run Flyway validation before deployment.
-3. Deploy backend and confirm `/actuator/health` and `/actuator/health/readiness`.
+3. Deploy backend and confirm `/`, `/actuator/health/liveness`, and `/actuator/health/readiness`.
 4. Deploy frontend and verify sign-in loads.
 5. Run hosted proof preparation:
 
@@ -60,7 +60,35 @@ The pilot is not considered live unless all eight steps pass.
 - dispatch queue backlog is not growing unexpectedly
 - runtime broker mode still reports `REDIS_PUBSUB`
 - wrong-password login still rejects quickly
-- latest hosted-proof tenant can still sign in and load dashboard/runtime/catalog surfaces
+- the latest hosted-proof tenant can still sign in and load dashboard, runtime, catalog, integrations, and replay surfaces
+
+## Replay And Recovery Rules
+
+Current operational rules:
+
+- disabled connector CSV failures create replay records immediately
+- those records remain visible for manual recovery
+- automated replay does not steal or mutate manual-only disabled-connector records while the connector is still disabled
+- manual replay becomes the intended ownership path once the connector is repaired
+- dead-lettered or orphaned records should be investigated, not silently ignored
+
+## Recovery Procedure
+
+Use recovery when the deployment is correct but operations are degraded.
+
+- replay backlog growth:
+  - confirm the connector is enabled when automated replay is expected
+  - inspect replay queue in the UI
+  - replay eligible records manually when the business wants intentional operator control
+  - investigate dead-lettered records before clearing them
+- realtime degradation:
+  - confirm broker mode in runtime
+  - verify Redis availability
+  - if the UI falls back to degraded snapshot polling, treat that as degraded service, not normal steady state
+- inventory contention:
+  - check recent lock-conflict surfaces
+  - confirm no oversell occurred
+  - reduce import or replay pressure before resuming high-volume operations if contention spikes
 
 ## Rollback Procedure
 
@@ -70,31 +98,14 @@ Use rollback when a deployment is healthy enough to answer traffic but no longer
 2. Identify the last known good frontend and backend build fingerprints.
 3. Redeploy the last known good versions.
 4. Re-run:
-   - `/actuator/health`
+   - `/`
+   - `/actuator/health/liveness`
    - `/actuator/health/readiness`
    - `powershell -ExecutionPolicy Bypass -File scripts\prepare-hosted-proof.ps1`
    - `npm.cmd run test:e2e:prod`
-5. If rollback does not restore integrity and the issue is data/schema-related, restore PostgreSQL from the most recent good backup.
+5. If rollback does not restore integrity and the issue is data or schema related, restore PostgreSQL from the most recent good backup.
 
-Do not attempt to "repair forward" blindly if runtime, replay, or catalog writes are untrustworthy.
-
-## Recovery Procedure
-
-Use recovery when the deployment is correct but operations are degraded.
-
-- replay backlog growth:
-  - confirm connector is enabled
-  - inspect replay queue in the UI
-  - replay eligible records
-  - investigate dead-lettered records before clearing them
-- realtime degradation:
-  - confirm broker mode in runtime
-  - verify Redis availability
-  - if the UI falls back to degraded snapshot polling, treat that as degraded service, not normal steady state
-- inventory contention:
-  - check recent lock-conflict surfaces
-  - confirm no oversell occurred
-  - if contention spikes, reduce import/replay pressure before resuming high-volume operations
+Do not attempt to repair forward blindly if runtime, replay, or catalog writes are untrustworthy.
 
 ## Security Handling
 
@@ -117,3 +128,7 @@ Operators should watch:
 - auth failure, rate-limit rejection, catalog write, replay, realtime publish, dispatch, alert-hook failure, integration failure, and inventory lock-conflict metrics
 
 If runtime truth and hosted proof disagree, trust hosted proof and investigate immediately.
+
+## Operational Noise Classification
+
+`Broken pipe` and `ClientAbortException` logs are operational noise when they happen during browser disconnects or navigation teardown and there is no matching failing proof step. Treat them as incidents only when they line up with real user-visible errors or requestId-backed server failures.

@@ -164,7 +164,7 @@ Before calling a public test lane pilot-ready, also run:
 - `powershell -ExecutionPolicy Bypass -File scripts\prepare-hosted-proof.ps1`
 - `npm.cmd run test:e2e:prod`
 
-That keeps the public test lane tied to the same hosted proof contract as the real Render deployment.
+That keeps the public test lane tied to the same hosted proof contract as the real Render deployment, including deterministic replay recovery, realtime live-state proof, and frontend-visible auth rate limiting.
 
 ## Best Short Description
 
@@ -174,3 +174,5 @@ If you want SynapseCore live on the internet without buying a domain yet, the fa
 2. public IP
 3. `sslip.io` or `nip.io` hostname generation
 4. built-in SynapseCore public HTTPS stack
+
+That path is still staging by intent, but it now uses the same final hosted proof contract as the live Render deployment.

@@ -1,0 +1,123 @@
+# Hosted Proof Guide
+
+This guide is the authoritative hosted-proof path for SynapseCore.
+
+## Purpose
+
+The hosted proof exists to prove the real frontend and backend connection on a live deployment without seeded shortcuts, hidden demo accounts, or manual database edits.
+
+## Official Order
+
+1. Set the proof credential env vars.
+2. Run hosted proof preparation.
+3. Run the frontend hosted Playwright proof.
+
+Commands:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File scripts\prepare-hosted-proof.ps1
+cd frontend
+npm.cmd run test:e2e:prod
+```
+
+## Proof Credential Flow
+
+The proof uses:
+
+- a real tenant
+- real tenant users
+- a real proof product SKU
+- production APIs only
+
+Required env values:
+
+- `PLAYWRIGHT_BASE_URL`
+- `PLAYWRIGHT_API_BASE_URL`
+- `PLAYWRIGHT_TENANT_CODE`
+- `PLAYWRIGHT_PROOF_PRODUCT_SKU`
+- `PLAYWRIGHT_TENANT_ADMIN_USERNAME`
+- `PLAYWRIGHT_TENANT_ADMIN_PASSWORD`
+- `PLAYWRIGHT_PLANNER_USERNAME`
+- `PLAYWRIGHT_PLANNER_PASSWORD`
+- `PLAYWRIGHT_INTEGRATION_ADMIN_USERNAME`
+- `PLAYWRIGHT_INTEGRATION_ADMIN_PASSWORD`
+
+## What Preparation Does
+
+`prepare-hosted-proof.ps1` now performs:
+
+- backend readiness warm-up
+- auth session warm-up
+- realtime SockJS endpoint warm-up
+- frontend sign-in shell verification
+- tenant and user verification
+- proof catalog and inventory baseline preparation
+- authenticated dashboard summary, runtime, and dashboard snapshot verification
+
+Preparation should be treated as part of the proof contract, not as an optional convenience step.
+
+## What The Browser Proof Covers
+
+The hosted browser proof covers:
+
+1. auth flow and the full authenticated page system
+2. product catalog onboarding through tenant-scoped API and browser
+3. realtime dashboard updates without refresh
+4. replay recovery, scenario approval, execution, and browser role gating
+5. alerts, recommendations, orders, inventory, integrations, users, profile, and settings connected to the live backend
+6. frontend-visible backend auth rate limiting without stuck loading
+
+## Realtime Contract
+
+Before realtime mutation begins, the proof now requires:
+
+- authenticated dashboard snapshot readiness
+- a live frontend realtime connection state
+
+Hosted Render uses STOMP over SockJS on:
+
+- `https://<backend-origin>/ws`
+
+## Replay Contract
+
+The hosted proof depends on the current product rule:
+
+- disabled connector CSV import returns a structured `CONNECTOR_DISABLED` failed row
+- the failed row creates a replay record immediately
+- automated replay does not consume that manual-only record while the connector is disabled
+- the UI can show the replay record
+- the operator can enable the connector and perform manual recovery intentionally
+
+## Auth Rate-Limit Contract
+
+The final proof intentionally exercises real auth rate limiting.
+
+That means:
+
+- the negative-auth proof is real
+- the cooldown is real
+- the repo records the cooldown and waits automatically before the next hosted proof run
+
+## Current Determinism Evidence
+
+Current live evidence:
+
+- run 1: `6 passed (6.3m)`
+- run 2: `6 passed (4.3m)`
+
+Those runs followed the official proof order above.
+
+## Operational Noise Classification
+
+`Broken pipe` and `ClientAbortException` lines are treated as operational noise when they are caused by browser teardown or navigation disconnects and do not line up with a failing hosted-proof step.
+
+## Failure Handling Rule
+
+If hosted proof fails:
+
+1. trust the failing request, message, and requestId
+2. inspect the exact API or runtime seam
+3. fix the real contract
+4. rerun the full hosted proof from the beginning
+
+Do not count a partial proof as final live signoff.
