@@ -44,6 +44,7 @@ powershell -ExecutionPolicy Bypass -File scripts\verify-deployment.ps1 -Frontend
 
 ## Live Functional Checks
 
+- `GET /` is up
 - `GET /actuator/health` is up
 - `GET /actuator/health/readiness` is up
 - `GET /api/system/runtime` loads
@@ -58,6 +59,8 @@ powershell -ExecutionPolicy Bypass -File scripts\verify-deployment.ps1 -Frontend
 - inventory changes
 - alerts and recommendations react
 - realtime runtime summary reports the intended broker mode (`REDIS_PUBSUB` for current pilot rollout)
+- hosted proof prep passes with `prepare-hosted-proof.ps1`
+- hosted browser proof passes after prep, not as a blind first browser run
 
 ## Trust And Operations Checks
 
@@ -73,6 +76,8 @@ powershell -ExecutionPolicy Bypass -File scripts\verify-deployment.ps1 -Frontend
 - no unexpected replay backlog exists
 - no disabled connector is accidental
 - no critical system incident is unexplained
+- manual-only disabled-connector replay records remain visible for operator recovery
+- isolated `Broken pipe` or `ClientAbortException` lines are investigated only if they line up with a real failing request or user-visible issue
 
 ## Recovery Checks
 
@@ -106,3 +111,4 @@ powershell -ExecutionPolicy Bypass -File scripts\verify-restore-drill.ps1
 - keep the first clean backup
 - document the public URLs
 - document the operator test accounts used during launch
+- document the last successful hosted proof run and the tenant used for it

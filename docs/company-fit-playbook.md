@@ -104,6 +104,13 @@ A generated HTML showcase is available at:
 
 - [generated/company-fit-showcase.html](generated/company-fit-showcase.html)
 
+Generated report packs are available at:
+
+- [generated/ecommerce-fulfillment-report.md](generated/ecommerce-fulfillment-report.md)
+- [generated/logistics-distribution-report.md](generated/logistics-distribution-report.md)
+- [generated/multi-warehouse-retail-chain-report.md](generated/multi-warehouse-retail-chain-report.md)
+- [generated/README.md](generated/README.md)
+
 ## Most Important Rule
 
 Keep the narrative grounded in the current supported product surface.

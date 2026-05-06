@@ -1,0 +1,150 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>SynapseCore Company Fit Report</title>
+  <style>
+    :root {
+      color-scheme: light;
+      --bg: #f4f1ea;
+      --panel: #fffdfa;
+      --ink: #182128;
+      --muted: #51606b;
+      --line: #d3c6b5;
+      --accent: #0c6d63;
+      --accent-soft: #e2f3f1;
+    }
+    body {
+      margin: 0;
+      font-family: "Segoe UI", "Helvetica Neue", Arial, sans-serif;
+      color: var(--ink);
+      background: linear-gradient(180deg, #f3eee5 0%, #f8f6f1 100%);
+      line-height: 1.55;
+    }
+    main {
+      max-width: 1100px;
+      margin: 0 auto;
+      padding: 40px 24px 80px;
+    }
+    header, article {
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: 20px;
+      box-shadow: 0 18px 40px rgba(24, 33, 40, 0.08);
+    }
+    header {
+      padding: 32px;
+      margin-bottom: 28px;
+    }
+    article {
+      padding: 28px;
+      margin-bottom: 24px;
+    }
+    h1, h2 {
+      margin-top: 0;
+      letter-spacing: -0.02em;
+    }
+    h1 {
+      font-size: 2.3rem;
+    }
+    h2 {
+      font-size: 1.65rem;
+      border-bottom: 1px solid var(--line);
+      padding-bottom: 10px;
+    }
+    h3 {
+      font-size: 1rem;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      color: var(--accent);
+      margin-bottom: 8px;
+    }
+    p, li {
+      color: var(--ink);
+    }
+    .muted {
+      color: var(--muted);
+    }
+    .grid {
+      display: grid;
+      gap: 18px;
+      grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+    }
+    .card {
+      background: var(--accent-soft);
+      border-radius: 14px;
+      padding: 16px;
+    }
+    .headline {
+      font-size: 1.05rem;
+      color: var(--muted);
+    }
+    .scenario {
+      border-left: 4px solid var(--accent);
+      padding-left: 14px;
+      margin-bottom: 14px;
+    }
+  </style>
+</head>
+<body>
+  <main>
+    <header>
+      <h1>SynapseCore Company Fit Report</h1>
+      <p class="muted">Generated at 2026-05-06T19:22:49.713Z</p>
+      <p>SynapseCore should be positioned as an operational control platform for the lanes it actually proves today: tenant-safe access, warehouse-aware catalog and inventory control, inbound order ingestion, deterministic replay and recovery, scenario governance, realtime operations, and runtime trust surfaces.</p>
+      <div class="grid">
+        <div class="card">
+          <h3>Current Supported Scope</h3>
+          <ul><li>tenant-explicit auth, session control, and operator lane scoping</li><li>catalog onboarding and warehouse-aware inventory control</li><li>order ingestion through webhook, CSV, and scheduled pull</li><li>alerts, recommendations, scenario approvals, and execution governance</li><li>integration replay and recovery with manual-versus-automated eligibility rules</li><li>tenant-scoped realtime visibility backed by Redis pub/sub on Render</li><li>runtime, incident, audit, and event-tracing trust surfaces</li><li>rate-limited auth and integration mutation paths</li></ul>
+        </div>
+        <div class="card">
+          <h3>Fit Signals</h3>
+          <ul><li>multiple operational systems feeding the same fulfillment or control process</li><li>warehouse, fleet, fulfillment, field, or approval teams that need a shared operating picture</li><li>teams that lose time reconciling spreadsheets, inboxes, exports, and delayed integration failures</li><li>companies that need incident recovery and audit traceability without rebuilding their whole stack at once</li></ul>
+        </div>
+        <div class="card">
+          <h3>Proof Highlights</h3>
+          <ul><li>full hosted proof passed end to end on Render twice in a row</li><li>disabled connector CSV failures return structured CONNECTOR_DISABLED rows and create replay records</li><li>manual replay records are not stolen by automated replay while the connector remains disabled</li><li>dashboard, replay, scenario approval, role gating, and auth rate limiting are all browser-proven live</li></ul>
+        </div>
+      </div>
+    </header>
+    
+    <article class="profile">
+      <h2>Ecommerce Fulfillment</h2>
+      <p class="headline">Best fit when order velocity and SLA pressure make integration failures and stale dashboard data expensive.</p>
+      <section><h3>Operational Pain</h3><p>High-volume fulfillment teams cannot afford silent import failures or lag between stock posture and order commitments.</p></section>
+      <section><h3>Fragmented Systems Usually Look Like</h3><p>Commerce platform exports, marketplace feeds, shipping dashboards, warehouse notes, and support escalations.</p></section>
+      <section><h3>Where Delays And Failures Happen</h3><p>Failed order ingestion or delayed updates ripple into customer-facing promise misses quickly.</p></section>
+      <section><h3>Why Visibility Breaks</h3><p>Operators cannot distinguish a real demand spike from a broken feed fast enough.</p></section>
+      <section><h3>Where Approvals Become Bottlenecks</h3><p>Rush substitutions or inventory overrides move through chat rather than governed review.</p></section>
+      <section><h3>Where Integrations Fail</h3><p>Marketplace CSV and webhook lanes fail at the worst possible times and need visible recovery.</p></section>
+      <section><h3>Where Inventory Or Order Mismatch Appears</h3><p>Oversell risk rises when commitments outrun visible stock posture.</p></section>
+      <section><h3>How Replay And Recovery Help</h3><p>Replay keeps failed inbound orders recoverable with traceability instead of forcing ad hoc reentry.</p></section>
+      <section><h3>How Realtime Visibility Changes Operations</h3><p>Live dashboard updates change triage speed when order pressure or stock risk shifts.</p></section>
+      <section><h3>How Audit And Event Tracing Help</h3><p>Critical for proving whether an order failed to ingest, was replayed, and when the promise-relevant state changed.</p></section>
+      <section><h3>Why Tenant Isolation Matters</h3><p>Useful for agencies or operators running multiple commerce brands in one platform.</p></section>
+      <section><h3>Metrics That Matter Most</h3><ul><li>orders ingested total</li><li>fulfillment backlog</li><li>delayed fulfillment count</li><li>replay attempts</li><li>recent import issues</li></ul></section>
+      <section><h3>Dashboard Views That Matter Most</h3><ul><li>dashboard summary</li><li>orders and fulfillment surfaces</li><li>integrations and replay</li></ul></section>
+      <section><h3>Alerts And Recommendations That Matter Most</h3><ul><li>connector disabled</li><li>inventory shortage against active demand</li><li>fulfillment delay escalation</li></ul></section>
+      <section><h3>ROI And Operational Value</h3><ul><li>fewer missed customer promises</li><li>faster operator triage</li><li>less time reconciling order-import exceptions</li></ul></section>
+      <section>
+        <h3>Realistic Scenarios</h3>
+        
+    <section class="scenario">
+      <h3>Marketplace CSV lane fails mid-campaign</h3>
+      <p><strong>Before:</strong> Support sees angry customers before operations sees the broken feed.</p>
+      <p><strong>After:</strong> The failed rows are classified, queued, and recovered through a visible replay lane.</p>
+    </section>
+  
+    <section class="scenario">
+      <h3>Warehouse stock drops during flash demand</h3>
+      <p><strong>Before:</strong> Teams refresh different tools and act on lagging numbers.</p>
+      <p><strong>After:</strong> Realtime dashboard risk and recommendations update immediately.</p>
+    </section>
+  
+      </section>
+    </article>
+  
+  </main>
+</body>
+</html>

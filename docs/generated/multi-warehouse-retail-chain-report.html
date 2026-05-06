@@ -1,0 +1,187 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>SynapseCore Company Fit Report</title>
+  <style>
+    :root {
+      color-scheme: light;
+      --bg: #f4f1ea;
+      --panel: #fffdfa;
+      --ink: #182128;
+      --muted: #51606b;
+      --line: #d3c6b5;
+      --accent: #0c6d63;
+      --accent-soft: #e2f3f1;
+    }
+    body {
+      margin: 0;
+      font-family: "Segoe UI", "Helvetica Neue", Arial, sans-serif;
+      color: var(--ink);
+      background: linear-gradient(180deg, #f3eee5 0%, #f8f6f1 100%);
+      line-height: 1.55;
+    }
+    main {
+      max-width: 1100px;
+      margin: 0 auto;
+      padding: 40px 24px 80px;
+    }
+    header, article {
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: 20px;
+      box-shadow: 0 18px 40px rgba(24, 33, 40, 0.08);
+    }
+    header {
+      padding: 32px;
+      margin-bottom: 28px;
+    }
+    article {
+      padding: 28px;
+      margin-bottom: 24px;
+    }
+    h1, h2 {
+      margin-top: 0;
+      letter-spacing: -0.02em;
+    }
+    h1 {
+      font-size: 2.3rem;
+    }
+    h2 {
+      font-size: 1.65rem;
+      border-bottom: 1px solid var(--line);
+      padding-bottom: 10px;
+    }
+    h3 {
+      font-size: 1rem;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      color: var(--accent);
+      margin-bottom: 8px;
+    }
+    p, li {
+      color: var(--ink);
+    }
+    .muted {
+      color: var(--muted);
+    }
+    .grid {
+      display: grid;
+      gap: 18px;
+      grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+    }
+    .card {
+      background: var(--accent-soft);
+      border-radius: 14px;
+      padding: 16px;
+    }
+    .headline {
+      font-size: 1.05rem;
+      color: var(--muted);
+    }
+    .scenario {
+      border-left: 4px solid var(--accent);
+      padding-left: 14px;
+      margin-bottom: 14px;
+    }
+  </style>
+</head>
+<body>
+  <main>
+    <header>
+      <h1>SynapseCore Company Fit Report</h1>
+      <p class="muted">Generated at 2026-05-06T19:23:05.262Z</p>
+      <p>SynapseCore should be positioned as an operational control platform for the lanes it actually proves today: tenant-safe access, warehouse-aware catalog and inventory control, inbound order ingestion, deterministic replay and recovery, scenario governance, realtime operations, and runtime trust surfaces.</p>
+      <div class="grid">
+        <div class="card">
+          <h3>Current Supported Scope</h3>
+          <ul><li>tenant-explicit auth, session control, and operator lane scoping</li><li>catalog onboarding and warehouse-aware inventory control</li><li>order ingestion through webhook, CSV, and scheduled pull</li><li>alerts, recommendations, scenario approvals, and execution governance</li><li>integration replay and recovery with manual-versus-automated eligibility rules</li><li>tenant-scoped realtime visibility backed by Redis pub/sub on Render</li><li>runtime, incident, audit, and event-tracing trust surfaces</li><li>rate-limited auth and integration mutation paths</li></ul>
+        </div>
+        <div class="card">
+          <h3>Fit Signals</h3>
+          <ul><li>multiple operational systems feeding the same fulfillment or control process</li><li>warehouse, fleet, fulfillment, field, or approval teams that need a shared operating picture</li><li>teams that lose time reconciling spreadsheets, inboxes, exports, and delayed integration failures</li><li>companies that need incident recovery and audit traceability without rebuilding their whole stack at once</li></ul>
+        </div>
+        <div class="card">
+          <h3>Proof Highlights</h3>
+          <ul><li>full hosted proof passed end to end on Render twice in a row</li><li>disabled connector CSV failures return structured CONNECTOR_DISABLED rows and create replay records</li><li>manual replay records are not stolen by automated replay while the connector remains disabled</li><li>dashboard, replay, scenario approval, role gating, and auth rate limiting are all browser-proven live</li></ul>
+        </div>
+      </div>
+    </header>
+    
+    <article class="profile">
+      <h2>Retail Chains</h2>
+      <p class="headline">Best fit when store, warehouse, and central operations need one tenant-safe control center instead of scattered spreadsheets and delayed reports.</p>
+      <section><h3>Operational Pain</h3><p>Store-level demand changes faster than central teams can rebalance stock and respond to fulfillment risk.</p></section>
+      <section><h3>Fragmented Systems Usually Look Like</h3><p>POS reports, store spreadsheets, email approvals, warehouse inventory views, and separate support inboxes.</p></section>
+      <section><h3>Where Delays And Failures Happen</h3><p>Store replenishment issues surface after shelves are already empty or store teams escalate manually.</p></section>
+      <section><h3>Why Visibility Breaks</h3><p>Central ops see reports, not live operational pressure across stores and warehouse lanes.</p></section>
+      <section><h3>Where Approvals Become Bottlenecks</h3><p>Transfers, substitutions, and urgent procurement waits for informal approval chains.</p></section>
+      <section><h3>Where Integrations Fail</h3><p>Store or partner order feeds fail without visible ownership.</p></section>
+      <section><h3>Where Inventory Or Order Mismatch Appears</h3><p>Store-facing availability and warehouse reality drift apart.</p></section>
+      <section><h3>How Replay And Recovery Help</h3><p>Failed store or partner imports can be recovered deliberately rather than reentered from scratch.</p></section>
+      <section><h3>How Realtime Visibility Changes Operations</h3><p>Central dashboards show fresh risk posture while inventory and inbound data change.</p></section>
+      <section><h3>How Audit And Event Tracing Help</h3><p>Useful for tracing who approved reallocation, who replayed inbound data, and when the state changed.</p></section>
+      <section><h3>Why Tenant Isolation Matters</h3><p>Supports brand or franchise separation without shared-user leakage.</p></section>
+      <section><h3>Metrics That Matter Most</h3><ul><li>stockout risk by warehouse</li><li>replay backlog by source system</li><li>active recommendation count</li><li>store-impacting alert count</li></ul></section>
+      <section><h3>Dashboard Views That Matter Most</h3><ul><li>central dashboard summary</li><li>catalog and inventory management</li><li>alerts and recommendations</li></ul></section>
+      <section><h3>Alerts And Recommendations That Matter Most</h3><ul><li>inventory below threshold</li><li>connector degraded for a retail feed</li><li>delayed fulfillment with store impact</li></ul></section>
+      <section><h3>ROI And Operational Value</h3><ul><li>fewer lost sales from invisible stock pressure</li><li>faster store-operations response</li><li>better cross-store transfer governance</li></ul></section>
+      <section>
+        <h3>Realistic Scenarios</h3>
+        
+    <section class="scenario">
+      <h3>Promoted SKU falls below safe threshold</h3>
+      <p><strong>Before:</strong> Store teams find out after service complaints and manual phone calls.</p>
+      <p><strong>After:</strong> Central operations sees the risk live, reviews scenario options, and executes an approved response path.</p>
+    </section>
+  
+    <section class="scenario">
+      <h3>Store-import lane fails overnight</h3>
+      <p><strong>Before:</strong> Morning teams manually compare exports and assume missing orders are already handled.</p>
+      <p><strong>After:</strong> Replay queue and incidents make the gap visible before store teams promise against bad data.</p>
+    </section>
+  
+      </section>
+    </article>
+  
+
+    <article class="profile">
+      <h2>Multi-Warehouse Businesses</h2>
+      <p class="headline">Best fit when visibility and replay must stay warehouse-aware instead of blending every lane together.</p>
+      <section><h3>Operational Pain</h3><p>Multiple warehouses create different risk profiles, but many systems flatten the view until problems are already expensive.</p></section>
+      <section><h3>Fragmented Systems Usually Look Like</h3><p>Warehouse-specific tools, central reporting, manual transfer sheets, and connector feeds with uneven quality.</p></section>
+      <section><h3>Where Delays And Failures Happen</h3><p>One location's connector or stock issue spreads confusion across the whole network.</p></section>
+      <section><h3>Why Visibility Breaks</h3><p>Teams cannot tell which warehouse is actually constrained or which lane still has capacity.</p></section>
+      <section><h3>Where Approvals Become Bottlenecks</h3><p>Transfers and priority changes need warehouse-aware approvals, not generic signoff.</p></section>
+      <section><h3>Where Integrations Fail</h3><p>A single warehouse-bound feed can fail and disappear into noise.</p></section>
+      <section><h3>Where Inventory Or Order Mismatch Appears</h3><p>On-hand versus committed posture differs sharply by warehouse, but teams act on blended totals.</p></section>
+      <section><h3>How Replay And Recovery Help</h3><p>Replay records remain visible with warehouse context so the right lane can recover them.</p></section>
+      <section><h3>How Realtime Visibility Changes Operations</h3><p>Warehouse-specific dashboard changes drive faster balancing decisions.</p></section>
+      <section><h3>How Audit And Event Tracing Help</h3><p>Useful for reviewing why inventory or transfer actions changed by location.</p></section>
+      <section><h3>Why Tenant Isolation Matters</h3><p>Tenant safety matters when the same platform supports multiple warehouse networks.</p></section>
+      <section><h3>Metrics That Matter Most</h3><ul><li>risk by warehouse</li><li>replay backlog by warehouse</li><li>transfer-related approval count</li><li>connector failures by source</li></ul></section>
+      <section><h3>Dashboard Views That Matter Most</h3><ul><li>warehouse inventory view</li><li>replay queue with warehouse context</li><li>alerts and recommendations</li></ul></section>
+      <section><h3>Alerts And Recommendations That Matter Most</h3><ul><li>warehouse-specific low stock</li><li>connector disabled for one lane</li><li>fulfillment delay tied to one location</li></ul></section>
+      <section><h3>ROI And Operational Value</h3><ul><li>better rebalancing decisions</li><li>less confusion caused by blended reporting</li><li>faster warehouse-specific recovery</li></ul></section>
+      <section>
+        <h3>Realistic Scenarios</h3>
+        
+    <section class="scenario">
+      <h3>WH-NORTH import fails while WH-SOUTH stays healthy</h3>
+      <p><strong>Before:</strong> Central teams overreact across both sites.</p>
+      <p><strong>After:</strong> Replay queue and incidents isolate the failing lane and keep the healthy one moving.</p>
+    </section>
+  
+    <section class="scenario">
+      <h3>Transfer approval affects a live shortage</h3>
+      <p><strong>Before:</strong> Decision history is scattered across messages.</p>
+      <p><strong>After:</strong> Scenario approval and audit keep the warehouse-specific rationale visible.</p>
+    </section>
+  
+      </section>
+    </article>
+  
+  </main>
+</body>
+</html>
