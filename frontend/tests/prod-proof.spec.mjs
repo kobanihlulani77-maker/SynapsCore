@@ -103,12 +103,36 @@ async function createApiContext(credentials) {
   return api
 }
 
-async function readJson(response) {
-  const payload = await response.json()
-  if (!response.ok()) {
-    throw new Error(payload.message || `Request failed with status ${response.status()}.`)
+async function readJson(response, context = {}) {
+  const responseText = await response.text()
+  let payload = null
+  try {
+    payload = responseText ? JSON.parse(responseText) : null
+  } catch {
+    payload = null
   }
-  return payload
+
+  if (!response.ok()) {
+    const failureDetails = {
+      method: context.method || response.request().method(),
+      url: context.url || response.url(),
+      status: response.status(),
+      requestId: response.headers()['x-request-id'] || payload?.requestId || null,
+      responseBody: payload ?? responseText,
+      requestPayload: context.requestPayload ?? null,
+      requestFormData: context.requestFormData ?? null,
+      note: context.note ?? null,
+    }
+    throw new Error(`SynapseCore API request failed: ${JSON.stringify(failureDetails)}`)
+  }
+
+  if (payload !== null) {
+    return payload
+  }
+  if (!responseText) {
+    return null
+  }
+  throw new Error(`Expected JSON response but received non-JSON payload from ${response.request().method()} ${response.url()}: ${responseText}`)
 }
 
 async function loginViaUi(page, credentials, options = {}) {
@@ -428,13 +452,27 @@ async function triggerUiAuthRateLimit(page, signInCard, credentials) {
 }
 
 async function readReplayOutcome(api, externalOrderId) {
-  const replayQueue = await readJson(await api.get('/api/integrations/orders/replay-queue'))
+  const replayQueue = await readJson(await api.get('/api/integrations/orders/replay-queue'), {
+    method: 'GET',
+    url: '/api/integrations/orders/replay-queue',
+    requestPayload: {
+      externalOrderId,
+    },
+    note: 'Replay queue lookup while verifying hosted replay fixture.',
+  })
   const replayRecord = replayQueue.find((record) => record.externalOrderId === externalOrderId)
   if (replayRecord) {
     return { state: 'queued', status: replayRecord.status, record: replayRecord }
   }
 
-  const recentOrders = await readJson(await api.get('/api/orders/recent'))
+  const recentOrders = await readJson(await api.get('/api/orders/recent'), {
+    method: 'GET',
+    url: '/api/orders/recent',
+    requestPayload: {
+      externalOrderId,
+    },
+    note: 'Recent orders lookup while verifying hosted replay fixture.',
+  })
   if (recentOrders.some((order) => order.externalOrderId === externalOrderId)) {
     return { state: 'replayed' }
   }
@@ -476,30 +514,43 @@ async function createReplayFixture() {
   const sourceSystem = `ui_replay_${suffix}`.toLowerCase()
   const externalOrderId = `UI-RPL-${suffix}`
   const connectorDisplayName = `UI Replay ${suffix}`
+  const inventoryPayload = {
+    productSku: proofProductSku,
+    warehouseCode: 'WH-NORTH',
+    quantityAvailable: 50,
+    reorderThreshold: 12,
+  }
+  const connectorPayload = {
+    sourceSystem,
+    type: 'CSV_ORDER_IMPORT',
+    displayName: connectorDisplayName,
+    enabled: false,
+    syncMode: 'BATCH_FILE_DROP',
+    validationPolicy: 'RELAXED',
+    transformationPolicy: 'NORMALIZE_CODES',
+    allowDefaultWarehouseFallback: false,
+    notes: 'Disposable replay verification connector.',
+  }
+  const csvPreview = `sourceSystem,externalOrderId,warehouseCode,productSku,quantity,unitPrice\n${sourceSystem},${externalOrderId},WH-NORTH,${proofProductSku},2,88.00\n`
 
   try {
     await readJson(await inventoryAdmin.post('/api/inventory/update', {
-      data: {
-        productSku: proofProductSku,
-        warehouseCode: 'WH-NORTH',
-        quantityAvailable: 50,
-        reorderThreshold: 12,
-      },
-    }))
+      data: inventoryPayload,
+    }), {
+      method: 'POST',
+      url: '/api/inventory/update',
+      requestPayload: inventoryPayload,
+      note: 'Hosted replay fixture baseline inventory reset.',
+    })
 
     await readJson(await api.post('/api/integrations/orders/connectors', {
-      data: {
-        sourceSystem,
-        type: 'CSV_ORDER_IMPORT',
-        displayName: connectorDisplayName,
-        enabled: false,
-        syncMode: 'BATCH_FILE_DROP',
-        validationPolicy: 'RELAXED',
-        transformationPolicy: 'NORMALIZE_CODES',
-        allowDefaultWarehouseFallback: false,
-        notes: 'Disposable replay verification connector.',
-      },
-    }))
+      data: connectorPayload,
+    }), {
+      method: 'POST',
+      url: '/api/integrations/orders/connectors',
+      requestPayload: connectorPayload,
+      note: 'Hosted replay fixture connector creation.',
+    })
 
     const csvImportResponse = await api.post('/api/integrations/orders/csv-import', {
       multipart: {
@@ -507,14 +558,24 @@ async function createReplayFixture() {
           name: 'orders.csv',
           mimeType: 'text/csv',
           buffer: Buffer.from(
-            `sourceSystem,externalOrderId,warehouseCode,productSku,quantity,unitPrice\n${sourceSystem},${externalOrderId},WH-NORTH,${proofProductSku},2,88.00\n`,
+            csvPreview,
             'utf8',
           ),
         },
         sourceSystem,
       },
     })
-    const csvImportPayload = await readJson(csvImportResponse)
+    const csvImportPayload = await readJson(csvImportResponse, {
+      method: 'POST',
+      url: '/api/integrations/orders/csv-import',
+      requestFormData: {
+        sourceSystem,
+        fileName: 'orders.csv',
+        mimeType: 'text/csv',
+        csvPreview: csvPreview.trim(),
+      },
+      note: 'Hosted replay fixture disabled-connector CSV import.',
+    })
     expect(csvImportPayload.ordersFailed).toBe(1)
     expect(csvImportPayload.failedOrders?.[0]?.externalOrderId).toBe(externalOrderId)
     expect(csvImportPayload.failedOrders?.[0]?.failureCode).toBe('CONNECTOR_DISABLED')
@@ -532,22 +593,35 @@ async function createReplayFixture() {
       sourceSystem,
       externalOrderId,
       enableConnector: async () => {
+        const enableConnectorPayload = {
+          sourceSystem,
+          type: 'CSV_ORDER_IMPORT',
+          displayName: connectorDisplayName,
+          enabled: true,
+          syncMode: 'BATCH_FILE_DROP',
+          validationPolicy: 'RELAXED',
+          transformationPolicy: 'NORMALIZE_CODES',
+          allowDefaultWarehouseFallback: false,
+          notes: 'Enabled for replay verification.',
+        }
         await readJson(await api.post('/api/integrations/orders/connectors', {
-          data: {
-            sourceSystem,
-            type: 'CSV_ORDER_IMPORT',
-            displayName: connectorDisplayName,
-            enabled: true,
-            syncMode: 'BATCH_FILE_DROP',
-            validationPolicy: 'RELAXED',
-            transformationPolicy: 'NORMALIZE_CODES',
-            allowDefaultWarehouseFallback: false,
-            notes: 'Enabled for replay verification.',
-          },
-        }))
+          data: enableConnectorPayload,
+        }), {
+          method: 'POST',
+          url: '/api/integrations/orders/connectors',
+          requestPayload: enableConnectorPayload,
+          note: 'Hosted replay fixture connector enable before manual replay.',
+        })
 
         await expect.poll(async () => {
-          const connectors = await readJson(await api.get('/api/integrations/orders/connectors'))
+          const connectors = await readJson(await api.get('/api/integrations/orders/connectors'), {
+            method: 'GET',
+            url: '/api/integrations/orders/connectors',
+            requestPayload: {
+              sourceSystem,
+            },
+            note: 'Hosted replay fixture connector enabled verification.',
+          })
           return connectors.find((connector) => connector.sourceSystem === sourceSystem && connector.type === 'CSV_ORDER_IMPORT')?.enabled ?? false
         }, {
           timeout: 15_000,
@@ -569,41 +643,59 @@ async function createScenarioFixture() {
   const title = `UI Scenario ${suffix}`
   const productSku = `SKU-SCN-${suffix}`
   const warehouseCode = 'WH-NORTH'
+  const productPayload = {
+    sku: productSku,
+    name: `Scenario Proof ${suffix}`,
+    category: 'Verification',
+  }
+  const inventoryPayload = {
+    productSku,
+    warehouseCode,
+    quantityAvailable: 40,
+    reorderThreshold: 10,
+  }
+  const scenarioPayload = {
+    title,
+    requestedBy: 'Operations Lead',
+    request: {
+      warehouseCode,
+      items: [
+        {
+          productSku,
+          quantity: 1,
+          unitPrice: 95,
+        },
+      ],
+    },
+  }
 
   try {
     await readJson(await api.post('/api/products', {
-      data: {
-        sku: productSku,
-        name: `Scenario Proof ${suffix}`,
-        category: 'Verification',
-      },
-    }))
+      data: productPayload,
+    }), {
+      method: 'POST',
+      url: '/api/products',
+      requestPayload: productPayload,
+      note: 'Hosted scenario fixture product creation.',
+    })
 
     await readJson(await api.post('/api/inventory/update', {
-      data: {
-        productSku,
-        warehouseCode,
-        quantityAvailable: 40,
-        reorderThreshold: 10,
-      },
-    }))
+      data: inventoryPayload,
+    }), {
+      method: 'POST',
+      url: '/api/inventory/update',
+      requestPayload: inventoryPayload,
+      note: 'Hosted scenario fixture inventory baseline.',
+    })
 
     const payload = await readJson(await api.post('/api/scenarios/save', {
-      data: {
-        title,
-        requestedBy: 'Operations Lead',
-        request: {
-          warehouseCode,
-          items: [
-            {
-              productSku,
-              quantity: 1,
-              unitPrice: 95,
-            },
-          ],
-        },
-      },
-    }))
+      data: scenarioPayload,
+    }), {
+      method: 'POST',
+      url: '/api/scenarios/save',
+      requestPayload: scenarioPayload,
+      note: 'Hosted scenario fixture save request.',
+    })
 
     expect(payload.approvalPolicy).toBe('STANDARD')
     expect(payload.approvalStatus).toBe('PENDING_APPROVAL')
@@ -982,10 +1074,25 @@ test('replay recovery, scenario approval, execution, and browser role gating wor
           }
 
           if (replayResponse) {
-            const replayPayload = await replayResponse.json().catch(() => null)
+            const replayResponseText = await replayResponse.text()
+            let replayPayload = null
+            try {
+              replayPayload = replayResponseText ? JSON.parse(replayResponseText) : null
+            } catch {
+              replayPayload = null
+            }
             if (!replayResponse.ok()) {
-              const replayFailureMessage = replayPayload?.message
-                || `Replay request failed with status ${replayResponse.status()} for ${replayFixture.externalOrderId}.`
+              const replayFailureMessage = JSON.stringify({
+                method: 'POST',
+                url: replayResponse.url(),
+                status: replayResponse.status(),
+                requestId: replayResponse.headers()['x-request-id'] || replayPayload?.requestId || null,
+                responseBody: replayPayload ?? replayResponseText,
+                requestPayload: {
+                  replayRecordExternalOrderId: replayFixture.externalOrderId,
+                },
+                note: `Replay request failed for ${replayFixture.externalOrderId}.`,
+              })
 
               let replayResolvedAfterConflict = false
               try {
