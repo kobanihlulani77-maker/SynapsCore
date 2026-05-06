@@ -69,6 +69,8 @@ synapsecore:
     default-delivery-hours: ${FULFILLMENT_DEFAULT_DELIVERY_HOURS:24}
     analysis-window-hours: ${FULFILLMENT_ANALYSIS_WINDOW_HOURS:6}
   integration:
+    csv-import:
+      max-bytes: ${SYNAPSECORE_INTEGRATION_CSV_IMPORT_MAX_BYTES:262144}
     pull-worker:
       enabled: ${SYNAPSECORE_INTEGRATION_PULL_WORKER_ENABLED:true}
       interval-ms: ${SYNAPSECORE_INTEGRATION_PULL_WORKER_INTERVAL_MS:60000}

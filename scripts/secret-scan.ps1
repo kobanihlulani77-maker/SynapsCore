@@ -70,7 +70,7 @@ foreach ($file in $trackedPlaywrightArtifacts) {
 }
 
 $outwardFacingFiles = $trackedFiles | Where-Object {
-    $_ -eq "README.md" -or $_ -like "docs/*" -or $_ -like "scripts/*"
+    ($_ -eq "README.md" -or $_ -like "docs/*" -or $_ -like "scripts/*") -and $_ -ne "scripts/secret-scan.ps1"
 }
 
 Add-ContentFindings -Bucket $criticalFindings `

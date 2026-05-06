@@ -94,9 +94,9 @@ Why this matters:
 
 ### Multipart upload ceiling
 
-- Status: not fully proven
-- Reason: there is not yet an automated proof that an oversized CSV upload is rejected with a deliberate safe boundary
-- Effect: malformed CSV handling is verified, but upload-volume abuse still needs an explicit limit test or a configured enforced ceiling
+- Status: locally proven
+- Reason: the backend now enforces a deliberate CSV import size ceiling and the security suite verifies a safe `413` response with `requestId`
+- Remaining action: confirm the same behavior once on the hosted Render deployment after merge
 
 ### Bundle verification depends on build artifact presence
 
@@ -111,7 +111,7 @@ Why this matters:
 - role enforcement posture: strong
 - auth error-message safety posture: strong
 - committed fixture hygiene: still needs cleanup or explicit long-term acceptance
-- upload-abuse ceiling: still needs explicit closure
+- upload-abuse ceiling: locally closed, hosted confirmation still advisable after deploy
 
 ## Verification Commands
 

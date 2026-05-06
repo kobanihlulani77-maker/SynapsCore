@@ -28,6 +28,7 @@ import java.util.Objects;
 import java.util.regex.Pattern;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
@@ -39,6 +40,9 @@ import org.springframework.web.server.ResponseStatusException;
 public class ExternalOrderCsvImportService {
 
     private static final Pattern SOURCE_SYSTEM_PATTERN = Pattern.compile("^[A-Za-z0-9_-]+$");
+
+    @Value("${synapsecore.integration.csv-import.max-bytes:262144}")
+    private long csvImportMaxBytes;
 
     private final OrderService orderService;
     private final BusinessEventService businessEventService;
@@ -61,6 +65,7 @@ public class ExternalOrderCsvImportService {
         if (file == null || file.isEmpty()) {
             throw IntegrationFailureCodes.badRequest(IntegrationFailureCode.MISSING_FILE, "CSV file is required.");
         }
+        validateFileSize(file);
 
         String normalizedDefaultSource = normalizeOptionalSourceSystem(sourceSystemDefault);
         CsvFileContent csvContent = readCsv(file, normalizedDefaultSource);
@@ -256,6 +261,16 @@ public class ExternalOrderCsvImportService {
             return new CsvFileContent(rows, failures);
         } catch (IOException exception) {
             throw IntegrationFailureCodes.badRequest(IntegrationFailureCode.MISSING_FILE, "CSV file could not be read.");
+        }
+    }
+
+    private void validateFileSize(MultipartFile file) {
+        long enforcedLimitBytes = csvImportMaxBytes > 0 ? csvImportMaxBytes : 262144;
+        if (file.getSize() > enforcedLimitBytes) {
+            throw new ResponseStatusException(
+                HttpStatus.PAYLOAD_TOO_LARGE,
+                "Uploaded file exceeds the configured SynapseCore CSV import size limit."
+            );
         }
     }
 

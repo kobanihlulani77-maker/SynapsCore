@@ -28,7 +28,8 @@ import org.springframework.transaction.annotation.Transactional;
 @SpringBootTest(properties = {
     "spring.session.store-type=none",
     "spring.autoconfigure.exclude=org.springframework.boot.autoconfigure.session.SessionAutoConfiguration",
-    "management.health.redis.enabled=false"
+    "management.health.redis.enabled=false",
+    "synapsecore.integration.csv-import.max-bytes=1024"
 })
 @AutoConfigureMockMvc
 @ActiveProfiles("test")
@@ -283,6 +284,31 @@ class SecurityVerificationIntegrationTest {
             .andExpect(jsonPath("$.trace").doesNotExist());
     }
 
+    @Test
+    void oversizedCsvUploadsAreRejectedSafely() throws Exception {
+        MockHttpSession integrationAdminSession = signIn(
+            StarterAccessUsers.STARTER_TENANT_CODE,
+            "integration.lead",
+            "integration-admin-2026"
+        );
+
+        MockMultipartFile oversizedCsv = new MockMultipartFile(
+            "file",
+            "oversized-orders.csv",
+            "text/csv",
+            buildOversizedCsv(1025).getBytes(StandardCharsets.UTF_8)
+        );
+
+        mockMvc.perform(multipart("/api/integrations/orders/csv-import")
+                .file(oversizedCsv)
+                .session(integrationAdminSession)
+                .param("sourceSystem", "oversized_feed"))
+            .andExpect(status().isPayloadTooLarge())
+            .andExpect(jsonPath("$.message").value("Uploaded file exceeds the configured SynapseCore CSV import size limit."))
+            .andExpect(jsonPath("$.requestId").isNotEmpty())
+            .andExpect(jsonPath("$.trace").doesNotExist());
+    }
+
     private TenantIsolationFixture onboardSecondTenantWithOperationalData() throws Exception {
         MockHttpSession starterAdminSession = signIn(
             StarterAccessUsers.STARTER_TENANT_CODE,
@@ -515,6 +541,19 @@ class SecurityVerificationIntegrationTest {
             .andReturn()
             .getRequest()
             .getSession(false);
+    }
+
+    private String buildOversizedCsv(int minimumBytes) {
+        StringBuilder builder = new StringBuilder("""
+            sourceSystem,externalOrderId,warehouseCode,productSku,quantity,unitPrice
+            oversized_feed,OS-1,WH-NORTH,SKU-PILOT-TENANT-PROOF,1,10.00
+            """);
+        while (builder.toString().getBytes(StandardCharsets.UTF_8).length <= minimumBytes) {
+            builder.append("oversized_feed,OS-")
+                .append(builder.length())
+                .append(",WH-NORTH,SKU-PILOT-TENANT-PROOF,1,10.00\n");
+        }
+        return builder.toString();
     }
 
     private record TenantIsolationFixture(

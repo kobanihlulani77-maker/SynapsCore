@@ -39,6 +39,7 @@ This plan verifies that SynapseCore's current supported scope is operationally s
     - operator directory lookup
   - replay endpoint cross-tenant boundary protection
   - malformed JSON and invalid enum payloads return safe `400` responses with `requestId`
+  - oversized CSV uploads return safe `413` responses with `requestId`
   - wrong tenant plus valid username stays on generic auth failure
 
 - `backend/src/test/java/com/synapsecore/MvpFlowIntegrationTest.java`
@@ -49,20 +50,6 @@ This plan verifies that SynapseCore's current supported scope is operationally s
   - password-change and session invalidation flows
 
 ## Manual Verification Still Required
-
-### Large CSV rejection
-
-- Status: manual check still required
-- Why: the current suite verifies malformed CSV and replay-safe failure handling, but it does not yet enforce or prove a hard multipart size ceiling in code.
-- Method:
-  1. Generate a CSV well above the intended upload ceiling.
-  2. Submit it to `POST /api/integrations/orders/csv-import`.
-  3. Confirm the server rejects it safely with a bounded error and no stack trace.
-- Expected:
-  - no `500`
-  - no stack trace
-  - request receives `413` or another deliberate client-safe rejection
-- Risk: `medium`
 
 ### Hosted cookie and CORS posture on Render
 
@@ -113,12 +100,12 @@ This plan verifies that SynapseCore's current supported scope is operationally s
 - backend test suites contain explicit test-only bootstrap/platform-admin tokens and test passwords.
 - These are not production secrets, but they are committed fixture credentials and should be treated as internal-only development/test debt.
 
-### Upload ceiling is not yet proven
+### Hosted cookie/CORS posture still needs live confirmation
 
-- The platform now safely handles malformed JSON and invalid enum input.
-- A hard tested multipart file-size boundary still needs either:
-  - explicit configuration and automated proof, or
-  - a documented hosted ingress limit with a repeatable verification step.
+- Local backend enforcement now proves safe malformed-input and oversized CSV rejection paths.
+- The remaining hosted validation is browser/runtime oriented:
+  - exact hosted cookie attributes
+  - exact production CORS behavior on the deployed Render pair
 
 ## Expected Verification Commands
 
