@@ -1,183 +1,253 @@
 # SynapseCore
 
-SynapseCore is a multi-tenant operational SaaS platform. It sits above company systems, receives operational activity, updates live state, detects risk, recommends action, routes approvals, exposes runtime trust signals, and keeps recovery paths visible.
+SynapseCore is a real-time operations control platform built as a tenant-based SaaS system.
 
-It is not a demo dashboard anymore. The repo is now aligned around a real product foundation with a few clearly isolated hardening gaps.
+It gives operations teams one governed place to see live state, recover failed inbound work, route approvals, track incidents, and keep tenant-scoped operational truth visible across orders, inventory, integrations, replay, alerts, recommendations, and runtime trust surfaces.
 
-## Current Product Label
+This is not being presented as a demo dashboard. The platform has been proven live through the hosted proof path on Render.
 
-SynapseCore is currently a **production-ready SaaS foundation candidate for its supported operational scope**.
+## What SynapseCore Is
 
-What is real today:
-
-- tenant-explicit sign-in, session, and workspace administration
-- tenant bootstrap and platform-admin provisioning lanes
-- tenant-owned product catalog, warehouses, inventory, orders, order items, scenarios, alerts, and recommendations
-- order lifecycle and reservation-aware inventory updates
-- policy-backed alerts and recommendations
-- approvals, escalations, and scenario execution
-- webhook, CSV, and scheduled pull order ingestion
-- replay and recovery queues
-- runtime, incidents, audit, metrics, and tenant-scoped realtime
-- a modular frontend with real product pages for dashboard, catalog, integrations, runtime, replay, approvals, audit, and admin surfaces
-
-What is bounded today:
-
-- integrations are real but intentionally narrow
-- webhook, CSV, and scheduled pull are the supported ingestion lanes
-- Redis pub/sub is the current distributed realtime posture; STOMP relay remains an optional later topology, not a missing requirement
-
-## Product Shape
-
-SynapseCore is meant to behave like one operating loop:
+SynapseCore is designed to sit above fragmented company systems and create one operational control loop:
 
 1. receive operational activity
 2. update internal state
-3. evaluate risk and pressure
+3. surface risk and pressure
 4. generate alerts and recommendations
 5. route approvals or escalations when needed
-6. expose the result live across dashboard, audit, runtime, and recovery surfaces
+6. keep replay, runtime, audit, and incident truth visible
 
-That loop now exists in the backend and the frontend is organized around it.
+Current live product surfaces include:
 
-## Core Product Surfaces
+- tenant-explicit auth, session, and workspace administration
+- catalog and warehouse-aware inventory control
+- order ingestion through webhook, CSV, and scheduled pull
+- alerts, recommendations, scenarios, approvals, and escalations
+- integration replay and recovery
+- runtime, incidents, audit, and business-event tracing
+- tenant-scoped realtime updates
+- users, settings, and SaaS administration surfaces
 
-- Public experience: product narrative and sign-in
-- Dashboard: act-now queue, risk signals, health overview, live activity, and what changed
-- Catalog: create, edit, and import tenant-owned products
-- Orders and Inventory: live operational state and stock posture
-- Fulfillment: backlog, dispatch pressure, delays, and lane risk
-- Scenarios, History, Approvals, Escalations: controlled decision and execution flow
-- Integrations: supported connector status, sync telemetry, failures, and recovery actions
-- Replay: failed inbound recovery and operator replay
-- Runtime and Audit: trust, incidents, queue posture, and traceability
-- Users, Settings, Tenants, Platform Admin, Releases: SaaS administration and rollout posture
+## Who It Is For
 
-## Repo Layout
+SynapseCore is a good fit for operations-heavy organizations such as:
 
-- `backend/`: Spring Boot operational platform
-- `frontend/`: React control center
-- `docs/`: product, deployment, verification, and architecture docs
-- `infrastructure/`: Docker Compose and edge files
-- `scripts/`: verification and operating helpers
-- `render.yaml`: current Render topology
+- logistics companies
+- warehouses and 3PL environments
+- retail chains
+- ecommerce fulfillment teams
+- distributors
+- manufacturers
+- procurement-heavy businesses
+- operations centers
+- supply chain coordinators
+- multi-warehouse businesses
+- transport and fleet operations
+- field operations
+- enterprise admin teams supporting multiple business units or clients
+
+## What Problems It Solves
+
+SynapseCore is strongest when a company has real operational pressure but weak operational coherence.
+
+Typical pain points:
+
+- fragmented systems across spreadsheets, portals, exports, and support channels
+- failed integrations that disappear into inboxes or manual re-entry
+- delayed approvals with weak ownership and no shared review lane
+- inventory and order mismatch across warehouses, planning, and fulfillment
+- no visible replay or recovery path for failed inbound work
+- poor operational visibility into connector failures, backlogs, or stock pressure
+- weak audit traceability after incidents or risky decisions
+
+## What Is Proven
+
+The current supported scope is not theoretical. It is proven.
+
+Hosted proof evidence:
+
+- full hosted proof passed twice consecutively on Render
+- run 1: `6 passed (6.3m)`
+- run 2: `6 passed (4.3m)`
+
+What those runs proved live:
+
+- frontend and backend connection is real
+- auth flow and session behavior are real
+- tenant-scoped catalog onboarding is real
+- orders and inventory surfaces are real
+- realtime dashboard updates work without refresh
+- replay recovery is deterministic for the supported disabled-connector recovery flow
+- scenario approval, execution, and browser role gating are real
+- runtime, integrations, users, settings, alerts, and recommendations are real
+- frontend-visible auth rate limiting is real
+
+## Current Supported Scope
+
+SynapseCore is fully real for its current supported scope.
+
+That scope is intentionally honest:
+
+- connector breadth is currently limited to webhook, CSV, and scheduled pull order ingestion
+- this is not being claimed as a broad ERP connector marketplace yet
+- Redis pub/sub is the current distributed realtime posture on Render
+- STOMP relay and larger horizontal-scale topologies remain future infrastructure hardening choices, not missing proof gaps
 
 ## Local Development
 
-Start the local stack:
+Recommended local path:
 
 ```bash
 cd infrastructure
 docker compose up --build
 ```
 
+Local default endpoints:
+
+- frontend: `http://localhost:5173`
+- backend: `http://localhost:8080`
+
+Local env files used by the compose stack:
+
+- `infrastructure/env/backend.env`
+- `infrastructure/env/frontend.env`
+
 Useful local checks:
 
 ```powershell
 cd frontend
 npm.cmd run build
-cd ..
+
+cd ..\backend
 cmd /c mvnw.cmd test
 ```
 
-Development-only tooling is still available, but it is explicitly isolated from the live product path. Examples include local reseed and local starter baselines for developer convenience. They are not part of production posture.
+Frontend development commands:
 
-## Production And Render
+```powershell
+cd frontend
+npm.cmd install
+npm.cmd run dev
+```
+
+Windows local host helpers are also available in the backend folder:
+
+- `backend\start-local-demo.cmd`
+- `backend\start-local-prod.cmd`
+
+## Deployment
 
 Current live Render services:
 
 - frontend: [https://synapscore-frontend-3.onrender.com](https://synapscore-frontend-3.onrender.com)
 - backend: [https://synapscore-3.onrender.com](https://synapscore-3.onrender.com)
 
-Important current production truths:
+Important deployment truths:
 
-- `SPRING_PROFILES_ACTIVE=prod`
-- `ALLOW_HEADER_FALLBACK=false`
-- `SYNAPSECORE_REALTIME_BROKER_MODE=REDIS_PUBSUB`
-- `SPRING_JPA_HIBERNATE_DDL_AUTO=validate`
-- `SYNAPSECORE_RATE_LIMIT_ENABLED=true`
-- `SYNAPSECORE_ALERT_HOOK_ENABLED` controls whether operational failures emit to an external webhook
+- backend profile: `prod`
+- schema posture: Flyway-backed startup with Hibernate `ddl-auto=validate`
+- realtime mode on current Render: `REDIS_PUBSUB`
+- production browser sessions: Redis-backed
+- header fallback in production: disabled
+- health checks should use liveness, while proof traffic should wait for readiness
 
-See:
+Key trust endpoints:
 
-- [docs/deployment.md](docs/deployment.md)
-- [docs/render-deployment.md](docs/render-deployment.md)
-- [docs/live-deployment-runbook.md](docs/live-deployment-runbook.md)
-- [docs/pilot-operations-runbook.md](docs/pilot-operations-runbook.md)
-- [docs/schema-migration-roadmap.md](docs/schema-migration-roadmap.md)
+- `/`
+- `/actuator/health/liveness`
+- `/actuator/health/readiness`
+- `/api/system/runtime`
+- `/api/system/incidents`
+- `/actuator/prometheus`
 
-## Hosted Proof
+## Final Hosted Proof Flow
 
-Hosted proof must use a real tenant and real accounts created through production APIs. It must not rely on `SYNAPSE-DEMO`, hidden seed users, or manual database edits.
-
-Hosted proof now classifies product-write conflicts more precisely. Duplicate or legacy-hidden catalog rows should surface as specific product conflicts, while failures in `business_events`, `audit_logs`, or `operational_dispatch_work_items` should surface as explicit repair-needed write-path failures instead of the old generic 409.
-
-Prepare a hosted proof tenant with:
+Official order:
 
 ```powershell
 powershell -ExecutionPolicy Bypass -File scripts\prepare-hosted-proof.ps1
-```
 
-Then run the browser proof:
-
-```powershell
 cd frontend
 npm.cmd run test:e2e:prod
 ```
 
-Current hosted-proof status:
+Hosted proof uses:
 
-- proof pack exists
-- tenant/user preparation works
-- live hosted proof passed end to end on Render
-- wrong-password sign-in now returns a fast structured `401` on the deployed backend
-- rerun the full browser proof after any future auth/security deploy before calling the deployment finally signed off
+- a real tenant
+- real tenant users
+- a real proof product SKU
+- production APIs only
 
-## Supported Integration Surface
+It does not rely on:
 
-The live supported connector surface is intentionally narrow and truthful:
+- `SYNAPSE-DEMO`
+- hidden seed users
+- manual database edits
 
-- webhook order ingestion
-- CSV order import
-- scheduled pull for order ingestion
+## Company-Fit Analyzer
 
-SynapseCore does not currently claim broad ERP coverage or arbitrary connector breadth. The integrations page and runtime docs should be read as support for those implemented order-ingestion lanes only.
+The repo now includes a real company-fit and operational pain analyzer grounded in the implemented platform scope.
 
-## Realtime Truth
+It can generate company-specific reports in markdown, HTML, or JSON for:
 
-Realtime is tenant-scoped and supports distributed fanout through Redis pub/sub.
+- logistics
+- warehousing
+- retail
+- ecommerce fulfillment
+- distribution
+- manufacturing
+- procurement-heavy operations
+- operations centers
+- fleet and field operations
+- enterprise administration
 
-Current mode:
+PowerShell wrapper:
 
-- development: simple in-memory STOMP broker
-- current Render: Redis pub/sub backed fanout
-- available for later rollout if infrastructure demands it: STOMP relay mode
+```powershell
+powershell -ExecutionPolicy Bypass -File scripts\explain-company-fit.ps1 --company-type warehouses --format markdown
+```
 
-## Verification And Status
+Shell wrapper:
 
-Read the strict current status in:
+```bash
+bash scripts/explain-company-fit.sh --company-type logistics-companies --format markdown
+```
 
+Direct generator examples:
+
+```powershell
+node scripts\generate-company-fit-report.mjs --list
+node scripts\generate-company-fit-report.mjs --company-type logistics-companies --format markdown
+node scripts\generate-company-fit-report.mjs --company-type retail-chains,ecommerce-fulfillment --format html --output docs\generated\commerce-fit.html
+node scripts\generate-company-fit-report.mjs --all --format json --output docs\generated\company-fit-report.json
+```
+
+Generated showcase:
+
+- [docs/generated/company-fit-showcase.html](docs/generated/company-fit-showcase.html)
+
+## Important Docs
+
+- [docs/hosted-proof.md](docs/hosted-proof.md)
+- [docs/company-fit-playbook.md](docs/company-fit-playbook.md)
+- [docs/replay-recovery.md](docs/replay-recovery.md)
+- [docs/runtime-observability.md](docs/runtime-observability.md)
+- [docs/integration-operations.md](docs/integration-operations.md)
+- [docs/onboarding-playbook.md](docs/onboarding-playbook.md)
+- [docs/live-deployment-runbook.md](docs/live-deployment-runbook.md)
+- [docs/deployment.md](docs/deployment.md)
+- [docs/render-deployment.md](docs/render-deployment.md)
 - [docs/verification-status.md](docs/verification-status.md)
-
-That document now distinguishes:
-
-- what is locally proven
-- what is live and working
-- what is supported in production today
-- what is intentionally out of current scope
-
-## Architecture References
-
-- [docs/architecture.md](docs/architecture.md)
-- [docs/system-flow.md](docs/system-flow.md)
 - [docs/api-spec.md](docs/api-spec.md)
 
 ## Honest Bottom Line
 
-SynapseCore is no longer presenting itself like a cleaned-up demo. It is a real multi-tenant SaaS foundation with operational logic, control surfaces, tenant administration, and recovery mechanics already in place.
+SynapseCore should now be read as a real SaaS operations platform with live hosted proof, not as a code repo looking for a story.
 
-The remaining work is no longer about core platform safety. It is about later scope expansion and scale choices:
+The platform is fully real for its current supported scope.
 
-- broader connector breadth beyond the current supported ingestion lanes
-- optional STOMP relay rollout if Redis pub/sub is no longer the preferred topology
-- larger-volume deployment tuning once real company load characteristics are known
+What remains from here is not proof-path repair. It is:
+
+- broader connector breadth if the product expands
+- future infrastructure choices if a larger horizontal scale pattern is needed
+- continued operations polish, positioning, and company-specific deployment work
