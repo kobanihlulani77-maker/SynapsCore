@@ -4,6 +4,7 @@ import com.synapsecore.access.AccessControlService;
 import com.synapsecore.auth.AuthSessionService;
 import com.synapsecore.config.SynapseAccessProperties;
 import com.synapsecore.observability.OperationalMetricsService;
+import jakarta.servlet.DispatcherType;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
@@ -73,6 +74,9 @@ public class RequestTraceFilter extends OncePerRequestFilter {
     }
 
     private String resolveActorName(HttpServletRequest request) {
+        if (request != null && request.getDispatcherType() == DispatcherType.ERROR) {
+            return RequestTraceContext.ANONYMOUS_ACTOR;
+        }
         if (isAuthLoginRequest(request)) {
             return RequestTraceContext.ANONYMOUS_ACTOR;
         }
@@ -94,6 +98,9 @@ public class RequestTraceFilter extends OncePerRequestFilter {
     }
 
     private String resolveTenantCode(HttpServletRequest request) {
+        if (request != null && request.getDispatcherType() == DispatcherType.ERROR) {
+            return RequestTraceContext.MISSING_TENANT_CONTEXT;
+        }
         if (isAuthLoginRequest(request)) {
             return RequestTraceContext.MISSING_TENANT_CONTEXT;
         }

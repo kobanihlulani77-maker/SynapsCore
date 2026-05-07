@@ -32,6 +32,7 @@ import com.synapsecore.domain.service.SeedService;
 import com.synapsecore.domain.service.IdentitySequenceMigrationService;
 import com.synapsecore.integration.IntegrationConnectorService;
 import com.synapsecore.tenant.TenantContextService;
+import jakarta.servlet.RequestDispatcher;
 import java.math.BigDecimal;
 import java.time.Instant;
 import org.junit.jupiter.api.Test;
@@ -526,6 +527,14 @@ class ProductionHardeningIntegrationTest {
         assertThatThrownBy(() -> tenantContextService.getCurrentTenantCodeOrDefault())
             .isInstanceOf(IllegalStateException.class)
             .hasMessageContaining("Tenant context is required");
+    }
+
+    @Test
+    void frameworkErrorEndpointSuppressesAbortLikeSessionInvalidationDispatches() throws Exception {
+        mockMvc.perform(get("/error")
+                .requestAttr(RequestDispatcher.ERROR_STATUS_CODE, 500)
+                .requestAttr(RequestDispatcher.ERROR_EXCEPTION, new IllegalStateException("Session was invalidated")))
+            .andExpect(status().isNoContent());
     }
 
     @Test

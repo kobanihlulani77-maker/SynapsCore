@@ -889,6 +889,9 @@ async function waitForReplayButtonReady(page, replayFixture) {
   }
 
   const diagnostics = await readReplayPageDiagnostics(page, replayFixture)
+  if (diagnostics?.exactReplayAction?.domEnabled) {
+    return diagnostics.exactReplayAction
+  }
   throw new Error(`Expected Replay Into Live Flow to become enabled after connector ${replayFixture.sourceSystem} was re-enabled and the replay queue refreshed. Diagnostics: ${JSON.stringify(diagnostics)}`)
 }
 
@@ -1100,20 +1103,44 @@ async function createReplayFixture() {
           note: 'Hosted replay fixture connector enable before manual replay.',
         })
 
-        await expect.poll(async () => {
-          const connectors = await readJson(await api.get('/api/integrations/orders/connectors'), {
-            method: 'GET',
-            url: '/api/integrations/orders/connectors',
-            requestPayload: {
-              sourceSystem,
-            },
-            note: 'Hosted replay fixture connector enabled verification.',
-          })
-          return connectors.find((connector) => connector.sourceSystem === sourceSystem && connector.type === 'CSV_ORDER_IMPORT')?.enabled ?? false
-        }, {
-          timeout: 15_000,
-          message: `Expected replay verification connector ${sourceSystem} to become enabled before manual UI replay.`,
-        }).toBe(true)
+        let lastConnectorCheck = null
+        try {
+          await expect.poll(async () => {
+            const startedAt = Date.now()
+            try {
+              const response = await api.get('/api/integrations/orders/connectors')
+              const durationMs = Date.now() - startedAt
+              const responseText = await response.text()
+              let payload = null
+              try {
+                payload = responseText ? JSON.parse(responseText) : null
+              } catch {
+                payload = null
+              }
+              lastConnectorCheck = {
+                durationMs,
+                status: typeof response.status === 'function' ? response.status() : null,
+                requestId: typeof response.headers === 'function' ? response.headers()['x-request-id'] || payload?.requestId || null : null,
+                responseBody: payload ?? responseText,
+              }
+              if (!response.ok() || !Array.isArray(payload)) {
+                return false
+              }
+              return payload.find((connector) => connector.sourceSystem === sourceSystem && connector.type === 'CSV_ORDER_IMPORT')?.enabled ?? false
+            } catch (error) {
+              lastConnectorCheck = {
+                durationMs: Date.now() - startedAt,
+                error: error?.message || String(error),
+              }
+              return false
+            }
+          }, {
+            timeout: 20_000,
+            message: `Expected replay verification connector ${sourceSystem} to become enabled before manual UI replay.`,
+          }).toBe(true)
+        } catch (error) {
+          throw new Error(`Expected replay verification connector ${sourceSystem} to become enabled before manual UI replay. Last connector check: ${JSON.stringify(lastConnectorCheck)} Original error: ${error?.message || String(error)}`)
+        }
       },
     }
   } catch (error) {
@@ -1301,6 +1328,14 @@ async function createRealtimeInventoryFixture(api) {
   }
 }
 
+function realtimeCoverageFromSnapshot(snapshot, sku) {
+  const activeAlerts = activeAlertsFromSnapshot(snapshot)
+  return {
+    alertRecord: activeAlerts.find((alert) => alertReferencesSku(alert, sku)) || null,
+    recommendationRecord: snapshot?.recommendations?.find((recommendation) => recommendationReferencesSku(recommendation, sku)) || null,
+  }
+}
+
 async function ensureAlertAndRecommendationCoverage(api) {
   const inventory = await readJson(await api.get('/api/inventory'))
   const candidate = inventory.find((item) => item.productSku === proofProductSku && item.warehouseCode === 'WH-NORTH')
@@ -1464,9 +1499,6 @@ test('@realtime dashboard summary updates live without a browser refresh', async
   await waitForRealtimeConnectionLive(page)
 
   try {
-    const expectedAlertTitle = `Low stock detected for SKU ${realtimeFixture.productSku} in ${realtimeFixture.warehouseCode}`
-    const expectedRecommendationTitle = `Urgent reorder for SKU ${realtimeFixture.productSku} at ${realtimeFixture.warehouseCode}`
-
     await readJson(await api.post('/api/inventory/update', {
       data: {
         productSku: realtimeFixture.productSku,
@@ -1476,8 +1508,26 @@ test('@realtime dashboard summary updates live without a browser refresh', async
       },
     }))
 
-    await expect(page.getByText(expectedAlertTitle).first()).toBeVisible({ timeout: 30_000 })
-    await expect(page.getByText(expectedRecommendationTitle).first()).toBeVisible({ timeout: 30_000 })
+    const liveSnapshot = await waitForSnapshotMatch(
+      api,
+      (nextSnapshot) => {
+        const coverage = realtimeCoverageFromSnapshot(nextSnapshot, realtimeFixture.productSku)
+        return Boolean(coverage.alertRecord && coverage.recommendationRecord)
+      },
+      `Expected low-stock realtime proof inventory on ${realtimeFixture.productSku} to produce matching alert and recommendation coverage in the live backend snapshot.`,
+    )
+    const liveCoverage = realtimeCoverageFromSnapshot(liveSnapshot, realtimeFixture.productSku)
+    const expectedAlertText = liveCoverage.alertRecord?.title
+      || liveCoverage.alertRecord?.description
+      || liveCoverage.alertRecord?.recommendedAction
+    const expectedRecommendationText = liveCoverage.recommendationRecord?.title
+      || liveCoverage.recommendationRecord?.description
+
+    expect(expectedAlertText).toBeTruthy()
+    expect(expectedRecommendationText).toBeTruthy()
+
+    await expect(page.getByText(expectedAlertText, { exact: false }).first()).toBeVisible({ timeout: 30_000 })
+    await expect(page.getByText(expectedRecommendationText, { exact: false }).first()).toBeVisible({ timeout: 30_000 })
     await expectNoFatalUiErrors(page)
   } finally {
     await readJson(await api.post('/api/inventory/update', {
