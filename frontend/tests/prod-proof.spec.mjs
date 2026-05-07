@@ -1072,6 +1072,184 @@ async function waitForOrdersPageOrderVisible(page, orderRecord, testInfo) {
   })}`)
 }
 
+async function waitForAlertPageAlertVisible(page, alertRecord, testInfo) {
+  const pageDiagnostics = ensurePageDiagnostics(page)
+  const startedAt = Date.now()
+  let lastRefreshAt = 0
+  let lastState = null
+
+  while (Date.now() - startedAt < 30_000) {
+    if (Date.now() - lastRefreshAt >= 2_500) {
+      lastRefreshAt = Date.now()
+      await refreshWorkspace(page)
+    }
+
+    const alertButton = page.getByRole('button', {
+      name: new RegExp(escapeRegExp(alertRecord.title), 'i'),
+    }).first()
+    if (await alertButton.isVisible().catch(() => false)) {
+      await activateSelectableButton(alertButton).catch(() => {})
+    }
+
+    lastState = await page.evaluate(({ title, recommendedAction }) => {
+      const normalizeText = (value) => value?.replace?.(/\s+/g, ' ')?.trim?.() || ''
+      const alertButtons = [...(globalThis.document?.querySelectorAll?.('button') || [])]
+      const exactAlertButton = alertButtons.find((button) => normalizeText(button.textContent).includes(title)) || null
+      const selectedAlert = globalThis.document?.querySelector?.('#alerts-focus') || null
+      const selectedText = normalizeText(selectedAlert?.textContent)
+      return {
+        pageUrl: globalThis.location?.href || '',
+        alertButtonFound: Boolean(exactAlertButton),
+        alertButtonText: normalizeText(exactAlertButton?.textContent),
+        selectedText,
+        selectedMatches: selectedText.includes(title) && selectedText.includes(`Action: ${recommendedAction}`),
+      }
+    }, {
+      title: alertRecord.title,
+      recommendedAction: alertRecord.recommendedAction,
+    })
+
+    if (lastState.alertButtonFound && lastState.selectedMatches) {
+      return lastState
+    }
+
+    await page.waitForTimeout(500)
+  }
+
+  let screenshotPath = null
+  if (testInfo) {
+    screenshotPath = testInfo.outputPath('alerts-page-timeout.png')
+    await page.screenshot({ path: screenshotPath, fullPage: true }).catch(() => {})
+  }
+
+  throw new Error(`Alerts page failed to render deterministic proof alert ${alertRecord.title}. Diagnostics: ${JSON.stringify({
+    expectedTitle: alertRecord.title,
+    expectedAction: alertRecord.recommendedAction,
+    lastState,
+    lastApiResponse: pageDiagnostics.lastApiResponse,
+    consoleErrors: pageDiagnostics.consoleErrors,
+    failedRequests: pageDiagnostics.failedRequests,
+    screenshotPath,
+  })}`)
+}
+
+async function waitForRecommendationPageVisible(page, recommendationRecord, testInfo) {
+  const pageDiagnostics = ensurePageDiagnostics(page)
+  const startedAt = Date.now()
+  let lastRefreshAt = 0
+  let lastState = null
+
+  while (Date.now() - startedAt < 30_000) {
+    if (Date.now() - lastRefreshAt >= 2_500) {
+      lastRefreshAt = Date.now()
+      await refreshWorkspace(page)
+    }
+
+    const recommendationButton = page.locator('.recommendation-board').getByRole('button', {
+      name: new RegExp(escapeRegExp(recommendationRecord.title), 'i'),
+    }).first()
+    if (await recommendationButton.isVisible().catch(() => false)) {
+      await activateSelectableButton(recommendationButton).catch(() => {})
+    }
+
+    lastState = await page.evaluate(({ title, description }) => {
+      const normalizeText = (value) => value?.replace?.(/\s+/g, ' ')?.trim?.() || ''
+      const recommendationButtons = [...(globalThis.document?.querySelectorAll?.('.recommendation-board button') || [])]
+      const exactRecommendationButton = recommendationButtons.find((button) => normalizeText(button.textContent).includes(title)) || null
+      const selectedRecommendation = globalThis.document?.querySelector?.('#recommendations-focus') || null
+      const selectedText = normalizeText(selectedRecommendation?.textContent)
+      return {
+        pageUrl: globalThis.location?.href || '',
+        recommendationButtonFound: Boolean(exactRecommendationButton),
+        recommendationButtonText: normalizeText(exactRecommendationButton?.textContent),
+        selectedText,
+        selectedMatches: selectedText.includes(title) && selectedText.includes(description),
+      }
+    }, {
+      title: recommendationRecord.title,
+      description: recommendationRecord.description,
+    })
+
+    if (lastState.recommendationButtonFound && lastState.selectedMatches) {
+      return lastState
+    }
+
+    await page.waitForTimeout(500)
+  }
+
+  let screenshotPath = null
+  if (testInfo) {
+    screenshotPath = testInfo.outputPath('recommendations-page-timeout.png')
+    await page.screenshot({ path: screenshotPath, fullPage: true }).catch(() => {})
+  }
+
+  throw new Error(`Recommendations page failed to render deterministic proof recommendation ${recommendationRecord.title}. Diagnostics: ${JSON.stringify({
+    expectedTitle: recommendationRecord.title,
+    expectedDescription: recommendationRecord.description,
+    lastState,
+    lastApiResponse: pageDiagnostics.lastApiResponse,
+    consoleErrors: pageDiagnostics.consoleErrors,
+    failedRequests: pageDiagnostics.failedRequests,
+    screenshotPath,
+  })}`)
+}
+
+async function waitForRuntimePageReady(page, runtimeRecord, testInfo) {
+  const pageDiagnostics = ensurePageDiagnostics(page)
+  const startedAt = Date.now()
+  let lastRefreshAt = 0
+  let lastState = null
+  const expectedReadiness = formatProofCodeLabel(runtimeRecord.readinessState)
+  const expectedBrokerMode = formatProofCodeLabel(runtimeRecord.backbone?.realtimeBrokerMode || 'unknown')
+
+  while (Date.now() - startedAt < 30_000) {
+    if (Date.now() - lastRefreshAt >= 2_500) {
+      lastRefreshAt = Date.now()
+      await refreshWorkspace(page)
+    }
+
+    lastState = await page.evaluate(({ expectedOverallStatus, expectedReadinessText, expectedBrokerModeText }) => {
+      const normalizeText = (value) => value?.replace?.(/\s+/g, ' ')?.trim?.() || ''
+      const runtimeHealth = globalThis.document?.querySelector?.('#runtime-health') || null
+      const runtimeText = normalizeText(runtimeHealth?.textContent)
+      return {
+        pageUrl: globalThis.location?.href || '',
+        runtimeText,
+        matches: runtimeText.includes(expectedOverallStatus)
+          && runtimeText.includes(expectedReadinessText)
+          && runtimeText.includes(expectedBrokerModeText),
+      }
+    }, {
+      expectedOverallStatus: runtimeRecord.overallStatus,
+      expectedReadinessText: expectedReadiness,
+      expectedBrokerModeText: expectedBrokerMode,
+    })
+
+    if (lastState.matches) {
+      return lastState
+    }
+
+    await page.waitForTimeout(500)
+  }
+
+  let screenshotPath = null
+  if (testInfo) {
+    screenshotPath = testInfo.outputPath('runtime-page-timeout.png')
+    await page.screenshot({ path: screenshotPath, fullPage: true }).catch(() => {})
+  }
+
+  throw new Error(`Runtime page failed to render deterministic backend runtime posture. Diagnostics: ${JSON.stringify({
+    expectedOverallStatus: runtimeRecord.overallStatus,
+    expectedReadiness,
+    expectedBrokerMode,
+    lastState,
+    lastApiResponse: pageDiagnostics.lastApiResponse,
+    consoleErrors: pageDiagnostics.consoleErrors,
+    failedRequests: pageDiagnostics.failedRequests,
+    screenshotPath,
+  })}`)
+}
+
 async function createReplayFixture() {
   const inventoryAdmin = await createApiContext(users.operationsLead)
   const api = await createApiContext(users.operationsLead)
@@ -1183,25 +1361,52 @@ async function createReplayFixture() {
           await expect.poll(async () => {
             const startedAt = Date.now()
             try {
-              const response = await api.get('/api/integrations/orders/connectors')
+              const [connectorsResponse, snapshotResponse] = await Promise.all([
+                api.get('/api/integrations/orders/connectors', { timeout: 20_000 }),
+                api.get('/api/dashboard/snapshot', { timeout: 20_000 }),
+              ])
               const durationMs = Date.now() - startedAt
-              const responseText = await response.text()
-              let payload = null
+              const connectorsText = await connectorsResponse.text()
+              const snapshotText = await snapshotResponse.text()
+              let connectorsPayload = null
+              let snapshotPayload = null
               try {
-                payload = responseText ? JSON.parse(responseText) : null
+                connectorsPayload = connectorsText ? JSON.parse(connectorsText) : null
               } catch {
-                payload = null
+                connectorsPayload = null
               }
+              try {
+                snapshotPayload = snapshotText ? JSON.parse(snapshotText) : null
+              } catch {
+                snapshotPayload = null
+              }
+              const connectorFromList = Array.isArray(connectorsPayload)
+                ? connectorsPayload.find((connector) => connector.sourceSystem === sourceSystem && connector.type === 'CSV_ORDER_IMPORT')
+                : null
+              const connectorFromSnapshot = Array.isArray(snapshotPayload?.integrationConnectors)
+                ? snapshotPayload.integrationConnectors.find((connector) => connector.sourceSystem === sourceSystem && connector.type === 'CSV_ORDER_IMPORT')
+                : null
+              const replayFromSnapshot = Array.isArray(snapshotPayload?.integrationReplayQueue)
+                ? snapshotPayload.integrationReplayQueue.find((record) => record.externalOrderId === externalOrderId)
+                : null
               lastConnectorCheck = {
                 durationMs,
-                status: typeof response.status === 'function' ? response.status() : null,
-                requestId: typeof response.headers === 'function' ? response.headers()['x-request-id'] || payload?.requestId || null : null,
-                responseBody: payload ?? responseText,
+                connectorsStatus: typeof connectorsResponse.status === 'function' ? connectorsResponse.status() : null,
+                connectorsRequestId: typeof connectorsResponse.headers === 'function' ? connectorsResponse.headers()['x-request-id'] || connectorsPayload?.requestId || null : null,
+                snapshotStatus: typeof snapshotResponse.status === 'function' ? snapshotResponse.status() : null,
+                snapshotRequestId: typeof snapshotResponse.headers === 'function' ? snapshotResponse.headers()['x-request-id'] || snapshotPayload?.requestId || null : null,
+                connectorFromList,
+                connectorFromSnapshot,
+                replayFromSnapshot,
               }
-              if (!response.ok() || !Array.isArray(payload)) {
+              if (!connectorsResponse.ok() || !Array.isArray(connectorsPayload) || !snapshotResponse.ok() || !snapshotPayload) {
                 return false
               }
-              return payload.find((connector) => connector.sourceSystem === sourceSystem && connector.type === 'CSV_ORDER_IMPORT')?.enabled ?? false
+              return Boolean(
+                connectorFromList?.enabled
+                && connectorFromSnapshot?.enabled
+                && replayFromSnapshot?.externalOrderId === externalOrderId,
+              )
             } catch (error) {
               lastConnectorCheck = {
                 durationMs: Date.now() - startedAt,
@@ -1333,6 +1538,17 @@ function alertReferencesSku(alert, sku) {
 function recommendationReferencesSku(recommendation, sku) {
   return textReferencesSku(recommendation?.title, sku)
     || textReferencesSku(recommendation?.description, sku)
+}
+
+function formatProofCodeLabel(value) {
+  if (!value) {
+    return 'Unknown'
+  }
+  return value
+    .toLowerCase()
+    .split('_')
+    .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+    .join(' ')
 }
 
 async function waitForBackendLowStockCoverage(api, fixture, message) {
@@ -1891,6 +2107,7 @@ test('alerts, recommendations, orders, inventory, integrations, users, profile, 
     const workspace = await readJson(await api.get('/api/access/admin/workspace'))
     const operators = await readJson(await api.get('/api/access/admin/operators'))
     const accessUsers = await readJson(await api.get('/api/access/admin/users'))
+    const runtimeRecord = await readJson(await api.get('/api/system/runtime'))
     const alertRecord = alertCoverage.alertRecord
     const recommendationRecord = alertCoverage.recommendationRecord
     const orderRecord = recentOrder.order
@@ -1923,19 +2140,11 @@ test('alerts, recommendations, orders, inventory, integrations, users, profile, 
 
     await navigateWithinApp(page, '/alerts')
     await expect(page.getByRole('heading', { level: 1, name: 'Operational warning center' })).toBeVisible()
-    await expect(page.getByText(alertRecord.title).first()).toBeVisible()
-    await activateSelectableButton(
-      page.getByRole('button', { name: new RegExp(escapeRegExp(alertRecord.title), 'i') }).first(),
-    )
-    await expect(page.getByText(`Action: ${alertRecord.recommendedAction}`).first()).toBeVisible()
+    await waitForAlertPageAlertVisible(page, alertRecord, testInfo)
 
     await navigateWithinApp(page, '/recommendations')
     await expect(page.getByRole('heading', { level: 1, name: 'Action queue for the operating team' })).toBeVisible()
-    await expect(page.getByText(recommendationRecord.title).first()).toBeVisible()
-    await activateSelectableButton(
-      page.locator('.recommendation-board').getByRole('button', { name: new RegExp(escapeRegExp(recommendationRecord.title), 'i') }).first(),
-    )
-    await expect(page.getByText(recommendationRecord.description).first()).toBeVisible()
+    await waitForRecommendationPageVisible(page, recommendationRecord, testInfo)
 
     await navigateWithinApp(page, '/orders')
     await expect(page.getByRole('heading', { level: 1, name: 'Live order operations' })).toBeVisible()
@@ -1967,6 +2176,10 @@ test('alerts, recommendations, orders, inventory, integrations, users, profile, 
     if (workspace.connectors?.length) {
       await expect(page.getByText(workspace.connectors[0].displayName).first()).toBeVisible()
     }
+
+    await navigateWithinApp(page, '/runtime')
+    await expect(page.getByRole('heading', { level: 1, name: 'Runtime, incidents, and observability' })).toBeVisible()
+    await waitForRuntimePageReady(page, runtimeRecord, testInfo)
 
     await navigateWithinApp(page, '/users')
     await expect(page.getByRole('heading', { level: 1, name: 'Users and access control' })).toBeVisible()

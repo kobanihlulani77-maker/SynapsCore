@@ -169,24 +169,6 @@ async function waitForAuthenticatedProofTraffic(credentials) {
         30_000,
       )
 
-      await waitWithinRemainingBudget(
-        'authenticated runtime',
-        async (requestTimeoutMs) => {
-          const runtimeResponse = await proofApi.get('/api/system/runtime', { timeout: requestTimeoutMs })
-          const runtimePayload = await runtimeResponse.json().catch(() => null)
-          return {
-            detail: `runtime=${runtimeResponse.status()} readiness=${runtimePayload?.readinessState}`,
-            status: runtimeResponse.status(),
-            payload: runtimePayload,
-          }
-        },
-        (result) => (
-          result.status === 200
-          && typeof result.payload?.readinessState === 'string'
-        ),
-        30_000,
-      )
-
       await waitForProbe(
         'authenticated dashboard snapshot',
         async () => {
@@ -207,6 +189,29 @@ async function waitForAuthenticatedProofTraffic(credentials) {
         ),
         remainingWarmupMs,
       )
+
+      try {
+        await waitWithinRemainingBudget(
+          'authenticated runtime',
+          async (requestTimeoutMs) => {
+            const runtimeResponse = await proofApi.get('/api/system/runtime', { timeout: requestTimeoutMs })
+            const runtimePayload = await runtimeResponse.json().catch(() => null)
+            return {
+              detail: `runtime=${runtimeResponse.status()} readiness=${runtimePayload?.readinessState}`,
+              status: runtimeResponse.status(),
+              payload: runtimePayload,
+            }
+          },
+          (result) => (
+            result.status === 200
+            && typeof result.payload?.readinessState === 'string'
+          ),
+          45_000,
+        )
+      } catch (error) {
+        const runtimeWarmupError = error instanceof Error ? error.message : String(error)
+        console.log(`[hosted-proof] authenticated runtime warm-up is still settling; continuing because runtime posture is asserted later in the browser proof. Last detail: ${runtimeWarmupError}`)
+      }
 
       await proofApi.post('/api/auth/session/logout').catch(() => null)
       await proofApi.dispose()

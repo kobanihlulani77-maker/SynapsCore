@@ -39,7 +39,8 @@ import java.util.Arrays;
 import java.util.List;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.boot.actuate.health.HealthEndpoint;
+import org.springframework.boot.availability.LivenessState;
+import org.springframework.boot.availability.ReadinessState;
 import org.springframework.boot.availability.ApplicationAvailability;
 import org.springframework.core.env.Environment;
 import org.springframework.stereotype.Service;
@@ -51,7 +52,6 @@ public class SystemRuntimeService {
     private final Environment environment;
     private final SynapseAccessProperties accessProperties;
     private final SynapseCorsProperties corsProperties;
-    private final HealthEndpoint healthEndpoint;
     private final ApplicationAvailability applicationAvailability;
     private final AlertRepository alertRepository;
     private final AuditLogRepository auditLogRepository;
@@ -120,6 +120,8 @@ public class SystemRuntimeService {
         if (activeProfiles.isEmpty()) {
             activeProfiles = Arrays.asList(environment.getDefaultProfiles());
         }
+        LivenessState livenessState = applicationAvailability.getLivenessState();
+        ReadinessState readinessState = applicationAvailability.getReadinessState();
 
         return new SystemRuntimeResponse(
             applicationName,
@@ -134,9 +136,9 @@ public class SystemRuntimeService {
                 emptyToNull(renderInstanceId)
             ),
             activeProfiles,
-            healthEndpoint.health().getStatus().getCode(),
-            applicationAvailability.getLivenessState().name(),
-            applicationAvailability.getReadinessState().name(),
+            resolveOverallStatus(livenessState, readinessState),
+            livenessState.name(),
+            readinessState.name(),
             accessProperties.isAllowHeaderFallback(),
             secureSessionCookies,
             corsProperties.getAllowedOrigins(),
@@ -149,6 +151,16 @@ public class SystemRuntimeService {
             buildConnectorDiagnostics(),
             Instant.now()
         );
+    }
+
+    private String resolveOverallStatus(LivenessState livenessState, ReadinessState readinessState) {
+        if (livenessState != LivenessState.CORRECT) {
+            return "DOWN";
+        }
+        if (readinessState == ReadinessState.ACCEPTING_TRAFFIC) {
+            return "UP";
+        }
+        return "DEGRADED";
     }
 
     private String emptyToNull(String value) {

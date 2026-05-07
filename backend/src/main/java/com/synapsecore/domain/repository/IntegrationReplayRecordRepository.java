@@ -82,28 +82,38 @@ public interface IntegrationReplayRecordRepository extends JpaRepository<Integra
     @Query("""
         select record
         from IntegrationReplayRecord record
-        where lower(record.tenantCode) = lower(?1)
-          and record.id = ?2
+        where record.id = ?1
         """)
-    java.util.Optional<IntegrationReplayRecord> findByTenantCodeIgnoreCaseAndIdForUpdate(String tenantCode, Long id);
+    java.util.Optional<IntegrationReplayRecord> findByIdForUpdate(Long id);
 
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("""
         select record
         from IntegrationReplayRecord record
-        join com.synapsecore.domain.entity.IntegrationConnector connector
-          on lower(connector.sourceSystem) = lower(record.sourceSystem)
-         and connector.type = record.connectorType
-         and lower(connector.tenant.code) = lower(record.tenantCode)
+        where lower(record.tenantCode) = lower(?1)
+          and record.id = ?2
+        """)
+    java.util.Optional<IntegrationReplayRecord> findByTenantCodeIgnoreCaseAndIdForUpdate(String tenantCode, Long id);
+
+    @Query("""
+        select record.id
+        from IntegrationReplayRecord record
         where record.status in ?1
           and record.nextEligibleAt is not null
           and record.nextEligibleAt <= ?2
-          and connector.enabled = true
           and (record.failureCode is null or record.failureCode not in ?3)
+          and exists (
+              select 1
+              from com.synapsecore.domain.entity.IntegrationConnector connector
+              where lower(connector.sourceSystem) = lower(record.sourceSystem)
+                and connector.type = record.connectorType
+                and lower(connector.tenant.code) = lower(record.tenantCode)
+                and connector.enabled = true
+          )
         order by record.nextEligibleAt asc, record.createdAt asc
         """)
-    List<IntegrationReplayRecord> findEligibleForAutomatedReplay(Collection<IntegrationReplayStatus> statuses,
-                                                                 Instant eligibleAt,
-                                                                 Collection<IntegrationFailureCode> excludedFailureCodes,
-                                                                 Pageable pageable);
+    List<Long> findEligibleIdsForAutomatedReplay(Collection<IntegrationReplayStatus> statuses,
+                                                 Instant eligibleAt,
+                                                 Collection<IntegrationFailureCode> excludedFailureCodes,
+                                                 Pageable pageable);
 }

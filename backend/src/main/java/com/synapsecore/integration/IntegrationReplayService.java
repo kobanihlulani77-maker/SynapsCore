@@ -173,17 +173,25 @@ public class IntegrationReplayService {
     @Transactional
     public int processAutomatedReplayBatch(int batchSize) {
         Instant now = Instant.now();
-        return integrationReplayRecordRepository.findEligibleForAutomatedReplay(
+        return integrationReplayRecordRepository.findEligibleIdsForAutomatedReplay(
                 List.of(IntegrationReplayStatus.PENDING, IntegrationReplayStatus.REPLAY_FAILED),
                 now,
                 MANUAL_ONLY_AUTOMATION_FAILURE_CODES,
                 PageRequest.of(0, Math.max(batchSize, 1)))
             .stream()
-            .mapToInt(record -> attemptAutomatedReplay(record, now))
+            .mapToInt(replayRecordId -> attemptAutomatedReplayById(replayRecordId, now))
             .sum();
     }
 
-    private int attemptAutomatedReplay(IntegrationReplayRecord record, Instant attemptedAt) {
+    private int attemptAutomatedReplayById(Long replayRecordId, Instant attemptedAt) {
+        IntegrationReplayRecord record = integrationReplayRecordRepository.findByIdForUpdate(replayRecordId)
+            .orElse(null);
+        if (record == null) {
+            return 0;
+        }
+        if (!isEligibleForAutomatedReplay(record, attemptedAt)) {
+            return 0;
+        }
         if (record.getTenantCode() == null || record.getTenantCode().isBlank()) {
             orphanReplayRecord(record, attemptedAt);
             return 0;
@@ -208,6 +216,32 @@ public class IntegrationReplayService {
             restoreTraceValue(previousRequestId, requestTraceContext::setCurrentRequestId);
             restoreTraceValue(previousActor, requestTraceContext::setCurrentActor);
             restoreTraceValue(previousTenant, requestTraceContext::setCurrentTenant);
+        }
+    }
+
+    private boolean isEligibleForAutomatedReplay(IntegrationReplayRecord record, Instant attemptedAt) {
+        if (record == null) {
+            return false;
+        }
+        if (!List.of(IntegrationReplayStatus.PENDING, IntegrationReplayStatus.REPLAY_FAILED).contains(record.getStatus())) {
+            return false;
+        }
+        if (record.getNextEligibleAt() == null || record.getNextEligibleAt().isAfter(attemptedAt)) {
+            return false;
+        }
+        if (isManualOnlyAutomatedReplayRecord(record)) {
+            return false;
+        }
+        try {
+            integrationConnectorService.requireEnabledConnectorForTenant(
+                record.getTenantCode(),
+                record.getSourceSystem(),
+                record.getConnectorType(),
+                "automatically replay failed inbound orders"
+            );
+            return true;
+        } catch (ResponseStatusException exception) {
+            return false;
         }
     }
 
