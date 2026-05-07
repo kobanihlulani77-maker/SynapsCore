@@ -1252,7 +1252,7 @@ async function waitForRuntimePageReady(page, runtimeRecord, testInfo) {
 
 async function createReplayFixture() {
   const inventoryAdmin = await createApiContext(users.operationsLead)
-  const api = await createApiContext(users.operationsLead)
+  const api = await createApiContext(users.integrationLead)
   const suffix = randomUUID().slice(0, 8).toUpperCase()
   const sourceSystem = `ui_replay_${suffix}`.toLowerCase()
   const externalOrderId = `UI-RPL-${suffix}`
@@ -1347,79 +1347,155 @@ async function createReplayFixture() {
           allowDefaultWarehouseFallback: false,
           notes: 'Enabled for replay verification.',
         }
-        await readJson(await api.post('/api/integrations/orders/connectors', {
+        const enableResponse = await api.post('/api/integrations/orders/connectors', {
           data: enableConnectorPayload,
-        }), {
+        })
+        const enableResponsePayload = await readJson(enableResponse, {
           method: 'POST',
           url: '/api/integrations/orders/connectors',
           requestPayload: enableConnectorPayload,
           note: 'Hosted replay fixture connector enable before manual replay.',
         })
+        const enableResponseDetails = {
+          status: typeof enableResponse.status === 'function' ? enableResponse.status() : null,
+          requestId: typeof enableResponse.headers === 'function'
+            ? enableResponse.headers()['x-request-id'] || enableResponsePayload?.requestId || null
+            : enableResponsePayload?.requestId || null,
+          responseBody: enableResponsePayload,
+          actorUsername: users.integrationLead.username,
+          tenantCode: users.integrationLead.tenantCode,
+        }
 
-        let lastConnectorCheck = null
+        let lastConnectorCheck = {
+          phase: 'connector-readback-not-started',
+          sourceSystem,
+        }
+        let lastReplayCheck = {
+          phase: 'replay-readback-not-started',
+          externalOrderId,
+        }
+        let lastSnapshotCheck = {
+          phase: 'snapshot-readback-not-started',
+          sourceSystem,
+          externalOrderId,
+        }
         try {
           await expect.poll(async () => {
             const startedAt = Date.now()
             try {
-              const [connectorsResponse, snapshotResponse] = await Promise.all([
-                api.get('/api/integrations/orders/connectors', { timeout: 20_000 }),
-                api.get('/api/dashboard/snapshot', { timeout: 20_000 }),
-              ])
-              const durationMs = Date.now() - startedAt
+              const connectorsPath = `/api/integrations/orders/connectors?sourceSystem=${encodeURIComponent(sourceSystem)}&type=CSV_ORDER_IMPORT`
+              const connectorsResponse = await api.get(connectorsPath, { timeout: 8_000 })
               const connectorsText = await connectorsResponse.text()
-              const snapshotText = await snapshotResponse.text()
               let connectorsPayload = null
-              let snapshotPayload = null
               try {
                 connectorsPayload = connectorsText ? JSON.parse(connectorsText) : null
               } catch {
                 connectorsPayload = null
               }
-              try {
-                snapshotPayload = snapshotText ? JSON.parse(snapshotText) : null
-              } catch {
-                snapshotPayload = null
-              }
               const connectorFromList = Array.isArray(connectorsPayload)
                 ? connectorsPayload.find((connector) => connector.sourceSystem === sourceSystem && connector.type === 'CSV_ORDER_IMPORT')
                 : null
-              const connectorFromSnapshot = Array.isArray(snapshotPayload?.integrationConnectors)
-                ? snapshotPayload.integrationConnectors.find((connector) => connector.sourceSystem === sourceSystem && connector.type === 'CSV_ORDER_IMPORT')
-                : null
-              const replayFromSnapshot = Array.isArray(snapshotPayload?.integrationReplayQueue)
-                ? snapshotPayload.integrationReplayQueue.find((record) => record.externalOrderId === externalOrderId)
-                : null
               lastConnectorCheck = {
-                durationMs,
+                phase: 'connector-list',
+                durationMs: Date.now() - startedAt,
+                path: connectorsPath,
                 connectorsStatus: typeof connectorsResponse.status === 'function' ? connectorsResponse.status() : null,
                 connectorsRequestId: typeof connectorsResponse.headers === 'function' ? connectorsResponse.headers()['x-request-id'] || connectorsPayload?.requestId || null : null,
-                snapshotStatus: typeof snapshotResponse.status === 'function' ? snapshotResponse.status() : null,
-                snapshotRequestId: typeof snapshotResponse.headers === 'function' ? snapshotResponse.headers()['x-request-id'] || snapshotPayload?.requestId || null : null,
+                connectorsOk: connectorsResponse.ok(),
+                payloadShape: Array.isArray(connectorsPayload) ? 'array' : typeof connectorsPayload,
+                payloadCount: Array.isArray(connectorsPayload) ? connectorsPayload.length : null,
                 connectorFromList,
-                connectorFromSnapshot,
-                replayFromSnapshot,
+                payloadPreview: Array.isArray(connectorsPayload)
+                  ? connectorsPayload.map((connector) => ({
+                    sourceSystem: connector.sourceSystem,
+                    type: connector.type,
+                    enabled: connector.enabled,
+                    healthStatus: connector.healthStatus,
+                    pendingReplayCount: connector.pendingReplayCount,
+                  }))
+                  : connectorsPayload ?? connectorsText.slice(0, 400),
               }
-              if (!connectorsResponse.ok() || !Array.isArray(connectorsPayload) || !snapshotResponse.ok() || !snapshotPayload) {
+              if (!connectorsResponse.ok() || !Array.isArray(connectorsPayload)) {
                 return false
               }
-              return Boolean(
-                connectorFromList?.enabled
-                && connectorFromSnapshot?.enabled
-                && replayFromSnapshot?.externalOrderId === externalOrderId,
-              )
+              return Boolean(connectorFromList?.enabled)
             } catch (error) {
               lastConnectorCheck = {
+                phase: 'connector-list',
                 durationMs: Date.now() - startedAt,
                 error: error?.message || String(error),
               }
               return false
             }
           }, {
-            timeout: 20_000,
+            timeout: 35_000,
             message: `Expected replay verification connector ${sourceSystem} to become enabled before manual UI replay.`,
           }).toBe(true)
+
+          await expect.poll(async () => {
+            const replayOutcome = await readReplayOutcome(api, externalOrderId)
+            lastReplayCheck = {
+              phase: 'replay-queue',
+              replayOutcome,
+            }
+            return replayOutcome.state === 'queued' && replayOutcome.record?.externalOrderId === externalOrderId
+          }, {
+            timeout: 20_000,
+            message: `Expected replay verification record ${externalOrderId} to remain queued after enabling connector ${sourceSystem}.`,
+          }).toBe(true)
+
+          await expect.poll(async () => {
+            const startedAt = Date.now()
+            try {
+              const snapshotResponse = await api.get('/api/dashboard/snapshot', { timeout: 8_000 })
+              const snapshotText = await snapshotResponse.text()
+              let snapshotPayload = null
+              try {
+                snapshotPayload = snapshotText ? JSON.parse(snapshotText) : null
+              } catch {
+                snapshotPayload = null
+              }
+              const connectorFromSnapshot = Array.isArray(snapshotPayload?.integrationConnectors)
+                ? snapshotPayload.integrationConnectors.find((connector) => connector.sourceSystem === sourceSystem && connector.type === 'CSV_ORDER_IMPORT')
+                : null
+              const replayFromSnapshot = Array.isArray(snapshotPayload?.integrationReplayQueue)
+                ? snapshotPayload.integrationReplayQueue.find((record) => record.externalOrderId === externalOrderId)
+                : null
+              lastSnapshotCheck = {
+                phase: 'dashboard-snapshot',
+                durationMs: Date.now() - startedAt,
+                snapshotStatus: typeof snapshotResponse.status === 'function' ? snapshotResponse.status() : null,
+                snapshotRequestId: typeof snapshotResponse.headers === 'function' ? snapshotResponse.headers()['x-request-id'] || snapshotPayload?.requestId || null : null,
+                snapshotOk: snapshotResponse.ok(),
+                connectorFromSnapshot,
+                replayFromSnapshot,
+              }
+              if (!snapshotResponse.ok() || !snapshotPayload) {
+                return false
+              }
+              return Boolean(
+                connectorFromSnapshot?.enabled
+                && replayFromSnapshot?.externalOrderId === externalOrderId,
+              )
+            } catch (error) {
+              lastSnapshotCheck = {
+                phase: 'dashboard-snapshot',
+                durationMs: Date.now() - startedAt,
+                error: error?.message || String(error),
+              }
+              return false
+            }
+          }, {
+            timeout: 35_000,
+            message: `Expected dashboard snapshot to show enabled replay connector ${sourceSystem} and queued replay record ${externalOrderId}.`,
+          }).toBe(true)
         } catch (error) {
-          throw new Error(`Expected replay verification connector ${sourceSystem} to become enabled before manual UI replay. Last connector check: ${JSON.stringify(lastConnectorCheck)} Original error: ${error?.message || String(error)}`)
+          throw new Error(`Expected replay verification connector ${sourceSystem} to become enabled before manual UI replay. Diagnostics: ${JSON.stringify({
+            enableResponseDetails,
+            lastConnectorCheck,
+            lastReplayCheck,
+            lastSnapshotCheck,
+          })} Original error: ${error?.message || String(error)}`)
         }
       },
     }

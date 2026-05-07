@@ -67,9 +67,17 @@ public class IntegrationConnectorService {
 
     @Transactional(readOnly = true)
     public List<IntegrationConnectorResponse> getConnectors() {
+        return getConnectors(null, null);
+    }
+
+    @Transactional(readOnly = true)
+    public List<IntegrationConnectorResponse> getConnectors(String sourceSystem, IntegrationConnectorType type) {
         var currentOperator = accessDirectoryService.getCurrentOperator();
-        return integrationConnectorRepository.findAllByTenant_CodeIgnoreCaseOrderByTypeAscSourceSystemAsc(
-                tenantContextService.getCurrentTenantCodeOrDefault())
+        String tenantCode = tenantContextService.getCurrentTenantCodeOrDefault();
+        String normalizedSourceSystem = normalizeOptional(sourceSystem) == null
+            ? null
+            : normalizeSourceSystem(sourceSystem);
+        return resolveConnectorSelection(tenantCode, normalizedSourceSystem, type)
             .stream()
             .filter(connector -> currentOperator.isEmpty()
                 || connector.getDefaultWarehouseCode() == null
@@ -324,6 +332,33 @@ public class IntegrationConnectorService {
             return null;
         }
         return value.trim();
+    }
+
+    private List<IntegrationConnector> resolveConnectorSelection(String tenantCode,
+                                                                 String normalizedSourceSystem,
+                                                                 IntegrationConnectorType type) {
+        if (normalizedSourceSystem != null && type != null) {
+            return integrationConnectorRepository
+                .findByTenant_CodeIgnoreCaseAndSourceSystemIgnoreCaseAndType(tenantCode, normalizedSourceSystem, type)
+                .stream()
+                .toList();
+        }
+        if (normalizedSourceSystem != null) {
+            return integrationConnectorRepository
+                .findAllByTenant_CodeIgnoreCaseAndSourceSystemIgnoreCaseOrderByTypeAscSourceSystemAsc(
+                    tenantCode,
+                    normalizedSourceSystem
+                );
+        }
+
+        List<IntegrationConnector> connectors = integrationConnectorRepository
+            .findAllByTenant_CodeIgnoreCaseOrderByTypeAscSourceSystemAsc(tenantCode);
+        if (type == null) {
+            return connectors;
+        }
+        return connectors.stream()
+            .filter(connector -> connector.getType() == type)
+            .toList();
     }
 
     private String extractTenantCode(IntegrationConnector connector) {

@@ -54,6 +54,9 @@ public interface IntegrationConnectorRepository extends JpaRepository<Integratio
 
     List<IntegrationConnector> findAllByTenant_CodeIgnoreCaseOrderByTypeAscSourceSystemAsc(String tenantCode);
 
+    List<IntegrationConnector> findAllByTenant_CodeIgnoreCaseAndSourceSystemIgnoreCaseOrderByTypeAscSourceSystemAsc(String tenantCode,
+                                                                                                                    String sourceSystem);
+
     @Query("select connector from IntegrationConnector connector join fetch connector.tenant where connector.enabled = true and connector.syncMode = :syncMode")
     List<IntegrationConnector> findAllEnabledBySyncModeWithTenant(@Param("syncMode") IntegrationSyncMode syncMode);
 

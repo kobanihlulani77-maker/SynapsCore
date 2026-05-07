@@ -2409,6 +2409,15 @@ class MvpFlowIntegrationTest {
                     .value(org.hamcrest.Matchers.hasItem("SUCCESS")))
                 .andExpect(jsonPath("$[?(@.sourceSystem == 'erp_north' && @.type == 'WEBHOOK_ORDER')].lastPullMessage")
                     .value(org.hamcrest.Matchers.hasItem(org.hamcrest.Matchers.containsString("imported 1"))));
+
+            mockMvc.perform(get("/api/integrations/orders/connectors")
+                    .param("sourceSystem", "erp_north")
+                    .param("type", "WEBHOOK_ORDER"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.length()").value(1))
+                .andExpect(jsonPath("$[0].sourceSystem").value("erp_north"))
+                .andExpect(jsonPath("$[0].type").value("WEBHOOK_ORDER"))
+                .andExpect(jsonPath("$[0].enabled").value(true));
         } finally {
             server.stop(0);
         }

@@ -23,6 +23,7 @@ import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.multipart.MultipartFile;
 import com.synapsecore.integration.dto.ExternalOrderCsvImportResponse;
+import com.synapsecore.domain.entity.IntegrationConnectorType;
 
 @RestController
 @RequestMapping("/api/integrations/orders")
@@ -78,9 +79,10 @@ public class ExternalOrderWebhookController {
     }
 
     @GetMapping("/connectors")
-    public List<IntegrationConnectorResponse> getConnectors() {
+    public List<IntegrationConnectorResponse> getConnectors(@RequestParam(required = false) String sourceSystem,
+                                                            @RequestParam(required = false) IntegrationConnectorType type) {
         accessControlService.requireWorkspaceAccess("view integration connectors");
-        return integrationConnectorService.getConnectors();
+        return integrationConnectorService.getConnectors(sourceSystem, type);
     }
 
     @PostMapping("/connectors")
