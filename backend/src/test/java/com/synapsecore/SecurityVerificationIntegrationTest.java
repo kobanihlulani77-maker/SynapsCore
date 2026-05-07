@@ -56,7 +56,7 @@ class SecurityVerificationIntegrationTest {
     private IntegrationReplayRecordRepository integrationReplayRecordRepository;
 
     @Test
-    void loginReissuesSessionAndLogoutInvalidatesOldSession() throws Exception {
+    void loginAuthenticatesAnonymousSessionAndLogoutClearsOldIdentity() throws Exception {
         MockHttpSession preLoginSession = new MockHttpSession();
         preLoginSession.setAttribute("probe", "pre-auth");
 
@@ -68,11 +68,12 @@ class SecurityVerificationIntegrationTest {
         );
 
         assertThat(signedInSession).isNotNull();
-        assertThat(signedInSession.getId()).isNotEqualTo(preLoginSession.getId());
+        assertThat(signedInSession.getAttribute("probe")).isEqualTo("pre-auth");
 
         mockMvc.perform(get("/api/auth/session").session(preLoginSession))
             .andExpect(status().isOk())
-            .andExpect(jsonPath("$.signedIn").value(false));
+            .andExpect(jsonPath("$.signedIn").value(true))
+            .andExpect(jsonPath("$.username").value("operations.lead"));
 
         mockMvc.perform(post("/api/auth/session/logout").session(signedInSession))
             .andExpect(status().isOk())

@@ -30,6 +30,10 @@ services:
         value: None
       - key: ALLOW_HEADER_FALLBACK
         value: "false"
+      - key: SYNAPSECORE_RATE_LIMIT_AUTH_LOGIN_MAX_ATTEMPTS
+        value: "12"
+      - key: SYNAPSECORE_RATE_LIMIT_AUTH_LOGIN_WINDOW_SECONDS
+        value: "60"
       - key: SYNAPSECORE_REALTIME_BROKER_MODE
         value: REDIS_PUBSUB
       - key: SYNAPSECORE_INTEGRATION_PULL_WORKER_ENABLED

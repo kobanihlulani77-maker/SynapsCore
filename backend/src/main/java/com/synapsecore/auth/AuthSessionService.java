@@ -76,11 +76,8 @@ public class AuthSessionService {
         Instant authenticatedAt = Instant.now();
         jakarta.servlet.http.HttpSession existingSession = request.getSession(false);
         if (existingSession != null) {
-            try {
-                existingSession.invalidate();
-            } catch (IllegalStateException ignored) {
-                // Another filter or container already disposed of the session.
-            }
+            clearSessionIdentity(existingSession);
+            rotateSessionIdSafely(request);
         }
         jakarta.servlet.http.HttpSession session = request.getSession(true);
         writeSession(session, user, operator, tenant, authenticatedAt);
@@ -134,8 +131,12 @@ public class AuthSessionService {
         return toResponse(buildSessionState(user, authenticatedSession.operator(), authenticatedSession.tenant(), authenticatedAt));
     }
 
-    public AuthSessionResponse signOut(jakarta.servlet.http.HttpSession session) {
-        session.invalidate();
+    public AuthSessionResponse signOut(jakarta.servlet.http.HttpServletRequest request) {
+        jakarta.servlet.http.HttpSession session = request.getSession(false);
+        if (session != null) {
+            clearSessionIdentity(session);
+            rotateSessionIdSafely(request);
+        }
         return signedOut();
     }
 
@@ -365,15 +366,35 @@ public class AuthSessionService {
                                        boolean strict,
                                        String message,
                                        String actionDescription) {
-        try {
-            session.invalidate();
-        } catch (IllegalStateException ignored) {
-            // Session is already gone; treat it as invalid either way.
-        }
+        clearSessionIdentity(session);
         if (strict) {
             throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, message);
         }
         return null;
+    }
+
+    private void clearSessionIdentity(jakarta.servlet.http.HttpSession session) {
+        if (session == null) {
+            return;
+        }
+        try {
+            session.removeAttribute(SESSION_USERNAME_KEY);
+            session.removeAttribute(SESSION_TENANT_CODE_KEY);
+            session.removeAttribute(SESSION_ACTOR_KEY);
+            session.removeAttribute(SESSION_AUTHENTICATED_AT_KEY);
+            session.removeAttribute(SESSION_USER_SESSION_VERSION_KEY);
+            session.removeAttribute(SESSION_TENANT_SECURITY_POLICY_VERSION_KEY);
+        } catch (IllegalStateException ignored) {
+            // Session is already gone; treat it as cleared either way.
+        }
+    }
+
+    private void rotateSessionIdSafely(jakarta.servlet.http.HttpServletRequest request) {
+        try {
+            request.changeSessionId();
+        } catch (IllegalStateException ignored) {
+            // No active session is available to rotate; a later getSession(true) can recreate it if needed.
+        }
     }
 
     private AuthSessionResponse signedOut() {

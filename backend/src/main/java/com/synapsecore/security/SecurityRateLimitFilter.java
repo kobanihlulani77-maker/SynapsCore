@@ -54,19 +54,21 @@ public class SecurityRateLimitFilter extends OncePerRequestFilter {
         }
 
         String principalKey = resolvePrincipalKey(request);
-        boolean allowed = securityRateLimitService.allow(
+        SecurityRateLimitService.RateLimitDecision decision = securityRateLimitService.evaluate(
             bucket.name(),
             principalKey,
             bucket.maxAttempts(),
             bucket.windowSeconds()
         );
-        if (allowed) {
+        applyRateLimitHeaders(response, bucket, decision);
+        if (decision.allowed()) {
             filterChain.doFilter(request, response);
             return;
         }
 
         operationalMetricsService.recordRateLimitRejection(bucket.name());
         applyCorsHeaders(request, response);
+        response.setHeader(HttpHeaders.RETRY_AFTER, String.valueOf(decision.retryAfterSeconds()));
         response.setStatus(HttpStatus.TOO_MANY_REQUESTS.value());
         response.setContentType(MediaType.APPLICATION_JSON_VALUE);
         objectMapper.writeValue(response.getWriter(), Map.of(
@@ -95,6 +97,15 @@ public class SecurityRateLimitFilter extends OncePerRequestFilter {
         response.setHeader(HttpHeaders.ACCESS_CONTROL_ALLOW_ORIGIN, allowedOrigin);
         response.setHeader(HttpHeaders.ACCESS_CONTROL_ALLOW_CREDENTIALS, "true");
         response.addHeader(HttpHeaders.VARY, HttpHeaders.ORIGIN);
+    }
+
+    private void applyRateLimitHeaders(HttpServletResponse response,
+                                       BucketDefinition bucket,
+                                       SecurityRateLimitService.RateLimitDecision decision) {
+        response.setHeader("X-Synapse-RateLimit-Bucket", bucket.name());
+        response.setHeader("X-Synapse-RateLimit-Limit", String.valueOf(decision.maxAttempts()));
+        response.setHeader("X-Synapse-RateLimit-Remaining", String.valueOf(decision.remainingAttempts()));
+        response.setHeader("X-Synapse-RateLimit-Reset-After-Seconds", String.valueOf(decision.retryAfterSeconds()));
     }
 
     private BucketDefinition resolveBucket(HttpServletRequest request) {

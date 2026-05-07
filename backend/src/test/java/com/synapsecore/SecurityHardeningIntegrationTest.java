@@ -78,6 +78,8 @@ class SecurityHardeningIntegrationTest {
                 .contentType(APPLICATION_JSON)
                 .content(requestBody))
             .andExpect(status().isUnauthorized())
+            .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.header().string("X-Synapse-RateLimit-Limit", "2"))
+            .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.header().string("X-Synapse-RateLimit-Remaining", "1"))
             .andExpect(jsonPath("$.message").value("Invalid operator credentials."))
             .andReturn();
 
@@ -93,7 +95,8 @@ class SecurityHardeningIntegrationTest {
                 .header("Origin", origin)
                 .contentType(APPLICATION_JSON)
                 .content(requestBody))
-            .andExpect(status().isUnauthorized());
+            .andExpect(status().isUnauthorized())
+            .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.header().string("X-Synapse-RateLimit-Remaining", "0"));
 
         mockMvc.perform(post("/api/auth/session/login")
                 .header("X-Forwarded-For", forwardedFor)
@@ -103,6 +106,8 @@ class SecurityHardeningIntegrationTest {
             .andExpect(status().isTooManyRequests())
             .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.header().string("Access-Control-Allow-Origin", origin))
             .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.header().string("Access-Control-Allow-Credentials", "true"))
+            .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.header().string("X-Synapse-RateLimit-Remaining", "0"))
+            .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.header().string("Retry-After", org.hamcrest.Matchers.matchesPattern("\\d+")))
             .andExpect(jsonPath("$.message").value("Authentication rate limit exceeded. Wait before attempting another sign-in."));
 
         org.assertj.core.api.Assertions.assertThat(auditLogRepository.count())

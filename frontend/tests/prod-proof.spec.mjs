@@ -34,7 +34,7 @@ const proofProductSku = (process.env.PLAYWRIGHT_PROOF_PRODUCT_SKU || defaultProo
 const configuredAuthRateLimitMaxAttempts = Number.parseInt(
   process.env.PLAYWRIGHT_AUTH_RATE_LIMIT_MAX_ATTEMPTS
     || process.env.SYNAPSECORE_RATE_LIMIT_AUTH_LOGIN_MAX_ATTEMPTS
-    || '30',
+    || '12',
   10,
 )
 const authRateLimitAttemptBudget = Number.isFinite(configuredAuthRateLimitMaxAttempts) && configuredAuthRateLimitMaxAttempts > 0
@@ -419,6 +419,8 @@ async function waitForScenarioHistoryCard(page, scenarioTitle) {
 async function triggerUiAuthRateLimit(page, signInCard, credentials) {
   const invalidMessage = 'Invalid operator credentials.'
   const rateLimitMessage = 'Authentication rate limit exceeded. Wait before attempting another sign-in.'
+  let verifiedInvalidMessage = false
+  let lastRateLimitHeaders = null
 
   for (let attempt = 1; attempt <= authRateLimitAttemptBudget; attempt += 1) {
     await fillSignInForm(signInCard, credentials, 'wrong-rate-limit')
@@ -430,6 +432,15 @@ async function triggerUiAuthRateLimit(page, signInCard, credentials) {
 
     await submitButton.click()
     const response = await responsePromise
+    lastRateLimitHeaders = {
+      attempt,
+      status: response.status(),
+      limit: response.headers()['x-synapse-ratelimit-limit'] || '',
+      remaining: response.headers()['x-synapse-ratelimit-remaining'] || '',
+      resetAfterSeconds: response.headers()['x-synapse-ratelimit-reset-after-seconds'] || '',
+      retryAfter: response.headers().retry-after || '',
+      requestId: response.headers()['x-request-id'] || '',
+    }
 
     if (response.status() === 429) {
       await expectSignInErrorAndRecovery(signInCard, rateLimitMessage)
@@ -445,10 +456,20 @@ async function triggerUiAuthRateLimit(page, signInCard, credentials) {
       throw new Error(payload?.message || `Expected auth warm-up attempts to return 401 or 429, but received ${response.status()}.`)
     }
 
-    await expectSignInErrorAndRecovery(signInCard, invalidMessage)
+    const payload = await response.json().catch(() => null)
+    if (payload?.message && payload.message !== invalidMessage) {
+      throw new Error(`Expected invalid sign-in attempts to return the safe auth message, but received: ${payload.message}`)
+    }
+
+    if (!verifiedInvalidMessage) {
+      await expectSignInErrorAndRecovery(signInCard, invalidMessage)
+      verifiedInvalidMessage = true
+    } else {
+      await waitForSignInReady(signInCard)
+    }
   }
 
-  throw new Error(`Expected repeated real browser sign-in attempts to reach the hosted auth rate-limit threshold within ${authRateLimitAttemptBudget} tries.`)
+  throw new Error(`Expected repeated real browser sign-in attempts to reach the hosted auth rate-limit threshold within ${authRateLimitAttemptBudget} tries. Last limiter headers: ${JSON.stringify(lastRateLimitHeaders)}`)
 }
 
 async function readReplayOutcome(api, externalOrderId) {

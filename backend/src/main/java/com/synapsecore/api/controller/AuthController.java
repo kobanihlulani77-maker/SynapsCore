@@ -37,8 +37,8 @@ public class AuthController {
 
     @PostMapping("/logout")
     @ResponseStatus(HttpStatus.OK)
-    public AuthSessionResponse signOut(HttpSession session) {
-        return authSessionService.signOut(session);
+    public AuthSessionResponse signOut(HttpServletRequest request) {
+        return authSessionService.signOut(request);
     }
 
     @PostMapping("/password")

@@ -91,7 +91,7 @@ synapsecore:
     rate-limit:
       enabled: ${SYNAPSECORE_RATE_LIMIT_ENABLED:true}
       auth-login:
-        max-attempts: ${SYNAPSECORE_RATE_LIMIT_AUTH_LOGIN_MAX_ATTEMPTS:30}
+        max-attempts: ${SYNAPSECORE_RATE_LIMIT_AUTH_LOGIN_MAX_ATTEMPTS:12}
         window-seconds: ${SYNAPSECORE_RATE_LIMIT_AUTH_LOGIN_WINDOW_SECONDS:60}
       auth-password:
         max-attempts: ${SYNAPSECORE_RATE_LIMIT_AUTH_PASSWORD_MAX_ATTEMPTS:12}
