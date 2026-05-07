@@ -272,7 +272,8 @@ public class ApiExceptionHandler {
                 if (normalized.contains("broken pipe")
                     || normalized.contains("connection reset by peer")
                     || normalized.contains("an existing connection was forcibly closed")
-                    || normalized.contains("an established connection was aborted")) {
+                    || normalized.contains("an established connection was aborted")
+                    || normalized.contains("session was invalidated")) {
                     return true;
                 }
             }

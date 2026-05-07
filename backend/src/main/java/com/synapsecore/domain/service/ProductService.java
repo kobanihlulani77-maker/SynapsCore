@@ -8,9 +8,6 @@ import com.synapsecore.domain.dto.ProductUpsertRequest;
 import com.synapsecore.domain.entity.BusinessEventType;
 import com.synapsecore.domain.entity.Product;
 import com.synapsecore.domain.entity.Tenant;
-import com.synapsecore.domain.repository.AuditLogRepository;
-import com.synapsecore.domain.repository.BusinessEventRepository;
-import com.synapsecore.domain.repository.OperationalDispatchWorkItemRepository;
 import com.synapsecore.domain.repository.ProductRepository;
 import com.synapsecore.event.BusinessEventService;
 import com.synapsecore.event.OperationalStateChangePublisher;
@@ -52,9 +49,6 @@ public class ProductService {
     private final OperationalStateChangePublisher operationalStateChangePublisher;
     private final AuditLogService auditLogService;
     private final IdentitySequenceMigrationService identitySequenceMigrationService;
-    private final BusinessEventRepository businessEventRepository;
-    private final AuditLogRepository auditLogRepository;
-    private final OperationalDispatchWorkItemRepository operationalDispatchWorkItemRepository;
     private final CatalogWriteConflictResolver catalogWriteConflictResolver;
     private final OperationalMetricsService operationalMetricsService;
 
@@ -79,6 +73,7 @@ public class ProductService {
         try {
             Product adoptedProduct = adoptOrphanedProductIfPresent(tenant, catalogSku, normalizedName, normalizedCategory);
             if (adoptedProduct != null) {
+                flushProductWritePath();
                 recordCatalogChange(
                     tenant.getCode(),
                     actorName,
@@ -86,7 +81,6 @@ public class ProductService {
                     adoptedProduct.resolveCatalogSku(),
                     "Adopted orphan catalog product " + adoptedProduct.resolveCatalogSku() + " (" + adoptedProduct.getName() + ") into tenant " + tenant.getCode() + "."
                 );
-                flushCatalogWritePath();
                 operationalMetricsService.recordCatalogWrite(tenant.getCode(), "PRODUCT_CREATED", true);
                 log.info("Catalog product {} adopted into tenant {}.", adoptedProduct.resolveCatalogSku(), tenant.getCode());
                 return toResponse(adoptedProduct);
@@ -99,6 +93,7 @@ public class ProductService {
                 .name(normalizedName)
                 .category(normalizedCategory)
                 .build());
+            flushProductWritePath();
 
             recordCatalogChange(
                 tenant.getCode(),
@@ -107,7 +102,6 @@ public class ProductService {
                 product.resolveCatalogSku(),
                 "Created catalog product " + product.resolveCatalogSku() + " (" + product.getName() + ")."
             );
-            flushCatalogWritePath();
             operationalMetricsService.recordCatalogWrite(tenant.getCode(), "PRODUCT_CREATED", true);
             log.info("Catalog product {} created for tenant {} by {}.", product.resolveCatalogSku(), tenant.getCode(), actorName);
             return toResponse(product);
@@ -137,6 +131,7 @@ public class ProductService {
         product.setCategory(normalizeRequiredText(request.category(), "Product category", 120));
         try {
             Product savedProduct = productRepository.save(product);
+            flushProductWritePath();
 
             recordCatalogChange(
                 tenant.getCode(),
@@ -145,7 +140,6 @@ public class ProductService {
                 savedProduct.resolveCatalogSku(),
                 "Updated catalog product " + savedProduct.resolveCatalogSku() + " (" + savedProduct.getName() + ")."
             );
-            flushCatalogWritePath();
             operationalMetricsService.recordCatalogWrite(tenant.getCode(), "PRODUCT_UPDATED", true);
             log.info("Catalog product {} updated for tenant {} by {}.", savedProduct.resolveCatalogSku(), tenant.getCode(), actorName);
             return toResponse(savedProduct);
@@ -273,6 +267,7 @@ public class ProductService {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Product CSV did not contain any product rows.");
         }
 
+        flushProductWritePath();
         recordCatalogChange(
             tenant.getCode(),
             actorName,
@@ -406,7 +401,8 @@ public class ProductService {
                                      String action,
                                      String targetRef,
                                      String details) {
-        businessEventService.record(
+        businessEventService.recordForTenant(
+            tenantCode,
             BusinessEventType.PRODUCT_CATALOG_UPDATED,
             "product-catalog",
             details
@@ -423,11 +419,8 @@ public class ProductService {
         );
     }
 
-    private void flushCatalogWritePath() {
+    private void flushProductWritePath() {
         productRepository.flush();
-        businessEventRepository.flush();
-        auditLogRepository.flush();
-        operationalDispatchWorkItemRepository.flush();
     }
 
     private ProductResponse toResponse(Product product) {

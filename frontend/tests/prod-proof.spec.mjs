@@ -112,12 +112,16 @@ async function readJson(response, context = {}) {
     payload = null
   }
 
+  const responseHeaders = safeResponseHeaders(response)
+  const responseMethod = safeResponseMethod(response, context)
+  const responseUrl = safeResponseUrl(response, context)
+
   if (!response.ok()) {
     const failureDetails = {
-      method: context.method || response.request().method(),
-      url: context.url || response.url(),
+      method: responseMethod,
+      url: responseUrl,
       status: response.status(),
-      requestId: response.headers()['x-request-id'] || payload?.requestId || null,
+      requestId: responseHeaders['x-request-id'] || payload?.requestId || null,
       responseBody: payload ?? responseText,
       requestPayload: context.requestPayload ?? null,
       requestFormData: context.requestFormData ?? null,
@@ -132,7 +136,43 @@ async function readJson(response, context = {}) {
   if (!responseText) {
     return null
   }
-  throw new Error(`Expected JSON response but received non-JSON payload from ${response.request().method()} ${response.url()}: ${responseText}`)
+  throw new Error(`Expected JSON response but received non-JSON payload from ${responseMethod} ${responseUrl}: ${responseText}`)
+}
+
+function safeResponseHeaders(response) {
+  try {
+    return typeof response?.headers === 'function' ? response.headers() || {} : {}
+  } catch {
+    return {}
+  }
+}
+
+function safeResponseMethod(response, context = {}) {
+  if (context.method) {
+    return context.method
+  }
+  try {
+    if (typeof response?.request === 'function') {
+      const request = response.request()
+      if (request && typeof request.method === 'function') {
+        return request.method()
+      }
+    }
+  } catch {
+    return 'UNKNOWN'
+  }
+  return 'UNKNOWN'
+}
+
+function safeResponseUrl(response, context = {}) {
+  if (context.url) {
+    return context.url
+  }
+  try {
+    return typeof response?.url === 'function' ? response.url() || 'UNKNOWN' : 'UNKNOWN'
+  } catch {
+    return 'UNKNOWN'
+  }
 }
 
 async function loginViaUi(page, credentials, options = {}) {
@@ -438,7 +478,7 @@ async function triggerUiAuthRateLimit(page, signInCard, credentials) {
       limit: response.headers()['x-synapse-ratelimit-limit'] || '',
       remaining: response.headers()['x-synapse-ratelimit-remaining'] || '',
       resetAfterSeconds: response.headers()['x-synapse-ratelimit-reset-after-seconds'] || '',
-      retryAfter: response.headers().retry-after || '',
+      retryAfter: response.headers()['retry-after'] || '',
       requestId: response.headers()['x-request-id'] || '',
     }
 
@@ -470,6 +510,62 @@ async function triggerUiAuthRateLimit(page, signInCard, credentials) {
   }
 
   throw new Error(`Expected repeated real browser sign-in attempts to reach the hosted auth rate-limit threshold within ${authRateLimitAttemptBudget} tries. Last limiter headers: ${JSON.stringify(lastRateLimitHeaders)}`)
+}
+
+function ensurePageDiagnostics(page) {
+  if (page.__synapsePageDiagnostics) {
+    return page.__synapsePageDiagnostics
+  }
+
+  const diagnostics = {
+    consoleErrors: [],
+    failedRequests: [],
+    lastApiResponse: null,
+  }
+
+  page.on('console', (message) => {
+    if (message.type() !== 'error') {
+      return
+    }
+    diagnostics.consoleErrors.push({
+      type: message.type(),
+      text: message.text(),
+      location: message.location(),
+    })
+    diagnostics.consoleErrors = diagnostics.consoleErrors.slice(-10)
+  })
+
+  page.on('requestfailed', (request) => {
+    diagnostics.failedRequests.push({
+      method: request.method(),
+      url: request.url(),
+      failure: request.failure()?.errorText || 'unknown failure',
+    })
+    diagnostics.failedRequests = diagnostics.failedRequests.slice(-10)
+  })
+
+  page.on('response', async (response) => {
+    if (!/\/api\//i.test(response.url())) {
+      return
+    }
+    let bodyPreview = ''
+    try {
+      bodyPreview = (await response.text()).replace(/\s+/g, ' ').trim().slice(0, 500)
+    } catch {
+      bodyPreview = ''
+    }
+    diagnostics.lastApiResponse = {
+      method: response.request().method(),
+      url: response.url(),
+      status: response.status(),
+      requestId: response.headers()['x-request-id'] || '',
+      contentType: response.headers()['content-type'] || '',
+      bodyPreview,
+    }
+  })
+
+  page.__synapsePageDiagnostics = diagnostics
+  return diagnostics
 }
 
 async function readReplayOutcome(api, externalOrderId) {
@@ -850,14 +946,52 @@ async function clickExactReplayButton(page, replayFixture) {
   }
 }
 
-async function waitForUsersPageReady(page, expectedOperatorName, expectedUserFullName) {
+async function waitForUsersPageReady(page, expectedOperatorName, expectedUserFullName, testInfo) {
   const operatorLane = page.locator('.section-card').filter({ hasText: 'Operator lanes' }).first()
   const userRoster = page.locator('.section-card').filter({ hasText: 'User roster' }).first()
+  const pageDiagnostics = ensurePageDiagnostics(page)
+  let stuckCheck = 'render operator lanes card'
 
-  await expect(operatorLane).toBeVisible()
-  await expect(userRoster).toBeVisible()
-  await expect(operatorLane.getByText(expectedOperatorName).first()).toBeVisible({ timeout: 30_000 })
-  await expect(userRoster.getByText(expectedUserFullName).first()).toBeVisible({ timeout: 30_000 })
+  try {
+    await expect(operatorLane).toBeVisible()
+    stuckCheck = 'render user roster card'
+    await expect(userRoster).toBeVisible()
+    stuckCheck = `show operator ${expectedOperatorName}`
+    await expect(operatorLane.getByText(expectedOperatorName).first()).toBeVisible({ timeout: 30_000 })
+    stuckCheck = `show user ${expectedUserFullName}`
+    await expect(userRoster.getByText(expectedUserFullName).first()).toBeVisible({ timeout: 30_000 })
+  } catch (error) {
+    let screenshotPath = null
+    if (testInfo) {
+      screenshotPath = testInfo.outputPath('users-page-timeout.png')
+      await page.screenshot({ path: screenshotPath, fullPage: true }).catch(() => {})
+    }
+
+    const lastVisibleHeading = await page.locator('h1, h2').evaluateAll((elements) => (
+      elements
+        .filter((element) => Boolean(element?.offsetWidth || element?.offsetHeight || element?.getClientRects?.().length))
+        .map((element) => element.textContent?.trim?.())
+        .filter(Boolean)
+        .at(-1) || ''
+    )).catch(() => '')
+    const pageTextExcerpt = await page.locator('body').textContent()
+      .then((text) => text?.replace(/\s+/g, ' ').trim().slice(0, 1_200) || '')
+      .catch(() => '')
+
+    throw new Error(`Users page readiness check failed. Diagnostics: ${JSON.stringify({
+      stuckCheck,
+      currentRoute: page.url(),
+      lastVisibleHeading,
+      expectedOperatorName,
+      expectedUserFullName,
+      lastApiResponse: pageDiagnostics.lastApiResponse,
+      consoleErrors: pageDiagnostics.consoleErrors,
+      failedRequests: pageDiagnostics.failedRequests,
+      pageTextExcerpt,
+      screenshotPath,
+      originalError: error?.message || String(error),
+    })}`)
+  }
 }
 
 async function createReplayFixture() {
@@ -1491,9 +1625,10 @@ test('replay recovery, scenario approval, execution, and browser role gating wor
   await expect(page.getByText('Operators', { exact: true }).first()).toBeVisible()
 })
 
-test('alerts, recommendations, orders, inventory, integrations, users, profile, and settings surfaces stay connected to the live backend', async ({ page }) => {
+test('alerts, recommendations, orders, inventory, integrations, users, profile, and settings surfaces stay connected to the live backend', async ({ page }, testInfo) => {
   const api = await createApiContext(users.operationsLead)
   let restoreAlertCoverage = async () => {}
+  ensurePageDiagnostics(page)
 
   try {
     const alertCoverage = await ensureAlertAndRecommendationCoverage(api)
@@ -1585,7 +1720,7 @@ test('alerts, recommendations, orders, inventory, integrations, users, profile, 
 
     await navigateWithinApp(page, '/users')
     await expect(page.getByRole('heading', { level: 1, name: 'Users and access control' })).toBeVisible()
-    await waitForUsersPageReady(page, expectedVisibleOperator.displayName, expectedVisibleUser.fullName)
+    await waitForUsersPageReady(page, expectedVisibleOperator.displayName, expectedVisibleUser.fullName, testInfo)
 
     await navigateWithinApp(page, '/profile')
     await expect(page.getByRole('heading', { level: 1, name: 'Personal profile and session controls' })).toBeVisible()

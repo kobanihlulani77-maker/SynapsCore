@@ -4,11 +4,10 @@ import com.synapsecore.domain.entity.BusinessEvent;
 import com.synapsecore.domain.entity.BusinessEventType;
 import com.synapsecore.domain.repository.BusinessEventRepository;
 import com.synapsecore.audit.RequestTraceContext;
-import com.synapsecore.domain.service.IdentitySequenceMigrationService;
+import com.synapsecore.domain.service.CoreIdentityWriteIsolationService;
 import com.synapsecore.tenant.TenantContextService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
 
 @Service
@@ -19,7 +18,7 @@ public class BusinessEventService {
     private final BusinessEventRepository businessEventRepository;
     private final RequestTraceContext requestTraceContext;
     private final TenantContextService tenantContextService;
-    private final IdentitySequenceMigrationService identitySequenceMigrationService;
+    private final CoreIdentityWriteIsolationService coreIdentityWriteIsolationService;
 
     public void record(BusinessEventType eventType, String source, String payloadSummary) {
         recordForTenant(null, eventType, source, payloadSummary);
@@ -35,13 +34,10 @@ public class BusinessEventService {
             .source(source)
             .payloadSummary(payloadSummary)
             .build();
-        try {
-            businessEventRepository.save(event);
-        } catch (DataIntegrityViolationException exception) {
-            log.warn("Business event persistence conflicted; synchronizing core identity sequences and retrying once.");
-            identitySequenceMigrationService.synchronizeCoreIdentitySequences();
-            businessEventRepository.save(event);
-        }
+        coreIdentityWriteIsolationService.persistWithSequenceRepair(
+            "Business event persistence",
+            () -> businessEventRepository.save(event)
+        );
     }
 
     private String resolveTenantCode(String explicitTenantCode) {

@@ -4,12 +4,11 @@ import com.synapsecore.domain.dto.AuditLogResponse;
 import com.synapsecore.domain.entity.AuditLog;
 import com.synapsecore.domain.entity.AuditStatus;
 import com.synapsecore.domain.repository.AuditLogRepository;
-import com.synapsecore.domain.service.IdentitySequenceMigrationService;
+import com.synapsecore.domain.service.CoreIdentityWriteIsolationService;
 import com.synapsecore.tenant.TenantContextService;
 import java.util.List;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
 
 @Service
@@ -20,7 +19,7 @@ public class AuditLogService {
     private final AuditLogRepository auditLogRepository;
     private final RequestTraceContext requestTraceContext;
     private final TenantContextService tenantContextService;
-    private final IdentitySequenceMigrationService identitySequenceMigrationService;
+    private final CoreIdentityWriteIsolationService coreIdentityWriteIsolationService;
 
     public void recordSuccess(String action,
                               String actor,
@@ -98,13 +97,10 @@ public class AuditLogService {
             .details(details)
             .requestId(requestTraceContext.getRequiredRequestId())
             .build();
-        try {
-            auditLogRepository.save(logEntry);
-        } catch (DataIntegrityViolationException exception) {
-            log.warn("Audit log persistence conflicted; synchronizing core identity sequences and retrying once.");
-            identitySequenceMigrationService.synchronizeCoreIdentitySequences();
-            auditLogRepository.save(logEntry);
-        }
+        coreIdentityWriteIsolationService.persistWithSequenceRepair(
+            "Audit log persistence",
+            () -> auditLogRepository.save(logEntry)
+        );
     }
 
     private String resolveTenantCode(String explicitTenantCode) {

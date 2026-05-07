@@ -5,7 +5,7 @@ import com.synapsecore.domain.entity.OperationalDispatchStatus;
 import com.synapsecore.domain.entity.OperationalDispatchWorkItem;
 import com.synapsecore.domain.repository.OperationalDispatchWorkItemRepository;
 import com.synapsecore.domain.service.DashboardService;
-import com.synapsecore.domain.service.IdentitySequenceMigrationService;
+import com.synapsecore.domain.service.CoreIdentityWriteIsolationService;
 import com.synapsecore.observability.OperationalMetricsService;
 import com.synapsecore.realtime.RealtimeService;
 import java.time.Instant;
@@ -17,7 +17,6 @@ import lombok.extern.slf4j.Slf4j;
 import org.slf4j.MDC;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.beans.factory.ObjectProvider;
-import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.orm.ObjectOptimisticLockingFailureException;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.scheduling.annotation.Scheduled;
@@ -38,7 +37,7 @@ public class OperationalDispatchQueueService {
     private final ObjectProvider<RealtimeService> realtimeServiceProvider;
     private final RequestTraceContext requestTraceContext;
     private final OperationalMetricsService operationalMetricsService;
-    private final IdentitySequenceMigrationService identitySequenceMigrationService;
+    private final CoreIdentityWriteIsolationService coreIdentityWriteIsolationService;
 
     private final AtomicBoolean draining = new AtomicBoolean(false);
 
@@ -54,13 +53,10 @@ public class OperationalDispatchQueueService {
             .status(OperationalDispatchStatus.PENDING)
             .occurredAt(event.occurredAt())
             .build();
-        try {
-            operationalDispatchWorkItemRepository.save(workItem);
-        } catch (DataIntegrityViolationException exception) {
-            log.warn("Operational dispatch enqueue conflicted; synchronizing core identity sequences and retrying once.");
-            identitySequenceMigrationService.synchronizeCoreIdentitySequences();
-            operationalDispatchWorkItemRepository.save(workItem);
-        }
+        coreIdentityWriteIsolationService.persistWithSequenceRepair(
+            "Operational dispatch enqueue",
+            () -> operationalDispatchWorkItemRepository.save(workItem)
+        );
         operationalMetricsService.recordDispatchQueued(event.tenantCode(), event.updateType());
     }
 
@@ -103,7 +99,13 @@ public class OperationalDispatchQueueService {
     private int processSingleWorkItem(OperationalDispatchWorkItem workItem) {
         workItem.setStatus(OperationalDispatchStatus.PROCESSING);
         workItem.setAttemptCount(workItem.getAttemptCount() + 1);
-        operationalDispatchWorkItemRepository.save(workItem);
+        try {
+            operationalDispatchWorkItemRepository.save(workItem);
+        } catch (ObjectOptimisticLockingFailureException lockingFailureException) {
+            log.debug("Operational dispatch work item {} was already claimed by another worker before processing started.",
+                workItem.getId());
+            return 0;
+        }
 
         requestTraceContext.setCurrentRequestId(workItem.getRequestId());
         requestTraceContext.setCurrentActor(SYSTEM_ACTOR);
@@ -122,7 +124,13 @@ public class OperationalDispatchQueueService {
             workItem.setStatus(OperationalDispatchStatus.COMPLETED);
             workItem.setProcessedAt(Instant.now());
             workItem.setLastError(null);
-            operationalDispatchWorkItemRepository.save(workItem);
+            try {
+                operationalDispatchWorkItemRepository.save(workItem);
+            } catch (ObjectOptimisticLockingFailureException lockingFailureException) {
+                log.debug("Operational dispatch work item {} was already completed by another worker.",
+                    workItem.getId());
+                return 0;
+            }
             operationalMetricsService.recordDispatchProcessed(workItem.getTenantCode(), workItem.getUpdateType());
             log.debug("Operational dispatch queue processed {} for tenant {} from {} request {}",
                 workItem.getUpdateType(), workItem.getTenantCode(), workItem.getSource(), workItem.getRequestId());
