@@ -5,7 +5,6 @@ import com.synapsecore.auth.dto.AuthSessionPasswordChangeRequest;
 import com.synapsecore.auth.dto.AuthSessionRequest;
 import com.synapsecore.auth.dto.AuthSessionResponse;
 import jakarta.servlet.http.HttpServletRequest;
-import jakarta.servlet.http.HttpSession;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
@@ -24,8 +23,8 @@ public class AuthController {
     private final AuthSessionService authSessionService;
 
     @GetMapping
-    public AuthSessionResponse getSession(HttpSession session) {
-        return authSessionService.getCurrentSession(session);
+    public AuthSessionResponse getSession(HttpServletRequest request) {
+        return authSessionService.getCurrentSession(request.getSession(false));
     }
 
     @PostMapping("/login")
@@ -44,7 +43,7 @@ public class AuthController {
     @PostMapping("/password")
     @ResponseStatus(HttpStatus.OK)
     public AuthSessionResponse changePassword(@Valid @RequestBody AuthSessionPasswordChangeRequest request,
-                                              HttpSession session) {
-        return authSessionService.changePassword(session, request.currentPassword().trim(), request.newPassword().trim());
+                                              HttpServletRequest httpRequest) {
+        return authSessionService.changePassword(httpRequest.getSession(false), request.currentPassword().trim(), request.newPassword().trim());
     }
 }

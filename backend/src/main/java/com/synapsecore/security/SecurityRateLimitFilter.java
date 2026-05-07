@@ -167,11 +167,18 @@ public class SecurityRateLimitFilter extends OncePerRequestFilter {
         if (forwardedFor != null && !forwardedFor.isBlank()) {
             networkKey = forwardedFor.split(",")[0].trim();
         }
-        jakarta.servlet.http.HttpSession session = request.getSession(false);
-        if (session != null && authSessionService.hasSessionIdentity(session)) {
-            String tenantCode = String.valueOf(session.getAttribute(AuthSessionService.SESSION_TENANT_CODE_KEY));
-            String username = String.valueOf(session.getAttribute(AuthSessionService.SESSION_USERNAME_KEY));
-            return ("session:" + tenantCode + ":" + username + ":" + networkKey).toUpperCase(java.util.Locale.ROOT);
+        try {
+            jakarta.servlet.http.HttpSession session = request.getSession(false);
+            if (session != null) {
+                var authenticatedSession = authSessionService.resolveAuthenticatedSession(session).orElse(null);
+                if (authenticatedSession != null) {
+                    return ("session:" + authenticatedSession.tenant().getCode()
+                        + ":" + authenticatedSession.user().getUsername()
+                        + ":" + networkKey).toUpperCase(java.util.Locale.ROOT);
+                }
+            }
+        } catch (IllegalStateException ignored) {
+            return networkKey;
         }
         return networkKey;
     }

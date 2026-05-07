@@ -4,6 +4,7 @@ import com.synapsecore.auth.AuthSessionService;
 import com.synapsecore.config.SynapseAccessProperties;
 import com.synapsecore.domain.entity.AccessOperator;
 import com.synapsecore.scenario.ScenarioActorRole;
+import jakarta.servlet.DispatcherType;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpSession;
 import java.util.EnumSet;
@@ -88,22 +89,24 @@ public class AccessControlService {
 
     private SynapseActorContext requireAnyRole(Set<SynapseAccessRole> requiredRoles, String actionDescription) {
         HttpServletRequest request = currentRequest();
-        HttpSession session = request.getSession(false);
-        if (session != null && authSessionService.hasSessionIdentity(session)) {
-            var authenticatedSession = authSessionService.requireAuthenticatedSession(session, actionDescription);
-            var sessionOperator = accessDirectoryService.requireActiveOperator(
-                authenticatedSession.operator().getActorName(),
-                authenticatedSession.tenant().getCode(),
-                actionDescription
-            );
-            boolean authorizedBySession = sessionOperator.getRoles().stream().anyMatch(requiredRoles::contains);
-            if (!authorizedBySession) {
-                throw new ResponseStatusException(HttpStatus.FORBIDDEN,
-                    "Signed-in operator " + sessionOperator.getActorName()
-                        + " does not have one of the required roles " + requiredRoles
-                        + " to " + actionDescription + ".");
+        if (request.getDispatcherType() != DispatcherType.ERROR) {
+            HttpSession session = resolveSessionSafely(request);
+            if (session != null && authSessionService.hasSessionIdentity(session)) {
+                var authenticatedSession = authSessionService.requireAuthenticatedSession(session, actionDescription);
+                var sessionOperator = accessDirectoryService.requireActiveOperator(
+                    authenticatedSession.operator().getActorName(),
+                    authenticatedSession.tenant().getCode(),
+                    actionDescription
+                );
+                boolean authorizedBySession = sessionOperator.getRoles().stream().anyMatch(requiredRoles::contains);
+                if (!authorizedBySession) {
+                    throw new ResponseStatusException(HttpStatus.FORBIDDEN,
+                        "Signed-in operator " + sessionOperator.getActorName()
+                            + " does not have one of the required roles " + requiredRoles
+                            + " to " + actionDescription + ".");
+                }
+                return new SynapseActorContext(sessionOperator.getActorName(), sessionOperator.getRoles());
             }
-            return new SynapseActorContext(sessionOperator.getActorName(), sessionOperator.getRoles());
         }
 
         if (!accessProperties.isAllowHeaderFallback()) {
@@ -140,14 +143,16 @@ public class AccessControlService {
 
     private AccessOperator requireCurrentOperator(String actionDescription) {
         HttpServletRequest request = currentRequest();
-        HttpSession session = request.getSession(false);
-        if (session != null && authSessionService.hasSessionIdentity(session)) {
-            var authenticatedSession = authSessionService.requireAuthenticatedSession(session, actionDescription);
-            return accessDirectoryService.requireActiveOperator(
-                authenticatedSession.operator().getActorName(),
-                authenticatedSession.tenant().getCode(),
-                actionDescription
-            );
+        if (request.getDispatcherType() != DispatcherType.ERROR) {
+            HttpSession session = resolveSessionSafely(request);
+            if (session != null && authSessionService.hasSessionIdentity(session)) {
+                var authenticatedSession = authSessionService.requireAuthenticatedSession(session, actionDescription);
+                return accessDirectoryService.requireActiveOperator(
+                    authenticatedSession.operator().getActorName(),
+                    authenticatedSession.tenant().getCode(),
+                    actionDescription
+                );
+            }
         }
 
         if (!accessProperties.isAllowHeaderFallback()) {
@@ -163,6 +168,14 @@ public class AccessControlService {
         String actorName = normalizeActorName(actorNameHeader);
         String tenantCode = normalizeTenantCode(request.getHeader(TENANT_HEADER));
         return accessDirectoryService.requireActiveOperator(actorName, tenantCode, actionDescription);
+    }
+
+    private HttpSession resolveSessionSafely(HttpServletRequest request) {
+        try {
+            return request.getSession(false);
+        } catch (IllegalStateException ignored) {
+            return null;
+        }
     }
 
     private String normalizeActorName(String actorName) {

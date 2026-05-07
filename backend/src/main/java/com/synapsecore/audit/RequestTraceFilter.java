@@ -57,6 +57,15 @@ public class RequestTraceFilter extends OncePerRequestFilter {
             filterChain.doFilter(request, response);
             responseStatus = response.getStatus();
         } catch (IOException | ServletException | RuntimeException exception) {
+            if (isAbortLike(exception)) {
+                responseStatus = response.isCommitted()
+                    ? response.getStatus()
+                    : HttpServletResponse.SC_NO_CONTENT;
+                if (!response.isCommitted()) {
+                    response.setStatus(HttpServletResponse.SC_NO_CONTENT);
+                }
+                return;
+            }
             responseStatus = response.getStatus() >= 400 ? response.getStatus() : HttpServletResponse.SC_INTERNAL_SERVER_ERROR;
             throw exception;
         } finally {
@@ -80,7 +89,7 @@ public class RequestTraceFilter extends OncePerRequestFilter {
         if (isAuthLoginRequest(request)) {
             return RequestTraceContext.ANONYMOUS_ACTOR;
         }
-        jakarta.servlet.http.HttpSession session = request.getSession(false);
+        jakarta.servlet.http.HttpSession session = resolveSessionSafely(request);
         if (session != null && authSessionService.hasSessionIdentity(session)) {
             return authSessionService.resolveAuthenticatedSession(session)
                 .map(authenticatedSession -> authenticatedSession.operator().getActorName())
@@ -104,7 +113,7 @@ public class RequestTraceFilter extends OncePerRequestFilter {
         if (isAuthLoginRequest(request)) {
             return RequestTraceContext.MISSING_TENANT_CONTEXT;
         }
-        jakarta.servlet.http.HttpSession session = request.getSession(false);
+        jakarta.servlet.http.HttpSession session = resolveSessionSafely(request);
         if (session != null && authSessionService.hasSessionIdentity(session)) {
             String sessionTenantCode = authSessionService.resolveAuthenticatedSession(session)
                 .map(authenticatedSession -> authenticatedSession.tenant().getCode())
@@ -128,5 +137,35 @@ public class RequestTraceFilter extends OncePerRequestFilter {
         return request != null
             && "POST".equalsIgnoreCase(request.getMethod())
             && "/api/auth/session/login".equals(request.getRequestURI());
+    }
+
+    private jakarta.servlet.http.HttpSession resolveSessionSafely(HttpServletRequest request) {
+        if (request == null) {
+            return null;
+        }
+        try {
+            return request.getSession(false);
+        } catch (IllegalStateException ignored) {
+            return null;
+        }
+    }
+
+    private boolean isAbortLike(Throwable exception) {
+        Throwable current = exception;
+        while (current != null) {
+            String message = current.getMessage();
+            if (message != null) {
+                String normalized = message.toLowerCase();
+                if (normalized.contains("broken pipe")
+                    || normalized.contains("connection reset by peer")
+                    || normalized.contains("an existing connection was forcibly closed")
+                    || normalized.contains("an established connection was aborted")
+                    || normalized.contains("session was invalidated")) {
+                    return true;
+                }
+            }
+            current = current.getCause();
+        }
+        return false;
     }
 }

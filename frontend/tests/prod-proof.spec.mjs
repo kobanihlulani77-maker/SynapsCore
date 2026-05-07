@@ -997,6 +997,81 @@ async function waitForUsersPageReady(page, expectedOperatorName, expectedUserFul
   }
 }
 
+async function waitForOrdersPageOrderVisible(page, orderRecord, testInfo) {
+  const pageDiagnostics = ensurePageDiagnostics(page)
+  const startedAt = Date.now()
+  let lastRefreshAt = 0
+  let lastState = null
+
+  while (Date.now() - startedAt < 30_000) {
+    if (Date.now() - lastRefreshAt >= 2_500) {
+      lastRefreshAt = Date.now()
+      await refreshWorkspace(page)
+    }
+
+    const orderButton = page.getByRole('button', {
+      name: new RegExp(escapeRegExp(orderRecord.externalOrderId), 'i'),
+    }).first()
+    if (await orderButton.isVisible().catch(() => false)) {
+      await activateSelectableButton(orderButton).catch(() => {})
+    }
+
+    lastState = await page.evaluate(({ externalOrderId, warehouseCode }) => {
+      const normalizeText = (value) => value?.replace?.(/\s+/g, ' ')?.trim?.() || ''
+      const orderButtons = [...(globalThis.document?.querySelectorAll?.('button') || [])]
+      const exactOrderButton = orderButtons.find((button) => (
+        normalizeText(button.textContent).includes(externalOrderId)
+      )) || null
+      const detailCards = [...(globalThis.document?.querySelectorAll?.('.section-card') || [])]
+      const exactDetail = detailCards.find((card) => (
+        normalizeText(card.textContent).includes(externalOrderId)
+          && normalizeText(card.textContent).includes(warehouseCode)
+      )) || detailCards.find((card) => normalizeText(card.textContent).includes(externalOrderId)) || null
+
+      return {
+        pageUrl: globalThis.location?.href || '',
+        orderButtonFound: Boolean(exactOrderButton),
+        orderButtonText: normalizeText(exactOrderButton?.textContent),
+        detailText: normalizeText(exactDetail?.textContent),
+        detailMatches: Boolean(
+          exactDetail
+            && normalizeText(exactDetail.textContent).includes(externalOrderId)
+            && normalizeText(exactDetail.textContent).includes(warehouseCode)
+        ),
+        visibleOrderIds: orderButtons
+          .map((button) => normalizeText(button.textContent))
+          .filter((text) => text.includes('UI-ORD-') || text.includes('ORD-'))
+          .slice(0, 20),
+      }
+    }, {
+      externalOrderId: orderRecord.externalOrderId,
+      warehouseCode: orderRecord.warehouseCode,
+    })
+
+    if (lastState.orderButtonFound && lastState.detailMatches) {
+      return lastState
+    }
+
+    await page.waitForTimeout(500)
+  }
+
+  let screenshotPath = null
+  if (testInfo) {
+    screenshotPath = testInfo.outputPath('orders-page-timeout.png')
+    await page.screenshot({ path: screenshotPath, fullPage: true }).catch(() => {})
+  }
+
+  throw new Error(`Orders page failed to render deterministic proof order ${orderRecord.externalOrderId}. Diagnostics: ${JSON.stringify({
+    expectedExternalOrderId: orderRecord.externalOrderId,
+    expectedWarehouseCode: orderRecord.warehouseCode,
+    lastState,
+    lastApiResponse: pageDiagnostics.lastApiResponse,
+    consoleErrors: pageDiagnostics.consoleErrors,
+    failedRequests: pageDiagnostics.failedRequests,
+    screenshotPath,
+  })}`)
+}
+
 async function createReplayFixture() {
   const inventoryAdmin = await createApiContext(users.operationsLead)
   const api = await createApiContext(users.operationsLead)
@@ -1260,16 +1335,97 @@ function recommendationReferencesSku(recommendation, sku) {
     || textReferencesSku(recommendation?.description, sku)
 }
 
-async function ensureRecentOrder(api) {
-  const recentOrders = await readJson(await api.get('/api/orders/recent'))
-  if (recentOrders.length) {
-    return recentOrders
+async function waitForBackendLowStockCoverage(api, fixture, message) {
+  const startedAt = Date.now()
+  let latestCoverage = null
+
+  while (Date.now() - startedAt < 30_000) {
+    const [inventory, alertFeed, recommendations, snapshot] = await Promise.all([
+      readJson(await api.get('/api/inventory'), {
+        method: 'GET',
+        url: '/api/inventory',
+        requestPayload: {
+          productSku: fixture.productSku,
+          warehouseCode: fixture.warehouseCode,
+        },
+        note: `Inventory coverage lookup for realtime proof SKU ${fixture.productSku}.`,
+      }),
+      readJson(await api.get('/api/alerts'), {
+        method: 'GET',
+        url: '/api/alerts',
+        requestPayload: {
+          productSku: fixture.productSku,
+        },
+        note: `Alert coverage lookup for realtime proof SKU ${fixture.productSku}.`,
+      }),
+      readJson(await api.get('/api/recommendations'), {
+        method: 'GET',
+        url: '/api/recommendations',
+        requestPayload: {
+          productSku: fixture.productSku,
+        },
+        note: `Recommendation coverage lookup for realtime proof SKU ${fixture.productSku}.`,
+      }),
+      readJson(await api.get('/api/dashboard/snapshot'), {
+        method: 'GET',
+        url: '/api/dashboard/snapshot',
+        requestPayload: {
+          productSku: fixture.productSku,
+        },
+        note: `Snapshot coverage lookup for realtime proof SKU ${fixture.productSku}.`,
+      }),
+    ])
+
+    const inventoryRecord = inventory.find((item) => (
+      item.productSku === fixture.productSku && item.warehouseCode === fixture.warehouseCode
+    )) || null
+    const alertRecord = alertFeed?.activeAlerts?.find((alert) => alertReferencesSku(alert, fixture.productSku)) || null
+    const recommendationRecord = recommendations.find((recommendation) => (
+      recommendationReferencesSku(recommendation, fixture.productSku)
+    )) || null
+    const snapshotCoverage = realtimeCoverageFromSnapshot(snapshot, fixture.productSku)
+
+    latestCoverage = {
+      inventoryRecord,
+      alertRecord,
+      recommendationRecord,
+      snapshot,
+      snapshotCoverage,
+      alertCount: alertFeed?.activeAlerts?.length ?? 0,
+      recommendationCount: recommendations.length,
+    }
+
+    if (
+      inventoryRecord?.lowStock
+      && alertRecord
+      && recommendationRecord
+      && snapshotCoverage.alertRecord
+      && snapshotCoverage.recommendationRecord
+    ) {
+      return latestCoverage
+    }
+
+    await new Promise((resolve) => setTimeout(resolve, 500))
   }
 
+  throw new Error(`${message} Diagnostics: ${JSON.stringify({
+    inventoryRecord: latestCoverage?.inventoryRecord ?? null,
+    alertRecord: latestCoverage?.alertRecord ?? null,
+    recommendationRecord: latestCoverage?.recommendationRecord ?? null,
+    snapshotAlertRecord: latestCoverage?.snapshotCoverage?.alertRecord ?? null,
+    snapshotRecommendationRecord: latestCoverage?.snapshotCoverage?.recommendationRecord ?? null,
+    snapshotGeneratedAt: latestCoverage?.snapshot?.generatedAt ?? null,
+    alertCount: latestCoverage?.alertCount ?? 0,
+    recommendationCount: latestCoverage?.recommendationCount ?? 0,
+  })}`)
+}
+
+async function ensureRecentOrder(api) {
   const suffix = randomUUID().slice(0, 8).toUpperCase()
-  await readJson(await api.post('/api/orders', {
+  const externalOrderId = `UI-ORD-${suffix}`
+  const createdOrder = await readJson(await api.post('/api/orders', {
     data: {
-      externalOrderId: `UI-ORD-${suffix}`,
+      externalOrderId,
       warehouseCode: 'WH-NORTH',
       items: [
         {
@@ -1279,17 +1435,64 @@ async function ensureRecentOrder(api) {
         },
       ],
     },
+  }, {
+    method: 'POST',
+    url: '/api/orders',
+    requestPayload: {
+      externalOrderId,
+      warehouseCode: 'WH-NORTH',
+      productSku: proofProductSku,
+    },
+    note: `Creating deterministic hosted proof order ${externalOrderId}.`,
   }))
 
-  let nextOrders = []
-  await expect.poll(async () => {
-    nextOrders = await readJson(await api.get('/api/orders/recent'))
-    return nextOrders.length > 0
-  }, {
-    timeout: 30_000,
-    message: 'Expected at least one recent order to appear after seeding the hosted proof order lane.',
-  }).toBe(true)
-  return nextOrders
+  const startedAt = Date.now()
+  let latestCoverage = null
+
+  while (Date.now() - startedAt < 30_000) {
+    const [recentOrders, snapshot] = await Promise.all([
+      readJson(await api.get('/api/orders/recent'), {
+        method: 'GET',
+        url: '/api/orders/recent',
+        requestPayload: {
+          externalOrderId,
+        },
+        note: `Recent order lookup for deterministic hosted proof order ${externalOrderId}.`,
+      }),
+      readJson(await api.get('/api/dashboard/snapshot'), {
+        method: 'GET',
+        url: '/api/dashboard/snapshot',
+        requestPayload: {
+          externalOrderId,
+        },
+        note: `Snapshot recent order lookup for deterministic hosted proof order ${externalOrderId}.`,
+      }),
+    ])
+
+    const order = recentOrders.find((candidate) => candidate.externalOrderId === externalOrderId) || null
+    const snapshotOrder = snapshot?.recentOrders?.find((candidate) => candidate.externalOrderId === externalOrderId) || null
+
+    latestCoverage = {
+      order,
+      snapshotOrder,
+      snapshotGeneratedAt: snapshot?.generatedAt ?? null,
+      recentOrderIds: recentOrders.map((candidate) => candidate.externalOrderId).slice(0, 12),
+      snapshotOrderIds: (snapshot?.recentOrders || []).map((candidate) => candidate.externalOrderId).slice(0, 12),
+    }
+
+    if (order && snapshotOrder) {
+      return {
+        createdOrder,
+        order,
+        snapshotOrder,
+        snapshot,
+      }
+    }
+
+    await new Promise((resolve) => setTimeout(resolve, 500))
+  }
+
+  throw new Error(`Expected deterministic proof order ${externalOrderId} to appear in both /api/orders/recent and /api/dashboard/snapshot before the orders UI assertion. Diagnostics: ${JSON.stringify(latestCoverage)}`)
 }
 
 async function createRealtimeInventoryFixture(api) {
@@ -1337,68 +1540,58 @@ function realtimeCoverageFromSnapshot(snapshot, sku) {
 }
 
 async function ensureAlertAndRecommendationCoverage(api) {
-  const inventory = await readJson(await api.get('/api/inventory'))
-  const candidate = inventory.find((item) => item.productSku === proofProductSku && item.warehouseCode === 'WH-NORTH')
-    || inventory.find((item) => Number.isFinite(item.quantityAvailable) && Number.isFinite(item.reorderThreshold))
-
-  expect(candidate).toBeTruthy()
-
-  const findCoverage = (snapshot) => {
-    const activeAlerts = activeAlertsFromSnapshot(snapshot)
-    return {
-      alertRecord: activeAlerts.find((alert) => alertReferencesSku(alert, candidate.productSku)),
-      recommendationRecord: snapshot.recommendations.find((recommendation) => recommendationReferencesSku(recommendation, candidate.productSku)),
-    }
-  }
-
-  const initialSnapshot = await readJson(await api.get('/api/dashboard/snapshot'))
-  const initialCoverage = findCoverage(initialSnapshot)
-  if (initialCoverage.alertRecord && initialCoverage.recommendationRecord) {
-    return {
-      snapshot: initialSnapshot,
-      candidate,
-      alertRecord: initialCoverage.alertRecord,
-      recommendationRecord: initialCoverage.recommendationRecord,
-      restore: async () => {},
-    }
-  }
-
-  const revertQuantity = candidate.quantityAvailable
-  const revertThreshold = candidate.reorderThreshold
-  const threshold = Math.max(5, Number.isFinite(candidate.reorderThreshold) ? candidate.reorderThreshold : 5)
-  let latestCoverage = null
-
+  const fixture = await createRealtimeInventoryFixture(api)
   await readJson(await api.post('/api/inventory/update', {
     data: {
-      productSku: candidate.productSku,
-      warehouseCode: candidate.warehouseCode,
-      quantityAvailable: Math.max(0, threshold - 1),
-      reorderThreshold: threshold,
+      productSku: fixture.productSku,
+      warehouseCode: fixture.warehouseCode,
+      quantityAvailable: fixture.lowQuantity,
+      reorderThreshold: fixture.reorderThreshold,
     },
+  }, {
+    method: 'POST',
+    url: '/api/inventory/update',
+    requestPayload: {
+      productSku: fixture.productSku,
+      warehouseCode: fixture.warehouseCode,
+      quantityAvailable: fixture.lowQuantity,
+      reorderThreshold: fixture.reorderThreshold,
+    },
+    note: `Driving deterministic hosted proof inventory ${fixture.productSku} into low-stock state.`,
   }))
 
-  const snapshot = await waitForSnapshotMatch(
+  const coverage = await waitForBackendLowStockCoverage(
     api,
-    (nextSnapshot) => {
-      latestCoverage = findCoverage(nextSnapshot)
-      return Boolean(latestCoverage.alertRecord && latestCoverage.recommendationRecord)
-    },
-    `Expected low-stock inventory on ${candidate.productSku} to produce matching alert and recommendation coverage from the live backend.`,
+    fixture,
+    `Expected deterministic low-stock fixture ${fixture.productSku} to propagate through inventory, alerts, recommendations, and snapshot read models.`,
   )
 
   return {
-    snapshot,
-    candidate,
-    alertRecord: latestCoverage?.alertRecord ?? null,
-    recommendationRecord: latestCoverage?.recommendationRecord ?? null,
+    fixture,
+    snapshot: coverage.snapshot,
+    inventoryRecord: coverage.inventoryRecord,
+    alertRecord: coverage.alertRecord,
+    recommendationRecord: coverage.recommendationRecord,
+    snapshotAlertRecord: coverage.snapshotCoverage?.alertRecord ?? null,
+    snapshotRecommendationRecord: coverage.snapshotCoverage?.recommendationRecord ?? null,
     restore: async () => {
       await readJson(await api.post('/api/inventory/update', {
         data: {
-          productSku: candidate.productSku,
-          warehouseCode: candidate.warehouseCode,
-          quantityAvailable: revertQuantity,
-          reorderThreshold: revertThreshold,
+          productSku: fixture.productSku,
+          warehouseCode: fixture.warehouseCode,
+          quantityAvailable: fixture.safeQuantity,
+          reorderThreshold: fixture.reorderThreshold,
         },
+      }, {
+        method: 'POST',
+        url: '/api/inventory/update',
+        requestPayload: {
+          productSku: fixture.productSku,
+          warehouseCode: fixture.warehouseCode,
+          quantityAvailable: fixture.safeQuantity,
+          reorderThreshold: fixture.reorderThreshold,
+        },
+        note: `Restoring deterministic hosted proof inventory ${fixture.productSku} to its safe quantity.`,
       }))
     },
   }
@@ -1506,21 +1699,32 @@ test('@realtime dashboard summary updates live without a browser refresh', async
         quantityAvailable: realtimeFixture.lowQuantity,
         reorderThreshold: realtimeFixture.reorderThreshold,
       },
+    }, {
+      method: 'POST',
+      url: '/api/inventory/update',
+      requestPayload: {
+        productSku: realtimeFixture.productSku,
+        warehouseCode: realtimeFixture.warehouseCode,
+        quantityAvailable: realtimeFixture.lowQuantity,
+        reorderThreshold: realtimeFixture.reorderThreshold,
+      },
+      note: `Driving realtime proof SKU ${realtimeFixture.productSku} into low-stock state from the hosted proof.`,
     }))
 
-    const liveSnapshot = await waitForSnapshotMatch(
+    const liveCoverage = await waitForBackendLowStockCoverage(
       api,
-      (nextSnapshot) => {
-        const coverage = realtimeCoverageFromSnapshot(nextSnapshot, realtimeFixture.productSku)
-        return Boolean(coverage.alertRecord && coverage.recommendationRecord)
-      },
-      `Expected low-stock realtime proof inventory on ${realtimeFixture.productSku} to produce matching alert and recommendation coverage in the live backend snapshot.`,
+      realtimeFixture,
+      `Expected low-stock realtime proof inventory on ${realtimeFixture.productSku} to propagate through backend inventory, alerts, recommendations, and dashboard snapshot before asserting the live UI update.`,
     )
-    const liveCoverage = realtimeCoverageFromSnapshot(liveSnapshot, realtimeFixture.productSku)
-    const expectedAlertText = liveCoverage.alertRecord?.title
+    const expectedAlertText = liveCoverage.snapshotCoverage?.alertRecord?.title
+      || liveCoverage.snapshotCoverage?.alertRecord?.description
+      || liveCoverage.snapshotCoverage?.alertRecord?.recommendedAction
+      || liveCoverage.alertRecord?.title
       || liveCoverage.alertRecord?.description
       || liveCoverage.alertRecord?.recommendedAction
-    const expectedRecommendationText = liveCoverage.recommendationRecord?.title
+    const expectedRecommendationText = liveCoverage.snapshotCoverage?.recommendationRecord?.title
+      || liveCoverage.snapshotCoverage?.recommendationRecord?.description
+      || liveCoverage.recommendationRecord?.title
       || liveCoverage.recommendationRecord?.description
 
     expect(expectedAlertText).toBeTruthy()
@@ -1683,14 +1887,14 @@ test('alerts, recommendations, orders, inventory, integrations, users, profile, 
   try {
     const alertCoverage = await ensureAlertAndRecommendationCoverage(api)
     restoreAlertCoverage = alertCoverage.restore
-    const recentOrders = await ensureRecentOrder(api)
+    const recentOrder = await ensureRecentOrder(api)
     const workspace = await readJson(await api.get('/api/access/admin/workspace'))
     const operators = await readJson(await api.get('/api/access/admin/operators'))
     const accessUsers = await readJson(await api.get('/api/access/admin/users'))
     const alertRecord = alertCoverage.alertRecord
     const recommendationRecord = alertCoverage.recommendationRecord
-    const orderRecord = recentOrders[0]
-    const inventoryRecord = alertCoverage.snapshot.inventory.find((item) => item.lowStock) || alertCoverage.snapshot.inventory[0]
+    const orderRecord = recentOrder.order
+    const inventoryRecord = alertCoverage.inventoryRecord
     const connectorCandidates = [
       ...alertCoverage.snapshot.integrationConnectors,
       ...(workspace.connectors || []),
@@ -1735,11 +1939,7 @@ test('alerts, recommendations, orders, inventory, integrations, users, profile, 
 
     await navigateWithinApp(page, '/orders')
     await expect(page.getByRole('heading', { level: 1, name: 'Live order operations' })).toBeVisible()
-    await expect(page.getByText(orderRecord.externalOrderId).first()).toBeVisible()
-    await activateSelectableButton(
-      page.getByRole('button', { name: new RegExp(escapeRegExp(orderRecord.externalOrderId), 'i') }).first(),
-    )
-    await expect(page.getByText(orderRecord.warehouseCode).first()).toBeVisible()
+    await waitForOrdersPageOrderVisible(page, orderRecord, testInfo)
 
     await navigateWithinApp(page, '/inventory')
     await expect(page.getByRole('heading', { level: 1, name: 'Inventory intelligence' })).toBeVisible()

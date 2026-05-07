@@ -7,6 +7,7 @@ import com.synapsecore.config.SynapseAccessProperties;
 import com.synapsecore.config.SynapseStarterProperties;
 import com.synapsecore.domain.entity.Tenant;
 import com.synapsecore.domain.repository.TenantRepository;
+import jakarta.servlet.DispatcherType;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpSession;
 import java.util.List;
@@ -75,11 +76,18 @@ public class TenantContextService {
         }
 
         HttpServletRequest request = attributes.getRequest();
-        HttpSession session = request.getSession(false);
-        if (session != null && authSessionService.hasSessionIdentity(session)) {
-            return authSessionService.resolveAuthenticatedSession(session)
-                .map(authenticatedSession -> authenticatedSession.tenant().getCode())
-                .orElse(null);
+        if (request.getDispatcherType() == DispatcherType.ERROR) {
+            return null;
+        }
+        try {
+            HttpSession session = request.getSession(false);
+            if (session != null && authSessionService.hasSessionIdentity(session)) {
+                return authSessionService.resolveAuthenticatedSession(session)
+                    .map(authenticatedSession -> authenticatedSession.tenant().getCode())
+                    .orElse(null);
+            }
+        } catch (IllegalStateException ignored) {
+            return null;
         }
 
         if (accessProperties.isAllowHeaderFallback()) {

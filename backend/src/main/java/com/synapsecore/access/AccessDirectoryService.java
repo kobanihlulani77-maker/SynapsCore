@@ -9,6 +9,7 @@ import com.synapsecore.domain.entity.Tenant;
 import com.synapsecore.domain.repository.AccessOperatorRepository;
 import com.synapsecore.domain.repository.TenantRepository;
 import com.synapsecore.tenant.TenantContextService;
+import jakarta.servlet.DispatcherType;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpSession;
 import java.util.Comparator;
@@ -96,10 +97,17 @@ public class AccessDirectoryService {
         }
 
         HttpServletRequest request = attributes.getRequest();
-        HttpSession session = request.getSession(false);
-        if (session != null && authSessionService.hasSessionIdentity(session)) {
-            return authSessionService.resolveAuthenticatedSession(session)
-                .map(AuthSessionService.AuthenticatedSession::operator);
+        if (request.getDispatcherType() == DispatcherType.ERROR) {
+            return Optional.empty();
+        }
+        try {
+            HttpSession session = request.getSession(false);
+            if (session != null && authSessionService.hasSessionIdentity(session)) {
+                return authSessionService.resolveAuthenticatedSession(session)
+                    .map(AuthSessionService.AuthenticatedSession::operator);
+            }
+        } catch (IllegalStateException ignored) {
+            return Optional.empty();
         }
 
         if (!accessProperties.isAllowHeaderFallback()) {

@@ -26,7 +26,6 @@ import com.synapsecore.config.SynapseStarterProperties;
 import com.synapsecore.domain.dto.WarehouseResponse;
 import com.synapsecore.integration.dto.IntegrationConnectorResponse;
 import jakarta.servlet.http.HttpServletRequest;
-import jakarta.servlet.http.HttpSession;
 import jakarta.validation.Valid;
 import java.util.List;
 import lombok.RequiredArgsConstructor;
@@ -120,11 +119,11 @@ public class AccessController {
 
     @PutMapping("/admin/workspace/security")
     public TenantWorkspaceResponse updateWorkspaceSecurity(@Valid @RequestBody TenantWorkspaceSecuritySettingsRequest request,
-                                                           HttpSession session) {
+                                                           HttpServletRequest httpRequest) {
         String actorName = accessControlService.requireTenantAdmin("update tenant security settings").actorName();
         TenantWorkspaceResponse workspace = tenantWorkspaceAdministrationService.updateSecuritySettings(request, actorName);
         authSessionService.syncTenantSecurityPolicy(
-            session,
+            httpRequest.getSession(false),
             workspace.tenantCode(),
             workspace.securitySettings().securityPolicyVersion(),
             workspace.securitySettings().sessionTimeoutMinutes()
