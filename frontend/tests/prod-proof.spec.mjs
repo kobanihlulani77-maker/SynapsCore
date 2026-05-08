@@ -1634,7 +1634,7 @@ async function createScenarioFixture() {
       title,
       productSku,
       warehouseCode,
-      scenarioId: payload.id,
+      scenarioId: payload.scenarioRunId ?? payload.id,
       approvalPolicy: payload.approvalPolicy,
       approvalStatus: payload.approvalStatus,
     }
@@ -1978,7 +1978,10 @@ async function waitForApprovedScenarioCoverage(api, scenarioFixture, message) {
     })
 
     const scenarioRun = Array.isArray(history)
-      ? history.find((candidate) => candidate.id === scenarioFixture.scenarioId) || null
+      ? history.find((candidate) => (
+          String(candidate.id) === String(scenarioFixture.scenarioId)
+          || candidate.title === scenarioFixture.title
+        )) || null
       : null
 
     latestCoverage = {
