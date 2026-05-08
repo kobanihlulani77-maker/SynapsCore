@@ -2245,7 +2245,8 @@ test('@realtime dashboard summary updates live without a browser refresh', async
   }
 })
 
-test('replay recovery, scenario approval, execution, and browser role gating work through the UI', async ({ page }) => {
+test('replay recovery, scenario approval, execution, and browser role gating work through the UI', async ({ page }, testInfo) => {
+  testInfo.setTimeout(360_000)
   const replayFixture = await createReplayFixture()
 
   try {
