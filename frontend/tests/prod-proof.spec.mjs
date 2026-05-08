@@ -2426,26 +2426,44 @@ test('replay recovery, scenario approval, execution, and browser role gating wor
       }).toBe(true)
 
       if (postEnableReplayState === 'queued:PENDING') {
+        const replayPageDiagnostics = ensurePageDiagnostics(page)
         await waitForReplayButtonReady(page, replayFixture)
 
+        const replayRequestPromise = page.waitForRequest((request) => (
+          request.method() === 'POST'
+            && /\/api\/integrations\/orders\/replay\/\d+$/i.test(request.url())
+        ), { timeout: 10_000 })
         const replayResponsePromise = page.waitForResponse((response) => (
           response.request().method() === 'POST'
             && /\/api\/integrations\/orders\/replay\/\d+$/i.test(response.url())
-        ), { timeout: 20_000 })
+        ), { timeout: 45_000 }).catch(() => null)
 
-        const [replayResponse] = await Promise.all([
-          replayResponsePromise,
-          clickExactReplayButton(page, replayFixture),
-        ])
-
-        const replayResponseText = await replayResponse.text()
-        let replayPayload = null
+        let replayRequest = null
         try {
-          replayPayload = replayResponseText ? JSON.parse(replayResponseText) : null
-        } catch {
-          replayPayload = null
+          [replayRequest] = await Promise.all([
+            replayRequestPromise,
+            clickExactReplayButton(page, replayFixture),
+          ])
+        } catch (error) {
+          throw new Error(`Expected replay request submission for ${replayFixture.externalOrderId} after the manual replay button became enabled. Diagnostics: ${JSON.stringify({
+            replayRecordExternalOrderId: replayFixture.externalOrderId,
+            lastApiResponse: replayPageDiagnostics.lastApiResponse,
+            consoleErrors: replayPageDiagnostics.consoleErrors,
+            failedRequests: replayPageDiagnostics.failedRequests,
+          })} Original error: ${error?.message || String(error)}`)
         }
-        if (!replayResponse.ok()) {
+
+        await expect(page.getByRole('button', { name: 'Replaying...' }).first()).toBeVisible({ timeout: 5_000 }).catch(() => {})
+
+        const replayResponse = await replayResponsePromise
+        if (replayResponse && !replayResponse.ok()) {
+          const replayResponseText = await replayResponse.text()
+          let replayPayload = null
+          try {
+            replayPayload = replayResponseText ? JSON.parse(replayResponseText) : null
+          } catch {
+            replayPayload = null
+          }
           throw new Error(JSON.stringify({
             method: 'POST',
             url: replayResponse.url(),
@@ -2454,9 +2472,17 @@ test('replay recovery, scenario approval, execution, and browser role gating wor
             responseBody: replayPayload ?? replayResponseText,
             requestPayload: {
               replayRecordExternalOrderId: replayFixture.externalOrderId,
+              observedRequestUrl: replayRequest?.url?.() || null,
             },
             note: `Replay request failed for ${replayFixture.externalOrderId}.`,
           }))
+        }
+
+        if (!replayResponse) {
+          currentReplayOutcome = await readReplayOutcome(replayFixture.api, replayFixture.externalOrderId).catch(() => null)
+          if (currentReplayOutcome?.state === 'queued') {
+            await expect(page.locator('.error-text').filter({ hasText: /failed|unable|forbidden|denied|error/i }).first()).toBeVisible({ timeout: 2_500 }).catch(() => {})
+          }
         }
       }
 
