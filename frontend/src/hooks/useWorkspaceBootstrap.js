@@ -82,6 +82,18 @@ export default function useWorkspaceBootstrap({
     })
   }
 
+  function mergeOrderSurfaceSnapshot(orderSurfaceData) {
+    snapshotSetter((current) => {
+      const previousSnapshot = current || emptySnapshot
+      return {
+        ...emptySnapshot,
+        ...previousSnapshot,
+        recentOrders: orderSurfaceData?.recentOrders ?? previousSnapshot.recentOrders ?? [],
+        generatedAt: previousSnapshot.generatedAt ?? new Date().toISOString(),
+      }
+    })
+  }
+
   async function fetchReplaySurfaceData() {
     const replayQueueRequest = fetchJson(
       '/api/integrations/orders/replay-queue',
@@ -115,6 +127,19 @@ export default function useWorkspaceBootstrap({
     }
   }
 
+  async function fetchOrderSurfaceData() {
+    const recentOrders = await fetchJson(
+      '/api/orders/recent',
+      globalThis.AbortSignal?.timeout
+        ? { signal: globalThis.AbortSignal.timeout(8_000) }
+        : {},
+    )
+
+    return {
+      recentOrders: Array.isArray(recentOrders) ? recentOrders : null,
+    }
+  }
+
   async function fetchAccessAdminData() {
     const [workspace, operators, users] = await Promise.all([
       fetchJson('/api/access/admin/workspace'),
@@ -144,17 +169,24 @@ export default function useWorkspaceBootstrap({
 
   async function fetchSnapshot() {
     const shouldHydrateReplaySurface = currentPage === 'replay' || currentPage === 'integrations'
-    const [snapshotResult, replaySurfaceResult] = await Promise.allSettled([
+    const shouldHydrateOrderSurface = currentPage === 'orders'
+    const [snapshotResult, replaySurfaceResult, orderSurfaceResult] = await Promise.allSettled([
       fetchJson('/api/dashboard/snapshot'),
       shouldHydrateReplaySurface ? fetchReplaySurfaceData() : Promise.resolve(null),
+      shouldHydrateOrderSurface ? fetchOrderSurfaceData() : Promise.resolve(null),
     ])
 
-    if (snapshotResult.status !== 'fulfilled' && (!shouldHydrateReplaySurface || replaySurfaceResult.status !== 'fulfilled')) {
-      throw snapshotResult.reason || replaySurfaceResult.reason || new Error('Workspace snapshot could not be loaded.')
+    if (
+      snapshotResult.status !== 'fulfilled'
+      && (!shouldHydrateReplaySurface || replaySurfaceResult.status !== 'fulfilled')
+      && (!shouldHydrateOrderSurface || orderSurfaceResult.status !== 'fulfilled')
+    ) {
+      throw snapshotResult.reason || replaySurfaceResult.reason || orderSurfaceResult.reason || new Error('Workspace snapshot could not be loaded.')
     }
 
     const nextSnapshot = snapshotResult.status === 'fulfilled' ? snapshotResult.value : null
     const replaySurfaceData = replaySurfaceResult.status === 'fulfilled' ? replaySurfaceResult.value : null
+    const orderSurfaceData = orderSurfaceResult.status === 'fulfilled' ? orderSurfaceResult.value : null
 
     snapshotSetter((current) => {
       const previousSnapshot = current || emptySnapshot
@@ -166,6 +198,7 @@ export default function useWorkspaceBootstrap({
         recentEvents: baseSnapshot.recentEvents ?? previousSnapshot.recentEvents ?? [],
         auditLogs: baseSnapshot.auditLogs ?? previousSnapshot.auditLogs ?? [],
         systemIncidents: baseSnapshot.systemIncidents ?? previousSnapshot.systemIncidents ?? [],
+        recentOrders: orderSurfaceData?.recentOrders ?? baseSnapshot.recentOrders ?? previousSnapshot.recentOrders ?? [],
         integrationConnectors: replaySurfaceData?.integrationConnectors ?? baseSnapshot.integrationConnectors ?? previousSnapshot.integrationConnectors ?? [],
         integrationImportRuns: baseSnapshot.integrationImportRuns ?? previousSnapshot.integrationImportRuns ?? [],
         integrationReplayQueue: replaySurfaceData?.integrationReplayQueue ?? baseSnapshot.integrationReplayQueue ?? previousSnapshot.integrationReplayQueue ?? [],
@@ -475,6 +508,37 @@ export default function useWorkspaceBootstrap({
       }
     }
     loadDedicatedIntegrationSurface()
+    return () => { active = false }
+  }, [authSessionState.session, currentPage, activeTenantCode])
+
+  useEffect(() => {
+    let active = true
+    async function loadDedicatedOrderSurface() {
+      if (!authSessionState.session?.tenantCode) {
+        return
+      }
+      if (currentPage !== 'orders') {
+        return
+      }
+      try {
+        const orderSurfaceData = await fetchOrderSurfaceData()
+        if (!active) {
+          return
+        }
+        mergeOrderSurfaceSnapshot(orderSurfaceData)
+        pageStateSetter((current) => ({ ...current, loading: false, error: current.error || '' }))
+      } catch (error) {
+        if (!active) {
+          return
+        }
+        pageStateSetter((current) => ({
+          ...current,
+          loading: false,
+          error: current.error || `Orders surface load issue: ${error.message}`,
+        }))
+      }
+    }
+    loadDedicatedOrderSurface()
     return () => { active = false }
   }, [authSessionState.session, currentPage, activeTenantCode])
 
