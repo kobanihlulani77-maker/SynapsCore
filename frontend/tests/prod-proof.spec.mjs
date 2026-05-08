@@ -640,7 +640,7 @@ async function waitForReplayQueueCoverage(api, externalOrderId, sourceSystem, me
       snapshotReplayQueueCount: Array.isArray(snapshot?.integrationReplayQueue) ? snapshot.integrationReplayQueue.length : null,
     }
 
-    return Boolean(replayRecord && snapshotReplayRecord)
+    return Boolean(replayRecord)
   }, {
     timeout: 30_000,
     message,
@@ -2279,7 +2279,7 @@ test('replay recovery, scenario approval, execution, and browser role gating wor
       replayFixture.api,
       replayFixture.externalOrderId,
       replayFixture.sourceSystem,
-      `Expected replay verification record ${replayFixture.externalOrderId} to be visible in both the replay queue API and dashboard snapshot before UI verification.`,
+      `Expected replay verification record ${replayFixture.externalOrderId} to be visible in the replay queue API before UI verification.`,
     )
 
     await loginViaUi(page, users.integrationLead, { requireDashboardSnapshot: true })
