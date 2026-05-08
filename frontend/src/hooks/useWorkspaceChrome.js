@@ -35,11 +35,16 @@ export default function useWorkspaceChrome({
   formatBuildValue,
   formatCodeLabel,
 }) {
+  const resolvedActiveAlertCount = Math.max(summary?.activeAlerts ?? 0, snapshot.alerts.activeAlerts.length)
+  const resolvedRecommendationCount = Math.max(summary?.recommendationsCount ?? 0, snapshot.recommendations.length)
+  const resolvedRecentOrderCount = Math.max(summary?.recentOrderCount ?? 0, snapshot.recentOrders.length)
+  const resolvedLowStockCount = Math.max(summary?.lowStockItems ?? 0, snapshot.inventory.filter((item) => item.lowStock).length)
+
   const pageBadgeMap = {
     dashboard: summary?.totalOrders ?? 0,
-    alerts: summary?.activeAlerts ?? snapshot.alerts.activeAlerts.length,
-    recommendations: summary?.recommendationsCount ?? snapshot.recommendations.length,
-    orders: summary?.recentOrderCount ?? snapshot.recentOrders.length,
+    alerts: resolvedActiveAlertCount,
+    recommendations: resolvedRecommendationCount,
+    orders: resolvedRecentOrderCount,
     inventory: summary?.inventoryRecordsCount ?? snapshot.inventory.length,
     catalog: catalogState.products.length,
     locations: summary?.totalWarehouses ?? warehouseOptions.length,
@@ -66,11 +71,19 @@ export default function useWorkspaceChrome({
   }
 
   const pageStatusMap = {
-    dashboard: isAuthenticated ? (summary?.lastUpdatedAt ? `Updated ${formatTimestamp(summary.lastUpdatedAt)}` : 'Waiting for live summary') : 'Sign in to unlock the control center',
+    dashboard: isAuthenticated
+      ? (
+        summary?.lastUpdatedAt
+          ? `Updated ${formatTimestamp(summary.lastUpdatedAt)}`
+          : (resolvedActiveAlertCount || resolvedRecommendationCount || resolvedRecentOrderCount || resolvedLowStockCount
+              ? 'Live signals flowing'
+              : 'Waiting for live summary')
+      )
+      : 'Sign in to unlock the control center',
     alerts: isAuthenticated ? (snapshot.alerts.activeAlerts.length ? `${snapshot.alerts.activeAlerts.length} active operational alert${snapshot.alerts.activeAlerts.length === 1 ? '' : 's'}` : 'No active alert pressure') : 'Protected by workspace sign-in',
     recommendations: isAuthenticated ? (snapshot.recommendations.length ? `${snapshot.recommendations.length} recommendation${snapshot.recommendations.length === 1 ? '' : 's'} waiting for review` : 'No immediate recommendation pressure') : 'Protected by workspace sign-in',
-    orders: isAuthenticated ? (summary?.recentOrderCount ? `${summary.recentOrderCount} order${summary.recentOrderCount === 1 ? '' : 's'} moved recently` : 'Order flow is currently quiet') : 'Protected by workspace sign-in',
-    inventory: isAuthenticated ? (summary?.lowStockItems ? `${summary.lowStockItems} low-stock item${summary.lowStockItems === 1 ? '' : 's'}` : 'Inventory posture is stable') : 'Protected by workspace sign-in',
+    orders: isAuthenticated ? (resolvedRecentOrderCount ? `${resolvedRecentOrderCount} order${resolvedRecentOrderCount === 1 ? '' : 's'} moved recently` : 'Order flow is currently quiet') : 'Protected by workspace sign-in',
+    inventory: isAuthenticated ? (resolvedLowStockCount ? `${resolvedLowStockCount} low-stock item${resolvedLowStockCount === 1 ? '' : 's'}` : 'Inventory posture is stable') : 'Protected by workspace sign-in',
     catalog: isAuthenticated ? `${catalogState.products.length} tenant product${catalogState.products.length === 1 ? '' : 's'} available` : 'Protected by workspace sign-in',
     locations: isAuthenticated ? `${warehouseOptions.length} operational location${warehouseOptions.length === 1 ? '' : 's'} tracked` : 'Protected by workspace sign-in',
     fulfillment: isAuthenticated ? (fulfillmentOverview.backlogCount ? `${fulfillmentOverview.backlogCount} backlog item${fulfillmentOverview.backlogCount === 1 ? '' : 's'} active` : 'Fulfillment lanes are clear') : 'Protected by workspace sign-in',
@@ -107,9 +120,9 @@ export default function useWorkspaceChrome({
 
   const metrics = [
     { label: 'Total Orders', value: summary ? summary.totalOrders : 'Loading', accent: 'amber' },
-    { label: 'Active Alerts', value: summary ? summary.activeAlerts : 'Loading', accent: 'rose' },
-    { label: 'Low Stock Items', value: summary ? summary.lowStockItems : 'Loading', accent: 'orange' },
-    { label: 'Recommendations', value: summary ? summary.recommendationsCount : 'Loading', accent: 'teal' },
+    { label: 'Active Alerts', value: summary ? resolvedActiveAlertCount : 'Loading', accent: 'rose' },
+    { label: 'Low Stock Items', value: summary ? resolvedLowStockCount : 'Loading', accent: 'orange' },
+    { label: 'Recommendations', value: summary ? resolvedRecommendationCount : 'Loading', accent: 'teal' },
     { label: 'Fulfillment Backlog', value: summary ? summary.fulfillmentBacklogCount : 'Loading', accent: 'slate' },
     { label: 'Delayed Shipments', value: summary ? summary.delayedShipmentCount : 'Loading', accent: 'rose' },
     { label: 'Products', value: summary ? summary.totalProducts : 'Loading', accent: 'blue' },
@@ -131,7 +144,7 @@ export default function useWorkspaceChrome({
     },
     {
       label: 'Operational Throughput',
-      value: summary?.recentOrderCount ? `${summary.recentOrderCount} recent orders` : 'Monitoring',
+      value: resolvedRecentOrderCount ? `${resolvedRecentOrderCount} recent orders` : 'Monitoring',
       note: fulfillmentOverview.backlogCount
         ? `${fulfillmentOverview.backlogCount} backlog item${fulfillmentOverview.backlogCount === 1 ? '' : 's'} and ${fulfillmentOverview.delayedShipmentCount} delayed shipment${fulfillmentOverview.delayedShipmentCount === 1 ? '' : 's'} are active.`
         : `${enabledConnectorCount}/${snapshot.integrationConnectors.length || 0} connectors are enabled with no fulfillment backlog right now.`,

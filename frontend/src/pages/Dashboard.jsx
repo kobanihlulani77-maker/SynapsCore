@@ -52,6 +52,9 @@ export default function DashboardPage({ context }) {
   const dashboardAlertPreview = activeAlerts.slice(0, 4)
   const dashboardRecommendationPreview = snapshot.recommendations.slice(0, 4)
   const dashboardApprovalPreview = pendingApprovalScenarios.slice(0, 4)
+  const resolvedRecentOrderCount = Math.max(snapshot.summary?.recentOrderCount ?? 0, snapshot.recentOrders.length)
+  const resolvedLowStockCount = Math.max(snapshot.summary?.lowStockItems ?? 0, snapshot.inventory.filter((item) => item.lowStock).length)
+  const resolvedActiveAlertCount = Math.max(snapshot.summary?.activeAlerts ?? 0, activeAlerts.length)
   const runtimeStatusLabel = runtime ? formatCodeLabel(runtime.overallStatus) : 'Loading'
   const incidentSeverityCount = systemIncidents.filter((incident) => ['CRITICAL', 'HIGH'].includes(incident.severity)).length
   const recentChanges = utilityTimeline.slice(0, 4).map((item) => ({
@@ -75,9 +78,9 @@ export default function DashboardPage({ context }) {
   return (
     <>
       <section className="summary-grid">
-        <MetricCard label="Orders" value={snapshot.summary?.recentOrderCount ?? snapshot.recentOrders.length} accent="amber" note="Live order activity in the current window" />
-        <MetricCard label="Risk" value={snapshot.summary?.lowStockItems ?? snapshot.inventory.filter((item) => item.lowStock).length} accent="orange" note="Inventory lanes under active pressure" />
-        <MetricCard label="Alerts" value={activeAlerts.length} accent="rose" note="Warnings requiring ownership" />
+        <MetricCard label="Orders" value={resolvedRecentOrderCount} accent="amber" note="Live order activity in the current window" />
+        <MetricCard label="Risk" value={resolvedLowStockCount} accent="orange" note="Inventory lanes under active pressure" />
+        <MetricCard label="Alerts" value={resolvedActiveAlertCount} accent="rose" note="Warnings requiring ownership" />
         <MetricCard label="Uptime posture" value={runtime ? formatCodeLabel(runtime.readinessState) : 'Loading'} accent="teal" note="System acceptance and readiness state" />
       </section>
       <section className="content-grid dashboard-command-grid">

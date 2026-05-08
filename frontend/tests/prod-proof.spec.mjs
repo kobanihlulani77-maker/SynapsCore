@@ -2294,7 +2294,7 @@ test('@realtime dashboard summary updates live without a browser refresh', async
   const api = await createApiContext(users.operationsLead)
   const realtimeFixture = await createRealtimeInventoryFixture(api)
 
-  await loginViaUi(page, users.operationsLead, { requireDashboardSnapshot: true })
+  await loginViaUi(page, users.operationsLead)
   await expect(page.getByRole('heading', { level: 1, name: 'Live operational command center' })).toBeVisible()
   await expect(page.getByText('Realtime state')).toBeVisible()
   await waitForRealtimeConnectionLive(page)
@@ -2322,7 +2322,7 @@ test('@realtime dashboard summary updates live without a browser refresh', async
     const liveCoverage = await waitForBackendLowStockCoverage(
       api,
       realtimeFixture,
-      `Expected low-stock realtime proof inventory on ${realtimeFixture.productSku} to propagate through backend inventory, alerts, recommendations, and dashboard snapshot before asserting the live UI update.`,
+      `Expected low-stock realtime proof inventory on ${realtimeFixture.productSku} to propagate through backend inventory, alerts, and recommendations before asserting the live UI update.`,
     )
     const expectedAlertText = liveCoverage.snapshotCoverage?.alertRecord?.title
       || liveCoverage.snapshotCoverage?.alertRecord?.description

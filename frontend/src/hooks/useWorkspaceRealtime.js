@@ -13,6 +13,7 @@ export default function useWorkspaceRealtime({
   websocketBrokerUrl,
   sockJsUrl,
   buildTenantTopicPrefix,
+  fetchJson,
   fetchSnapshot,
   fetchCatalogProducts,
   mergeSnapshot,
@@ -27,6 +28,9 @@ export default function useWorkspaceRealtime({
     let connectionMode = 'connecting'
     let degradedRefreshIntervalId = null
     let activeClient = null
+    let decisionSurfaceRefreshTimeoutId = null
+    let decisionSurfaceRefreshInFlight = false
+    let decisionSurfaceRefreshQueued = false
 
     const publishRealtimeDebug = (partial) => {
       const nextDebugState = {
@@ -115,6 +119,91 @@ export default function useWorkspaceRealtime({
       } catch {
         // Keep the current degraded connection state visible; snapshot errors are already surfaced by loadSnapshot.
       }
+    }
+
+    function stopDecisionSurfaceRefreshTimer() {
+      if (decisionSurfaceRefreshTimeoutId !== null) {
+        globalThis.clearTimeout(decisionSurfaceRefreshTimeoutId)
+        decisionSurfaceRefreshTimeoutId = null
+      }
+    }
+
+    async function refreshDecisionSurface(reason = 'realtime-surface-refresh') {
+      if (!active || !signedInTenantCode || !fetchJson) {
+        return
+      }
+      if (decisionSurfaceRefreshInFlight) {
+        decisionSurfaceRefreshQueued = true
+        return
+      }
+
+      decisionSurfaceRefreshInFlight = true
+      try {
+        const timeoutInit = (timeoutMs) => (
+          globalThis.AbortSignal?.timeout ? { signal: globalThis.AbortSignal.timeout(timeoutMs) } : {}
+        )
+
+        const [summaryResult, inventoryResult, alertsResult, recommendationsResult] = await Promise.allSettled([
+          fetchJson('/api/dashboard/summary', timeoutInit(8_000)),
+          fetchJson('/api/inventory', timeoutInit(8_000)),
+          fetchJson('/api/alerts', timeoutInit(8_000)),
+          fetchJson('/api/recommendations', timeoutInit(8_000)),
+        ])
+
+        const nextPartial = {}
+        if (summaryResult.status === 'fulfilled' && summaryResult.value) {
+          nextPartial.summary = summaryResult.value
+        }
+        if (inventoryResult.status === 'fulfilled' && Array.isArray(inventoryResult.value)) {
+          nextPartial.inventory = inventoryResult.value
+        }
+        if (alertsResult.status === 'fulfilled' && alertsResult.value) {
+          nextPartial.alerts = alertsResult.value
+        }
+        if (recommendationsResult.status === 'fulfilled' && Array.isArray(recommendationsResult.value)) {
+          nextPartial.recommendations = recommendationsResult.value
+        }
+
+        if (Object.keys(nextPartial).length) {
+          mergeSnapshot(nextPartial)
+          publishRealtimeDebug({
+            lastDecisionSurfaceRefreshAt: new Date().toISOString(),
+            lastDecisionSurfaceRefreshReason: reason,
+            lastDecisionSurfaceRefreshStatus: 'ok',
+            lastDecisionSurfaceRefreshKeys: Object.keys(nextPartial),
+          })
+        } else {
+          publishRealtimeDebug({
+            lastDecisionSurfaceRefreshAt: new Date().toISOString(),
+            lastDecisionSurfaceRefreshReason: reason,
+            lastDecisionSurfaceRefreshStatus: 'empty',
+          })
+        }
+      } catch (error) {
+        publishRealtimeDebug({
+          lastDecisionSurfaceRefreshAt: new Date().toISOString(),
+          lastDecisionSurfaceRefreshReason: reason,
+          lastDecisionSurfaceRefreshStatus: 'error',
+          lastDecisionSurfaceRefreshError: error?.message || String(error),
+        })
+      } finally {
+        decisionSurfaceRefreshInFlight = false
+        if (decisionSurfaceRefreshQueued) {
+          decisionSurfaceRefreshQueued = false
+          void refreshDecisionSurface(`${reason}:queued`)
+        }
+      }
+    }
+
+    function scheduleDecisionSurfaceRefresh(reason, delayMs = 750) {
+      if (!active || !signedInTenantCode || !fetchJson) {
+        return
+      }
+      stopDecisionSurfaceRefreshTimer()
+      decisionSurfaceRefreshTimeoutId = globalThis.setTimeout(() => {
+        decisionSurfaceRefreshTimeoutId = null
+        void refreshDecisionSurface(reason)
+      }, delayMs)
     }
 
     loadSnapshot()
@@ -274,13 +363,28 @@ export default function useWorkspaceRealtime({
             topicPrefix,
           })
           updateConnectionState('live')
-          nextClient.subscribe(`${topicPrefix}/dashboard.summary`, (message) => mergeSnapshot({ summary: JSON.parse(message.body) }))
-          nextClient.subscribe(`${topicPrefix}/alerts`, (message) => mergeSnapshot({ alerts: JSON.parse(message.body) }))
-          nextClient.subscribe(`${topicPrefix}/recommendations`, (message) => mergeSnapshot({ recommendations: JSON.parse(message.body) }))
-          nextClient.subscribe(`${topicPrefix}/inventory`, (message) => mergeSnapshot({ inventory: JSON.parse(message.body) }))
+          nextClient.subscribe(`${topicPrefix}/dashboard.summary`, (message) => {
+            mergeSnapshot({ summary: JSON.parse(message.body) })
+            scheduleDecisionSurfaceRefresh('dashboard-summary-topic')
+          })
+          nextClient.subscribe(`${topicPrefix}/alerts`, (message) => {
+            mergeSnapshot({ alerts: JSON.parse(message.body) })
+            scheduleDecisionSurfaceRefresh('alerts-topic')
+          })
+          nextClient.subscribe(`${topicPrefix}/recommendations`, (message) => {
+            mergeSnapshot({ recommendations: JSON.parse(message.body) })
+            scheduleDecisionSurfaceRefresh('recommendations-topic')
+          })
+          nextClient.subscribe(`${topicPrefix}/inventory`, (message) => {
+            mergeSnapshot({ inventory: JSON.parse(message.body) })
+            scheduleDecisionSurfaceRefresh('inventory-topic')
+          })
           nextClient.subscribe(`${topicPrefix}/fulfillment.overview`, (message) => mergeSnapshot({ fulfillment: JSON.parse(message.body) }))
           nextClient.subscribe(`${topicPrefix}/orders.recent`, (message) => mergeSnapshot({ recentOrders: JSON.parse(message.body) }))
-          nextClient.subscribe(`${topicPrefix}/events.recent`, (message) => mergeSnapshot({ recentEvents: JSON.parse(message.body) }))
+          nextClient.subscribe(`${topicPrefix}/events.recent`, (message) => {
+            mergeSnapshot({ recentEvents: JSON.parse(message.body) })
+            scheduleDecisionSurfaceRefresh('events-recent-topic')
+          })
           nextClient.subscribe(`${topicPrefix}/audit.recent`, (message) => mergeSnapshot({ auditLogs: JSON.parse(message.body) }))
           nextClient.subscribe(`${topicPrefix}/system.incidents`, (message) => mergeSnapshot({ systemIncidents: JSON.parse(message.body) }))
           nextClient.subscribe(`${topicPrefix}/integrations.connectors`, (message) => mergeSnapshot({ integrationConnectors: JSON.parse(message.body) }))
@@ -324,6 +428,7 @@ export default function useWorkspaceRealtime({
     return () => {
       active = false
       stopDegradedRefreshLoop()
+      stopDecisionSurfaceRefreshTimer()
       publishRealtimeDebug({
         connectionState: 'disposed',
         disposedAt: new Date().toISOString(),
