@@ -108,30 +108,42 @@ export default function useWorkspaceBootstrap({
   }
 
   async function fetchSnapshot() {
-    const nextSnapshot = await fetchJson('/api/dashboard/snapshot')
-    let replaySurfaceData = null
-    if (currentPage === 'replay' || currentPage === 'integrations') {
-      try {
-        replaySurfaceData = await fetchReplaySurfaceData()
-      } catch {
-        replaySurfaceData = null
-      }
+    const shouldHydrateReplaySurface = currentPage === 'replay' || currentPage === 'integrations'
+    const [snapshotResult, replaySurfaceResult] = await Promise.allSettled([
+      fetchJson('/api/dashboard/snapshot'),
+      shouldHydrateReplaySurface ? fetchReplaySurfaceData() : Promise.resolve(null),
+    ])
+
+    if (snapshotResult.status !== 'fulfilled' && (!shouldHydrateReplaySurface || replaySurfaceResult.status !== 'fulfilled')) {
+      throw snapshotResult.reason || replaySurfaceResult.reason || new Error('Workspace snapshot could not be loaded.')
     }
-    snapshotSetter({
-      ...emptySnapshot,
-      ...nextSnapshot,
-      recentEvents: nextSnapshot.recentEvents ?? [],
-      auditLogs: nextSnapshot.auditLogs ?? [],
-      systemIncidents: nextSnapshot.systemIncidents ?? [],
-      integrationConnectors: replaySurfaceData?.integrationConnectors ?? nextSnapshot.integrationConnectors ?? [],
-      integrationImportRuns: nextSnapshot.integrationImportRuns ?? [],
-      integrationReplayQueue: replaySurfaceData?.integrationReplayQueue ?? nextSnapshot.integrationReplayQueue ?? [],
-      scenarioNotifications: nextSnapshot.scenarioNotifications ?? [],
-      slaEscalations: nextSnapshot.slaEscalations ?? [],
-      recentScenarios: nextSnapshot.recentScenarios ?? [],
-      generatedAt: nextSnapshot.generatedAt ?? new Date().toISOString(),
+
+    const nextSnapshot = snapshotResult.status === 'fulfilled' ? snapshotResult.value : null
+    const replaySurfaceData = replaySurfaceResult.status === 'fulfilled' ? replaySurfaceResult.value : null
+
+    snapshotSetter((current) => {
+      const previousSnapshot = current || emptySnapshot
+      const baseSnapshot = nextSnapshot || previousSnapshot
+      return {
+        ...emptySnapshot,
+        ...previousSnapshot,
+        ...baseSnapshot,
+        recentEvents: baseSnapshot.recentEvents ?? previousSnapshot.recentEvents ?? [],
+        auditLogs: baseSnapshot.auditLogs ?? previousSnapshot.auditLogs ?? [],
+        systemIncidents: baseSnapshot.systemIncidents ?? previousSnapshot.systemIncidents ?? [],
+        integrationConnectors: replaySurfaceData?.integrationConnectors ?? baseSnapshot.integrationConnectors ?? previousSnapshot.integrationConnectors ?? [],
+        integrationImportRuns: baseSnapshot.integrationImportRuns ?? previousSnapshot.integrationImportRuns ?? [],
+        integrationReplayQueue: replaySurfaceData?.integrationReplayQueue ?? baseSnapshot.integrationReplayQueue ?? previousSnapshot.integrationReplayQueue ?? [],
+        scenarioNotifications: baseSnapshot.scenarioNotifications ?? previousSnapshot.scenarioNotifications ?? [],
+        slaEscalations: baseSnapshot.slaEscalations ?? previousSnapshot.slaEscalations ?? [],
+        recentScenarios: baseSnapshot.recentScenarios ?? previousSnapshot.recentScenarios ?? [],
+        generatedAt: baseSnapshot.generatedAt ?? previousSnapshot.generatedAt ?? new Date().toISOString(),
+      }
     })
-    pageStateSetter({ loading: false, error: '' })
+    pageStateSetter({
+      loading: false,
+      error: snapshotResult.status === 'fulfilled' ? '' : '',
+    })
   }
 
   async function fetchCatalogProducts(options = {}) {
