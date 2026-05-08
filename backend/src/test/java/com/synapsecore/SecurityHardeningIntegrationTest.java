@@ -1,6 +1,8 @@
 package com.synapsecore;
 
 import static org.springframework.http.MediaType.APPLICATION_JSON;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.options;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
@@ -14,10 +16,14 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
+import org.springframework.boot.test.context.TestConfiguration;
+import org.springframework.context.annotation.Bean;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.test.annotation.DirtiesContext;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.RestController;
 
 @SpringBootTest(properties = {
     "spring.profiles.active=prod",
@@ -60,6 +66,63 @@ class SecurityHardeningIntegrationTest {
     }
 
     @Test
+    void allowedOriginReceivesCorsHeadersOnAuthSessionEndpointsAndUnauthenticatedApiReads() throws Exception {
+        String origin = "https://synapscore-frontend-3.onrender.com";
+
+        mockMvc.perform(get("/api/auth/session")
+                .header("Origin", origin))
+            .andExpect(status().isOk())
+            .andExpect(header().string("Access-Control-Allow-Origin", origin))
+            .andExpect(header().string("Access-Control-Allow-Credentials", "true"));
+
+        mockMvc.perform(get("/api/orders/recent")
+                .header("Origin", origin))
+            .andExpect(status().isForbidden())
+            .andExpect(header().string("Access-Control-Allow-Origin", origin))
+            .andExpect(header().string("Access-Control-Allow-Credentials", "true"));
+
+        mockMvc.perform(get("/api/system/runtime")
+                .header("Origin", origin))
+            .andExpect(status().isForbidden())
+            .andExpect(header().string("Access-Control-Allow-Origin", origin))
+            .andExpect(header().string("Access-Control-Allow-Credentials", "true"));
+
+        mockMvc.perform(get("/api/dashboard/snapshot")
+                .header("Origin", origin))
+            .andExpect(status().isForbidden())
+            .andExpect(header().string("Access-Control-Allow-Origin", origin))
+            .andExpect(header().string("Access-Control-Allow-Credentials", "true"));
+    }
+
+    @Test
+    void allowedOriginReceivesCorsHeadersForPreflightAndRepresentativeErrorResponses() throws Exception {
+        String origin = "https://synapscore-frontend-3.onrender.com";
+
+        mockMvc.perform(options("/api/orders/recent")
+                .header("Origin", origin)
+                .header("Access-Control-Request-Method", "GET")
+                .header("Access-Control-Request-Headers", "content-type,x-synapse-tenant"))
+            .andExpect(status().isOk())
+            .andExpect(header().string("Access-Control-Allow-Origin", origin))
+            .andExpect(header().string("Access-Control-Allow-Credentials", "true"))
+            .andExpect(header().string("Access-Control-Allow-Headers", "content-type,x-synapse-tenant"));
+
+        mockMvc.perform(post("/api/auth/session/login")
+                .header("Origin", origin)
+                .contentType(APPLICATION_JSON)
+                .content("{}"))
+            .andExpect(status().isBadRequest())
+            .andExpect(header().string("Access-Control-Allow-Origin", origin))
+            .andExpect(header().string("Access-Control-Allow-Credentials", "true"));
+
+        mockMvc.perform(get("/api/test/cors-failure")
+                .header("Origin", origin))
+            .andExpect(status().isInternalServerError())
+            .andExpect(header().string("Access-Control-Allow-Origin", origin))
+            .andExpect(header().string("Access-Control-Allow-Credentials", "true"));
+    }
+
+    @Test
     void authLoginEndpointRejectsRequestsQuicklyWithoutCreatingSessionsOrAuditWrites() throws Exception {
         long auditCountBefore = auditLogRepository.count();
         String forwardedFor = "203.0.113.10";
@@ -78,6 +141,8 @@ class SecurityHardeningIntegrationTest {
                 .contentType(APPLICATION_JSON)
                 .content(requestBody))
             .andExpect(status().isUnauthorized())
+            .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.header().string("Access-Control-Allow-Origin", origin))
+            .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.header().string("Access-Control-Allow-Credentials", "true"))
             .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.header().string("X-Synapse-RateLimit-Limit", "2"))
             .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.header().string("X-Synapse-RateLimit-Remaining", "1"))
             .andExpect(jsonPath("$.message").value("Invalid operator credentials."))
@@ -229,5 +294,23 @@ class SecurityHardeningIntegrationTest {
                 .content("{}"))
             .andExpect(status().isTooManyRequests())
             .andExpect(jsonPath("$.message").value("Integration mutation rate limit exceeded. Wait before attempting another connector, webhook, import, or replay change."));
+    }
+
+    @TestConfiguration
+    static class CorsFailureTestConfiguration {
+
+        @Bean
+        CorsFailureController corsFailureController() {
+            return new CorsFailureController();
+        }
+    }
+
+    @RestController
+    static class CorsFailureController {
+
+        @GetMapping("/api/test/cors-failure")
+        String fail() {
+            throw new IllegalStateException("CORS test failure endpoint.");
+        }
     }
 }

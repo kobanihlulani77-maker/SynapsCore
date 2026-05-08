@@ -222,6 +222,43 @@ async function readJsonGetBestEffort(api, url, context = {}, requestOptions = {}
   }
 }
 
+async function readApiDiagnosticWithOrigin(api, url, origin, context = {}) {
+  try {
+    const response = await api.get(url, {
+      timeout: context.timeout ?? 8_000,
+      headers: origin ? { Origin: origin } : undefined,
+    })
+    const responseText = await response.text()
+    let payload = null
+    try {
+      payload = responseText ? JSON.parse(responseText) : null
+    } catch {
+      payload = null
+    }
+    const responseHeaders = safeResponseHeaders(response)
+    return {
+      method: 'GET',
+      url,
+      status: typeof response.status === 'function' ? response.status() : null,
+      ok: typeof response.ok === 'function' ? response.ok() : null,
+      requestId: responseHeaders['x-request-id'] || payload?.requestId || null,
+      accessControlAllowOrigin: responseHeaders['access-control-allow-origin'] || null,
+      accessControlAllowCredentials: responseHeaders['access-control-allow-credentials'] || null,
+      vary: responseHeaders['vary'] || null,
+      contentType: responseHeaders['content-type'] || null,
+      bodyPreview: payload ?? responseText.slice(0, 1_200),
+      requestOrigin: origin || null,
+    }
+  } catch (error) {
+    return {
+      method: 'GET',
+      url,
+      requestOrigin: origin || null,
+      error: error?.message || String(error),
+    }
+  }
+}
+
 function safeResponseHeaders(response) {
   try {
     return typeof response?.headers === 'function' ? response.headers() || {} : {}
@@ -1222,7 +1259,7 @@ async function waitForUsersPageReady(page, expectedOperatorName, expectedUserFul
   }
 }
 
-async function waitForOrdersPageOrderVisible(page, orderRecord, testInfo) {
+async function waitForOrdersPageOrderVisible(page, orderRecord, testInfo, api = null) {
   const pageDiagnostics = ensurePageDiagnostics(page)
   const startedAt = Date.now()
   let lastRefreshAt = 0
@@ -1286,13 +1323,23 @@ async function waitForOrdersPageOrderVisible(page, orderRecord, testInfo) {
     await page.screenshot({ path: screenshotPath, fullPage: true }).catch(() => {})
   }
 
+  const browserOrigin = await page.evaluate(() => globalThis.location?.origin || '').catch(() => '')
+  const apiReadbacks = api ? {
+    ordersRecent: await readApiDiagnosticWithOrigin(api, '/api/orders/recent', browserOrigin, { timeout: 8_000 }),
+    systemRuntime: await readApiDiagnosticWithOrigin(api, '/api/system/runtime', browserOrigin, { timeout: 8_000 }),
+    dashboardSnapshot: await readApiDiagnosticWithOrigin(api, '/api/dashboard/snapshot', browserOrigin, { timeout: 8_000 }),
+    authSession: await readApiDiagnosticWithOrigin(api, '/api/auth/session', browserOrigin, { timeout: 8_000 }),
+  } : null
+
   throw new Error(`Orders page failed to render deterministic proof order ${orderRecord.externalOrderId}. Diagnostics: ${JSON.stringify({
     expectedExternalOrderId: orderRecord.externalOrderId,
     expectedWarehouseCode: orderRecord.warehouseCode,
     lastState,
+    browserOrigin,
     lastApiResponse: pageDiagnostics.lastApiResponse,
     consoleErrors: pageDiagnostics.consoleErrors,
     failedRequests: pageDiagnostics.failedRequests,
+    apiReadbacks,
     screenshotPath,
   })}`)
 }
@@ -2181,7 +2228,7 @@ async function executeScenarioAndWaitForOrder(page, api, scenarioFixture, scenar
 
   await navigateWithinApp(page, '/orders')
   await expect(page.getByRole('heading', { level: 1, name: 'Live order operations' })).toBeVisible()
-  await waitForOrdersPageOrderVisible(page, durableOrderCoverage.order, testInfo)
+  await waitForOrdersPageOrderVisible(page, durableOrderCoverage.order, testInfo, api)
 
   return {
     executeResponseDetails,
@@ -2774,7 +2821,7 @@ test('alerts, recommendations, orders, inventory, integrations, users, profile, 
 
     await navigateWithinApp(page, '/orders')
     await expect(page.getByRole('heading', { level: 1, name: 'Live order operations' })).toBeVisible()
-    await waitForOrdersPageOrderVisible(page, orderRecord, testInfo)
+    await waitForOrdersPageOrderVisible(page, orderRecord, testInfo, api)
 
     await navigateWithinApp(page, '/inventory')
     await expect(page.getByRole('heading', { level: 1, name: 'Inventory intelligence' })).toBeVisible()
