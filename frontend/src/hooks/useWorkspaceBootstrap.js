@@ -69,6 +69,19 @@ export default function useWorkspaceBootstrap({
   normalizeScenarioForm,
   scenarioHistoryFilters,
 }) {
+  function mergeReplaySurfaceSnapshot(replaySurfaceData) {
+    snapshotSetter((current) => {
+      const previousSnapshot = current || emptySnapshot
+      return {
+        ...emptySnapshot,
+        ...previousSnapshot,
+        integrationConnectors: replaySurfaceData?.integrationConnectors ?? previousSnapshot.integrationConnectors ?? [],
+        integrationReplayQueue: replaySurfaceData?.integrationReplayQueue ?? previousSnapshot.integrationReplayQueue ?? [],
+        generatedAt: previousSnapshot.generatedAt ?? new Date().toISOString(),
+      }
+    })
+  }
+
   async function fetchReplaySurfaceData() {
     const replayQueueRequest = fetchJson(
       '/api/integrations/orders/replay-queue',
@@ -433,6 +446,37 @@ export default function useWorkspaceBootstrap({
       }
     }
   }, [authSessionState.session, integrationActorRole, scenarioActorRole])
+
+  useEffect(() => {
+    let active = true
+    async function loadDedicatedIntegrationSurface() {
+      if (!authSessionState.session?.tenantCode) {
+        return
+      }
+      if (currentPage !== 'replay' && currentPage !== 'integrations') {
+        return
+      }
+      try {
+        const replaySurfaceData = await fetchReplaySurfaceData()
+        if (!active) {
+          return
+        }
+        mergeReplaySurfaceSnapshot(replaySurfaceData)
+        pageStateSetter((current) => ({ ...current, loading: false, error: current.error || '' }))
+      } catch (error) {
+        if (!active) {
+          return
+        }
+        pageStateSetter((current) => ({
+          ...current,
+          loading: false,
+          error: current.error || `Replay surface load issue: ${error.message}`,
+        }))
+      }
+    }
+    loadDedicatedIntegrationSurface()
+    return () => { active = false }
+  }, [authSessionState.session, currentPage, activeTenantCode])
 
   useEffect(() => {
     let active = true
