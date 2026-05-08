@@ -1,3 +1,4 @@
+import { useEffect, useState } from 'react'
 import EmptyState from '../components/EmptyState'
 import Panel from '../components/Panel'
 import { SummaryCard } from '../components/Card'
@@ -20,6 +21,7 @@ export default function ReplayPage({ context }) {
     formatCodeLabel,
     formatTimestamp,
     getReplayStatusClassName,
+    fetchJson,
   } = context
 
   if (!isAuthenticated || !isReplayPage) {
@@ -30,9 +32,83 @@ export default function ReplayPage({ context }) {
   const selectedRecord = queuedRecords.find((record) => record.id === selectedReplayRecordId)
     || queuedRecords.find((record) => record.status === 'PENDING')
     || queuedRecords[0]
-  const selectedConnector = selectedRecord
+  const snapshotSelectedConnector = selectedRecord
     ? snapshot.integrationConnectors.find((connector) => connector.sourceSystem === selectedRecord.sourceSystem && connector.type === selectedRecord.connectorType)
     : null
+  const [selectedConnectorOverride, setSelectedConnectorOverride] = useState(null)
+
+  useEffect(() => {
+    let active = true
+    let refreshTimeoutId = null
+
+    const clearRefreshTimer = () => {
+      if (refreshTimeoutId !== null) {
+        globalThis.clearTimeout(refreshTimeoutId)
+        refreshTimeoutId = null
+      }
+    }
+
+    async function loadSelectedConnector() {
+      if (!selectedRecord?.sourceSystem || !selectedRecord?.connectorType || !fetchJson) {
+        if (active) {
+          setSelectedConnectorOverride(null)
+        }
+        return
+      }
+
+      try {
+        const connectorPayload = await fetchJson(
+          `/api/integrations/orders/connectors?sourceSystem=${encodeURIComponent(selectedRecord.sourceSystem)}&type=${encodeURIComponent(selectedRecord.connectorType)}`,
+          globalThis.AbortSignal?.timeout ? { signal: globalThis.AbortSignal.timeout(8_000) } : {},
+        )
+        const exactConnector = Array.isArray(connectorPayload)
+          ? connectorPayload.find((connector) => connector.sourceSystem === selectedRecord.sourceSystem && connector.type === selectedRecord.connectorType) || null
+          : null
+
+        if (!active) {
+          return
+        }
+
+        setSelectedConnectorOverride(exactConnector)
+
+        if (selectedRecord.status === 'PENDING' && exactConnector && !exactConnector.enabled) {
+          clearRefreshTimer()
+          refreshTimeoutId = globalThis.setTimeout(() => {
+            refreshTimeoutId = null
+            void loadSelectedConnector()
+          }, 2_000)
+        }
+      } catch {
+        if (!active) {
+          return
+        }
+        setSelectedConnectorOverride(null)
+        if (selectedRecord.status === 'PENDING') {
+          clearRefreshTimer()
+          refreshTimeoutId = globalThis.setTimeout(() => {
+            refreshTimeoutId = null
+            void loadSelectedConnector()
+          }, 2_000)
+        }
+      }
+    }
+
+    void loadSelectedConnector()
+
+    return () => {
+      active = false
+      clearRefreshTimer()
+    }
+  }, [
+    fetchJson,
+    selectedRecord?.id,
+    selectedRecord?.sourceSystem,
+    selectedRecord?.connectorType,
+    selectedRecord?.status,
+    snapshot.integrationConnectors,
+  ])
+
+  const selectedConnector = selectedConnectorOverride || snapshotSelectedConnector
   const replayBlockedByEligibility = Boolean(
     selectedRecord?.nextEligibleAt
       && Number.isFinite(Date.parse(selectedRecord.nextEligibleAt))

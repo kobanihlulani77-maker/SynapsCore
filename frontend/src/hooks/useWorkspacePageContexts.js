@@ -137,6 +137,7 @@ export default function useWorkspacePageContexts({
   } = authContext
 
   const {
+    fetchJson,
     apiUrl,
     wsUrl,
     realtimeTransportLabel,
@@ -574,7 +575,7 @@ export default function useWorkspacePageContexts({
       approvalsContext: { isAuthenticated, isApprovalsPage, pendingApprovalScenarios, approvedScenarios, rejectedScenarios, overdueScenarios, selectedApprovalScenario, setSelectedScenarioId, formatCodeLabel, formatTimestamp, snapshot, scenarioDecisionContext },
       escalationsContext: { isAuthenticated, isEscalationsPage, snapshot, systemIncidents, escalatedScenarios, selectedEscalationScenario, setSelectedScenarioId, formatCodeLabel, formatTimestamp, getIncidentStatusClassName, scenarioDecisionContext },
       integrationsContext: { isAuthenticated, isIntegrationsPage, snapshot, selectedIntegrationConnectorId, setSelectedIntegrationConnectorId, enabledConnectorCount, pendingReplayCount, systemIncidents, navigateToPage, formatCodeLabel, formatTimestamp, getImportStatusClassName },
-      replayContext: { isAuthenticated, isReplayPage, snapshot, selectedReplayRecordId, setSelectedReplayRecordId, pendingReplayCount, integrationReplayState, replayFailedIntegration, signedInSession, signedInRoles, signedInWarehouseScopes, hasWarehouseScope, navigateToPage, formatCodeLabel, formatTimestamp, getReplayStatusClassName },
+      replayContext: { isAuthenticated, isReplayPage, snapshot, selectedReplayRecordId, setSelectedReplayRecordId, pendingReplayCount, integrationReplayState, replayFailedIntegration, signedInSession, signedInRoles, signedInWarehouseScopes, hasWarehouseScope, navigateToPage, formatCodeLabel, formatTimestamp, getReplayStatusClassName, fetchJson },
       runtimeContext: { isAuthenticated, isRuntimePage, runtime, systemIncidents, selectedRuntimeIncidentKey, setSelectedRuntimeIncidentKey, navigateToPage, formatCodeLabel, formatMetricValue, formatTimestamp, getIncidentStatusClassName, getRuntimeStatusClassName },
       auditContext: { isAuthenticated, isAuditPage, snapshot, systemIncidents, pendingReplayCount, recentBusinessEvents, recentAuditEntries, selectedAuditTrace, setSelectedTraceEntryKey, formatCodeLabel, formatTimestamp, navigateToPage },
       usersContext: { isAuthenticated, isUsersPage, accessAdminOperators, accessAdminUsers, workspaceAdmin, selectedAccessSubject, setSelectedAccessSubjectKey, formatCodeLabel, navigateToPage },
