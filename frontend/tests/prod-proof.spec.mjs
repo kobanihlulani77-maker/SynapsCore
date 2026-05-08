@@ -176,6 +176,52 @@ function isTransientApiReadFailure(error, options = {}) {
   return true
 }
 
+function isTransientTransportReadFailure(error, options = {}) {
+  const { url = null } = options
+  const message = error?.message || String(error)
+  const transientSignals = ['ECONNRESET', 'ETIMEDOUT', 'ECONNABORTED', 'socket hang up', 'EAI_AGAIN']
+
+  if (!transientSignals.some((signal) => message.includes(signal))) {
+    return false
+  }
+
+  if (!message.includes('apiRequestContext.get')) {
+    return false
+  }
+
+  if (!url) {
+    return true
+  }
+
+  const absoluteUrl = `${backendUrl}${url}`
+  return message.includes(url) || message.includes(absoluteUrl)
+}
+
+function isTransientGetReadFailure(error, options = {}) {
+  return isTransientApiReadFailure(error, options) || isTransientTransportReadFailure(error, options)
+}
+
+async function readJsonGetBestEffort(api, url, context = {}, requestOptions = {}) {
+  try {
+    return {
+      payload: await readJson(await api.get(url, requestOptions), {
+        method: 'GET',
+        url,
+        ...context,
+      }),
+      error: null,
+    }
+  } catch (error) {
+    if (!isTransientGetReadFailure(error, { url })) {
+      throw error
+    }
+    return {
+      payload: null,
+      error: error?.message || String(error),
+    }
+  }
+}
+
 function safeResponseHeaders(response) {
   try {
     return typeof response?.headers === 'function' ? response.headers() || {} : {}
@@ -621,7 +667,7 @@ async function readReplayOutcome(api, externalOrderId) {
       return { state: 'queued', status: replayRecord.status, record: replayRecord }
     }
   } catch (error) {
-    if (!isTransientApiReadFailure(error, { url: '/api/integrations/orders/replay-queue' })) {
+    if (!isTransientGetReadFailure(error, { url: '/api/integrations/orders/replay-queue' })) {
       throw error
     }
     replayQueueError = error?.message || String(error)
@@ -641,7 +687,7 @@ async function readReplayOutcome(api, externalOrderId) {
       return { state: 'replayed' }
     }
   } catch (error) {
-    if (!isTransientApiReadFailure(error, { url: '/api/orders/recent' })) {
+    if (!isTransientGetReadFailure(error, { url: '/api/orders/recent' })) {
       throw error
     }
     recentOrdersError = error?.message || String(error)
@@ -1933,14 +1979,26 @@ async function ensureRecentOrder(api) {
   let latestCoverage = null
 
   while (Date.now() - startedAt < 30_000) {
-    const recentOrders = await readJson(await api.get('/api/orders/recent'), {
-      method: 'GET',
-      url: '/api/orders/recent',
+    const { payload: recentOrders, error: recentOrdersError } = await readJsonGetBestEffort(api, '/api/orders/recent', {
       requestPayload: {
         externalOrderId,
       },
       note: `Recent order lookup for deterministic hosted proof order ${externalOrderId}.`,
     })
+
+    if (!Array.isArray(recentOrders)) {
+      latestCoverage = {
+        order: null,
+        snapshotOrder: null,
+        snapshotGeneratedAt: null,
+        snapshotError: null,
+        recentOrderIds: [],
+        recentOrdersError,
+        snapshotOrderIds: [],
+      }
+      await new Promise((resolve) => setTimeout(resolve, 500))
+      continue
+    }
 
     const order = recentOrders.find((candidate) => candidate.externalOrderId === externalOrderId) || null
     latestCoverage = {
@@ -1949,6 +2007,7 @@ async function ensureRecentOrder(api) {
       snapshotGeneratedAt: null,
       snapshotError: null,
       recentOrderIds: recentOrders.map((candidate) => candidate.externalOrderId).slice(0, 12),
+      recentOrdersError,
       snapshotOrderIds: [],
     }
 
@@ -1994,14 +2053,26 @@ async function waitForOrderReadModelCoverage(api, externalOrderId, message) {
   let latestCoverage = null
 
   while (Date.now() - startedAt < 30_000) {
-    const recentOrders = await readJson(await api.get('/api/orders/recent'), {
-      method: 'GET',
-      url: '/api/orders/recent',
+    const { payload: recentOrders, error: recentOrdersError } = await readJsonGetBestEffort(api, '/api/orders/recent', {
       requestPayload: {
         externalOrderId,
       },
       note: `Recent order lookup for hosted proof order ${externalOrderId}.`,
     })
+
+    if (!Array.isArray(recentOrders)) {
+      latestCoverage = {
+        order: null,
+        snapshotOrder: null,
+        snapshotGeneratedAt: null,
+        snapshotError: null,
+        recentOrderIds: [],
+        recentOrdersError,
+        snapshotOrderIds: [],
+      }
+      await pageWait(500)
+      continue
+    }
 
     const order = Array.isArray(recentOrders)
       ? recentOrders.find((candidate) => candidate.externalOrderId === externalOrderId) || null
@@ -2013,6 +2084,7 @@ async function waitForOrderReadModelCoverage(api, externalOrderId, message) {
       snapshotGeneratedAt: null,
       snapshotError: null,
       recentOrderIds: Array.isArray(recentOrders) ? recentOrders.map((candidate) => candidate.externalOrderId).slice(0, 12) : [],
+      recentOrdersError,
       snapshotOrderIds: [],
     }
 
