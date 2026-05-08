@@ -69,6 +69,17 @@ export default function useWorkspaceBootstrap({
   normalizeScenarioForm,
   scenarioHistoryFilters,
 }) {
+  async function fetchReplaySurfaceData() {
+    const [integrationReplayQueue, integrationConnectors] = await Promise.all([
+      fetchJson('/api/integrations/orders/replay-queue'),
+      fetchJson('/api/integrations/orders/connectors'),
+    ])
+    return {
+      integrationReplayQueue: Array.isArray(integrationReplayQueue) ? integrationReplayQueue : [],
+      integrationConnectors: Array.isArray(integrationConnectors) ? integrationConnectors : [],
+    }
+  }
+
   async function fetchAccessAdminData() {
     const [workspace, operators, users] = await Promise.all([
       fetchJson('/api/access/admin/workspace'),
@@ -98,15 +109,23 @@ export default function useWorkspaceBootstrap({
 
   async function fetchSnapshot() {
     const nextSnapshot = await fetchJson('/api/dashboard/snapshot')
+    let replaySurfaceData = null
+    if (currentPage === 'replay' || currentPage === 'integrations') {
+      try {
+        replaySurfaceData = await fetchReplaySurfaceData()
+      } catch {
+        replaySurfaceData = null
+      }
+    }
     snapshotSetter({
       ...emptySnapshot,
       ...nextSnapshot,
       recentEvents: nextSnapshot.recentEvents ?? [],
       auditLogs: nextSnapshot.auditLogs ?? [],
       systemIncidents: nextSnapshot.systemIncidents ?? [],
-      integrationConnectors: nextSnapshot.integrationConnectors ?? [],
+      integrationConnectors: replaySurfaceData?.integrationConnectors ?? nextSnapshot.integrationConnectors ?? [],
       integrationImportRuns: nextSnapshot.integrationImportRuns ?? [],
-      integrationReplayQueue: nextSnapshot.integrationReplayQueue ?? [],
+      integrationReplayQueue: replaySurfaceData?.integrationReplayQueue ?? nextSnapshot.integrationReplayQueue ?? [],
       scenarioNotifications: nextSnapshot.scenarioNotifications ?? [],
       slaEscalations: nextSnapshot.slaEscalations ?? [],
       recentScenarios: nextSnapshot.recentScenarios ?? [],
