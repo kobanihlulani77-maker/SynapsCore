@@ -611,42 +611,75 @@ async function waitForReplayQueueCoverage(api, externalOrderId, sourceSystem, me
     snapshotContainsRecord: false,
     replayRecord: null,
     snapshotReplayRecord: null,
+    replayQueueError: null,
+    snapshotError: null,
   }
 
-  await expect.poll(async () => {
-    const [replayQueue, snapshot] = await Promise.all([
-      readJson(await api.get('/api/integrations/orders/replay-queue'), {
+  const startedAt = Date.now()
+  while (Date.now() - startedAt < 30_000) {
+    try {
+      const replayQueue = await readJson(await api.get('/api/integrations/orders/replay-queue'), {
         method: 'GET',
         url: '/api/integrations/orders/replay-queue',
         requestPayload: { externalOrderId, sourceSystem },
         note: 'Hosted replay queue readback verification.',
-      }),
-      readDashboardSnapshot(api, 'Hosted replay queue snapshot verification.'),
-    ])
+      })
 
-    const replayRecord = Array.isArray(replayQueue)
-      ? replayQueue.find((record) => record.externalOrderId === externalOrderId)
-      : null
-    const snapshotReplayRecord = Array.isArray(snapshot?.integrationReplayQueue)
-      ? snapshot.integrationReplayQueue.find((record) => record.externalOrderId === externalOrderId)
-      : null
+      const replayRecord = Array.isArray(replayQueue)
+        ? replayQueue.find((record) => record.externalOrderId === externalOrderId)
+        : null
 
-    latestCoverage = {
-      replayQueueContainsRecord: Boolean(replayRecord),
-      snapshotContainsRecord: Boolean(snapshotReplayRecord),
-      replayRecord,
-      snapshotReplayRecord,
-      replayQueueCount: Array.isArray(replayQueue) ? replayQueue.length : null,
-      snapshotReplayQueueCount: Array.isArray(snapshot?.integrationReplayQueue) ? snapshot.integrationReplayQueue.length : null,
+      latestCoverage = {
+        ...latestCoverage,
+        replayQueueContainsRecord: Boolean(replayRecord),
+        replayRecord,
+        replayQueueCount: Array.isArray(replayQueue) ? replayQueue.length : null,
+        replayQueuePreview: Array.isArray(replayQueue)
+          ? replayQueue.slice(0, 12).map((record) => ({
+              externalOrderId: record.externalOrderId,
+              sourceSystem: record.sourceSystem,
+              status: record.status,
+            }))
+          : [],
+        replayQueueError: null,
+      }
+
+      if (replayRecord) {
+        try {
+          const snapshot = await readJson(await api.get('/api/dashboard/snapshot', { timeout: 5_000 }), {
+            method: 'GET',
+            url: '/api/dashboard/snapshot',
+            note: 'Best-effort replay queue snapshot verification.',
+          })
+          const snapshotReplayRecord = Array.isArray(snapshot?.integrationReplayQueue)
+            ? snapshot.integrationReplayQueue.find((record) => record.externalOrderId === externalOrderId)
+            : null
+          latestCoverage = {
+            ...latestCoverage,
+            snapshotContainsRecord: Boolean(snapshotReplayRecord),
+            snapshotReplayRecord,
+            snapshotReplayQueueCount: Array.isArray(snapshot?.integrationReplayQueue) ? snapshot.integrationReplayQueue.length : null,
+            snapshotError: null,
+          }
+        } catch (error) {
+          latestCoverage = {
+            ...latestCoverage,
+            snapshotError: error?.message || String(error),
+          }
+        }
+        return latestCoverage
+      }
+    } catch (error) {
+      latestCoverage = {
+        ...latestCoverage,
+        replayQueueError: error?.message || String(error),
+      }
     }
 
-    return Boolean(replayRecord)
-  }, {
-    timeout: 30_000,
-    message,
-  }).toBe(true)
+    await pageWait(500)
+  }
 
-  return latestCoverage
+  throw new Error(`${message} Diagnostics: ${JSON.stringify(latestCoverage)}`)
 }
 
 function describeReplayOutcome(replayOutcome) {
