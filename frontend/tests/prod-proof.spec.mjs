@@ -2416,16 +2416,35 @@ test('replay recovery, scenario approval, execution, and browser role gating wor
 
       await replayFixture.enableConnector()
       let postEnableReplayState = 'waiting'
-      await expect.poll(async () => {
-        currentReplayOutcome = await readReplayOutcome(replayFixture.api, replayFixture.externalOrderId)
-        postEnableReplayState = describeReplayOutcome(currentReplayOutcome)
-        return postEnableReplayState === 'queued:PENDING' || postEnableReplayState === 'replayed'
-      }, {
-        timeout: 20_000,
-        message: `Expected ${replayFixture.externalOrderId} to either remain queued for manual replay or auto-replay after enabling the replay connector.`,
-      }).toBe(true)
+      let postEnableReplayUiState = null
+      const postEnableReplayStatesSeen = []
+      try {
+        await expect.poll(async () => {
+          currentReplayOutcome = await readReplayOutcome(replayFixture.api, replayFixture.externalOrderId)
+          postEnableReplayState = describeReplayOutcome(currentReplayOutcome)
+          if (!postEnableReplayStatesSeen.includes(postEnableReplayState)) {
+            postEnableReplayStatesSeen.push(postEnableReplayState)
+          }
+          postEnableReplayUiState = await readExactReplayActionState(page, replayFixture).catch(() => null)
+          return currentReplayOutcome?.state === 'replayed'
+            || currentReplayOutcome?.state === 'queued'
+            || Boolean(postEnableReplayUiState?.rowFound)
+        }, {
+          timeout: 20_000,
+          message: `Expected ${replayFixture.externalOrderId} to either remain queued for manual replay or auto-replay after enabling the replay connector.`,
+        }).toBe(true)
+      } catch (error) {
+        const replayPageDiagnostics = await readReplayPageDiagnostics(page, replayFixture).catch(() => null)
+        throw new Error(`Expected ${replayFixture.externalOrderId} to either remain queued for manual replay or auto-replay after enabling the replay connector. Diagnostics: ${JSON.stringify({
+          postEnableReplayState,
+          postEnableReplayStatesSeen,
+          currentReplayOutcome,
+          postEnableReplayUiState,
+          replayPageDiagnostics,
+        })} Original error: ${error?.message || String(error)}`)
+      }
 
-      if (postEnableReplayState === 'queued:PENDING') {
+      if (currentReplayOutcome?.state !== 'replayed') {
         const replayPageDiagnostics = ensurePageDiagnostics(page)
         await waitForReplayButtonReady(page, replayFixture)
 
