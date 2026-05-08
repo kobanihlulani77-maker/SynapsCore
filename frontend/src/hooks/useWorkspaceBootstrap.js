@@ -70,13 +70,35 @@ export default function useWorkspaceBootstrap({
   scenarioHistoryFilters,
 }) {
   async function fetchReplaySurfaceData() {
-    const [integrationReplayQueue, integrationConnectors] = await Promise.all([
-      fetchJson('/api/integrations/orders/replay-queue'),
-      fetchJson('/api/integrations/orders/connectors'),
+    const replayQueueRequest = fetchJson(
+      '/api/integrations/orders/replay-queue',
+      globalThis.AbortSignal?.timeout
+        ? { signal: globalThis.AbortSignal.timeout(8_000) }
+        : {},
+    )
+    const connectorsRequest = fetchJson(
+      '/api/integrations/orders/connectors',
+      globalThis.AbortSignal?.timeout
+        ? { signal: globalThis.AbortSignal.timeout(5_000) }
+        : {},
+    )
+
+    const [integrationReplayQueueResult, integrationConnectorsResult] = await Promise.allSettled([
+      replayQueueRequest,
+      connectorsRequest,
     ])
+
+    if (integrationReplayQueueResult.status !== 'fulfilled' && integrationConnectorsResult.status !== 'fulfilled') {
+      throw integrationReplayQueueResult.reason || integrationConnectorsResult.reason || new Error('Replay surface data could not be loaded.')
+    }
+
     return {
-      integrationReplayQueue: Array.isArray(integrationReplayQueue) ? integrationReplayQueue : [],
-      integrationConnectors: Array.isArray(integrationConnectors) ? integrationConnectors : [],
+      integrationReplayQueue: integrationReplayQueueResult.status === 'fulfilled' && Array.isArray(integrationReplayQueueResult.value)
+        ? integrationReplayQueueResult.value
+        : null,
+      integrationConnectors: integrationConnectorsResult.status === 'fulfilled' && Array.isArray(integrationConnectorsResult.value)
+        ? integrationConnectorsResult.value
+        : null,
     }
   }
 
