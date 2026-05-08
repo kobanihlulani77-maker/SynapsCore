@@ -139,6 +139,43 @@ async function readJson(response, context = {}) {
   throw new Error(`Expected JSON response but received non-JSON payload from ${responseMethod} ${responseUrl}: ${responseText}`)
 }
 
+function parseApiFailureDetails(error) {
+  const message = error?.message || String(error)
+  const prefix = 'SynapseCore API request failed: '
+  if (!message.startsWith(prefix)) {
+    return null
+  }
+
+  try {
+    return JSON.parse(message.slice(prefix.length))
+  } catch {
+    return null
+  }
+}
+
+function isTransientApiReadFailure(error, options = {}) {
+  const {
+    url = null,
+    statuses = [502, 503, 504],
+  } = options
+  const failureDetails = parseApiFailureDetails(error)
+  if (!failureDetails) {
+    return false
+  }
+
+  const method = `${failureDetails.method || ''}`.toUpperCase()
+  const status = Number(failureDetails.status)
+  if (method !== 'GET' || !statuses.includes(status)) {
+    return false
+  }
+
+  if (url && failureDetails.url !== url) {
+    return false
+  }
+
+  return true
+}
+
 function safeResponseHeaders(response) {
   try {
     return typeof response?.headers === 'function' ? response.headers() || {} : {}
@@ -569,29 +606,53 @@ function ensurePageDiagnostics(page) {
 }
 
 async function readReplayOutcome(api, externalOrderId) {
-  const replayQueue = await readJson(await api.get('/api/integrations/orders/replay-queue'), {
-    method: 'GET',
-    url: '/api/integrations/orders/replay-queue',
-    requestPayload: {
-      externalOrderId,
-    },
-    note: 'Replay queue lookup while verifying hosted replay fixture.',
-  })
-  const replayRecord = replayQueue.find((record) => record.externalOrderId === externalOrderId)
-  if (replayRecord) {
-    return { state: 'queued', status: replayRecord.status, record: replayRecord }
+  let replayQueueError = null
+  try {
+    const replayQueue = await readJson(await api.get('/api/integrations/orders/replay-queue'), {
+      method: 'GET',
+      url: '/api/integrations/orders/replay-queue',
+      requestPayload: {
+        externalOrderId,
+      },
+      note: 'Replay queue lookup while verifying hosted replay fixture.',
+    })
+    const replayRecord = replayQueue.find((record) => record.externalOrderId === externalOrderId)
+    if (replayRecord) {
+      return { state: 'queued', status: replayRecord.status, record: replayRecord }
+    }
+  } catch (error) {
+    if (!isTransientApiReadFailure(error, { url: '/api/integrations/orders/replay-queue' })) {
+      throw error
+    }
+    replayQueueError = error?.message || String(error)
   }
 
-  const recentOrders = await readJson(await api.get('/api/orders/recent'), {
-    method: 'GET',
-    url: '/api/orders/recent',
-    requestPayload: {
-      externalOrderId,
-    },
-    note: 'Recent orders lookup while verifying hosted replay fixture.',
-  })
-  if (recentOrders.some((order) => order.externalOrderId === externalOrderId)) {
-    return { state: 'replayed' }
+  let recentOrdersError = null
+  try {
+    const recentOrders = await readJson(await api.get('/api/orders/recent'), {
+      method: 'GET',
+      url: '/api/orders/recent',
+      requestPayload: {
+        externalOrderId,
+      },
+      note: 'Recent orders lookup while verifying hosted replay fixture.',
+    })
+    if (recentOrders.some((order) => order.externalOrderId === externalOrderId)) {
+      return { state: 'replayed' }
+    }
+  } catch (error) {
+    if (!isTransientApiReadFailure(error, { url: '/api/orders/recent' })) {
+      throw error
+    }
+    recentOrdersError = error?.message || String(error)
+  }
+
+  if (replayQueueError || recentOrdersError) {
+    return {
+      state: 'transient-error',
+      replayQueueError,
+      recentOrdersError,
+    }
   }
 
   return { state: 'missing' }
@@ -705,6 +766,10 @@ function describeReplayOutcome(replayOutcome) {
     return 'missing'
   }
 
+  if (replayOutcome.state === 'transient-error') {
+    return 'transient-error'
+  }
+
   if (replayOutcome.state === 'replayed') {
     return 'replayed'
   }
@@ -718,13 +783,30 @@ function describeReplayOutcome(replayOutcome) {
 }
 
 async function waitForReplayResolution(api, externalOrderId, timeout, message) {
-  await expect.poll(async () => {
-    const replayOutcome = await readReplayOutcome(api, externalOrderId)
-    return replayOutcome.state === 'queued' ? `${replayOutcome.state}:${replayOutcome.status}` : replayOutcome.state
-  }, {
-    timeout,
-    message,
-  }).toBe('replayed')
+  let lastReplayOutcome = null
+  const replayStatesSeen = []
+  try {
+    await expect.poll(async () => {
+      const replayOutcome = await readReplayOutcome(api, externalOrderId)
+      lastReplayOutcome = replayOutcome
+      const describedOutcome = replayOutcome.state === 'queued'
+        ? `${replayOutcome.state}:${replayOutcome.status}`
+        : replayOutcome.state
+      if (!replayStatesSeen.includes(describedOutcome)) {
+        replayStatesSeen.push(describedOutcome)
+      }
+      return describedOutcome === 'transient-error' ? 'waiting' : describedOutcome
+    }, {
+      timeout,
+      message,
+    }).toBe('replayed')
+  } catch (error) {
+    throw new Error(`${message} Diagnostics: ${JSON.stringify({
+      externalOrderId,
+      lastReplayOutcome,
+      replayStatesSeen,
+    })} Original error: ${error?.message || String(error)}`)
+  }
 }
 
 async function readReplayPageDiagnostics(page, replayFixture) {
