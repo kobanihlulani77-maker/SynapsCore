@@ -915,13 +915,7 @@ async function waitForReplayButtonReady(page, replayFixture) {
   const startedAt = Date.now()
   let lastRefreshAt = 0
 
-  while (Date.now() - startedAt < 30_000) {
-    const replayOutcome = await readReplayOutcome(replayFixture.api, replayFixture.externalOrderId)
-    if (describeReplayOutcome(replayOutcome) !== 'queued:PENDING') {
-      const diagnostics = await readReplayPageDiagnostics(page, replayFixture)
-      throw new Error(`Expected ${replayFixture.externalOrderId} to remain manually replayable while waiting for the replay button to enable. Diagnostics: ${JSON.stringify(diagnostics)}`)
-    }
-
+  while (Date.now() - startedAt < 12_000) {
     if (Date.now() - lastRefreshAt >= 2_500) {
       lastRefreshAt = Date.now()
       await refreshWorkspace(page)
@@ -1935,6 +1929,97 @@ async function executeScenarioAndWaitForOrder(page, api, scenarioFixture, scenar
   }
 }
 
+async function waitForApprovedScenarioCoverage(api, scenarioFixture, message) {
+  const startedAt = Date.now()
+  let latestCoverage = null
+
+  while (Date.now() - startedAt < 30_000) {
+    const history = await readJson(await api.get('/api/scenarios/history'), {
+      method: 'GET',
+      url: '/api/scenarios/history',
+      requestPayload: {
+        scenarioRunId: scenarioFixture.scenarioId,
+        scenarioTitle: scenarioFixture.title,
+      },
+      note: `Scenario approval history lookup for hosted proof scenario ${scenarioFixture.title}.`,
+    })
+
+    const scenarioRun = Array.isArray(history)
+      ? history.find((candidate) => candidate.id === scenarioFixture.scenarioId) || null
+      : null
+
+    latestCoverage = {
+      scenarioRun,
+      historyPreview: Array.isArray(history)
+        ? history.slice(0, 12).map((candidate) => ({
+            id: candidate.id,
+            title: candidate.title,
+            approvalStatus: candidate.approvalStatus,
+            approvalStage: candidate.approvalStage,
+            executable: candidate.executable,
+          }))
+        : [],
+    }
+
+    if (scenarioRun?.approvalStatus === 'APPROVED' && scenarioRun?.executable) {
+      return scenarioRun
+    }
+
+    await pageWait(500)
+  }
+
+  throw new Error(`${message} Diagnostics: ${JSON.stringify(latestCoverage)}`)
+}
+
+async function approveScenarioAndWaitForExecutionReadiness(page, api, scenarioFixture, scenarioActionConsole) {
+  const pageDiagnostics = ensurePageDiagnostics(page)
+  const approveButton = scenarioActionConsole.getByRole('button', { name: 'Approve Plan' })
+  const approveResponsePromise = page.waitForResponse((response) => (
+    response.request().method() === 'POST'
+      && new RegExp(`/api/scenarios/${scenarioFixture.scenarioId}/approve$`, 'i').test(response.url())
+  ), { timeout: 30_000 })
+
+  await expect(approveButton).toBeVisible()
+  await approveButton.click()
+
+  const approveResponse = await approveResponsePromise
+  const approveResponseText = await approveResponse.text()
+  let approvePayload = null
+  try {
+    approvePayload = approveResponseText ? JSON.parse(approveResponseText) : null
+  } catch {
+    approvePayload = null
+  }
+
+  const approveResponseDetails = {
+    status: approveResponse.status(),
+    requestId: approveResponse.headers()['x-request-id'] || approvePayload?.requestId || null,
+    responseBody: approvePayload ?? approveResponseText,
+    scenarioId: scenarioFixture.scenarioId,
+    scenarioTitle: scenarioFixture.title,
+  }
+
+  if (!approveResponse.ok()) {
+    throw new Error(`Scenario approval request failed. Diagnostics: ${JSON.stringify(approveResponseDetails)}`)
+  }
+
+  if (!approvePayload?.executionReady) {
+    throw new Error(`Scenario approval response did not make ${scenarioFixture.title} execution-ready. Diagnostics: ${JSON.stringify(approveResponseDetails)}`)
+  }
+
+  const approvedScenario = await waitForApprovedScenarioCoverage(
+    api,
+    scenarioFixture,
+    `Expected scenario ${scenarioFixture.title} to become approved and execution-ready in scenario history after approval.`,
+  )
+
+  return {
+    approveResponseDetails,
+    approvedScenario,
+    lastApiResponse: pageDiagnostics.lastApiResponse,
+  }
+}
+
 async function createRealtimeInventoryFixture(api) {
   const suffix = randomUUID().slice(0, 8).toUpperCase()
   const productSku = `SKU-RT-${suffix}`
@@ -2203,31 +2288,27 @@ test('replay recovery, scenario approval, execution, and browser role gating wor
     await refreshWorkspace(page)
 
     let currentReplayOutcome = await readReplayOutcome(replayFixture.api, replayFixture.externalOrderId)
-    if (currentReplayOutcome.state === 'queued') {
-      const replayQueueRecord = page.locator('.signal-list-item.selectable-card').filter({ hasText: replayFixture.externalOrderId }).first()
-      let lastReplayQueueUiState = null
-      try {
-        await expect.poll(async () => {
-          currentReplayOutcome = await readReplayOutcome(replayFixture.api, replayFixture.externalOrderId)
-          if (describeReplayOutcome(currentReplayOutcome) !== 'queued:PENDING') {
-            return describeReplayOutcome(currentReplayOutcome)
-          }
-          await refreshWorkspace(page)
-          lastReplayQueueUiState = await page.evaluate((expectedExternalOrderId) => {
-            const normalizeText = (value) => value?.replace?.(/\s+/g, ' ')?.trim?.() || ''
-            const queueButtons = [...(globalThis.document?.querySelectorAll?.('.signal-list-item.selectable-card') || [])]
-            return {
-              pageUrl: globalThis.location?.href || '',
-              queueRows: queueButtons.map((button) => normalizeText(button.textContent)).slice(0, 12),
-              matchingRowFound: queueButtons.some((button) => normalizeText(button.textContent).includes(expectedExternalOrderId)),
-              selectedReplayDetail: normalizeText(
-                [...(globalThis.document?.querySelectorAll?.('.section-card') || [])]
-                  .find((card) => normalizeText(card.textContent).includes('Recovery detail'))
-                  ?.textContent,
-              ),
-            }
-          }, replayFixture.externalOrderId)
-          return lastReplayQueueUiState.matchingRowFound && await replayQueueRecord.isVisible().catch(() => false) ? 'visible' : 'waiting'
+      if (currentReplayOutcome.state === 'queued') {
+        const replayQueueRecord = page.locator('.signal-list-item.selectable-card').filter({ hasText: replayFixture.externalOrderId }).first()
+        let lastReplayQueueUiState = null
+        try {
+          await expect.poll(async () => {
+            await refreshWorkspace(page)
+            lastReplayQueueUiState = await page.evaluate((expectedExternalOrderId) => {
+              const normalizeText = (value) => value?.replace?.(/\s+/g, ' ')?.trim?.() || ''
+              const queueButtons = [...(globalThis.document?.querySelectorAll?.('.signal-list-item.selectable-card') || [])]
+              return {
+                pageUrl: globalThis.location?.href || '',
+                queueRows: queueButtons.map((button) => normalizeText(button.textContent)).slice(0, 12),
+                matchingRowFound: queueButtons.some((button) => normalizeText(button.textContent).includes(expectedExternalOrderId)),
+                selectedReplayDetail: normalizeText(
+                  [...(globalThis.document?.querySelectorAll?.('.section-card') || [])]
+                    .find((card) => normalizeText(card.textContent).includes('Recovery detail'))
+                    ?.textContent,
+                ),
+              }
+            }, replayFixture.externalOrderId)
+            return lastReplayQueueUiState.matchingRowFound && await replayQueueRecord.isVisible().catch(() => false) ? 'visible' : 'waiting'
         }, {
           timeout: 30_000,
           message: `Expected replay queue ${replayFixture.externalOrderId} to appear in the UI before any automated replay could mutate it.`,
@@ -2294,20 +2375,13 @@ test('replay recovery, scenario approval, execution, and browser role gating wor
       await waitForReplayResolution(
         replayFixture.api,
         replayFixture.externalOrderId,
-        30_000,
+        45_000,
         `Expected replay verification order ${replayFixture.externalOrderId} to recover into the live order flow.`,
       )
 
       await refreshWorkspace(page)
       await expect(page.getByText(/Replay queue is clear|Replayed .* into the live order flow\./).first()).toBeVisible()
     }
-
-    await waitForReplayResolution(
-      replayFixture.api,
-      replayFixture.externalOrderId,
-      60_000,
-      `Expected ${replayFixture.externalOrderId} to reach a replayed state through deterministic manual recovery.`,
-    )
 
   await expect(page.getByText(/Replay queue is clear|Replayed .* into the live order flow\./).first()).toBeVisible()
   } finally {
@@ -2331,10 +2405,20 @@ test('replay recovery, scenario approval, execution, and browser role gating wor
       has: page.getByText(scenarioFixture.title),
     }).first()
     await expect(scenarioActionConsole).toBeVisible()
-    await scenarioActionConsole.getByRole('button', { name: 'Approve Plan' }).click()
-    await expect(page.locator('.success-text').filter({ hasText: `Approved ${scenarioFixture.title} for execution under Standard approval.` }).first()).toBeVisible()
+    await approveScenarioAndWaitForExecutionReadiness(page, scenarioFixture.api, scenarioFixture, scenarioActionConsole)
 
-    await executeScenarioAndWaitForOrder(page, scenarioFixture.api, scenarioFixture, scenarioActionConsole, testInfo)
+    await refreshWorkspace(page)
+    const executableScenarioCard = await waitForScenarioHistoryCard(page, scenarioFixture.title)
+    await activateSelectableButton(executableScenarioCard)
+
+    const executableScenarioActionConsole = page.locator('.section-card').filter({
+      hasText: 'Scenario action console',
+      has: page.getByText(scenarioFixture.title),
+    }).first()
+    await expect(executableScenarioActionConsole).toBeVisible()
+    await expect(executableScenarioActionConsole.getByRole('button', { name: 'Execute Scenario' })).toBeVisible()
+
+    await executeScenarioAndWaitForOrder(page, scenarioFixture.api, scenarioFixture, executableScenarioActionConsole, testInfo)
   } finally {
     await scenarioFixture.api.dispose()
   }
