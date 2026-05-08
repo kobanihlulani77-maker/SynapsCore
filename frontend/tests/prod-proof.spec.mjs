@@ -597,6 +597,58 @@ async function readReplayOutcome(api, externalOrderId) {
   return { state: 'missing' }
 }
 
+async function readDashboardSnapshot(api, note = 'Dashboard snapshot lookup during hosted proof verification.') {
+  return readJson(await api.get('/api/dashboard/snapshot'), {
+    method: 'GET',
+    url: '/api/dashboard/snapshot',
+    note,
+  })
+}
+
+async function waitForReplayQueueCoverage(api, externalOrderId, sourceSystem, message) {
+  let latestCoverage = {
+    replayQueueContainsRecord: false,
+    snapshotContainsRecord: false,
+    replayRecord: null,
+    snapshotReplayRecord: null,
+  }
+
+  await expect.poll(async () => {
+    const [replayQueue, snapshot] = await Promise.all([
+      readJson(await api.get('/api/integrations/orders/replay-queue'), {
+        method: 'GET',
+        url: '/api/integrations/orders/replay-queue',
+        requestPayload: { externalOrderId, sourceSystem },
+        note: 'Hosted replay queue readback verification.',
+      }),
+      readDashboardSnapshot(api, 'Hosted replay queue snapshot verification.'),
+    ])
+
+    const replayRecord = Array.isArray(replayQueue)
+      ? replayQueue.find((record) => record.externalOrderId === externalOrderId)
+      : null
+    const snapshotReplayRecord = Array.isArray(snapshot?.integrationReplayQueue)
+      ? snapshot.integrationReplayQueue.find((record) => record.externalOrderId === externalOrderId)
+      : null
+
+    latestCoverage = {
+      replayQueueContainsRecord: Boolean(replayRecord),
+      snapshotContainsRecord: Boolean(snapshotReplayRecord),
+      replayRecord,
+      snapshotReplayRecord,
+      replayQueueCount: Array.isArray(replayQueue) ? replayQueue.length : null,
+      snapshotReplayQueueCount: Array.isArray(snapshot?.integrationReplayQueue) ? snapshot.integrationReplayQueue.length : null,
+    }
+
+    return Boolean(replayRecord && snapshotReplayRecord)
+  }, {
+    timeout: 30_000,
+    message,
+  }).toBe(true)
+
+  return latestCoverage
+}
+
 function describeReplayOutcome(replayOutcome) {
   if (!replayOutcome || replayOutcome.state === 'missing') {
     return 'missing'
@@ -625,9 +677,9 @@ async function waitForReplayResolution(api, externalOrderId, timeout, message) {
 }
 
 async function readReplayPageDiagnostics(page, replayFixture) {
-  const backendConnectors = await readJson(await replayFixture.api.get('/api/integrations/orders/connectors'), {
+  const backendConnectors = await readJson(await replayFixture.api.get(`/api/integrations/orders/connectors?sourceSystem=${encodeURIComponent(replayFixture.sourceSystem)}&type=CSV_ORDER_IMPORT`), {
     method: 'GET',
-    url: '/api/integrations/orders/connectors',
+    url: `/api/integrations/orders/connectors?sourceSystem=${encodeURIComponent(replayFixture.sourceSystem)}&type=CSV_ORDER_IMPORT`,
     requestPayload: {
       sourceSystem: replayFixture.sourceSystem,
     },
@@ -2042,24 +2094,55 @@ test('replay recovery, scenario approval, execution, and browser role gating wor
   const replayFixture = await createReplayFixture()
 
   try {
-    await loginViaUi(page, users.integrationLead)
+    const backendReplayCoverage = await waitForReplayQueueCoverage(
+      replayFixture.api,
+      replayFixture.externalOrderId,
+      replayFixture.sourceSystem,
+      `Expected replay verification record ${replayFixture.externalOrderId} to be visible in both the replay queue API and dashboard snapshot before UI verification.`,
+    )
+
+    await loginViaUi(page, users.integrationLead, { requireDashboardSnapshot: true })
     await navigateWithinApp(page, '/replay-queue')
     await expect(page.getByRole('heading', { level: 1, name: 'Failed inbound recovery' })).toBeVisible()
+    await refreshWorkspace(page)
 
     let currentReplayOutcome = await readReplayOutcome(replayFixture.api, replayFixture.externalOrderId)
     if (currentReplayOutcome.state === 'queued') {
       const replayQueueRecord = page.locator('.signal-list-item.selectable-card').filter({ hasText: replayFixture.externalOrderId }).first()
-      await expect.poll(async () => {
-        currentReplayOutcome = await readReplayOutcome(replayFixture.api, replayFixture.externalOrderId)
-        if (describeReplayOutcome(currentReplayOutcome) !== 'queued:PENDING') {
-          return describeReplayOutcome(currentReplayOutcome)
-        }
-        await refreshWorkspace(page)
-        return await replayQueueRecord.isVisible().catch(() => false) ? 'visible' : 'waiting'
-      }, {
-        timeout: 30_000,
-        message: `Expected replay queue ${replayFixture.externalOrderId} to appear in the UI before any automated replay could mutate it.`,
-      }).toBe('visible')
+      let lastReplayQueueUiState = null
+      try {
+        await expect.poll(async () => {
+          currentReplayOutcome = await readReplayOutcome(replayFixture.api, replayFixture.externalOrderId)
+          if (describeReplayOutcome(currentReplayOutcome) !== 'queued:PENDING') {
+            return describeReplayOutcome(currentReplayOutcome)
+          }
+          await refreshWorkspace(page)
+          lastReplayQueueUiState = await page.evaluate((expectedExternalOrderId) => {
+            const normalizeText = (value) => value?.replace?.(/\s+/g, ' ')?.trim?.() || ''
+            const queueButtons = [...(globalThis.document?.querySelectorAll?.('.signal-list-item.selectable-card') || [])]
+            return {
+              pageUrl: globalThis.location?.href || '',
+              queueRows: queueButtons.map((button) => normalizeText(button.textContent)).slice(0, 12),
+              matchingRowFound: queueButtons.some((button) => normalizeText(button.textContent).includes(expectedExternalOrderId)),
+              selectedReplayDetail: normalizeText(
+                [...(globalThis.document?.querySelectorAll?.('.section-card') || [])]
+                  .find((card) => normalizeText(card.textContent).includes('Recovery detail'))
+                  ?.textContent,
+              ),
+            }
+          }, replayFixture.externalOrderId)
+          return lastReplayQueueUiState.matchingRowFound && await replayQueueRecord.isVisible().catch(() => false) ? 'visible' : 'waiting'
+        }, {
+          timeout: 30_000,
+          message: `Expected replay queue ${replayFixture.externalOrderId} to appear in the UI before any automated replay could mutate it.`,
+        }).toBe('visible')
+      } catch (error) {
+        throw new Error(`Expected replay queue ${replayFixture.externalOrderId} to appear in the UI before any automated replay could mutate it. Diagnostics: ${JSON.stringify({
+          backendReplayCoverage,
+          currentReplayOutcome,
+          lastReplayQueueUiState,
+        })} Original error: ${error?.message || String(error)}`)
+      }
 
       await expect(replayQueueRecord).toBeVisible()
       await replayQueueRecord.click()
