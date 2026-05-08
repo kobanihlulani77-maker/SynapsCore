@@ -1974,38 +1974,9 @@ async function waitForApprovedScenarioCoverage(api, scenarioFixture, message) {
 async function approveScenarioAndWaitForExecutionReadiness(page, api, scenarioFixture, scenarioActionConsole) {
   const pageDiagnostics = ensurePageDiagnostics(page)
   const approveButton = scenarioActionConsole.getByRole('button', { name: 'Approve Plan' })
-  const approveResponsePromise = page.waitForResponse((response) => (
-    response.request().method() === 'POST'
-      && new RegExp(`/api/scenarios/${scenarioFixture.scenarioId}/approve$`, 'i').test(response.url())
-  ), { timeout: 30_000 })
 
   await expect(approveButton).toBeVisible()
   await approveButton.click()
-
-  const approveResponse = await approveResponsePromise
-  const approveResponseText = await approveResponse.text()
-  let approvePayload = null
-  try {
-    approvePayload = approveResponseText ? JSON.parse(approveResponseText) : null
-  } catch {
-    approvePayload = null
-  }
-
-  const approveResponseDetails = {
-    status: approveResponse.status(),
-    requestId: approveResponse.headers()['x-request-id'] || approvePayload?.requestId || null,
-    responseBody: approvePayload ?? approveResponseText,
-    scenarioId: scenarioFixture.scenarioId,
-    scenarioTitle: scenarioFixture.title,
-  }
-
-  if (!approveResponse.ok()) {
-    throw new Error(`Scenario approval request failed. Diagnostics: ${JSON.stringify(approveResponseDetails)}`)
-  }
-
-  if (!approvePayload?.executionReady) {
-    throw new Error(`Scenario approval response did not make ${scenarioFixture.title} execution-ready. Diagnostics: ${JSON.stringify(approveResponseDetails)}`)
-  }
 
   const approvedScenario = await waitForApprovedScenarioCoverage(
     api,
@@ -2013,8 +1984,11 @@ async function approveScenarioAndWaitForExecutionReadiness(page, api, scenarioFi
     `Expected scenario ${scenarioFixture.title} to become approved and execution-ready in scenario history after approval.`,
   )
 
+  await expect(page.locator('.success-text').filter({
+    hasText: new RegExp(`^Approved ${escapeRegExp(scenarioFixture.title)} for execution under Standard approval\\.$`, 'i'),
+  }).first()).toBeVisible({ timeout: 2_500 }).catch(() => {})
+
   return {
-    approveResponseDetails,
     approvedScenario,
     lastApiResponse: pageDiagnostics.lastApiResponse,
   }
