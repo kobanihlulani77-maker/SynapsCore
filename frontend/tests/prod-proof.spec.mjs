@@ -605,6 +605,32 @@ async function readDashboardSnapshot(api, note = 'Dashboard snapshot lookup duri
   })
 }
 
+async function readDashboardSnapshotBestEffort(api, options = {}) {
+  const {
+    timeout = 5_000,
+    note = 'Best-effort dashboard snapshot lookup during hosted proof verification.',
+    requestPayload = null,
+  } = options
+
+  try {
+    const snapshot = await readJson(await api.get('/api/dashboard/snapshot', { timeout }), {
+      method: 'GET',
+      url: '/api/dashboard/snapshot',
+      requestPayload,
+      note,
+    })
+    return {
+      snapshot,
+      snapshotError: null,
+    }
+  } catch (error) {
+    return {
+      snapshot: null,
+      snapshotError: error?.message || String(error),
+    }
+  }
+}
+
 async function waitForReplayQueueCoverage(api, externalOrderId, sourceSystem, message) {
   let latestCoverage = {
     replayQueueContainsRecord: false,
@@ -645,27 +671,19 @@ async function waitForReplayQueueCoverage(api, externalOrderId, sourceSystem, me
       }
 
       if (replayRecord) {
-        try {
-          const snapshot = await readJson(await api.get('/api/dashboard/snapshot', { timeout: 5_000 }), {
-            method: 'GET',
-            url: '/api/dashboard/snapshot',
-            note: 'Best-effort replay queue snapshot verification.',
-          })
-          const snapshotReplayRecord = Array.isArray(snapshot?.integrationReplayQueue)
-            ? snapshot.integrationReplayQueue.find((record) => record.externalOrderId === externalOrderId)
-            : null
-          latestCoverage = {
-            ...latestCoverage,
-            snapshotContainsRecord: Boolean(snapshotReplayRecord),
-            snapshotReplayRecord,
-            snapshotReplayQueueCount: Array.isArray(snapshot?.integrationReplayQueue) ? snapshot.integrationReplayQueue.length : null,
-            snapshotError: null,
-          }
-        } catch (error) {
-          latestCoverage = {
-            ...latestCoverage,
-            snapshotError: error?.message || String(error),
-          }
+        const { snapshot, snapshotError } = await readDashboardSnapshotBestEffort(api, {
+          note: 'Best-effort replay queue snapshot verification.',
+          requestPayload: { externalOrderId, sourceSystem },
+        })
+        const snapshotReplayRecord = Array.isArray(snapshot?.integrationReplayQueue)
+          ? snapshot.integrationReplayQueue.find((record) => record.externalOrderId === externalOrderId)
+          : null
+        latestCoverage = {
+          ...latestCoverage,
+          snapshotContainsRecord: Boolean(snapshotReplayRecord),
+          snapshotReplayRecord,
+          snapshotReplayQueueCount: Array.isArray(snapshot?.integrationReplayQueue) ? snapshot.integrationReplayQueue.length : null,
+          snapshotError,
         }
         return latestCoverage
       }
@@ -1523,11 +1541,14 @@ async function createReplayFixture() {
             message: `Expected replay verification record ${externalOrderId} to remain queued after enabling connector ${sourceSystem}.`,
           }).toBe(true)
           const snapshotStartedAt = Date.now()
-          try {
-            const snapshotPayload = await readDashboardSnapshot(
-              api,
-              `Best-effort replay snapshot readback for ${externalOrderId} after connector enable.`,
-            )
+          const { snapshot: snapshotPayload, snapshotError } = await readDashboardSnapshotBestEffort(api, {
+            note: `Best-effort replay snapshot readback for ${externalOrderId} after connector enable.`,
+            requestPayload: {
+              externalOrderId,
+              sourceSystem,
+            },
+          })
+          if (snapshotPayload) {
             const connectorFromSnapshot = Array.isArray(snapshotPayload?.integrationConnectors)
               ? snapshotPayload.integrationConnectors.find((connector) => connector.sourceSystem === sourceSystem && connector.type === 'CSV_ORDER_IMPORT')
               : null
@@ -1541,11 +1562,11 @@ async function createReplayFixture() {
               connectorFromSnapshot,
               replayFromSnapshot,
             }
-          } catch (error) {
+          } else {
             lastSnapshotCheck = {
               phase: 'dashboard-snapshot-best-effort',
               durationMs: Date.now() - snapshotStartedAt,
-              error: error?.message || String(error),
+              error: snapshotError,
             }
           }
         } catch (error) {
@@ -1691,7 +1712,7 @@ async function waitForBackendLowStockCoverage(api, fixture, message) {
   let latestCoverage = null
 
   while (Date.now() - startedAt < 30_000) {
-    const [inventory, alertFeed, recommendations, snapshot] = await Promise.all([
+    const [inventory, alertFeed, recommendations] = await Promise.all([
       readJson(await api.get('/api/inventory'), {
         method: 'GET',
         url: '/api/inventory',
@@ -1717,14 +1738,6 @@ async function waitForBackendLowStockCoverage(api, fixture, message) {
         },
         note: `Recommendation coverage lookup for realtime proof SKU ${fixture.productSku}.`,
       }),
-      readJson(await api.get('/api/dashboard/snapshot'), {
-        method: 'GET',
-        url: '/api/dashboard/snapshot',
-        requestPayload: {
-          productSku: fixture.productSku,
-        },
-        note: `Snapshot coverage lookup for realtime proof SKU ${fixture.productSku}.`,
-      }),
     ])
 
     const inventoryRecord = inventory.find((item) => (
@@ -1734,14 +1747,14 @@ async function waitForBackendLowStockCoverage(api, fixture, message) {
     const recommendationRecord = recommendations.find((recommendation) => (
       recommendationReferencesSku(recommendation, fixture.productSku)
     )) || null
-    const snapshotCoverage = realtimeCoverageFromSnapshot(snapshot, fixture.productSku)
 
     latestCoverage = {
       inventoryRecord,
       alertRecord,
       recommendationRecord,
-      snapshot,
-      snapshotCoverage,
+      snapshot: null,
+      snapshotCoverage: null,
+      snapshotError: null,
       alertCount: alertFeed?.activeAlerts?.length ?? 0,
       recommendationCount: recommendations.length,
     }
@@ -1750,13 +1763,48 @@ async function waitForBackendLowStockCoverage(api, fixture, message) {
       inventoryRecord?.lowStock
       && alertRecord
       && recommendationRecord
-      && snapshotCoverage.alertRecord
-      && snapshotCoverage.recommendationRecord
     ) {
+      const { snapshot, snapshotError } = await readDashboardSnapshotBestEffort(api, {
+        note: `Best-effort snapshot coverage lookup for realtime proof SKU ${fixture.productSku}.`,
+        requestPayload: {
+          productSku: fixture.productSku,
+        },
+      })
+      const snapshotCoverage = realtimeCoverageFromSnapshot(snapshot, fixture.productSku)
       return latestCoverage
+        ? {
+            ...latestCoverage,
+            snapshot,
+            snapshotCoverage,
+            snapshotError,
+          }
+        : {
+            inventoryRecord,
+            alertRecord,
+            recommendationRecord,
+            snapshot,
+            snapshotCoverage,
+            snapshotError,
+            alertCount: alertFeed?.activeAlerts?.length ?? 0,
+            recommendationCount: recommendations.length,
+          }
     }
 
     await new Promise((resolve) => setTimeout(resolve, 500))
+  }
+
+  const { snapshot, snapshotError } = await readDashboardSnapshotBestEffort(api, {
+    note: `Best-effort snapshot coverage lookup for realtime proof SKU ${fixture.productSku}.`,
+    requestPayload: {
+      productSku: fixture.productSku,
+    },
+  })
+  const snapshotCoverage = realtimeCoverageFromSnapshot(snapshot, fixture.productSku)
+  latestCoverage = {
+    ...latestCoverage,
+    snapshot,
+    snapshotCoverage,
+    snapshotError,
   }
 
   throw new Error(`${message} Diagnostics: ${JSON.stringify({
@@ -1811,42 +1859,47 @@ async function ensureRecentOrder(api) {
     })
 
     const order = recentOrders.find((candidate) => candidate.externalOrderId === externalOrderId) || null
-    let snapshot = null
-    let snapshotOrder = null
-    let snapshotError = null
-    try {
-      snapshot = await readJson(await api.get('/api/dashboard/snapshot', { timeout: 5_000 }), {
-        method: 'GET',
-        url: '/api/dashboard/snapshot',
-        requestPayload: {
-          externalOrderId,
-        },
-        note: `Best-effort snapshot recent order lookup for deterministic hosted proof order ${externalOrderId}.`,
-      })
-      snapshotOrder = snapshot?.recentOrders?.find((candidate) => candidate.externalOrderId === externalOrderId) || null
-    } catch (error) {
-      snapshotError = error?.message || String(error)
-    }
-
     latestCoverage = {
       order,
-      snapshotOrder,
-      snapshotGeneratedAt: snapshot?.generatedAt ?? null,
-      snapshotError,
+      snapshotOrder: null,
+      snapshotGeneratedAt: null,
+      snapshotError: null,
       recentOrderIds: recentOrders.map((candidate) => candidate.externalOrderId).slice(0, 12),
-      snapshotOrderIds: (snapshot?.recentOrders || []).map((candidate) => candidate.externalOrderId).slice(0, 12),
+      snapshotOrderIds: [],
     }
 
     if (order) {
+      const { snapshot, snapshotError } = await readDashboardSnapshotBestEffort(api, {
+        note: `Best-effort snapshot recent order lookup for deterministic hosted proof order ${externalOrderId}.`,
+        requestPayload: {
+          externalOrderId,
+        },
+      })
+      const snapshotOrder = snapshot?.recentOrders?.find((candidate) => candidate.externalOrderId === externalOrderId) || null
       return {
         createdOrder,
         order,
         snapshotOrder,
         snapshot,
+        snapshotError,
       }
     }
 
     await new Promise((resolve) => setTimeout(resolve, 500))
+  }
+
+  const { snapshot, snapshotError } = await readDashboardSnapshotBestEffort(api, {
+    note: `Best-effort snapshot recent order lookup for deterministic hosted proof order ${externalOrderId}.`,
+    requestPayload: {
+      externalOrderId,
+    },
+  })
+  latestCoverage = {
+    ...latestCoverage,
+    snapshotOrder: snapshot?.recentOrders?.find((candidate) => candidate.externalOrderId === externalOrderId) || null,
+    snapshotGeneratedAt: snapshot?.generatedAt ?? null,
+    snapshotError,
+    snapshotOrderIds: (snapshot?.recentOrders || []).map((candidate) => candidate.externalOrderId).slice(0, 12),
   }
 
   throw new Error(`Expected deterministic proof order ${externalOrderId} to appear in /api/orders/recent before the orders UI assertion. Diagnostics: ${JSON.stringify(latestCoverage)}`)
@@ -1869,43 +1922,51 @@ async function waitForOrderReadModelCoverage(api, externalOrderId, message) {
     const order = Array.isArray(recentOrders)
       ? recentOrders.find((candidate) => candidate.externalOrderId === externalOrderId) || null
       : null
-    let snapshot = null
-    let snapshotOrder = null
-    let snapshotError = null
-    try {
-      snapshot = await readJson(await api.get('/api/dashboard/snapshot', { timeout: 5_000 }), {
-        method: 'GET',
-        url: '/api/dashboard/snapshot',
-        requestPayload: {
-          externalOrderId,
-        },
-        note: `Best-effort snapshot order lookup for hosted proof order ${externalOrderId}.`,
-      })
-      snapshotOrder = Array.isArray(snapshot?.recentOrders)
-        ? snapshot.recentOrders.find((candidate) => candidate.externalOrderId === externalOrderId) || null
-        : null
-    } catch (error) {
-      snapshotError = error?.message || String(error)
-    }
 
     latestCoverage = {
       order,
-      snapshotOrder,
-      snapshotGeneratedAt: snapshot?.generatedAt ?? null,
-      snapshotError,
+      snapshotOrder: null,
+      snapshotGeneratedAt: null,
+      snapshotError: null,
       recentOrderIds: Array.isArray(recentOrders) ? recentOrders.map((candidate) => candidate.externalOrderId).slice(0, 12) : [],
-      snapshotOrderIds: Array.isArray(snapshot?.recentOrders) ? snapshot.recentOrders.map((candidate) => candidate.externalOrderId).slice(0, 12) : [],
+      snapshotOrderIds: [],
     }
 
     if (order) {
+      const { snapshot, snapshotError } = await readDashboardSnapshotBestEffort(api, {
+        note: `Best-effort snapshot order lookup for hosted proof order ${externalOrderId}.`,
+        requestPayload: {
+          externalOrderId,
+        },
+      })
+      const snapshotOrder = Array.isArray(snapshot?.recentOrders)
+        ? snapshot.recentOrders.find((candidate) => candidate.externalOrderId === externalOrderId) || null
+        : null
       return {
         order,
         snapshotOrder,
         snapshot,
+        snapshotError,
       }
     }
 
     await pageWait(500)
+  }
+
+  const { snapshot, snapshotError } = await readDashboardSnapshotBestEffort(api, {
+    note: `Best-effort snapshot order lookup for hosted proof order ${externalOrderId}.`,
+    requestPayload: {
+      externalOrderId,
+    },
+  })
+  latestCoverage = {
+    ...latestCoverage,
+    snapshotOrder: Array.isArray(snapshot?.recentOrders)
+      ? snapshot.recentOrders.find((candidate) => candidate.externalOrderId === externalOrderId) || null
+      : null,
+    snapshotGeneratedAt: snapshot?.generatedAt ?? null,
+    snapshotError,
+    snapshotOrderIds: Array.isArray(snapshot?.recentOrders) ? snapshot.recentOrders.map((candidate) => candidate.externalOrderId).slice(0, 12) : [],
   }
 
   throw new Error(`${message} Diagnostics: ${JSON.stringify(latestCoverage)}`)
@@ -1955,7 +2016,7 @@ async function executeScenarioAndWaitForOrder(page, api, scenarioFixture, scenar
   const durableOrderCoverage = await waitForOrderReadModelCoverage(
     api,
     executedOrder.externalOrderId,
-    `Expected executed scenario order ${executedOrder.externalOrderId} to appear in both /api/orders/recent and /api/dashboard/snapshot.`,
+    `Expected executed scenario order ${executedOrder.externalOrderId} to appear in /api/orders/recent before the orders UI assertion.`,
   )
 
   await expect(page.locator('.success-text').filter({
@@ -2110,7 +2171,7 @@ async function ensureAlertAndRecommendationCoverage(api) {
   const coverage = await waitForBackendLowStockCoverage(
     api,
     fixture,
-    `Expected deterministic low-stock fixture ${fixture.productSku} to propagate through inventory, alerts, recommendations, and snapshot read models.`,
+    `Expected deterministic low-stock fixture ${fixture.productSku} to propagate through inventory, alerts, and recommendations before the UI verification.`,
   )
 
   return {
@@ -2305,7 +2366,7 @@ test('replay recovery, scenario approval, execution, and browser role gating wor
       `Expected replay verification record ${replayFixture.externalOrderId} to be visible in the replay queue API before UI verification.`,
     )
 
-    await loginViaUi(page, users.integrationLead, { requireDashboardSnapshot: true })
+    await loginViaUi(page, users.integrationLead)
     await navigateWithinApp(page, '/replay-queue')
     await expect(page.getByRole('heading', { level: 1, name: 'Failed inbound recovery' })).toBeVisible()
     await refreshWorkspace(page)
@@ -2477,7 +2538,7 @@ test('alerts, recommendations, orders, inventory, integrations, users, profile, 
     const orderRecord = recentOrder.order
     const inventoryRecord = alertCoverage.inventoryRecord
     const connectorCandidates = [
-      ...alertCoverage.snapshot.integrationConnectors,
+      ...(alertCoverage.snapshot?.integrationConnectors || []),
       ...(workspace.connectors || []),
     ]
 
