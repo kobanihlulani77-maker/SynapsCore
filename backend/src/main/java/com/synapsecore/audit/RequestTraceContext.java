@@ -55,4 +55,8 @@ public class RequestTraceContext {
         currentActor.remove();
         currentTenant.remove();
     }
+
+    public void clearCurrentTenant() {
+        currentTenant.remove();
+    }
 }

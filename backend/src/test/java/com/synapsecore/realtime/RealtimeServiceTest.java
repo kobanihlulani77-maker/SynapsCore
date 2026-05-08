@@ -36,6 +36,7 @@ import com.synapsecore.integration.dto.IntegrationConnectorHealthStatus;
 import com.synapsecore.integration.dto.IntegrationConnectorResponse;
 import com.synapsecore.integration.dto.IntegrationImportRunResponse;
 import com.synapsecore.integration.dto.IntegrationReplayRecordResponse;
+import com.synapsecore.audit.RequestTraceContext;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import java.math.BigDecimal;
 import java.time.Instant;
@@ -127,6 +128,7 @@ class RealtimeServiceTest {
             new StompRealtimePublisher(new SimpMessagingTemplate(channel), new com.synapsecore.config.SynapseRealtimeProperties()),
             new StubOperationalViewService(alerts, recommendations, inventory, fulfillment, recentOrders, recentEvents, auditLogs, systemIncidents, integrationConnectors, integrationImportRuns, integrationReplayQueue, scenarioNotifications, slaEscalations, List.of()),
             new StubDashboardService(summary),
+            new RequestTraceContext(),
             null
         );
 
@@ -206,6 +208,7 @@ class RealtimeServiceTest {
                 List.of()
             ),
             new StubDashboardService(new DashboardSummaryResponse(0, 0, 0, 0, 0, 0, 0, 4, 2, 0, 8, Instant.now())),
+            new RequestTraceContext(),
             null
         );
 

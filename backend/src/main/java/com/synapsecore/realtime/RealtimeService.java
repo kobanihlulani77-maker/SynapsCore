@@ -1,5 +1,6 @@
 package com.synapsecore.realtime;
 
+import com.synapsecore.audit.RequestTraceContext;
 import com.synapsecore.domain.service.DashboardService;
 import com.synapsecore.domain.service.OperationalViewService;
 import com.synapsecore.tenant.TenantContextService;
@@ -14,6 +15,7 @@ public class RealtimeService {
     private final RealtimePublisher realtimePublisher;
     private final OperationalViewService operationalViewService;
     private final DashboardService dashboardService;
+    private final RequestTraceContext requestTraceContext;
     private final TenantContextService tenantContextService;
 
     public void broadcastOperationalUpdates() {
@@ -25,29 +27,35 @@ public class RealtimeService {
     }
 
     public void broadcastOperationalUpdates(String tenantCode) {
-        realtimePublisher.publish(topic(tenantCode, "/dashboard.summary"), dashboardService.getSummary());
-        realtimePublisher.publish(topic(tenantCode, "/alerts"), operationalViewService.getAlertFeed());
-        realtimePublisher.publish(topic(tenantCode, "/recommendations"), operationalViewService.getRecommendations());
-        realtimePublisher.publish(topic(tenantCode, "/inventory"), operationalViewService.getInventoryOverview());
-        realtimePublisher.publish(topic(tenantCode, "/fulfillment.overview"), operationalViewService.getFulfillmentOverview());
-        realtimePublisher.publish(topic(tenantCode, "/orders.recent"), operationalViewService.getRecentOrders());
-        realtimePublisher.publish(topic(tenantCode, "/events.recent"), operationalViewService.getRecentEvents());
-        realtimePublisher.publish(topic(tenantCode, "/audit.recent"), operationalViewService.getRecentAuditLogs());
-        realtimePublisher.publish(topic(tenantCode, "/system.incidents"), operationalViewService.getSystemIncidents());
-        realtimePublisher.publish(topic(tenantCode, "/integrations.connectors"), operationalViewService.getIntegrationConnectors());
-        realtimePublisher.publish(topic(tenantCode, "/integrations.imports"), operationalViewService.getRecentIntegrationImportRuns());
-        realtimePublisher.publish(topic(tenantCode, "/integrations.replay"), operationalViewService.getIntegrationReplayQueue());
-        realtimePublisher.publish(topic(tenantCode, "/scenarios.notifications"), operationalViewService.getScenarioNotifications());
-        realtimePublisher.publish(topic(tenantCode, "/scenarios.escalated"), operationalViewService.getSlaEscalations());
+        String normalizedTenantCode = normalizeTenantCode(tenantCode);
+        withTenantContext(normalizedTenantCode, () -> {
+            realtimePublisher.publish(topic(normalizedTenantCode, "/dashboard.summary"), dashboardService.getSummary());
+            realtimePublisher.publish(topic(normalizedTenantCode, "/alerts"), operationalViewService.getAlertFeed());
+            realtimePublisher.publish(topic(normalizedTenantCode, "/recommendations"), operationalViewService.getRecommendations());
+            realtimePublisher.publish(topic(normalizedTenantCode, "/inventory"), operationalViewService.getInventoryOverview());
+            realtimePublisher.publish(topic(normalizedTenantCode, "/fulfillment.overview"), operationalViewService.getFulfillmentOverview());
+            realtimePublisher.publish(topic(normalizedTenantCode, "/orders.recent"), operationalViewService.getRecentOrders());
+            realtimePublisher.publish(topic(normalizedTenantCode, "/events.recent"), operationalViewService.getRecentEvents());
+            realtimePublisher.publish(topic(normalizedTenantCode, "/audit.recent"), operationalViewService.getRecentAuditLogs());
+            realtimePublisher.publish(topic(normalizedTenantCode, "/system.incidents"), operationalViewService.getSystemIncidents());
+            realtimePublisher.publish(topic(normalizedTenantCode, "/integrations.connectors"), operationalViewService.getIntegrationConnectors());
+            realtimePublisher.publish(topic(normalizedTenantCode, "/integrations.imports"), operationalViewService.getRecentIntegrationImportRuns());
+            realtimePublisher.publish(topic(normalizedTenantCode, "/integrations.replay"), operationalViewService.getIntegrationReplayQueue());
+            realtimePublisher.publish(topic(normalizedTenantCode, "/scenarios.notifications"), operationalViewService.getScenarioNotifications());
+            realtimePublisher.publish(topic(normalizedTenantCode, "/scenarios.escalated"), operationalViewService.getSlaEscalations());
+        });
     }
 
     public void broadcastIntegrationUpdates(String tenantCode) {
-        realtimePublisher.publish(topic(tenantCode, "/events.recent"), operationalViewService.getRecentEvents());
-        realtimePublisher.publish(topic(tenantCode, "/audit.recent"), operationalViewService.getRecentAuditLogs());
-        realtimePublisher.publish(topic(tenantCode, "/system.incidents"), operationalViewService.getSystemIncidents());
-        realtimePublisher.publish(topic(tenantCode, "/integrations.connectors"), operationalViewService.getIntegrationConnectors());
-        realtimePublisher.publish(topic(tenantCode, "/integrations.imports"), operationalViewService.getRecentIntegrationImportRuns());
-        realtimePublisher.publish(topic(tenantCode, "/integrations.replay"), operationalViewService.getIntegrationReplayQueue());
+        String normalizedTenantCode = normalizeTenantCode(tenantCode);
+        withTenantContext(normalizedTenantCode, () -> {
+            realtimePublisher.publish(topic(normalizedTenantCode, "/events.recent"), operationalViewService.getRecentEvents());
+            realtimePublisher.publish(topic(normalizedTenantCode, "/audit.recent"), operationalViewService.getRecentAuditLogs());
+            realtimePublisher.publish(topic(normalizedTenantCode, "/system.incidents"), operationalViewService.getSystemIncidents());
+            realtimePublisher.publish(topic(normalizedTenantCode, "/integrations.connectors"), operationalViewService.getIntegrationConnectors());
+            realtimePublisher.publish(topic(normalizedTenantCode, "/integrations.imports"), operationalViewService.getRecentIntegrationImportRuns());
+            realtimePublisher.publish(topic(normalizedTenantCode, "/integrations.replay"), operationalViewService.getIntegrationReplayQueue());
+        });
     }
 
     public RealtimeBrokerMode brokerMode() {
@@ -63,5 +71,24 @@ public class RealtimeService {
             throw new IllegalArgumentException("Realtime updates require an explicit tenant code.");
         }
         return tenantCode.trim().toUpperCase(Locale.ROOT);
+    }
+
+    private void withTenantContext(String tenantCode, Runnable action) {
+        if (requestTraceContext == null) {
+            action.run();
+            return;
+        }
+
+        String previousTenant = requestTraceContext.getCurrentTenant().orElse(null);
+        requestTraceContext.setCurrentTenant(tenantCode);
+        try {
+            action.run();
+        } finally {
+            if (previousTenant != null && !previousTenant.isBlank()) {
+                requestTraceContext.setCurrentTenant(previousTenant);
+            } else {
+                requestTraceContext.clearCurrentTenant();
+            }
+        }
     }
 }
