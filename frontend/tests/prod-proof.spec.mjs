@@ -1819,6 +1819,122 @@ async function ensureRecentOrder(api) {
   throw new Error(`Expected deterministic proof order ${externalOrderId} to appear in both /api/orders/recent and /api/dashboard/snapshot before the orders UI assertion. Diagnostics: ${JSON.stringify(latestCoverage)}`)
 }
 
+async function waitForOrderReadModelCoverage(api, externalOrderId, message) {
+  const startedAt = Date.now()
+  let latestCoverage = null
+
+  while (Date.now() - startedAt < 30_000) {
+    const [recentOrders, snapshot] = await Promise.all([
+      readJson(await api.get('/api/orders/recent'), {
+        method: 'GET',
+        url: '/api/orders/recent',
+        requestPayload: {
+          externalOrderId,
+        },
+        note: `Recent order lookup for hosted proof order ${externalOrderId}.`,
+      }),
+      readJson(await api.get('/api/dashboard/snapshot'), {
+        method: 'GET',
+        url: '/api/dashboard/snapshot',
+        requestPayload: {
+          externalOrderId,
+        },
+        note: `Snapshot order lookup for hosted proof order ${externalOrderId}.`,
+      }),
+    ])
+
+    const order = Array.isArray(recentOrders)
+      ? recentOrders.find((candidate) => candidate.externalOrderId === externalOrderId) || null
+      : null
+    const snapshotOrder = Array.isArray(snapshot?.recentOrders)
+      ? snapshot.recentOrders.find((candidate) => candidate.externalOrderId === externalOrderId) || null
+      : null
+
+    latestCoverage = {
+      order,
+      snapshotOrder,
+      snapshotGeneratedAt: snapshot?.generatedAt ?? null,
+      recentOrderIds: Array.isArray(recentOrders) ? recentOrders.map((candidate) => candidate.externalOrderId).slice(0, 12) : [],
+      snapshotOrderIds: Array.isArray(snapshot?.recentOrders) ? snapshot.recentOrders.map((candidate) => candidate.externalOrderId).slice(0, 12) : [],
+    }
+
+    if (order && snapshotOrder) {
+      return {
+        order,
+        snapshotOrder,
+        snapshot,
+      }
+    }
+
+    await pageWait(500)
+  }
+
+  throw new Error(`${message} Diagnostics: ${JSON.stringify(latestCoverage)}`)
+}
+
+async function pageWait(timeoutMs) {
+  await new Promise((resolve) => setTimeout(resolve, timeoutMs))
+}
+
+async function executeScenarioAndWaitForOrder(page, api, scenarioFixture, scenarioActionConsole, testInfo) {
+  const pageDiagnostics = ensurePageDiagnostics(page)
+  const executeButton = scenarioActionConsole.getByRole('button', { name: 'Execute Scenario' })
+  const executeResponsePromise = page.waitForResponse((response) => (
+    response.request().method() === 'POST'
+      && new RegExp(`/api/scenarios/${scenarioFixture.scenarioId}/execute$`, 'i').test(response.url())
+  ), { timeout: 30_000 })
+
+  await expect(executeButton).toBeVisible()
+  await executeButton.click()
+
+  const executeResponse = await executeResponsePromise
+  const executeResponseText = await executeResponse.text()
+  let executePayload = null
+  try {
+    executePayload = executeResponseText ? JSON.parse(executeResponseText) : null
+  } catch {
+    executePayload = null
+  }
+
+  const executeResponseDetails = {
+    status: executeResponse.status(),
+    requestId: executeResponse.headers()['x-request-id'] || executePayload?.requestId || null,
+    responseBody: executePayload ?? executeResponseText,
+    scenarioId: scenarioFixture.scenarioId,
+    scenarioTitle: scenarioFixture.title,
+  }
+
+  if (!executeResponse.ok()) {
+    throw new Error(`Scenario execution request failed. Diagnostics: ${JSON.stringify(executeResponseDetails)}`)
+  }
+
+  const executedOrder = executePayload?.order || null
+  if (!executedOrder?.externalOrderId) {
+    throw new Error(`Scenario execution response did not include a live order. Diagnostics: ${JSON.stringify(executeResponseDetails)}`)
+  }
+
+  const durableOrderCoverage = await waitForOrderReadModelCoverage(
+    api,
+    executedOrder.externalOrderId,
+    `Expected executed scenario order ${executedOrder.externalOrderId} to appear in both /api/orders/recent and /api/dashboard/snapshot.`,
+  )
+
+  await expect(page.locator('.success-text').filter({
+    hasText: new RegExp(`^Executed ${escapeRegExp(scenarioFixture.title)} as live order ${escapeRegExp(executedOrder.externalOrderId)}\\.$`, 'i'),
+  }).first()).toBeVisible({ timeout: 2_500 }).catch(() => {})
+
+  await navigateWithinApp(page, '/orders')
+  await expect(page.getByRole('heading', { level: 1, name: 'Live order operations' })).toBeVisible()
+  await waitForOrdersPageOrderVisible(page, durableOrderCoverage.order, testInfo)
+
+  return {
+    executeResponseDetails,
+    executedOrder,
+    durableOrderCoverage,
+    lastApiResponse: pageDiagnostics.lastApiResponse,
+  }
+}
+
 async function createRealtimeInventoryFixture(api) {
   const suffix = randomUUID().slice(0, 8).toUpperCase()
   const productSku = `SKU-RT-${suffix}`
@@ -2218,9 +2334,7 @@ test('replay recovery, scenario approval, execution, and browser role gating wor
     await scenarioActionConsole.getByRole('button', { name: 'Approve Plan' }).click()
     await expect(page.locator('.success-text').filter({ hasText: `Approved ${scenarioFixture.title} for execution under Standard approval.` }).first()).toBeVisible()
 
-    await expect(scenarioActionConsole.getByRole('button', { name: 'Execute Scenario' })).toBeVisible()
-    await scenarioActionConsole.getByRole('button', { name: 'Execute Scenario' }).click()
-    await expect(page.locator('.success-text').filter({ hasText: new RegExp(`^Executed ${scenarioFixture.title} as live order `, 'i') }).first()).toBeVisible()
+    await executeScenarioAndWaitForOrder(page, scenarioFixture.api, scenarioFixture, scenarioActionConsole, testInfo)
   } finally {
     await scenarioFixture.api.dispose()
   }
