@@ -77,13 +77,16 @@ public class IntegrationConnectorService {
         String normalizedSourceSystem = normalizeOptional(sourceSystem) == null
             ? null
             : normalizeSourceSystem(sourceSystem);
+        boolean exactReadback = normalizedSourceSystem != null && type != null;
         return resolveConnectorSelection(tenantCode, normalizedSourceSystem, type)
             .stream()
             .filter(connector -> currentOperator.isEmpty()
                 || connector.getDefaultWarehouseCode() == null
                 || connector.getDefaultWarehouseCode().isBlank()
                 || accessDirectoryService.hasWarehouseAccess(currentOperator.get(), connector.getDefaultWarehouseCode()))
-            .map(this::describeConnector)
+            .map(connector -> exactReadback
+                ? describeConnectorForExactReadback(connector)
+                : describeConnector(connector))
             .toList();
     }
 
@@ -502,6 +505,16 @@ public class IntegrationConnectorService {
     public IntegrationConnectorResponse describeConnector(IntegrationConnector connector) {
         AccessOperator supportOwner = resolveSupportOwner(connector);
         ConnectorTelemetry telemetry = buildTelemetry(connector);
+        return toConnectorResponse(connector, supportOwner, telemetry);
+    }
+
+    private IntegrationConnectorResponse describeConnectorForExactReadback(IntegrationConnector connector) {
+        return toConnectorResponse(connector, null, buildExactReadbackTelemetry(connector));
+    }
+
+    private IntegrationConnectorResponse toConnectorResponse(IntegrationConnector connector,
+                                                             AccessOperator supportOwner,
+                                                             ConnectorTelemetry telemetry) {
         return new IntegrationConnectorResponse(
             connector.getId(),
             connector.getTenant() == null ? null : connector.getTenant().getCode(),
@@ -697,6 +710,43 @@ public class IntegrationConnectorService {
             latestFailureSignal.failureAt(),
             oldestPendingReplayAt,
             oldestPendingReplayAgeSeconds
+        );
+    }
+
+    private ConnectorTelemetry buildExactReadbackTelemetry(IntegrationConnector connector) {
+        if (!connector.isEnabled()) {
+            return new ConnectorTelemetry(
+                IntegrationConnectorHealthStatus.OFFLINE,
+                "Connector is disabled and cannot ingest live activity.",
+                null,
+                null,
+                null,
+                null,
+                0,
+                0,
+                0,
+                null,
+                null,
+                null,
+                null,
+                null
+            );
+        }
+        return new ConnectorTelemetry(
+            IntegrationConnectorHealthStatus.DEGRADED,
+            "Connector is enabled. Detailed health telemetry is deferred on exact readback so the hosted response stays deterministic under proof load.",
+            null,
+            null,
+            null,
+            null,
+            0,
+            0,
+            0,
+            null,
+            null,
+            null,
+            null,
+            null
         );
     }
 

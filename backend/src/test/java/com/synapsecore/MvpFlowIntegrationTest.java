@@ -3897,6 +3897,87 @@ class MvpFlowIntegrationTest {
     }
 
     @Test
+    void exactFilteredConnectorReadbackReturnsEnabledConnectorWithoutFullTelemetryFanout() throws Exception {
+        mockMvc.perform(post("/api/integrations/orders/connectors")
+                .with(accessHeaders("Integration Lead", "INTEGRATION_ADMIN"))
+                .header("X-Synapse-Tenant", "STARTER-OPS")
+                .contentType(APPLICATION_JSON)
+                .content("""
+                    {
+                      "sourceSystem": "erp_batch_exact_readback",
+                      "type": "CSV_ORDER_IMPORT",
+                      "displayName": "ERP Batch Exact Readback",
+                      "enabled": false,
+                      "syncMode": "BATCH_FILE_DROP",
+                      "validationPolicy": "RELAXED",
+                      "transformationPolicy": "NORMALIZE_CODES",
+                      "allowDefaultWarehouseFallback": false,
+                      "notes": "Disabled for exact connector readback verification."
+                    }
+                    """))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.enabled").value(false));
+
+        MockMultipartFile file = new MockMultipartFile(
+            "file",
+            "exact-readback-orders.csv",
+            "text/csv",
+            """
+                sourceSystem,externalOrderId,warehouseCode,productSku,quantity,unitPrice
+                erp_batch_exact_readback,CSV-EXACT-1001,WH-NORTH,SKU-FLX-100,2,88.00
+                """.getBytes(StandardCharsets.UTF_8)
+        );
+
+        mockMvc.perform(multipart("/api/integrations/orders/csv-import")
+                .file(file)
+                .header("X-Synapse-Tenant", "STARTER-OPS")
+                .param("sourceSystem", "erp_batch_exact_readback"))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.ordersImported").value(0))
+            .andExpect(jsonPath("$.ordersFailed").value(1))
+            .andExpect(jsonPath("$.failedOrders[0].failureCode").value("CONNECTOR_DISABLED"))
+            .andExpect(jsonPath("$.failedOrders[0].externalOrderId").value("CSV-EXACT-1001"));
+
+        mockMvc.perform(post("/api/integrations/orders/connectors")
+                .with(accessHeaders("Integration Lead", "INTEGRATION_ADMIN"))
+                .header("X-Synapse-Tenant", "STARTER-OPS")
+                .contentType(APPLICATION_JSON)
+                .content("""
+                    {
+                      "sourceSystem": "erp_batch_exact_readback",
+                      "type": "CSV_ORDER_IMPORT",
+                      "displayName": "ERP Batch Exact Readback",
+                      "enabled": true,
+                      "syncMode": "BATCH_FILE_DROP",
+                      "validationPolicy": "RELAXED",
+                      "transformationPolicy": "NORMALIZE_CODES",
+                      "allowDefaultWarehouseFallback": false,
+                      "notes": "Enabled for exact connector readback verification."
+                    }
+                    """))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.sourceSystem").value("erp_batch_exact_readback"))
+            .andExpect(jsonPath("$.type").value("CSV_ORDER_IMPORT"))
+            .andExpect(jsonPath("$.enabled").value(true));
+
+        mockMvc.perform(get("/api/integrations/orders/connectors")
+                .with(accessHeaders("Integration Lead", "INTEGRATION_ADMIN"))
+                .header("X-Synapse-Tenant", "STARTER-OPS")
+                .param("sourceSystem", "erp_batch_exact_readback")
+                .param("type", "CSV_ORDER_IMPORT"))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.length()").value(1))
+            .andExpect(jsonPath("$[0].tenantCode").value("STARTER-OPS"))
+            .andExpect(jsonPath("$[0].sourceSystem").value("erp_batch_exact_readback"))
+            .andExpect(jsonPath("$[0].type").value("CSV_ORDER_IMPORT"))
+            .andExpect(jsonPath("$[0].enabled").value(true))
+            .andExpect(jsonPath("$[0].healthStatus").value("DEGRADED"))
+            .andExpect(jsonPath("$[0].healthSummary")
+                .value(org.hamcrest.Matchers.containsString("Detailed health telemetry is deferred on exact readback")))
+            .andExpect(jsonPath("$[0].pendingReplayCount").value(0));
+    }
+
+    @Test
     void detachedDisabledCsvConnectorStillReturnsStructuredReplayFailure() throws Exception {
         mockMvc.perform(post("/api/integrations/orders/connectors")
                 .with(accessHeaders("Integration Lead", "INTEGRATION_ADMIN"))
