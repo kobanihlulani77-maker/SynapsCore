@@ -101,9 +101,9 @@ public class ExternalOrderWebhookController {
     }
 
     @GetMapping("/replay-queue")
-    public List<IntegrationReplayRecordResponse> getReplayQueue() {
+    public List<IntegrationReplayRecordResponse> getReplayQueue(@RequestParam(required = false) String externalOrderId) {
         accessControlService.requireWorkspaceAccess("view integration replay queue");
-        return integrationReplayService.getReplayQueue();
+        return integrationReplayService.getReplayQueue(externalOrderId);
     }
 
     @PostMapping("/replay/{replayRecordId}")

@@ -26,6 +26,16 @@ public interface CustomerOrderRepository extends JpaRepository<CustomerOrder, Lo
     @EntityGraph(attributePaths = {"warehouse", "items", "items.product"})
     List<CustomerOrder> findByIdIn(List<Long> ids);
 
+    @EntityGraph(attributePaths = {"warehouse", "items", "items.product"})
+    @Query("""
+        select o
+        from CustomerOrder o
+        where upper(o.tenant.code) = upper(:tenantCode)
+          and upper(o.externalOrderId) = upper(:externalOrderId)
+        order by o.createdAt desc
+        """)
+    java.util.Optional<CustomerOrder> findLatestByTenantCodeAndExternalOrderId(String tenantCode, String externalOrderId);
+
     long countByCreatedAtAfter(Instant createdAt);
 
     long countByTenant_CodeIgnoreCase(String tenantCode);

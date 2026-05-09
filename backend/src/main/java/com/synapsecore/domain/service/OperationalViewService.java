@@ -97,6 +97,19 @@ public class OperationalViewService {
     }
 
     public List<OrderResponse> getRecentOrders() {
+        return getRecentOrders(null);
+    }
+
+    public List<OrderResponse> getRecentOrders(String externalOrderId) {
+        if (externalOrderId != null && !externalOrderId.isBlank()) {
+            return customerOrderRepository.findLatestByTenantCodeAndExternalOrderId(
+                    tenantContextService.getCurrentTenantCodeOrDefault(),
+                    externalOrderId.trim())
+                .stream()
+                .map(this::toOrderResponse)
+                .toList();
+        }
+
         List<Long> orderIds = customerOrderRepository.findRecentOrderIdsByTenantCode(
             tenantContextService.getCurrentTenantCodeOrDefault(),
             PageRequest.of(0, 12));

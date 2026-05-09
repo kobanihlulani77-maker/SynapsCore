@@ -51,6 +51,39 @@ public interface IntegrationReplayRecordRepository extends JpaRepository<Integra
                                                                                                Collection<IntegrationReplayStatus> statuses,
                                                                                                Pageable pageable);
 
+    @Query("""
+        select new com.synapsecore.integration.dto.IntegrationReplayRecordResponse(
+            record.id,
+            record.sourceSystem,
+            record.connectorType,
+            record.externalOrderId,
+            record.warehouseCode,
+            record.failureCode,
+            record.failureMessage,
+            record.status,
+            record.replayAttemptCount,
+            record.lastReplayMessage,
+            record.lastAttemptedAt,
+            record.nextEligibleAt,
+            record.resolvedAt,
+            record.deadLetteredAt,
+            record.replayedOrderExternalId,
+            record.createdAt,
+            record.updatedAt
+        )
+        from IntegrationReplayRecord record
+        where lower(record.tenantCode) = lower(?1)
+          and lower(record.externalOrderId) = lower(?2)
+          and record.status in ?3
+        order by record.createdAt desc
+        """)
+    List<IntegrationReplayRecordResponse> findQueueSummariesByTenantCodeIgnoreCaseAndExternalOrderIdIgnoreCaseAndStatusIn(
+        String tenantCode,
+        String externalOrderId,
+        Collection<IntegrationReplayStatus> statuses,
+        Pageable pageable
+    );
+
     long countByStatusIn(Collection<IntegrationReplayStatus> statuses);
 
     long countByTenantCodeIgnoreCaseAndStatusIn(String tenantCode, Collection<IntegrationReplayStatus> statuses);

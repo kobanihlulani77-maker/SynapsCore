@@ -3768,6 +3768,13 @@ class MvpFlowIntegrationTest {
             .andExpect(jsonPath("$[0].status").value("PENDING"))
             .andExpect(jsonPath("$[0].nextEligibleAt").exists());
 
+        mockMvc.perform(get("/api/integrations/orders/replay-queue")
+                .param("externalOrderId", "CSV-RPL-1001"))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.length()").value(1))
+            .andExpect(jsonPath("$[0].externalOrderId").value("CSV-RPL-1001"))
+            .andExpect(jsonPath("$[0].status").value("PENDING"));
+
         mockMvc.perform(get("/api/dashboard/snapshot"))
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.integrationReplayQueue.length()").value(1))
@@ -3802,6 +3809,18 @@ class MvpFlowIntegrationTest {
         mockMvc.perform(get("/api/integrations/orders/replay-queue"))
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.length()").value(0));
+
+        mockMvc.perform(get("/api/integrations/orders/replay-queue")
+                .param("externalOrderId", "CSV-RPL-1001"))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.length()").value(0));
+
+        mockMvc.perform(get("/api/orders/recent")
+                .param("externalOrderId", "CSV-RPL-1001"))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.length()").value(1))
+            .andExpect(jsonPath("$[0].externalOrderId").value("CSV-RPL-1001"))
+            .andExpect(jsonPath("$[0].warehouseCode").value("WH-NORTH"));
 
         mockMvc.perform(get("/api/dashboard/snapshot"))
             .andExpect(status().isOk())

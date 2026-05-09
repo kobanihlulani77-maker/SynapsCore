@@ -259,6 +259,14 @@ async function readApiDiagnosticWithOrigin(api, url, origin, context = {}) {
   }
 }
 
+function replayQueueLookupUrl(externalOrderId) {
+  return `/api/integrations/orders/replay-queue?externalOrderId=${encodeURIComponent(externalOrderId)}`
+}
+
+function recentOrdersLookupUrl(externalOrderId) {
+  return `/api/orders/recent?externalOrderId=${encodeURIComponent(externalOrderId)}`
+}
+
 function safeResponseHeaders(response) {
   try {
     return typeof response?.headers === 'function' ? response.headers() || {} : {}
@@ -689,11 +697,12 @@ function ensurePageDiagnostics(page) {
 }
 
 async function readReplayOutcome(api, externalOrderId) {
+  const replayQueueUrl = replayQueueLookupUrl(externalOrderId)
   let replayQueueError = null
   try {
-    const replayQueue = await readJson(await api.get('/api/integrations/orders/replay-queue'), {
+    const replayQueue = await readJson(await api.get(replayQueueUrl), {
       method: 'GET',
-      url: '/api/integrations/orders/replay-queue',
+      url: replayQueueUrl,
       requestPayload: {
         externalOrderId,
       },
@@ -704,17 +713,18 @@ async function readReplayOutcome(api, externalOrderId) {
       return { state: 'queued', status: replayRecord.status, record: replayRecord }
     }
   } catch (error) {
-    if (!isTransientGetReadFailure(error, { url: '/api/integrations/orders/replay-queue' })) {
+    if (!isTransientGetReadFailure(error, { url: replayQueueUrl })) {
       throw error
     }
     replayQueueError = error?.message || String(error)
   }
 
+  const recentOrdersUrl = recentOrdersLookupUrl(externalOrderId)
   let recentOrdersError = null
   try {
-    const recentOrders = await readJson(await api.get('/api/orders/recent'), {
+    const recentOrders = await readJson(await api.get(recentOrdersUrl), {
       method: 'GET',
-      url: '/api/orders/recent',
+      url: recentOrdersUrl,
       requestPayload: {
         externalOrderId,
       },
@@ -724,7 +734,7 @@ async function readReplayOutcome(api, externalOrderId) {
       return { state: 'replayed' }
     }
   } catch (error) {
-    if (!isTransientGetReadFailure(error, { url: '/api/orders/recent' })) {
+    if (!isTransientGetReadFailure(error, { url: recentOrdersUrl })) {
       throw error
     }
     recentOrdersError = error?.message || String(error)
@@ -788,9 +798,10 @@ async function waitForReplayQueueCoverage(api, externalOrderId, sourceSystem, me
   const startedAt = Date.now()
   while (Date.now() - startedAt < 30_000) {
     try {
-      const replayQueue = await readJson(await api.get('/api/integrations/orders/replay-queue'), {
+      const replayQueueUrl = replayQueueLookupUrl(externalOrderId)
+      const replayQueue = await readJson(await api.get(replayQueueUrl), {
         method: 'GET',
-        url: '/api/integrations/orders/replay-queue',
+        url: replayQueueUrl,
         requestPayload: { externalOrderId, sourceSystem },
         note: 'Hosted replay queue readback verification.',
       })
@@ -1325,7 +1336,7 @@ async function waitForOrdersPageOrderVisible(page, orderRecord, testInfo, api = 
 
   const browserOrigin = await page.evaluate(() => globalThis.location?.origin || '').catch(() => '')
   const apiReadbacks = api ? {
-    ordersRecent: await readApiDiagnosticWithOrigin(api, '/api/orders/recent', browserOrigin, { timeout: 8_000 }),
+    ordersRecent: await readApiDiagnosticWithOrigin(api, recentOrdersLookupUrl(orderRecord.externalOrderId), browserOrigin, { timeout: 8_000 }),
     systemRuntime: await readApiDiagnosticWithOrigin(api, '/api/system/runtime', browserOrigin, { timeout: 8_000 }),
     dashboardSnapshot: await readApiDiagnosticWithOrigin(api, '/api/dashboard/snapshot', browserOrigin, { timeout: 8_000 }),
     authSession: await readApiDiagnosticWithOrigin(api, '/api/auth/session', browserOrigin, { timeout: 8_000 }),
@@ -2026,7 +2037,8 @@ async function ensureRecentOrder(api) {
   let latestCoverage = null
 
   while (Date.now() - startedAt < 30_000) {
-    const { payload: recentOrders, error: recentOrdersError } = await readJsonGetBestEffort(api, '/api/orders/recent', {
+    const recentOrdersUrl = recentOrdersLookupUrl(externalOrderId)
+    const { payload: recentOrders, error: recentOrdersError } = await readJsonGetBestEffort(api, recentOrdersUrl, {
       requestPayload: {
         externalOrderId,
       },
@@ -2100,7 +2112,8 @@ async function waitForOrderReadModelCoverage(api, externalOrderId, message) {
   let latestCoverage = null
 
   while (Date.now() - startedAt < 30_000) {
-    const { payload: recentOrders, error: recentOrdersError } = await readJsonGetBestEffort(api, '/api/orders/recent', {
+    const recentOrdersUrl = recentOrdersLookupUrl(externalOrderId)
+    const { payload: recentOrders, error: recentOrdersError } = await readJsonGetBestEffort(api, recentOrdersUrl, {
       requestPayload: {
         externalOrderId,
       },

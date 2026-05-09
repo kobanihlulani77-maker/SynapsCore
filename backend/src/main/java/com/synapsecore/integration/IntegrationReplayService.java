@@ -125,11 +125,27 @@ public class IntegrationReplayService {
 
     @Transactional(readOnly = true)
     public List<IntegrationReplayRecordResponse> getReplayQueue() {
+        return getReplayQueue(null);
+    }
+
+    @Transactional(readOnly = true)
+    public List<IntegrationReplayRecordResponse> getReplayQueue(String externalOrderId) {
         var currentOperator = accessDirectoryService.getCurrentOperator();
-        return integrationReplayRecordRepository.findQueueSummariesByTenantCodeIgnoreCaseAndStatusIn(
-                tenantContextService.getCurrentTenantCodeOrDefault(),
+        String tenantCode = tenantContextService.getCurrentTenantCodeOrDefault();
+        String normalizedExternalOrderId = externalOrderId == null || externalOrderId.isBlank()
+            ? null
+            : externalOrderId.trim();
+        List<IntegrationReplayRecordResponse> replayQueue = normalizedExternalOrderId == null
+            ? integrationReplayRecordRepository.findQueueSummariesByTenantCodeIgnoreCaseAndStatusIn(
+                tenantCode,
                 List.of(IntegrationReplayStatus.PENDING, IntegrationReplayStatus.REPLAY_FAILED, IntegrationReplayStatus.DEAD_LETTERED),
                 PageRequest.of(0, DEFAULT_QUEUE_LIMIT))
+            : integrationReplayRecordRepository.findQueueSummariesByTenantCodeIgnoreCaseAndExternalOrderIdIgnoreCaseAndStatusIn(
+                tenantCode,
+                normalizedExternalOrderId,
+                List.of(IntegrationReplayStatus.PENDING, IntegrationReplayStatus.REPLAY_FAILED, IntegrationReplayStatus.DEAD_LETTERED),
+                PageRequest.of(0, 1));
+        return replayQueue
             .stream()
             .filter(record -> currentOperator.isEmpty()
                 || accessDirectoryService.hasWarehouseAccess(currentOperator.get(), record.warehouseCode()))

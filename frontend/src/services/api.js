@@ -174,8 +174,13 @@ export const createApiRequestHelpers = ({ authSession, currentPage, onUnauthoriz
     let response
     try {
       response = await fetchApi(path, init)
-    } catch {
-      throw new Error(`Unable to reach the SynapseCore backend at ${apiUrl}. Check the live API URL, CORS policy, and backend availability.`)
+    } catch (error) {
+      const method = String(init.method || 'GET').toUpperCase()
+      const endpoint = `${apiUrl}${path}`
+      const transportDetail = error?.name === 'AbortError'
+        ? 'The request timed out before the backend responded.'
+        : 'The browser did not receive any HTTP response.'
+      throw new Error(`${method} ${endpoint} could not be completed. ${transportDetail} Check backend availability or proxy health, and only treat this as CORS if the browser console reports a CORS rejection.`)
     }
 
     const payload = await readResponsePayload(response)

@@ -10,7 +10,10 @@ import com.synapsecore.observability.OperationalMetricsService;
 import com.synapsecore.realtime.RealtimeService;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
+import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.concurrent.atomic.AtomicBoolean;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -76,13 +79,22 @@ public class OperationalDispatchQueueService {
                 List.of(OperationalDispatchStatus.PENDING),
                 PageRequest.of(0, Math.max(batchSize, 1))
             );
-            for (OperationalDispatchWorkItem workItem : pendingItems) {
-                processedCount += processSingleWorkItem(workItem);
+            List<DispatchBatch> dispatchBatches = collapseIntoDispatchBatches(pendingItems);
+            for (DispatchBatch dispatchBatch : dispatchBatches) {
+                processedCount += processDispatchBatch(dispatchBatch);
+            }
+            if (!pendingItems.isEmpty()) {
+                log.debug("Operational dispatch queue collapsed {} pending item(s) into {} broadcast batch(es).",
+                    pendingItems.size(), dispatchBatches.size());
             }
         } finally {
             draining.set(false);
         }
         return processedCount;
+    }
+
+    public boolean isDraining() {
+        return draining.get();
     }
 
     public Long oldestPendingAgeSeconds(String tenantCode) {
@@ -96,58 +108,36 @@ public class OperationalDispatchQueueService {
             .orElse(null);
     }
 
-    private int processSingleWorkItem(OperationalDispatchWorkItem workItem) {
-        workItem.setStatus(OperationalDispatchStatus.PROCESSING);
-        workItem.setAttemptCount(workItem.getAttemptCount() + 1);
-        try {
-            operationalDispatchWorkItemRepository.save(workItem);
-        } catch (ObjectOptimisticLockingFailureException lockingFailureException) {
-            log.debug("Operational dispatch work item {} was already claimed by another worker before processing started.",
-                workItem.getId());
+    private int processDispatchBatch(DispatchBatch dispatchBatch) {
+        List<OperationalDispatchWorkItem> claimedItems = claimDispatchBatch(dispatchBatch.workItems());
+        if (claimedItems.isEmpty()) {
             return 0;
         }
 
-        requestTraceContext.setCurrentRequestId(workItem.getRequestId());
+        OperationalDispatchWorkItem representativeItem = claimedItems.get(0);
+        requestTraceContext.setCurrentRequestId(representativeItem.getRequestId());
         requestTraceContext.setCurrentActor(SYSTEM_ACTOR);
-        requestTraceContext.setCurrentTenant(workItem.getTenantCode());
-        MDC.put(REQUEST_ID_MDC_KEY, workItem.getRequestId());
+        requestTraceContext.setCurrentTenant(representativeItem.getTenantCode());
+        MDC.put(REQUEST_ID_MDC_KEY, representativeItem.getRequestId());
         MDC.put(ACTOR_MDC_KEY, SYSTEM_ACTOR);
-        MDC.put(TENANT_MDC_KEY, workItem.getTenantCode());
+        MDC.put(TENANT_MDC_KEY, representativeItem.getTenantCode());
 
         try {
-            if (workItem.getUpdateType() == OperationalUpdateType.INTEGRATION_STATE) {
-                realtimeServiceProvider.getObject().broadcastIntegrationUpdates(workItem.getTenantCode());
+            if (dispatchBatch.surface() == DispatchSurface.INTEGRATION) {
+                realtimeServiceProvider.getObject().broadcastIntegrationUpdates(dispatchBatch.tenantCode());
             } else {
                 dashboardServiceProvider.getObject().refreshSummary();
-                realtimeServiceProvider.getObject().broadcastOperationalUpdates(workItem.getTenantCode());
+                realtimeServiceProvider.getObject().broadcastOperationalUpdates(dispatchBatch.tenantCode());
             }
-            workItem.setStatus(OperationalDispatchStatus.COMPLETED);
-            workItem.setProcessedAt(Instant.now());
-            workItem.setLastError(null);
-            try {
-                operationalDispatchWorkItemRepository.save(workItem);
-            } catch (ObjectOptimisticLockingFailureException lockingFailureException) {
-                log.debug("Operational dispatch work item {} was already completed by another worker.",
-                    workItem.getId());
-                return 0;
-            }
-            operationalMetricsService.recordDispatchProcessed(workItem.getTenantCode(), workItem.getUpdateType());
-            log.debug("Operational dispatch queue processed {} for tenant {} from {} request {}",
-                workItem.getUpdateType(), workItem.getTenantCode(), workItem.getSource(), workItem.getRequestId());
-            return 1;
+            markDispatchBatchCompleted(claimedItems);
+            log.debug("Operational dispatch queue processed {} {} item(s) for tenant {} using request {}",
+                claimedItems.size(), dispatchBatch.surface(), dispatchBatch.tenantCode(), representativeItem.getRequestId());
+            return claimedItems.size();
         } catch (RuntimeException exception) {
-            workItem.setStatus(OperationalDispatchStatus.FAILED);
-            workItem.setLastError(limit(exception.getMessage()));
-            try {
-                operationalDispatchWorkItemRepository.save(workItem);
-            } catch (ObjectOptimisticLockingFailureException lockingFailureException) {
-                log.debug("Operational dispatch work item {} was already updated by another worker while recording failure.",
-                    workItem.getId());
-                return 0;
-            }
-            operationalMetricsService.recordDispatchFailure(workItem.getTenantCode(), workItem.getUpdateType());
-            log.warn("Operational dispatch queue failed {} for tenant {} request {}: {}",
-                workItem.getUpdateType(), workItem.getTenantCode(), workItem.getRequestId(), exception.getMessage());
+            markDispatchBatchFailed(claimedItems, exception);
+            log.warn("Operational dispatch queue failed {} {} item(s) for tenant {} request {}: {}",
+                claimedItems.size(), dispatchBatch.surface(), dispatchBatch.tenantCode(),
+                representativeItem.getRequestId(), exception.getMessage());
             return 0;
         } finally {
             MDC.remove(REQUEST_ID_MDC_KEY);
@@ -157,10 +147,83 @@ public class OperationalDispatchQueueService {
         }
     }
 
+    private List<DispatchBatch> collapseIntoDispatchBatches(List<OperationalDispatchWorkItem> pendingItems) {
+        Map<String, List<OperationalDispatchWorkItem>> groupedItems = new LinkedHashMap<>();
+        for (OperationalDispatchWorkItem pendingItem : pendingItems) {
+            groupedItems.computeIfAbsent(pendingItem.getTenantCode(), ignored -> new ArrayList<>()).add(pendingItem);
+        }
+        return groupedItems.entrySet().stream()
+            .map(entry -> new DispatchBatch(entry.getKey(), determineDispatchSurface(entry.getValue()), entry.getValue()))
+            .toList();
+    }
+
+    private List<OperationalDispatchWorkItem> claimDispatchBatch(List<OperationalDispatchWorkItem> workItems) {
+        List<OperationalDispatchWorkItem> claimedItems = new ArrayList<>();
+        for (OperationalDispatchWorkItem workItem : workItems) {
+            workItem.setStatus(OperationalDispatchStatus.PROCESSING);
+            workItem.setAttemptCount(workItem.getAttemptCount() + 1);
+            try {
+                operationalDispatchWorkItemRepository.save(workItem);
+                claimedItems.add(workItem);
+            } catch (ObjectOptimisticLockingFailureException lockingFailureException) {
+                log.debug("Operational dispatch work item {} was already claimed by another worker before processing started.",
+                    workItem.getId());
+            }
+        }
+        return claimedItems;
+    }
+
+    private void markDispatchBatchCompleted(List<OperationalDispatchWorkItem> workItems) {
+        Instant processedAt = Instant.now();
+        for (OperationalDispatchWorkItem workItem : workItems) {
+            workItem.setStatus(OperationalDispatchStatus.COMPLETED);
+            workItem.setProcessedAt(processedAt);
+            workItem.setLastError(null);
+            try {
+                operationalDispatchWorkItemRepository.save(workItem);
+                operationalMetricsService.recordDispatchProcessed(workItem.getTenantCode(), workItem.getUpdateType());
+            } catch (ObjectOptimisticLockingFailureException lockingFailureException) {
+                log.debug("Operational dispatch work item {} was already completed by another worker.",
+                    workItem.getId());
+            }
+        }
+    }
+
+    private void markDispatchBatchFailed(List<OperationalDispatchWorkItem> workItems, RuntimeException exception) {
+        String errorMessage = limit(exception.getMessage());
+        for (OperationalDispatchWorkItem workItem : workItems) {
+            workItem.setStatus(OperationalDispatchStatus.FAILED);
+            workItem.setLastError(errorMessage);
+            try {
+                operationalDispatchWorkItemRepository.save(workItem);
+                operationalMetricsService.recordDispatchFailure(workItem.getTenantCode(), workItem.getUpdateType());
+            } catch (ObjectOptimisticLockingFailureException lockingFailureException) {
+                log.debug("Operational dispatch work item {} was already updated by another worker while recording failure.",
+                    workItem.getId());
+            }
+        }
+    }
+
+    private DispatchSurface determineDispatchSurface(List<OperationalDispatchWorkItem> workItems) {
+        return workItems.stream().allMatch(workItem -> workItem.getUpdateType() == OperationalUpdateType.INTEGRATION_STATE)
+            ? DispatchSurface.INTEGRATION
+            : DispatchSurface.OPERATIONAL;
+    }
+
     private String limit(String value) {
         if (value == null || value.length() <= 320) {
             return value;
         }
         return value.substring(0, 317) + "...";
+    }
+
+    private enum DispatchSurface {
+        OPERATIONAL,
+        INTEGRATION
+    }
+
+    private record DispatchBatch(String tenantCode,
+                                 DispatchSurface surface,
+                                 List<OperationalDispatchWorkItem> workItems) {
     }
 }
