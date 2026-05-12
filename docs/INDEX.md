@@ -9,6 +9,37 @@ This index links the main product, architecture, runbook, proof, and operator do
 - [frontend-flow.md](frontend-flow.md)
 - [backend-flow.md](backend-flow.md)
 
+## Product Understanding
+
+- [product-purpose.md](product-purpose.md)
+- [founder-brief.md](founder-brief.md)
+- [operations-story-pack.md](operations-story-pack.md)
+- [company-fit-playbook.md](company-fit-playbook.md)
+- [onboarding-playbook.md](onboarding-playbook.md)
+
+## Infrastructure
+
+- [system-architecture.md](system-architecture.md)
+- [infrastructure-communication-map.md](infrastructure-communication-map.md)
+- [frontend-flow.md](frontend-flow.md)
+- [backend-flow.md](backend-flow.md)
+- [runtime-observability.md](runtime-observability.md)
+
+## Data Flows
+
+- [data-flow-playbook.md](data-flow-playbook.md)
+- [system-flow.md](system-flow.md)
+- [replay-recovery.md](replay-recovery.md)
+- [integration-operations.md](integration-operations.md)
+- [hosted-proof.md](hosted-proof.md)
+
+## Business Potential
+
+- [platform-potential.md](platform-potential.md)
+- [company-fit-playbook.md](company-fit-playbook.md)
+- [pilot-onboarding-pack.md](pilot-onboarding-pack.md)
+- [pilot-operations-runbook.md](pilot-operations-runbook.md)
+
 ## Runbooks
 
 - [local-runbook.md](local-runbook.md)
@@ -64,6 +95,7 @@ This index links the main product, architecture, runbook, proof, and operator do
 - `scripts\check-live-connections.ps1`
 - `scripts\check-local-connections.ps1`
 - `scripts\explain-system.ps1`
+- `scripts\explain-infrastructure.ps1`
 - `scripts\prepare-hosted-proof.ps1`
 - `scripts\verify-deployment.ps1`
 - `scripts\verify-realtime.ps1`
