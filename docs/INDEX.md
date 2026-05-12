@@ -44,9 +44,22 @@ This index links the main product, architecture, runbook, proof, and operator do
 - [system-architecture.md](system-architecture.md)
 - [infrastructure-handbook.md](infrastructure-handbook.md)
 - [infrastructure-communication-map.md](infrastructure-communication-map.md)
+- [system-communication-map.md](system-communication-map.md)
 - [frontend-flow.md](frontend-flow.md)
 - [backend-flow.md](backend-flow.md)
 - [runtime-observability.md](runtime-observability.md)
+
+## Project Structure
+
+- [master-project-tree.md](master-project-tree.md)
+- [contributor-guide.md](contributor-guide.md)
+- [system-architecture.md](system-architecture.md)
+
+## System Communication
+
+- [system-communication-map.md](system-communication-map.md)
+- [infrastructure-communication-map.md](infrastructure-communication-map.md)
+- [data-flow-playbook.md](data-flow-playbook.md)
 
 ## Technical Review
 
@@ -191,6 +204,30 @@ This index links the main product, architecture, runbook, proof, and operator do
 - [operations-reliability.md](operations-reliability.md)
 - [operational-hardening-audit.md](operational-hardening-audit.md)
 
+## Product Roadmap
+
+- [master-product-roadmap.md](master-product-roadmap.md)
+- [final-product-vision.md](final-product-vision.md)
+- [platform-potential.md](platform-potential.md)
+
+## Infrastructure Evolution
+
+- [infrastructure-evolution-roadmap.md](infrastructure-evolution-roadmap.md)
+- [enterprise-hardening-roadmap.md](enterprise-hardening-roadmap.md)
+- [render-ops-runbook.md](render-ops-runbook.md)
+
+## Engineering Priorities
+
+- [engineering-priorities.md](engineering-priorities.md)
+- [proof-system-evolution.md](proof-system-evolution.md)
+- [current-limitations.md](current-limitations.md)
+
+## Contributor Guidance
+
+- [contributor-guide.md](contributor-guide.md)
+- [technical-reviewer-guide.md](technical-reviewer-guide.md)
+- [proof-and-validation.md](proof-and-validation.md)
+
 ## Current Limitations
 
 - [current-limitations.md](current-limitations.md)
@@ -222,6 +259,7 @@ This index links the main product, architecture, runbook, proof, and operator do
 - `scripts\explain-infrastructure.ps1`
 - `scripts\explain-pilot-readiness.ps1`
 - `scripts\explain-proof-system.ps1`
+- `scripts\project-map.ps1`
 - `scripts\recovery-checklist.ps1`
 - `scripts\prepare-hosted-proof.ps1`
 - `scripts\verify-deployment.ps1`
