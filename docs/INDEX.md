@@ -30,12 +30,14 @@ This index links the main product, architecture, runbook, proof, and operator do
 - [market-fit-playbook.md](market-fit-playbook.md)
 - [platform-potential.md](platform-potential.md)
 - [company-fit-playbook.md](company-fit-playbook.md)
+- [platform-differentiation.md](platform-differentiation.md)
 
 ## Company Understanding
 
 - [company-explainer.md](company-explainer.md)
 - [product-purpose.md](product-purpose.md)
 - [final-product-vision.md](final-product-vision.md)
+- [buyer-due-diligence-guide.md](buyer-due-diligence-guide.md)
 
 ## Infrastructure
 
@@ -111,12 +113,38 @@ This index links the main product, architecture, runbook, proof, and operator do
 - [pilot-program-guide.md](pilot-program-guide.md)
 - [pilot-onboarding-pack.md](pilot-onboarding-pack.md)
 - [pilot-operations-runbook.md](pilot-operations-runbook.md)
+- [pilot-adoption-roadmap.md](pilot-adoption-roadmap.md)
+- [pilot-faq.md](pilot-faq.md)
 
 ## Executive Overview
 
 - [executive-summary.md](executive-summary.md)
 - [final-product-vision.md](final-product-vision.md)
 - [render-ops-runbook.md](render-ops-runbook.md)
+
+## Buyer Evaluation
+
+- [buyer-due-diligence-guide.md](buyer-due-diligence-guide.md)
+- [executive-summary.md](executive-summary.md)
+- [technical-reviewer-guide.md](technical-reviewer-guide.md)
+
+## Enterprise Evaluation
+
+- [enterprise-evaluation-checklist.md](enterprise-evaluation-checklist.md)
+- [technical-reviewer-guide.md](technical-reviewer-guide.md)
+- [current-limitations.md](current-limitations.md)
+
+## Operational Value
+
+- [operational-value-guide.md](operational-value-guide.md)
+- [platform-differentiation.md](platform-differentiation.md)
+- [company-explainer.md](company-explainer.md)
+
+## Platform Positioning
+
+- [platform-differentiation.md](platform-differentiation.md)
+- [final-product-vision.md](final-product-vision.md)
+- [why-synapsecore-exists.md](why-synapsecore-exists.md)
 
 ## Runbooks
 
@@ -192,6 +220,7 @@ This index links the main product, architecture, runbook, proof, and operator do
 - `scripts\check-local-connections.ps1`
 - `scripts\explain-system.ps1`
 - `scripts\explain-infrastructure.ps1`
+- `scripts\explain-pilot-readiness.ps1`
 - `scripts\explain-proof-system.ps1`
 - `scripts\recovery-checklist.ps1`
 - `scripts\prepare-hosted-proof.ps1`
