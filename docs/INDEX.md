@@ -46,6 +46,19 @@ This index links the main product, architecture, runbook, proof, and operator do
 - [backend-flow.md](backend-flow.md)
 - [runtime-observability.md](runtime-observability.md)
 
+## Technical Review
+
+- [technical-reviewer-guide.md](technical-reviewer-guide.md)
+- [operations-reliability.md](operations-reliability.md)
+- [infrastructure-communication-map.md](infrastructure-communication-map.md)
+
+## Security / Trust
+
+- [security-and-trust-model.md](security-and-trust-model.md)
+- [security-test-plan.md](security-test-plan.md)
+- [leakage-audit.md](leakage-audit.md)
+- [runtime-observability.md](runtime-observability.md)
+
 ## Data Flows
 
 - [data-flow-playbook.md](data-flow-playbook.md)
@@ -86,10 +99,17 @@ This index links the main product, architecture, runbook, proof, and operator do
 ## Hosted Proof And Verification
 
 - [hosted-proof.md](hosted-proof.md)
+- [proof-and-validation.md](proof-and-validation.md)
 - [verification-status.md](verification-status.md)
 - [frontend-demo-guide.md](frontend-demo-guide.md)
 - [frontend-qa-checklist.md](frontend-qa-checklist.md)
 - [frontend-demo-mode.md](frontend-demo-mode.md)
+
+## Proof / Validation
+
+- [proof-and-validation.md](proof-and-validation.md)
+- [hosted-proof.md](hosted-proof.md)
+- [technical-reviewer-guide.md](technical-reviewer-guide.md)
 
 ## Product And Architecture
 
@@ -105,6 +125,17 @@ This index links the main product, architecture, runbook, proof, and operator do
 - [leakage-audit.md](leakage-audit.md)
 - [operational-hardening-audit.md](operational-hardening-audit.md)
 - [schema-migration-roadmap.md](schema-migration-roadmap.md)
+
+## Enterprise Hardening
+
+- [enterprise-hardening-roadmap.md](enterprise-hardening-roadmap.md)
+- [operations-reliability.md](operations-reliability.md)
+- [operational-hardening-audit.md](operational-hardening-audit.md)
+
+## Current Limitations
+
+- [current-limitations.md](current-limitations.md)
+- [enterprise-hardening-roadmap.md](enterprise-hardening-roadmap.md)
 
 ## Onboarding And Pilot
 
@@ -130,6 +161,7 @@ This index links the main product, architecture, runbook, proof, and operator do
 - `scripts\check-local-connections.ps1`
 - `scripts\explain-system.ps1`
 - `scripts\explain-infrastructure.ps1`
+- `scripts\explain-proof-system.ps1`
 - `scripts\prepare-hosted-proof.ps1`
 - `scripts\verify-deployment.ps1`
 - `scripts\verify-realtime.ps1`
