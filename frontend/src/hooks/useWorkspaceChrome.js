@@ -110,12 +110,12 @@ export default function useWorkspaceChrome({
 
   const selectedTenantOption = tenantDirectoryState.items.find((tenant) => tenant.code === authSessionState.tenantCode.trim())
   const signInWorkspaceHint = tenantDirectoryState.error
-    ? 'Workspace directory lookup is unavailable. Enter the tenant code manually and continue with a valid operator account.'
+    ? 'Workspace directory lookup is unavailable. Enter the company workspace code manually and continue with a valid operator account.'
     : tenantDirectoryState.loading
-      ? 'Loading the active workspace directory so operators can sign in against the live tenant list.'
+      ? 'Loading the active workspace directory so operators can sign in against the live company workspace list.'
       : selectedTenantOption
         ? `Signing into ${selectedTenantOption.name}.`
-        : 'Enter the tenant code exactly as it exists in SynapseCore, or pick it from the live directory suggestions.'
+        : 'Enter the company workspace code exactly as it exists in SynapseCore, or pick it from the live directory suggestions.'
   const signInConfigHint = `API ${apiUrl || 'missing'} | Realtime ${wsUrl || 'missing'} | Transport ${realtimeTransportLabel}`
 
   const metrics = [

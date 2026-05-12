@@ -1,3 +1,4 @@
+import { useState } from 'react'
 import LoadingState from '../components/LoadingState'
 
 export default function SignInPage({ context }) {
@@ -17,12 +18,37 @@ export default function SignInPage({ context }) {
     signInConfigHint,
   } = context
 
+  const [showPassword, setShowPassword] = useState(false)
+  const [attemptedSubmit, setAttemptedSubmit] = useState(false)
+  const [visitedFields, setVisitedFields] = useState({
+    tenantCode: false,
+    username: false,
+    password: false,
+  })
+
   const featureCards = [
     { title: 'Live visibility', body: 'Orders, inventory, locations, fulfillment, incidents, and connectors pulled into one operational picture.' },
     { title: 'Prediction and guidance', body: 'Detect risk early, estimate near-term impact, and surface what the team should do next.' },
     { title: 'Control and trust', body: 'Run scenarios, route approvals, recover failed inbound work, and keep runtime confidence visible.' },
   ]
   const signInBusy = authSessionState.loading && authSessionState.action === 'signin'
+  const workspaceCodeMissing = (attemptedSubmit || visitedFields.tenantCode) && !authSessionState.tenantCode.trim()
+  const usernameMissing = (attemptedSubmit || visitedFields.username) && !authSessionState.username.trim()
+  const passwordMissing = (attemptedSubmit || visitedFields.password) && !authSessionState.password.trim()
+  const authError = authSessionState.error || tenantDirectoryState.error
+  const authIssueTone = authError?.toLowerCase().includes('expired') ? 'warning' : 'danger'
+  const authIssueTitle = authError?.toLowerCase().includes('expired')
+    ? 'Session expired'
+    : 'Workspace sign-in needs attention'
+
+  const handleFieldBlur = (field) => {
+    setVisitedFields((current) => ({ ...current, [field]: true }))
+  }
+
+  const submitWithValidation = (event) => {
+    setAttemptedSubmit(true)
+    handleSignInSubmit(event)
+  }
 
   return (
     <main className={`public-shell public-page-${effectivePageMeta.key}`}>
@@ -59,22 +85,29 @@ export default function SignInPage({ context }) {
           <p className="panel-kicker">Company sign in</p>
           <h2>Enter the operational platform</h2>
           {tenantDirectoryState.loading && !tenantDirectoryState.items.length ? <LoadingState label="Loading available workspaces..." /> : null}
-          <form className="signin-form-shell" onSubmit={handleSignInSubmit}>
+          <form className="signin-form-shell" onSubmit={submitWithValidation}>
             <div className="signin-form-grid">
               <label className="field">
-                <span>Tenant workspace</span>
+                <span>Company workspace code</span>
                 <input
                   type="text"
                   list="tenant-workspace-options"
                   value={authSessionState.tenantCode}
                   onChange={(event) => setAuthSessionState((current) => ({ ...current, tenantCode: event.target.value.toUpperCase() }))}
-                  placeholder={tenantDirectoryState.loading ? 'Loading workspace directory...' : 'Enter tenant code'}
+                  placeholder={tenantDirectoryState.loading ? 'Loading workspace directory...' : 'Enter company workspace code'}
                   autoComplete="organization"
                   disabled={signInBusy}
+                  aria-invalid={workspaceCodeMissing}
+                  onBlur={() => handleFieldBlur('tenantCode')}
                 />
                 <datalist id="tenant-workspace-options">
                   {tenantDirectoryState.items.map((tenant) => <option key={tenant.code} value={tenant.code}>{tenant.name}</option>)}
                 </datalist>
+                <span className={`field-hint ${workspaceCodeMissing ? 'field-validation-warning' : ''}`}>
+                  {workspaceCodeMissing
+                    ? 'Enter the workspace code so SynapseCore can open the correct company environment.'
+                    : 'Use the workspace code your SynapseCore company admin gave your team.'}
+                </span>
               </label>
               <label className="field">
                 <span>Username</span>
@@ -85,39 +118,71 @@ export default function SignInPage({ context }) {
                   placeholder="workspace.admin"
                   autoComplete="username"
                   disabled={signInBusy}
+                  aria-invalid={usernameMissing}
+                  onBlur={() => handleFieldBlur('username')}
                 />
+                <span className={`field-hint ${usernameMissing ? 'field-validation-warning' : ''}`}>
+                  {usernameMissing
+                    ? 'Enter the operator username tied to this company workspace.'
+                    : 'Operator usernames stay inside the company workspace boundary.'}
+                </span>
               </label>
               <label className="field">
                 <span>Password</span>
-                <input
-                  type="password"
-                  value={authSessionState.password}
-                  onChange={(event) => setAuthSessionState((current) => ({ ...current, password: event.target.value }))}
-                  placeholder="Enter workspace password"
-                  autoComplete="current-password"
-                  disabled={signInBusy}
-                />
+                <div className="field-control">
+                  <input
+                    type={showPassword ? 'text' : 'password'}
+                    value={authSessionState.password}
+                    onChange={(event) => setAuthSessionState((current) => ({ ...current, password: event.target.value }))}
+                    placeholder="Enter workspace password"
+                    autoComplete="current-password"
+                    disabled={signInBusy}
+                    aria-invalid={passwordMissing}
+                    onBlur={() => handleFieldBlur('password')}
+                  />
+                  <button className="field-inline-button" onClick={() => setShowPassword((current) => !current)} type="button">
+                    {showPassword ? 'Hide' : 'Show'}
+                  </button>
+                </div>
+                <span className={`field-hint ${passwordMissing ? 'field-validation-warning' : ''}`}>
+                  {passwordMissing
+                    ? 'Enter the password for this operator account.'
+                    : 'Passwords are verified against the signed company workspace before protected actions unlock.'}
+                </span>
               </label>
+            </div>
+            <div className="signin-status-grid">
+              <article className="signin-status-card">
+                <span>Workspace target</span>
+                <strong>{selectedTenantOption?.name || authSessionState.tenantCode.trim() || 'Choose workspace code'}</strong>
+                <p>{selectedTenantOption ? 'The live workspace directory recognizes this company environment.' : 'Workspace codes point operators into the correct company operations environment.'}</p>
+              </article>
+              <article className="signin-status-card">
+                <span>Access flow</span>
+                <strong>{signInBusy ? 'Validating access' : 'Operator sign-in'}</strong>
+                <p>{signInBusy ? 'SynapseCore is validating workspace identity, operator credentials, and session posture.' : 'Operators enter with workspace code, username, and password. Company admins manage reset and access policy.'}</p>
+              </article>
             </div>
             <div className="signin-meta-row">
               <label className="checkbox-field inline-checkbox">
                 <input className="checkbox-input" type="checkbox" checked={rememberWorkspace} onChange={(event) => setRememberWorkspace(event.target.checked)} />
-                <span>Remember tenant code and username on this device</span>
+                <span>Remember workspace code and username on this device</span>
               </label>
-              <span className="muted-text">Password recovery is managed by your tenant admin.</span>
+              <span className="muted-text">Password recovery is managed by your company workspace admin.</span>
             </div>
             <div className="history-action-row">
               <button className="primary-button" disabled={signInBusy || !authSessionState.tenantCode.trim() || !authSessionState.username.trim() || !authSessionState.password.trim()} type="submit">
                 {signInBusy ? 'Opening Workspace...' : 'Enter Platform'}
               </button>
+              <button className="secondary-button" onClick={() => navigateToPage('create-workspace')} type="button">Create Workspace</button>
               <button className="ghost-button" onClick={() => navigateToPage('product')} type="button">Product Overview</button>
             </div>
           </form>
           <div className="signin-trust-grid">
             <article className="signin-trust-card">
-              <span>Tenant scope</span>
+              <span>Workspace scope</span>
               <strong>{selectedTenantOption?.name || authSessionState.tenantCode.trim() || 'Workspace required'}</strong>
-              <p>Operators enter a company workspace, not a generic app account.</p>
+              <p>Operators sign into a specific company workspace, not a generic application account.</p>
             </article>
             <article className="signin-trust-card">
               <span>Session model</span>
@@ -130,10 +195,20 @@ export default function SignInPage({ context }) {
               <p>SynapseCore opens the command workspace with live operational updates when the session is valid.</p>
             </article>
           </div>
+          {signInBusy ? (
+            <div className="signin-feedback-card tone-info">
+              <strong>Opening your operations workspace</strong>
+              <p>We’re validating the company workspace, operator identity, and live session before the command center opens.</p>
+            </div>
+          ) : null}
+          {authError ? (
+            <div className={`signin-feedback-card tone-${authIssueTone}`}>
+              <strong>{authIssueTitle}</strong>
+              <p>{authError}</p>
+            </div>
+          ) : null}
           <p className="muted-text integration-note">{signInWorkspaceHint}</p>
           <p className="muted-text integration-note">{signInConfigHint}</p>
-          {tenantDirectoryState.error ? <p className="error-text">{tenantDirectoryState.error}</p> : null}
-          {authSessionState.error ? <p className="error-text">{authSessionState.error}</p> : null}
         </article>
       </section>
     </main>

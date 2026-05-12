@@ -22,6 +22,12 @@ export default function Topbar({
   signOutOperator,
   authSessionState,
 }) {
+  const workspaceLabel = signedInSession?.tenantName || signedInSession?.tenantCode || 'Workspace'
+  const primaryRole = signedInSession?.roles?.[0] ? formatCodeLabel(signedInSession.roles[0]) : 'Operator'
+  const runtimeLabel = systemRuntimeState.runtime?.overallStatus
+    ? formatCodeLabel(systemRuntimeState.runtime.overallStatus)
+    : (systemRuntimeState.loading ? 'Loading trust' : 'Runtime pending')
+
   return (
     <header className="workspace-topbar">
       <div>
@@ -30,6 +36,23 @@ export default function Topbar({
         <p className="workspace-topbar-copy">{effectivePageMeta.description}</p>
       </div>
       <div className="workspace-topbar-actions">
+        <div className="workspace-topbar-identity">
+          <div className="workspace-identity-card">
+            <span>Workspace</span>
+            <strong>{workspaceLabel}</strong>
+            <p>{signedInSession?.tenantCode || 'No workspace code'} | {primaryRole}</p>
+          </div>
+          <div className="workspace-identity-card">
+            <span>Operator</span>
+            <strong>{signedInSession?.displayName || 'Unknown operator'}</strong>
+            <p>{signedInSession?.actorName || 'No actor binding'} | {signedInSession?.username || 'No username'}</p>
+          </div>
+          <div className="workspace-identity-card">
+            <span>System posture</span>
+            <strong>{connectionState === 'live' ? 'Live system' : formatCodeLabel(connectionState)}</strong>
+            <p>{runtimeLabel} | Updated {liveClockLabel}</p>
+          </div>
+        </div>
         <div className="workspace-topbar-search">
           <label className="field workspace-search-field">
             <span>Global search</span>
@@ -45,7 +68,7 @@ export default function Topbar({
                   setWorkspaceSearch('')
                 }
               }}
-              placeholder="Search pages, orders, or alerts"
+              placeholder="Search pages, orders, alerts, or incidents"
             />
           </label>
           {hasWorkspaceSearch ? (
@@ -100,6 +123,9 @@ export default function Topbar({
         <div className="workspace-status-strip">
           <span className="workspace-status-pill">{liveClockLabel}</span>
           <span className={`workspace-status-pill status-${connectionState}`}>{connectionState === 'live' ? 'Live system' : formatCodeLabel(connectionState)}</span>
+          <button className="workspace-status-pill workspace-status-button" onClick={() => navigateToPage('runtime')} type="button">
+            Runtime {runtimeLabel}
+          </button>
           <button className="workspace-status-pill workspace-status-button" onClick={() => navigateToPage('alerts')} type="button">
             Notifications {globalNotificationCount}
           </button>
@@ -108,7 +134,9 @@ export default function Topbar({
           {topbarQuickActions.map((action) => (
             <button key={action.label} className="ghost-button" onClick={() => navigateToPage(action.target)} type="button">{action.label}</button>
           ))}
-          <button className="ghost-button" onClick={async () => { await Promise.all([pageState.onRefresh(), systemRuntimeState.onRefresh()]) }} disabled={pageState.loading || actionState.loading || systemRuntimeState.loading} type="button">Refresh</button>
+          <button className="ghost-button" onClick={async () => { await Promise.all([pageState.onRefresh(), systemRuntimeState.onRefresh()]) }} disabled={pageState.loading || actionState.loading || systemRuntimeState.loading} type="button">
+            {pageState.loading || systemRuntimeState.loading ? 'Refreshing...' : 'Refresh'}
+          </button>
           <button className="ghost-button" onClick={() => navigateToPage('profile')} type="button">{signedInSession?.displayName || 'Profile'}</button>
           <button className="ghost-button" onClick={signOutOperator} disabled={authSessionState.loading} type="button">
             {authSessionState.action === 'signout' ? 'Signing Out...' : 'Sign Out'}

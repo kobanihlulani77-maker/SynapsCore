@@ -1,5 +1,6 @@
 import Panel from '../components/Panel'
 import ScenarioDecisionConsole from '../components/ScenarioDecisionConsole'
+import { MetricCard } from '../components/Card'
 
 export default function ApprovalsPage({ context }) {
   const {
@@ -23,9 +24,40 @@ export default function ApprovalsPage({ context }) {
     <section className="content-grid approvals-center-grid">
       <Panel wide>
         <div className="panel-header">
-          <div><p className="panel-kicker">Approvals center</p><h2>Pending, approved, rejected, and overdue decisions</h2></div>
+          <div>
+            <p className="panel-kicker">Approvals center</p>
+            <h2>Pending, approved, rejected, and overdue decisions</h2>
+          </div>
           <span className="panel-badge scenario-badge">{pendingApprovalScenarios.length}</span>
         </div>
+
+        <div className="ops-command-hero">
+          <div className="ops-command-copy">
+            <strong>Approval board and decision execution</strong>
+            <p>
+              Teams should be able to see pending decisions, overdue risk, and action-ready approvals in one place, then
+              move confidently through review without losing operational context.
+            </p>
+            <div className="ops-pill-row">
+              <span className="workspace-meta-pill">Stage aware</span>
+              <span className="workspace-meta-pill">SLA visible</span>
+              <span className="workspace-meta-pill">Execution linked</span>
+            </div>
+          </div>
+          <div className="ops-command-actions">
+            <button className="secondary-button" onClick={() => overdueScenarios[0] && setSelectedScenarioId(overdueScenarios[0].id)} disabled={!overdueScenarios[0]} type="button">
+              Focus overdue decision
+            </button>
+          </div>
+        </div>
+
+        <div className="summary-grid compact-summary-grid">
+          <MetricCard label="Pending" value={pendingApprovalScenarios.length} accent="amber" note="Plans still waiting on review or final approval." />
+          <MetricCard label="Approved" value={approvedScenarios.length} accent="teal" note="Plans already approved and available for execution or traceability." />
+          <MetricCard label="Rejected" value={rejectedScenarios.length} accent="rose" note="Plans routed back or closed out with a rejection decision." />
+          <MetricCard label="Overdue" value={overdueScenarios.length} accent="orange" note="Plans that have already breached expected approval timing." />
+        </div>
+
         <div className="approval-status-grid">
           <article className="stack-card">
             <div className="stack-title-row"><strong>Pending</strong><span className="status-tag status-partial">{pendingApprovalScenarios.length}</span></div>
@@ -76,6 +108,7 @@ export default function ApprovalsPage({ context }) {
             </div>
           </article>
         </div>
+
         <div className="experience-grid experience-grid-split">
           <article className="stack-card section-card">
             <div className="stack-title-row">
@@ -95,6 +128,7 @@ export default function ApprovalsPage({ context }) {
               </div>
             ) : <div className="empty-state">When a plan is waiting on approval, its decision path and due pressure will appear here.</div>}
           </article>
+
           <ScenarioDecisionConsole
             scenario={selectedApprovalScenario}
             title="Approval action console"
@@ -102,6 +136,7 @@ export default function ApprovalsPage({ context }) {
             context={scenarioDecisionContext}
           />
         </div>
+
         <div className="experience-grid experience-grid-split">
           <article className="stack-card section-card">
             <div className="stack-title-row"><strong>Decision workload</strong><span className="scenario-type-tag">{pendingApprovalScenarios.length + overdueScenarios.length}</span></div>
@@ -118,6 +153,7 @@ export default function ApprovalsPage({ context }) {
               </div>
             </div>
           </article>
+
           <article className="stack-card section-card">
             <div className="stack-title-row"><strong>Ops notices</strong><span className="scenario-type-tag">{snapshot.scenarioNotifications.length}</span></div>
             <div className="signal-list">

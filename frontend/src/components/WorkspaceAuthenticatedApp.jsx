@@ -127,7 +127,15 @@ export default function WorkspaceAuthenticatedApp({
         effectivePageMeta={effectivePageMeta}
         currentPage={currentPage}
       />
-      <WorkspaceNotices pageError={pageState.error} actionError={actionState.error} authError={authSessionState.error} />
+      <WorkspaceNotices
+        pageError={pageState.error}
+        actionError={actionState.error}
+        authError={authSessionState.error}
+        runtimeError={systemRuntimeState.error}
+        onRetry={async () => {
+          await Promise.all([fetchSnapshot(), fetchSystemRuntime()])
+        }}
+      />
       <AppRoutes
         dashboardContext={dashboardContext}
         alertsContext={alertsContext}

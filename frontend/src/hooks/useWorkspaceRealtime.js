@@ -6,6 +6,7 @@ const isSessionBootstrapError = (message = '') => /signed-in user session|sessio
 const realtimeDebugKey = '__SYNAPSE_REALTIME_DEBUG__'
 const degradedRefreshIntervalMs = 15_000
 const hostedSockJsTransportCandidates = ['websocket', 'xhr-streaming', 'xhr-polling']
+const enableRealtimeConsoleLogs = Boolean(import.meta.env.DEV)
 
 export default function useWorkspaceRealtime({
   activeTenantCode,
@@ -48,6 +49,9 @@ export default function useWorkspaceRealtime({
     }
 
     const logRealtime = (level, message, details = null) => {
+      if (!enableRealtimeConsoleLogs) {
+        return
+      }
       const logger = console?.[level] || console.log
       if (details) {
         logger(`[synapsecore:realtime] ${message}`, details)

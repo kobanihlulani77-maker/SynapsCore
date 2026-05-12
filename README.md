@@ -127,8 +127,16 @@ Frontend development commands:
 ```powershell
 cd frontend
 npm.cmd install
+npm.cmd run lint
+npm.cmd run verify
 npm.cmd run dev
 ```
+
+Frontend demo/readiness docs:
+
+- [docs/frontend-demo-guide.md](docs/frontend-demo-guide.md)
+- [docs/frontend-demo-mode.md](docs/frontend-demo-mode.md)
+- [docs/frontend-qa-checklist.md](docs/frontend-qa-checklist.md)
 
 Windows local host helpers are also available in the backend folder:
 

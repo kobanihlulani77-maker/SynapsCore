@@ -32,10 +32,18 @@ export default function DataGrid({ columns = [], rows = [], className = '', empt
         <thead>
           <tr>
             {columns.map((column) => (
-              <th key={column.key}>
-                <button className={`data-grid-sort ${column.sortable ? 'is-sortable' : ''}`} onClick={() => toggleSort(column)} type="button">
+              <th
+                key={column.key}
+                aria-sort={sortState.key === column.key ? (sortState.direction === 'asc' ? 'ascending' : 'descending') : 'none'}
+              >
+                <button
+                  className={`data-grid-sort ${column.sortable ? 'is-sortable' : ''}`}
+                  onClick={() => toggleSort(column)}
+                  type="button"
+                  aria-label={column.sortable ? `Sort by ${column.label}` : column.label}
+                >
                   <span>{column.label}</span>
-                  {sortState.key === column.key ? <span>{sortState.direction === 'asc' ? '↑' : '↓'}</span> : null}
+                  {sortState.key === column.key ? <span aria-hidden="true">{sortState.direction === 'asc' ? '↑' : '↓'}</span> : null}
                 </button>
               </th>
             ))}

@@ -1,4 +1,4 @@
-import { SummaryCard } from '../components/Card'
+import { MetricCard } from '../components/Card'
 import Panel from '../components/Panel'
 import EmptyState from '../components/EmptyState'
 import ScenarioDecisionConsole from '../components/ScenarioDecisionConsole'
@@ -19,23 +19,57 @@ export default function ScenarioHistoryPage({ context }) {
 
   const executableScenarios = scenarioHistoryItems.filter((scenario) => scenario.executable).slice(0, 4)
   const revisionScenarios = scenarioHistoryItems.filter((scenario) => scenario.revisionNumber).slice(0, 4)
+  const savedPlans = scenarioHistoryItems.filter((scenario) => scenario.type === 'SAVED_PLAN').length
+  const comparisons = scenarioHistoryItems.filter((scenario) => scenario.type === 'COMPARISON').length
+  const revisions = scenarioHistoryItems.filter((scenario) => scenario.revisionNumber).length
+  const executableCount = scenarioHistoryItems.filter((scenario) => scenario.executable).length
 
   return (
     <section className="content-grid">
       <Panel wide>
         <div className="panel-header">
-          <div><p className="panel-kicker">Scenario history</p><h2>Saved plans, revisions, and compare posture</h2></div>
+          <div>
+            <p className="panel-kicker">Scenario history</p>
+            <h2>Saved plans, revisions, and compare posture</h2>
+          </div>
           <span className="panel-badge scenario-badge">{scenarioHistoryItems.length}</span>
         </div>
-        <div className="summary-grid compact-summary-grid">
-          <SummaryCard label="Saved plans" value={scenarioHistoryItems.filter((scenario) => scenario.type === 'SAVED_PLAN').length} accent="blue" />
-          <SummaryCard label="Comparisons" value={scenarioHistoryItems.filter((scenario) => scenario.type === 'COMPARISON').length} accent="teal" />
-          <SummaryCard label="Revisions" value={scenarioHistoryItems.filter((scenario) => scenario.revisionNumber).length} accent="amber" />
-          <SummaryCard label="Executable" value={scenarioHistoryItems.filter((scenario) => scenario.executable).length} accent="orange" />
+
+        <div className="ops-command-hero">
+          <div className="ops-command-copy">
+            <strong>Scenario memory and execution surface</strong>
+            <p>
+              Scenario history should help teams compare revisions, understand why a plan exists, and move confidently from
+              saved analysis into approval and execution without losing context.
+            </p>
+            <div className="ops-pill-row">
+              <span className="workspace-meta-pill">Traceable</span>
+              <span className="workspace-meta-pill">Approval aware</span>
+              <span className="workspace-meta-pill">Execution ready</span>
+            </div>
+          </div>
+          <div className="ops-command-actions">
+            <button className="secondary-button" onClick={() => executableScenarios[0] && setSelectedScenarioId(executableScenarios[0].id)} disabled={!executableScenarios[0]} type="button">
+              Focus executable plan
+            </button>
+          </div>
         </div>
+
+        <div className="summary-grid compact-summary-grid">
+          <MetricCard label="Saved plans" value={savedPlans} accent="blue" note="Scenario plans currently retained for comparison and approval." />
+          <MetricCard label="Comparisons" value={comparisons} accent="teal" note="Alternative scenario comparisons generated for operator review." />
+          <MetricCard label="Revisions" value={revisions} accent="amber" note="Revision memory showing how teams refined the plan before go-live." />
+          <MetricCard label="Executable" value={executableCount} accent="orange" note="Plans currently eligible to move into live execution." />
+        </div>
+
         <div className="approval-board">
           {scenarioHistoryItems.slice(0, 6).map((scenario) => (
-            <button key={scenario.id} className={`stack-card selectable-card ${selectedHistoryScenario?.id === scenario.id ? 'is-selected' : ''}`} onClick={() => setSelectedScenarioId(scenario.id)} type="button">
+            <button
+              key={scenario.id}
+              className={`stack-card selectable-card ${selectedHistoryScenario?.id === scenario.id ? 'is-selected' : ''}`}
+              onClick={() => setSelectedScenarioId(scenario.id)}
+              type="button"
+            >
               <div className="stack-title-row">
                 <strong>{scenario.title}</strong>
                 <div className="stack-tag-row">
@@ -49,9 +83,13 @@ export default function ScenarioHistoryPage({ context }) {
           ))}
           {!scenarioHistoryItems.length ? <EmptyState>Scenario history will fill up after planners start previewing and saving alternative operating paths.</EmptyState> : null}
         </div>
+
         <div className="experience-grid experience-grid-split">
           <article className="stack-card section-card">
-            <div className="stack-title-row"><strong>Selected scenario memory</strong><span className="scenario-type-tag">{selectedHistoryScenario ? formatCodeLabel(selectedHistoryScenario.type) : 'Waiting'}</span></div>
+            <div className="stack-title-row">
+              <strong>Selected scenario memory</strong>
+              <span className="scenario-type-tag">{selectedHistoryScenario ? formatCodeLabel(selectedHistoryScenario.type) : 'Waiting'}</span>
+            </div>
             {selectedHistoryScenario ? (
               <div className="signal-list">
                 <div className="signal-list-item">
@@ -68,6 +106,7 @@ export default function ScenarioHistoryPage({ context }) {
               </div>
             ) : <EmptyState>Select a saved plan or revision to inspect its decision memory and next action posture.</EmptyState>}
           </article>
+
           <ScenarioDecisionConsole
             scenario={selectedHistoryScenario}
             title="Scenario action console"
@@ -75,9 +114,13 @@ export default function ScenarioHistoryPage({ context }) {
             context={scenarioDecisionContext}
           />
         </div>
+
         <div className="experience-grid experience-grid-split">
           <article className="stack-card section-card">
-            <div className="stack-title-row"><strong>Execution-ready plans</strong><span className="scenario-type-tag">{executableScenarios.length}</span></div>
+            <div className="stack-title-row">
+              <strong>Execution-ready plans</strong>
+              <span className="scenario-type-tag">{executableScenarios.length}</span>
+            </div>
             <div className="signal-list">
               {executableScenarios.length ? executableScenarios.map((scenario) => (
                 <div key={scenario.id} className="signal-list-item">
@@ -88,8 +131,12 @@ export default function ScenarioHistoryPage({ context }) {
               )) : <EmptyState>Executable plans appear here once approved scenarios are ready to be pushed into the live flow.</EmptyState>}
             </div>
           </article>
+
           <article className="stack-card section-card">
-            <div className="stack-title-row"><strong>Revision memory</strong><span className="scenario-type-tag">{revisionScenarios.length}</span></div>
+            <div className="stack-title-row">
+              <strong>Revision memory</strong>
+              <span className="scenario-type-tag">{revisionScenarios.length}</span>
+            </div>
             <div className="signal-list">
               {revisionScenarios.length ? revisionScenarios.map((scenario) => (
                 <div key={scenario.id} className="signal-list-item">

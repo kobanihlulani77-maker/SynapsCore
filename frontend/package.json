@@ -6,10 +6,13 @@
   "type": "module",
   "scripts": {
     "dev": "vite --host 0.0.0.0 --port 5173",
+    "check": "node scripts/frontend-check.mjs",
     "build": "vite build",
+    "lint": "npm run check",
     "preview": "vite preview --host 0.0.0.0 --port 4173",
     "test:e2e:prod": "playwright test -c playwright.prod.config.mjs",
-    "test:e2e:realtime": "playwright test -c playwright.prod.config.mjs --grep @realtime"
+    "test:e2e:realtime": "playwright test -c playwright.prod.config.mjs --grep @realtime",
+    "verify": "npm run lint && npm run build"
   },
   "dependencies": {
     "@stomp/stompjs": "^7.1.1",
