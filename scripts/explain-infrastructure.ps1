@@ -47,6 +47,7 @@ Write-Host ""
 
 Write-Host "Important Docs"
 Write-Host "--------------"
+Write-Host "- docs\\infrastructure-handbook.md"
 Write-Host "- docs\\system-architecture.md"
 Write-Host "- docs\\infrastructure-communication-map.md"
 Write-Host "- docs\\backend-flow.md"

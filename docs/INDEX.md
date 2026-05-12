@@ -20,6 +20,7 @@ This index links the main product, architecture, runbook, proof, and operator do
 ## Infrastructure
 
 - [system-architecture.md](system-architecture.md)
+- [infrastructure-handbook.md](infrastructure-handbook.md)
 - [infrastructure-communication-map.md](infrastructure-communication-map.md)
 - [frontend-flow.md](frontend-flow.md)
 - [backend-flow.md](backend-flow.md)
