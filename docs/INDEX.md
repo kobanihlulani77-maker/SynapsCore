@@ -12,10 +12,30 @@ This index links the main product, architecture, runbook, proof, and operator do
 ## Product Understanding
 
 - [product-purpose.md](product-purpose.md)
+- [why-synapsecore-exists.md](why-synapsecore-exists.md)
 - [founder-brief.md](founder-brief.md)
 - [operations-story-pack.md](operations-story-pack.md)
 - [company-fit-playbook.md](company-fit-playbook.md)
 - [onboarding-playbook.md](onboarding-playbook.md)
+
+## Product Vision
+
+- [final-product-vision.md](final-product-vision.md)
+- [product-purpose.md](product-purpose.md)
+- [why-synapsecore-exists.md](why-synapsecore-exists.md)
+
+## Market Positioning
+
+- [company-explainer.md](company-explainer.md)
+- [market-fit-playbook.md](market-fit-playbook.md)
+- [platform-potential.md](platform-potential.md)
+- [company-fit-playbook.md](company-fit-playbook.md)
+
+## Company Understanding
+
+- [company-explainer.md](company-explainer.md)
+- [product-purpose.md](product-purpose.md)
+- [final-product-vision.md](final-product-vision.md)
 
 ## Infrastructure
 
@@ -37,9 +57,22 @@ This index links the main product, architecture, runbook, proof, and operator do
 ## Business Potential
 
 - [platform-potential.md](platform-potential.md)
+- [market-fit-playbook.md](market-fit-playbook.md)
 - [company-fit-playbook.md](company-fit-playbook.md)
 - [pilot-onboarding-pack.md](pilot-onboarding-pack.md)
 - [pilot-operations-runbook.md](pilot-operations-runbook.md)
+
+## Pilot Rollout
+
+- [pilot-program-guide.md](pilot-program-guide.md)
+- [pilot-onboarding-pack.md](pilot-onboarding-pack.md)
+- [pilot-operations-runbook.md](pilot-operations-runbook.md)
+
+## Executive Overview
+
+- [executive-summary.md](executive-summary.md)
+- [final-product-vision.md](final-product-vision.md)
+- [render-ops-runbook.md](render-ops-runbook.md)
 
 ## Runbooks
 
