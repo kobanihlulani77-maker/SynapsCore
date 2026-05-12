@@ -59,6 +59,37 @@ This index links the main product, architecture, runbook, proof, and operator do
 - [leakage-audit.md](leakage-audit.md)
 - [runtime-observability.md](runtime-observability.md)
 
+## Recovery / Resilience
+
+- [deployment-recovery-guide.md](deployment-recovery-guide.md)
+- [render-recovery-playbook.md](render-recovery-playbook.md)
+- [local-recovery-playbook.md](local-recovery-playbook.md)
+- [resilience-philosophy.md](resilience-philosophy.md)
+- [operations-reliability.md](operations-reliability.md)
+
+## Incident Handling
+
+- [operator-incident-guide.md](operator-incident-guide.md)
+- [runtime-observability.md](runtime-observability.md)
+- [render-recovery-playbook.md](render-recovery-playbook.md)
+
+## Failure Classification
+
+- [failure-classification-matrix.md](failure-classification-matrix.md)
+- [deployment-recovery-guide.md](deployment-recovery-guide.md)
+- [current-limitations.md](current-limitations.md)
+
+## Deployment Recovery
+
+- [deployment-recovery-guide.md](deployment-recovery-guide.md)
+- [render-recovery-playbook.md](render-recovery-playbook.md)
+- [local-recovery-playbook.md](local-recovery-playbook.md)
+
+## Operational Philosophy
+
+- [resilience-philosophy.md](resilience-philosophy.md)
+- [why-synapsecore-exists.md](why-synapsecore-exists.md)
+
 ## Data Flows
 
 - [data-flow-playbook.md](data-flow-playbook.md)
@@ -162,6 +193,7 @@ This index links the main product, architecture, runbook, proof, and operator do
 - `scripts\explain-system.ps1`
 - `scripts\explain-infrastructure.ps1`
 - `scripts\explain-proof-system.ps1`
+- `scripts\recovery-checklist.ps1`
 - `scripts\prepare-hosted-proof.ps1`
 - `scripts\verify-deployment.ps1`
 - `scripts\verify-realtime.ps1`
