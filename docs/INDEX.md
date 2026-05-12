@@ -5,6 +5,7 @@ This index links the main product, architecture, runbook, proof, and operator do
 ## Start Here
 
 - [README.md](../README.md)
+- [documentation-map.md](documentation-map.md)
 - [system-architecture.md](system-architecture.md)
 - [frontend-flow.md](frontend-flow.md)
 - [backend-flow.md](backend-flow.md)
@@ -52,6 +53,7 @@ This index links the main product, architecture, runbook, proof, and operator do
 ## Project Structure
 
 - [master-project-tree.md](master-project-tree.md)
+- [documentation-map.md](documentation-map.md)
 - [contributor-guide.md](contributor-guide.md)
 - [system-architecture.md](system-architecture.md)
 
@@ -225,8 +227,15 @@ This index links the main product, architecture, runbook, proof, and operator do
 ## Contributor Guidance
 
 - [contributor-guide.md](contributor-guide.md)
+- [scripts-reference.md](scripts-reference.md)
 - [technical-reviewer-guide.md](technical-reviewer-guide.md)
 - [proof-and-validation.md](proof-and-validation.md)
+
+## Documentation Navigation
+
+- [documentation-map.md](documentation-map.md)
+- [INDEX.md](INDEX.md)
+- [scripts-reference.md](scripts-reference.md)
 
 ## Current Limitations
 
@@ -260,6 +269,7 @@ This index links the main product, architecture, runbook, proof, and operator do
 - `scripts\explain-pilot-readiness.ps1`
 - `scripts\explain-proof-system.ps1`
 - `scripts\project-map.ps1`
+- `scripts\repo-health.ps1`
 - `scripts\recovery-checklist.ps1`
 - `scripts\prepare-hosted-proof.ps1`
 - `scripts\verify-deployment.ps1`

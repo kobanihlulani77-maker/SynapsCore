@@ -20,6 +20,11 @@ frontend/test-results/
 # Env
 *.env
 .env
+backend/.env.local
+backend/.env.local.example
+frontend/.env.local
+frontend/.env.local.example
+frontend/Playwright.env
 
 # Logs
 *.log

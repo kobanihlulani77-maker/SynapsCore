@@ -236,6 +236,9 @@ Generated showcase:
 
 ## Important Docs
 
+- [docs/documentation-map.md](docs/documentation-map.md)
+- [docs/scripts-reference.md](docs/scripts-reference.md)
+- [docs/INDEX.md](docs/INDEX.md)
 - [docs/hosted-proof.md](docs/hosted-proof.md)
 - [docs/company-fit-playbook.md](docs/company-fit-playbook.md)
 - [docs/replay-recovery.md](docs/replay-recovery.md)
@@ -247,6 +250,18 @@ Generated showcase:
 - [docs/render-deployment.md](docs/render-deployment.md)
 - [docs/verification-status.md](docs/verification-status.md)
 - [docs/api-spec.md](docs/api-spec.md)
+
+## Repo Health
+
+Safe repo and docs checks:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File scripts\repo-health.ps1
+powershell -ExecutionPolicy Bypass -File scripts\project-map.ps1
+powershell -ExecutionPolicy Bypass -File scripts\explain-infrastructure.ps1
+```
+
+These commands are informational only. They do not modify runtime behavior or delete files.
 
 ## Honest Bottom Line
 
