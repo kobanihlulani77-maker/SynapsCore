@@ -9,13 +9,14 @@ The repo now contains product, architecture, recovery, proof, pilot, roadmap, an
 If someone is new to the project, the recommended reading order is:
 
 1. [README.md](../README.md)
-2. [executive-summary.md](executive-summary.md)
-3. [company-explainer.md](company-explainer.md)
-4. [system-architecture.md](system-architecture.md)
-5. [infrastructure-handbook.md](infrastructure-handbook.md)
-6. [proof-and-validation.md](proof-and-validation.md)
-7. [deployment-recovery-guide.md](deployment-recovery-guide.md)
-8. [master-product-roadmap.md](master-product-roadmap.md)
+2. [repository-review-report.md](repository-review-report.md)
+3. [executive-summary.md](executive-summary.md)
+4. [company-explainer.md](company-explainer.md)
+5. [system-architecture.md](system-architecture.md)
+6. [infrastructure-handbook.md](infrastructure-handbook.md)
+7. [proof-and-validation.md](proof-and-validation.md)
+8. [deployment-recovery-guide.md](deployment-recovery-guide.md)
+9. [master-product-roadmap.md](master-product-roadmap.md)
 
 That path gives a good sequence from high-level meaning to real architecture, then into trust, recovery, and long-term direction.
 

@@ -82,6 +82,16 @@ What those runs proved live:
 - runtime, integrations, users, settings, alerts, and recommendations are real
 - frontend-visible auth rate limiting is real
 
+## Current Live Status
+
+The most important current truth is:
+
+- historical hosted proof evidence exists
+- the frontend deployment is reachable
+- hosted proof is currently paused whenever live backend, DB, readiness, auth, or websocket trust are unavailable
+
+That means historical proof success should be read together with the current recovery and runtime posture, not as a permanent guarantee that the live backend is healthy right now.
+
 ## Current Supported Scope
 
 SynapseCore is fully real for its current supported scope.
@@ -237,6 +247,7 @@ Generated showcase:
 ## Important Docs
 
 - [docs/documentation-map.md](docs/documentation-map.md)
+- [docs/repository-review-report.md](docs/repository-review-report.md)
 - [docs/scripts-reference.md](docs/scripts-reference.md)
 - [docs/INDEX.md](docs/INDEX.md)
 - [docs/environment-reference.md](docs/environment-reference.md)
@@ -274,6 +285,8 @@ These commands are informational only. They do not modify runtime behavior or de
 SynapseCore should now be read as a real SaaS operations platform with live hosted proof, not as a code repo looking for a story.
 
 The platform is fully real for its current supported scope.
+
+Current live proof readiness, however, still depends on backend and dependency health. If readiness, auth, websocket trust, or DB availability are down, hosted proof should pause and the repo should describe that honestly.
 
 What remains from here is not proof-path repair. It is:
 

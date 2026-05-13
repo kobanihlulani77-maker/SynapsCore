@@ -6,6 +6,7 @@ This index links the main product, architecture, runbook, proof, and operator do
 
 - [README.md](../README.md)
 - [documentation-map.md](documentation-map.md)
+- [repository-review-report.md](repository-review-report.md)
 - [system-architecture.md](system-architecture.md)
 - [environment-reference.md](environment-reference.md)
 - [frontend-flow.md](frontend-flow.md)
@@ -245,6 +246,7 @@ This index links the main product, architecture, runbook, proof, and operator do
 ## Documentation Navigation
 
 - [documentation-map.md](documentation-map.md)
+- [repository-review-report.md](repository-review-report.md)
 - [INDEX.md](INDEX.md)
 - [scripts-reference.md](scripts-reference.md)
 
