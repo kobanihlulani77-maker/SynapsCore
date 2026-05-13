@@ -13,8 +13,8 @@ function Test-PathSafe {
     return Test-Path -LiteralPath (Join-Path $rootDir $Path)
 }
 
-$gitStatus = git status --short
-$gitIgnoredStatus = git status --ignored --short
+$gitStatus = @(git status --short)
+$gitIgnoredStatus = @(git status --ignored --short)
 
 $localOnlyFiles = @(
     "backend/.env.local",
