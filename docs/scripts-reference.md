@@ -203,6 +203,66 @@ Requires backend or DB:
 
 - no
 
+## `scripts\env-sanity-check.ps1`
+
+Purpose:
+
+- checks env template and config-reference posture
+
+Checks:
+
+- key env files exist
+- key frontend and backend template variables exist
+- local example guidance files are present
+
+Safe to run anytime:
+
+- yes
+
+Changes anything:
+
+- no
+
+Requires backend or DB:
+
+- no
+
+## `scripts\docs-link-check.ps1`
+
+Purpose:
+
+- scans `README.md` and `docs/` markdown files for broken local links
+
+Safe to run anytime:
+
+- yes
+
+Changes anything:
+
+- no
+
+Requires backend or DB:
+
+- no
+
+## `scripts\script-help.ps1`
+
+Purpose:
+
+- prints a categorized quick-help map for the most important scripts
+
+Safe to run anytime:
+
+- yes
+
+Changes anything:
+
+- no
+
+Requires backend or DB:
+
+- no
+
 ## `scripts\repo-health.ps1`
 
 Purpose:
@@ -334,6 +394,7 @@ Requires backend or DB:
 For repo hygiene:
 
 - `scripts\repo-health.ps1`
+- `scripts\docs-link-check.ps1`
 
 For local stack understanding:
 
@@ -350,6 +411,13 @@ For proof readiness:
 - `scripts\explain-proof-system.ps1`
 - `scripts\check-live-connections.ps1`
 - `scripts\prepare-hosted-proof.ps1`
+
+For release and env posture:
+
+- `scripts\env-sanity-check.ps1`
+- `scripts\check-prod-config.ps1`
+- `scripts\release-readiness.ps1`
+- `scripts\script-help.ps1`
 
 For recovery posture:
 

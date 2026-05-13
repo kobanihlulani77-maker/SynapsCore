@@ -239,6 +239,9 @@ Generated showcase:
 - [docs/documentation-map.md](docs/documentation-map.md)
 - [docs/scripts-reference.md](docs/scripts-reference.md)
 - [docs/INDEX.md](docs/INDEX.md)
+- [docs/environment-reference.md](docs/environment-reference.md)
+- [docs/release-process.md](docs/release-process.md)
+- [docs/troubleshooting-index.md](docs/troubleshooting-index.md)
 - [docs/hosted-proof.md](docs/hosted-proof.md)
 - [docs/company-fit-playbook.md](docs/company-fit-playbook.md)
 - [docs/replay-recovery.md](docs/replay-recovery.md)
@@ -259,6 +262,9 @@ Safe repo and docs checks:
 powershell -ExecutionPolicy Bypass -File scripts\repo-health.ps1
 powershell -ExecutionPolicy Bypass -File scripts\project-map.ps1
 powershell -ExecutionPolicy Bypass -File scripts\explain-infrastructure.ps1
+powershell -ExecutionPolicy Bypass -File scripts\env-sanity-check.ps1
+powershell -ExecutionPolicy Bypass -File scripts\docs-link-check.ps1
+powershell -ExecutionPolicy Bypass -File scripts\script-help.ps1
 ```
 
 These commands are informational only. They do not modify runtime behavior or delete files.

@@ -7,6 +7,7 @@ This index links the main product, architecture, runbook, proof, and operator do
 - [README.md](../README.md)
 - [documentation-map.md](documentation-map.md)
 - [system-architecture.md](system-architecture.md)
+- [environment-reference.md](environment-reference.md)
 - [frontend-flow.md](frontend-flow.md)
 - [backend-flow.md](backend-flow.md)
 
@@ -46,9 +47,17 @@ This index links the main product, architecture, runbook, proof, and operator do
 - [infrastructure-handbook.md](infrastructure-handbook.md)
 - [infrastructure-communication-map.md](infrastructure-communication-map.md)
 - [system-communication-map.md](system-communication-map.md)
+- [environment-reference.md](environment-reference.md)
+- [database-and-migrations.md](database-and-migrations.md)
 - [frontend-flow.md](frontend-flow.md)
 - [backend-flow.md](backend-flow.md)
 - [runtime-observability.md](runtime-observability.md)
+
+## API Reference
+
+- [api-surface-reference.md](api-surface-reference.md)
+- [api-spec.md](api-spec.md)
+- [backend-flow.md](backend-flow.md)
 
 ## Project Structure
 
@@ -169,6 +178,8 @@ This index links the main product, architecture, runbook, proof, and operator do
 - [deployment.md](deployment.md)
 - [render-deployment.md](render-deployment.md)
 - [go-live-checklist.md](go-live-checklist.md)
+- [release-process.md](release-process.md)
+- [troubleshooting-index.md](troubleshooting-index.md)
 
 ## Hosted Proof And Verification
 
@@ -270,6 +281,9 @@ This index links the main product, architecture, runbook, proof, and operator do
 - `scripts\explain-proof-system.ps1`
 - `scripts\project-map.ps1`
 - `scripts\repo-health.ps1`
+- `scripts\env-sanity-check.ps1`
+- `scripts\docs-link-check.ps1`
+- `scripts\script-help.ps1`
 - `scripts\recovery-checklist.ps1`
 - `scripts\prepare-hosted-proof.ps1`
 - `scripts\verify-deployment.ps1`

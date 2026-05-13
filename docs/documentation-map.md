@@ -24,8 +24,10 @@ That path gives a good sequence from high-level meaning to real architecture, th
 Read first:
 
 - [system-architecture.md](system-architecture.md)
+- [environment-reference.md](environment-reference.md)
 - [frontend-flow.md](frontend-flow.md)
 - [backend-flow.md](backend-flow.md)
+- [api-surface-reference.md](api-surface-reference.md)
 - [system-communication-map.md](system-communication-map.md)
 - [proof-and-validation.md](proof-and-validation.md)
 - [contributor-guide.md](contributor-guide.md)
@@ -95,6 +97,7 @@ Core docs:
 - [render-recovery-playbook.md](render-recovery-playbook.md)
 - [local-recovery-playbook.md](local-recovery-playbook.md)
 - [resilience-philosophy.md](resilience-philosophy.md)
+- [troubleshooting-index.md](troubleshooting-index.md)
 
 Use these when:
 
@@ -112,6 +115,7 @@ Core docs:
 - [proof-system-evolution.md](proof-system-evolution.md)
 - [frontend-qa-checklist.md](frontend-qa-checklist.md)
 - [frontend-demo-guide.md](frontend-demo-guide.md)
+- [release-process.md](release-process.md)
 
 Use these when:
 
@@ -140,12 +144,23 @@ Use these when:
 These are stronger reference-style docs rather than first-read docs:
 
 - [api-spec.md](api-spec.md)
+- [api-surface-reference.md](api-surface-reference.md)
 - [data-flow-playbook.md](data-flow-playbook.md)
 - [infrastructure-communication-map.md](infrastructure-communication-map.md)
 - [system-communication-map.md](system-communication-map.md)
 - [master-project-tree.md](master-project-tree.md)
 - [runtime-observability.md](runtime-observability.md)
 - [integration-operations.md](integration-operations.md)
+- [database-and-migrations.md](database-and-migrations.md)
+
+## If You Need Release Or Environment Guidance
+
+Read first:
+
+- [environment-reference.md](environment-reference.md)
+- [release-process.md](release-process.md)
+- [go-live-checklist.md](go-live-checklist.md)
+- [troubleshooting-index.md](troubleshooting-index.md)
 
 ## Overlap Guidance
 

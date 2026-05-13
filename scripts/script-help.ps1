@@ -1,0 +1,68 @@
+Set-StrictMode -Version Latest
+$ErrorActionPreference = "Stop"
+
+$rootDir = Split-Path -Parent $PSScriptRoot
+
+Write-Host "=================================================="
+Write-Host "SYNAPSECORE SCRIPT HELP"
+Write-Host "=================================================="
+Write-Host "Repo root: $rootDir"
+Write-Host ""
+
+Write-Host "Start Here"
+Write-Host "----------"
+Write-Host "- scripts\\project-map.ps1"
+Write-Host "- scripts\\repo-health.ps1"
+Write-Host "- docs\\scripts-reference.md"
+Write-Host ""
+
+Write-Host "Connection Checks"
+Write-Host "-----------------"
+Write-Host "- scripts\\check-local-connections.ps1"
+Write-Host "- scripts\\check-live-connections.ps1"
+Write-Host ""
+
+Write-Host "Proof And Verification"
+Write-Host "----------------------"
+Write-Host "- scripts\\explain-proof-system.ps1"
+Write-Host "- scripts\\prepare-hosted-proof.ps1"
+Write-Host "- scripts\\verify-deployment.ps1"
+Write-Host "- scripts\\verify-realtime.ps1"
+Write-Host "- frontend\\scripts\\frontend-check.mjs"
+Write-Host ""
+
+Write-Host "Infrastructure And System Explain"
+Write-Host "---------------------------------"
+Write-Host "- scripts\\explain-system.ps1"
+Write-Host "- scripts\\explain-infrastructure.ps1"
+Write-Host "- scripts\\project-map.ps1"
+Write-Host ""
+
+Write-Host "Recovery And Reliability"
+Write-Host "------------------------"
+Write-Host "- scripts\\recovery-checklist.ps1"
+Write-Host "- scripts\\check-live-connections.ps1"
+Write-Host "- scripts\\check-local-connections.ps1"
+Write-Host ""
+
+Write-Host "Release And Environment"
+Write-Host "-----------------------"
+Write-Host "- scripts\\env-sanity-check.ps1"
+Write-Host "- scripts\\check-prod-config.ps1"
+Write-Host "- scripts\\release-readiness.ps1"
+Write-Host "- scripts\\docs-link-check.ps1"
+Write-Host ""
+
+Write-Host "Backup And Restore"
+Write-Host "------------------"
+Write-Host "- scripts\\backup-postgres.ps1"
+Write-Host "- scripts\\restore-postgres.ps1"
+Write-Host "- scripts\\verify-restore-drill.ps1"
+Write-Host ""
+
+Write-Host "Guidance"
+Write-Host "--------"
+Write-Host "- Use repo-health first when you are unsure what state the repo is in."
+Write-Host "- Use check-live-connections before hosted proof."
+Write-Host "- Use env-sanity-check and release-readiness before production-style release work."
+Write-Host "- Use docs\\scripts-reference.md for deeper per-script explanation."
