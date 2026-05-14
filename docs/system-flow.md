@@ -1705,3 +1705,741 @@ If someone wants the shortest possible truthful reread of the whole platform, it
 10. if runtime trust degrades, the platform is supposed to say so explicitly
 11. hosted proof only runs when readiness, auth, and websocket truth are healthy
 12. success means visible operational completion; failure means visible, classifiable, recoverable truth
+
+## 18. Full Frontend Participation Inventory
+
+This section names the current first-party frontend files that participate in the system flow.
+It exists so the document does not stop at backend and runtime logic only.
+
+### Frontend bootstrap and root composition
+
+- `main.jsx`
+  - browser entry point
+  - mounts the React application
+- `App.jsx`
+  - root application composition
+  - connects the shell and route system into the browser app
+
+### Frontend service adapters
+
+- `services/api.js`
+  - API request helper layer for backend HTTP communication
+- `services/auth.js`
+  - auth/session helper layer for login, logout, and session reads
+
+### Frontend configuration files
+
+- `config/pageRegistry.js`
+  - route/page registration map
+  - controls page metadata, navigation labels, and route identity
+- `config/workspaceModel.js`
+  - workspace-oriented frontend model configuration
+  - helps define the shell and context structure
+
+### Frontend state and operational hooks
+
+- `hooks/useApi.js`
+  - basic API request hook behavior
+- `hooks/useAuth.js`
+  - frontend auth/session state behavior
+- `hooks/useCatalogActions.js`
+  - catalog create/update/import action paths
+- `hooks/useIntegrationActions.js`
+  - connector, import, and replay action paths
+- `hooks/useScenarioActions.js`
+  - scenario save/approve/reject/execute action paths
+- `hooks/useWorkspaceAdminActions.js`
+  - workspace admin action paths
+- `hooks/useWorkspaceAppModel.js`
+  - aggregate workspace app state model
+- `hooks/useWorkspaceBootstrap.js`
+  - authenticated app bootstrap logic
+- `hooks/useWorkspaceChrome.js`
+  - shell chrome and page-frame behavior
+- `hooks/useWorkspacePageContexts.js`
+  - page-specific data context selection and shaping
+- `hooks/useWorkspaceRealtime.js`
+  - websocket/realtime subscription lifecycle and update handling
+- `hooks/useWorkspaceSessionActions.js`
+  - session-level actions such as login/logout/password/session handling
+- `hooks/useWorkspaceShell.js`
+  - shell orchestration for sidebar/topbar/page framing
+- `hooks/useWorkspaceState.js`
+  - broad workspace state management
+
+### Frontend shell and layout files
+
+- `layout/AppShell.jsx`
+  - top-level authenticated page frame
+- `layout/Sidebar.jsx`
+  - navigation hierarchy and workspace route switching entry
+- `layout/Topbar.jsx`
+  - workspace identity, runtime status, operator posture
+- `layout/WorkspacePageHeader.jsx`
+  - per-page command header presentation
+- `layout/WorkspaceUtilityRail.jsx`
+  - auxiliary command/info rail presentation
+
+### Frontend application composition components
+
+- `components/AppRoutes.jsx`
+  - route composition entry
+- `components/WorkspaceApplication.jsx`
+  - workspace-scoped application composition
+- `components/WorkspaceAuthenticatedApp.jsx`
+  - authenticated workspace application entry
+- `components/WorkspaceRouteSwitch.jsx`
+  - page routing switcher inside workspace shell
+- `components/WorkspaceNotices.jsx`
+  - runtime, degraded-state, and operational notice rendering
+
+### Frontend shared operational UI components
+
+- `components/ActionPanel.jsx`
+  - action grouping and control surface
+- `components/ActivityFeed.jsx`
+  - recent events / audit-like timeline rendering
+- `components/Card.jsx`
+  - reusable card surface
+- `components/DataGrid.jsx`
+  - tabular data rendering and sort behavior
+- `components/EmptyState.jsx`
+  - empty/no-data surface
+- `components/LoadingState.jsx`
+  - loading/skeleton posture
+- `components/Panel.jsx`
+  - reusable content panel surface
+- `components/ScenarioDecisionConsole.jsx`
+  - scenario review/execution action console
+- `components/ScenarioEditor.jsx`
+  - scenario input/editing surface
+- `components/StatusBadge.jsx`
+  - normalized status/severity/health badge rendering
+
+### Frontend public entry pages
+
+- `pages/PublicExperience.jsx`
+  - homepage and public platform framing
+- `pages/CreateWorkspace.jsx`
+  - create-workspace guided onboarding surface
+- `pages/SignIn.jsx`
+  - workspace code + username + password sign-in flow
+
+### Frontend authenticated operational pages
+
+- `pages/Dashboard.jsx`
+  - command-center summary, executive signals, activity rail, guidance
+- `pages/Orders.jsx`
+  - live order operations and selected-order detail
+- `pages/Inventory.jsx`
+  - inventory health, stock posture, replenishment and risk context
+- `pages/Catalog.jsx`
+  - product onboarding, create/edit/import, import result clarity
+- `pages/Alerts.jsx`
+  - operational warning center
+- `pages/Recommendations.jsx`
+  - decision intelligence and next-best action surface
+- `pages/Replay.jsx`
+  - failed inbound recovery and replay queue operations
+- `pages/Integrations.jsx`
+  - connector visibility, status, health, and import/replay context
+- `pages/Fulfillment.jsx`
+  - fulfillment-specific posture and task-related visibility
+- `pages/ScenarioPlanner.jsx`
+  - scenario planning and request composition
+- `pages/ScenarioHistory.jsx`
+  - scenario memory, saved plans, approvals, execution history
+- `pages/ScenarioControl.jsx`
+  - scenario control and execution-related operations
+- `pages/Approvals.jsx`
+  - approval queues and action console
+- `pages/Escalations.jsx`
+  - escalated scenario and operational review flow
+- `pages/Runtime.jsx`
+  - runtime trust, readiness, incidents, and diagnostics
+- `pages/Audit.jsx`
+  - audit-history-facing surface
+
+### Frontend authenticated support and admin pages
+
+- `pages/Users.jsx`
+  - tenant users and operator administration
+- `pages/Profile.jsx`
+  - signed-in identity and password/session posture
+- `pages/Settings.jsx`
+  - company workspace settings and operational policy
+- `pages/Locations.jsx`
+  - warehouse/location posture
+- `pages/Tenants.jsx`
+  - tenant listing / platform-facing access surface
+- `pages/PlatformAdmin.jsx`
+  - broader support/admin operational layer
+- `pages/SystemConfig.jsx`
+  - system configuration posture
+- `pages/Releases.jsx`
+  - release/build-facing operational surface
+
+### Frontend styling layers
+
+- `design-system.css`
+  - primary design tokens and shared command-center visual patterns
+- `styles.css`
+  - legacy/supporting route and layout styling bridge
+
+## 19. Full Backend Participation Inventory
+
+This section names the current backend packages, classes, DTO groups, entities, repositories, configuration classes, and migrations that participate in the operational system.
+
+### API controller layer
+
+These classes are the request-entry layer for backend flows:
+
+- `AccessController`
+  - tenant onboarding
+  - operator management
+  - user management
+  - workspace settings
+  - workspace security
+  - workspace warehouse and connector support updates
+- `AlertController`
+  - alert feed reads
+- `AuditController`
+  - recent audit history reads
+- `AuthController`
+  - session read
+  - login
+  - logout
+  - password change
+- `DashboardController`
+  - dashboard summary
+  - dashboard snapshot
+- `DevToolsController`
+  - local reseed path for development flows
+- `EventController`
+  - recent business event reads
+- `FulfillmentController`
+  - fulfillment overview and updates
+- `InventoryController`
+  - inventory update
+  - receive
+  - adjust
+  - reconcile
+  - inventory overview reads
+- `OperationalPolicyController`
+  - tenant operational policy read and update
+- `OrderController`
+  - create order
+  - transition order
+  - recent orders
+- `ProductController`
+  - product list
+  - product create
+  - product update
+  - product import
+- `RecommendationController`
+  - recommendation reads
+- `ScenarioController`
+  - order impact analysis
+  - comparison
+  - save
+  - approve
+  - reject
+  - acknowledge escalation
+  - execute
+  - request load
+  - history
+  - notifications
+- `ServiceStatusController`
+  - basic service status entrypoint
+- `SystemController`
+  - runtime status
+  - incidents
+- `WarehouseController`
+  - warehouse list reads
+- `FrameworkErrorController`
+  - framework error routing
+- `ApiExceptionHandler`
+  - structured exception mapping
+- `ApiErrorResponse`
+  - standard API error payload shape
+
+### Access package
+
+The access package controls who may do what and when:
+
+- `AccessAdministrationService`
+  - tenant user/operator CRUD administration
+- `AccessControlService`
+  - role checks
+  - workspace checks
+  - warehouse checks
+  - session-vs-header-fallback access decisions
+- `AccessDirectoryService`
+  - active tenant/operator lookup
+  - warehouse access checks
+- `BootstrapAccessService`
+  - initial bootstrap gate
+- `PlatformAdministrationAccessService`
+  - platform admin gate for privileged onboarding
+- `TenantOnboardingService`
+  - tenant/workspace creation and bootstrap seeding
+- `TenantWorkspaceAdministrationService`
+  - workspace settings/security/warehouse/connector support updates
+- `SynapseAccessRole`
+  - tenant/system role vocabulary
+- `SynapseActorContext`
+  - current actor role context wrapper
+- `access/dto/*`
+  - `AccessOperatorResponse`
+  - `AccessOperatorUpsertRequest`
+  - `AccessUserCreateRequest`
+  - `AccessUserPasswordResetRequest`
+  - `AccessUserResponse`
+  - `AccessUserUpdateRequest`
+  - `TenantOnboardingRequest`
+  - `TenantOnboardingResponse`
+  - `TenantResponse`
+  - `TenantWorkspaceConnectorSupportUpdateRequest`
+  - `TenantWorkspaceResponse`
+  - `TenantWorkspaceSecuritySettings`
+  - `TenantWorkspaceSecuritySettingsRequest`
+  - `TenantWorkspaceSupportActivity`
+  - `TenantWorkspaceSupportDiagnostics`
+  - `TenantWorkspaceSupportSummary`
+  - `TenantWorkspaceUpdateRequest`
+  - `TenantWorkspaceWarehouseUpdateRequest`
+
+### Auth package
+
+The auth package controls session truth:
+
+- `AuthSessionService`
+  - sign-in
+  - session validation
+  - password change
+  - sign-out
+  - session timeout and security-policy-version enforcement
+- `FastAuthFailureException`
+  - auth failure helper
+- `StarterAccessUsers`
+  - seeded starter credential support definitions
+- `auth/dto/*`
+  - `AuthSessionRequest`
+  - `AuthSessionResponse`
+  - `AuthSessionPasswordChangeRequest`
+
+### Tenant package
+
+Tenant protection is centralized here:
+
+- `TenantContextService`
+  - current tenant resolution
+- `TenantOwnershipAssertions`
+  - tenant ownership validation helpers
+- `TenantScopeGuard`
+  - ensures domain objects belong to the correct tenant/workspace
+
+### Security package
+
+The security package shapes browser/API trust:
+
+- `ApiCorsResponseFilter`
+  - API-side CORS response handling
+- `SecurityRateLimitFilter`
+  - request throttling edge behavior
+- `SecurityRateLimitService`
+  - rate-limit decision support
+
+### Audit package
+
+The audit package gives request and action traceability:
+
+- `AuditLogService`
+  - success/failure audit writes
+  - recent audit log reads
+- `RequestTraceContext`
+  - per-request actor/tenant/request-id context
+- `RequestTraceFilter`
+  - injects or normalizes request trace state
+
+### Domain service package
+
+These are the main business services:
+
+- `ProductService`
+  - product CRUD and CSV import
+- `InventoryService`
+  - stock baseline, receive, adjust, reconcile, reserve, release, fulfill
+- `OrderService`
+  - create, transition, synchronize, cancel, return orders
+- `DashboardService`
+  - dashboard summary and cache posture
+- `OperationalViewService`
+  - aggregate snapshot/read surfaces for alerts, recs, inventory, orders, events, audit, incidents, connectors, replay, scenarios
+- `SystemRuntimeService`
+  - runtime truth, readiness/liveness-facing diagnostics, connector and queue posture
+- `SystemIncidentService`
+  - active incident view support
+- `TenantOperationalPolicyService`
+  - tenant policy read/update support
+- `WarehouseService`
+  - warehouse-related domain behavior
+- `SeedService`
+  - seeding support
+- `DataInitializer`
+  - startup data initialization support
+- `IdentitySequenceMigrationService`
+  - identity sequence safety before writes
+- `InventorySchemaMigrationService`
+  - schema-alignment support
+- `CatalogTenantOwnershipMigrationService`
+  - catalog ownership migration support
+- `CatalogWriteConflictResolver`
+  - product/catalog conflict interpretation
+- `CoreIdentityWriteIsolationService`
+  - identity write isolation support
+
+### Domain repository package
+
+These repositories persist operational truth:
+
+- `AccessOperatorRepository`
+- `AccessUserRepository`
+- `AlertRepository`
+- `AuditLogRepository`
+- `BusinessEventRepository`
+- `CustomerOrderRepository`
+- `FulfillmentTaskRepository`
+- `IntegrationConnectorRepository`
+- `IntegrationImportRunRepository`
+- `IntegrationInboundRecordRepository`
+- `IntegrationReplayRecordRepository`
+- `InventoryRepository`
+- `OperationalDispatchWorkItemRepository`
+- `OrderItemRepository`
+- `ProductRepository`
+- `RecommendationRepository`
+- `ScenarioRunRepository`
+- `TenantOperationalPolicyRepository`
+- `TenantRepository`
+- `WarehouseRepository`
+
+### Domain entity package
+
+These entities and enums define the current persisted model and state vocabulary:
+
+- `AccessOperator`
+- `AccessUser`
+- `Alert`
+- `AlertSeverity`
+- `AlertStatus`
+- `AlertType`
+- `AuditLog`
+- `AuditStatus`
+- `BusinessEvent`
+- `BusinessEventType`
+- `CustomerOrder`
+- `FulfillmentStatus`
+- `FulfillmentTask`
+- `IntegrationConnector`
+- `IntegrationConnectorType`
+- `IntegrationImportRun`
+- `IntegrationImportStatus`
+- `IntegrationInboundRecord`
+- `IntegrationInboundStatus`
+- `IntegrationReplayRecord`
+- `IntegrationReplayStatus`
+- `IntegrationSyncMode`
+- `IntegrationTransformationPolicy`
+- `IntegrationValidationPolicy`
+- `Inventory`
+- `OperationalDispatchStatus`
+- `OperationalDispatchWorkItem`
+- `OrderItem`
+- `OrderStatus`
+- `Product`
+- `Recommendation`
+- `RecommendationPriority`
+- `RecommendationType`
+- `ScenarioApprovalPolicy`
+- `ScenarioApprovalStage`
+- `ScenarioApprovalStatus`
+- `ScenarioReviewPriority`
+- `ScenarioRun`
+- `ScenarioRunType`
+- `Tenant`
+- `TenantOperationalPolicy`
+- `Warehouse`
+
+### Domain DTO package
+
+These DTOs carry domain request/response payloads across the UI/API boundary:
+
+- `AlertFeedResponse`
+- `AlertResponse`
+- `AuditLogResponse`
+- `BusinessEventResponse`
+- `DashboardSnapshotResponse`
+- `DashboardSummaryResponse`
+- `FulfillmentOverviewResponse`
+- `FulfillmentStatusResponse`
+- `FulfillmentUpdateRequest`
+- `InventoryAdjustmentRequest`
+- `InventoryReceiptRequest`
+- `InventoryReconciliationRequest`
+- `InventoryStatusResponse`
+- `InventoryUpdateRequest`
+- `OrderCreateRequest`
+- `OrderItemRequest`
+- `OrderItemResponse`
+- `OrderLifecycleTransitionRequest`
+- `OrderResponse`
+- `ProductImportResponse`
+- `ProductImportRowResult`
+- `ProductResponse`
+- `ProductUpsertRequest`
+- `RecommendationResponse`
+- `SeedResetResponse`
+- `SystemBackboneSummary`
+- `SystemBuildInfo`
+- `SystemConnectorDiagnosticSummary`
+- `SystemDiagnosticsSummary`
+- `SystemIncidentResponse`
+- `SystemIncidentSeverity`
+- `SystemIncidentType`
+- `SystemMetricsSummary`
+- `SystemRuntimeResponse`
+- `SystemTelemetrySummary`
+- `TenantOperationalPolicyRequest`
+- `TenantOperationalPolicyResponse`
+- `WarehouseResponse`
+
+### Integration package
+
+This package owns connector ingestion, import history, and replay:
+
+- `ExternalOrderWebhookController`
+  - integration API edge for webhook, CSV import, connectors, recent imports, replay queue, replay action
+- `ExternalOrderWebhookService`
+  - webhook mapping, connector policy application, order handoff, failure recording
+- `ExternalOrderCsvImportService`
+  - CSV parsing, grouping, connector normalization, order handoff, failure recording
+- `IntegrationConnectorService`
+  - connector lookup, enablement enforcement, connector upsert, tenant resolution
+- `IntegrationConnectorPolicyService`
+  - source-specific connector policy preparation before live order creation
+- `IntegrationInboundAccessService`
+  - connector token/authenticated ingress decisions
+- `IntegrationInboundRecordService`
+  - received / accepted / rejected / replay-linked inbound record handling
+- `IntegrationImportRunService`
+  - recent import run summaries
+- `IntegrationReplayService`
+  - replay queue, manual replay, automated replay batch logic, dead-letter decisions
+- `IntegrationReplayAutomationService`
+  - automation-related replay support
+- `IntegrationScheduledPullWorkerService`
+  - scheduled inbound pull support
+- `IntegrationValidationException`
+  - integration validation failure type
+- `IntegrationFailureCode`
+  - normalized failure-code vocabulary
+- `IntegrationFailureCodes`
+  - failure-code extraction and structured error creation
+- `package-info.java`
+  - package documentation boundary
+- `integration/dto/*`
+  - `ExternalOrderCsvImportFailure`
+  - `ExternalOrderCsvImportOrderResult`
+  - `ExternalOrderCsvImportResponse`
+  - `ExternalOrderItemRequest`
+  - `ExternalOrderWebhookRequest`
+  - `ExternalOrderWebhookResponse`
+  - `IntegrationConnectorHealthStatus`
+  - `IntegrationConnectorRequest`
+  - `IntegrationConnectorResponse`
+  - `IntegrationImportRunResponse`
+  - `IntegrationReplayRecordResponse`
+  - `IntegrationReplayResultResponse`
+
+### Scenario package
+
+This package owns preview, governance, escalation, and execution:
+
+- `ScenarioActorRole`
+  - scenario-side actor vocabulary
+- `ScenarioAnalysisService`
+  - order impact and comparison analysis
+- `ScenarioProjectionService`
+  - projected alert/recommendation/inventory consequence modeling
+- `ScenarioRiskAssessment`
+  - calculated risk result model
+- `ScenarioRiskPolicyService`
+  - approval and review-priority policy decisions
+- `ScenarioHistoryService`
+  - save, approve, reject, escalate, history, notifications, request reload
+- `ScenarioExecutionService`
+  - executes approved scenario into live order flow
+- `scenario/dto/*`
+  - `ScenarioAlertProjection`
+  - `ScenarioApprovalRequest`
+  - `ScenarioApprovalResponse`
+  - `ScenarioCompareRequest`
+  - `ScenarioComparisonResponse`
+  - `ScenarioComparisonSummary`
+  - `ScenarioEscalationAcknowledgementRequest`
+  - `ScenarioExecutionResponse`
+  - `ScenarioHistoryFilter`
+  - `ScenarioNotificationResponse`
+  - `ScenarioNotificationType`
+  - `ScenarioOrderImpactResponse`
+  - `ScenarioRecommendationProjection`
+  - `ScenarioRejectionRequest`
+  - `ScenarioRejectionResponse`
+  - `ScenarioRequestResponse`
+  - `ScenarioRunResponse`
+  - `ScenarioSaveRequest`
+  - `ScenarioSaveResponse`
+
+### Alert, recommendation, intelligence, prediction, and fulfillment packages
+
+These packages transform operational state into warnings, guidance, and downstream movement:
+
+- `AlertService`
+  - syncs live alerts for inventory and fulfillment
+  - resolves or refreshes active alerts
+- `RecommendationService`
+  - creates inventory and fulfillment recommendations
+- `InventoryMonitoringService`
+  - low-stock and operational inventory condition monitoring
+- `InventoryIntelligenceService`
+  - inventory insight calculation
+- `InventoryInsight`
+  - inventory risk result model
+- `StockPredictionService`
+  - stockout/depletion projection
+- `StockPrediction`
+  - prediction result model
+- `FulfillmentService`
+  - fulfillment lifecycle and overview
+- `FulfillmentAssessment`
+  - backlog/delay/anomaly assessment result
+
+### Event and realtime packages
+
+These packages convert persisted truth into live fanout:
+
+- `BusinessEventService`
+  - records domain events
+- `BusinessEventQueryService`
+  - reads recent events
+- `OperationalStateChangePublisher`
+  - creates operational state changed events and dispatch work items
+- `OperationalStateChangeListener`
+  - event reaction layer
+- `OperationalStateChangedEvent`
+  - event payload model
+- `OperationalUpdateType`
+  - update-category vocabulary such as order flow or integration state
+- `OperationalDispatchQueueService`
+  - queueing/dispatch support for operational updates
+- `RealtimeService`
+  - publishes tenant-scoped dashboard, alert, recommendation, inventory, order, audit, event, incident, integration, and scenario topics
+- `RealtimePublisher`
+  - broker abstraction
+- `StompRealtimePublisher`
+  - STOMP publishing implementation
+- `RedisRealtimeEnvelope`
+  - Redis fanout wrapper
+- `RealtimeBrokerMode`
+  - broker mode vocabulary
+
+### Observability package
+
+- `OperationalMetricsService`
+  - records auth, tenant, integration, catalog, and other operational metrics
+- `OperationalAlertHookService`
+  - alert-hook / notification integration support
+
+### Configuration package
+
+These classes shape runtime behavior even when they are not business services themselves:
+
+- `AsyncExecutionConfig`
+  - async execution setup
+- `AuthConfig`
+  - auth/security wiring
+- `CorsConfig`
+  - CORS configuration wiring
+- `RedisConfig`
+  - Redis wiring
+- `RedisRealtimePubSubConfig`
+  - Redis-backed realtime fanout wiring
+- `RedisUrlEnvironmentPostProcessor`
+  - environment URL normalization for Redis
+- `RenderDatabaseUrlEnvironmentPostProcessor`
+  - environment URL normalization for Render DB connections
+- `SchedulingConfig`
+  - scheduled worker wiring
+- `SchemaExportRunner`
+  - schema export support
+- `SynapseAccessProperties`
+  - access/header fallback properties
+- `SynapseBootstrapProperties`
+  - bootstrap behavior flags
+- `SynapseCorsProperties`
+  - allowed-origin and browser trust properties
+- `SynapseObservabilityProperties`
+  - observability-related properties
+- `SynapseRealtimeProperties`
+  - realtime properties
+- `SynapseSecurityProperties`
+  - security-related properties
+- `SynapseStarterProperties`
+  - starter/demo/bootstrap feature flags
+- `WebSocketConfig`
+  - websocket endpoint and broker configuration
+
+### Bootstrap and application root
+
+- `SynapseCoreApplication`
+  - Spring Boot app entrypoint
+- `SchemaBootstrapExitRunner`
+  - startup/schema bootstrap exit behavior
+
+### Database migration layer
+
+These are first-party schema evolution steps for the current database:
+
+- `V1__inventory_stock_columns`
+- `V2__catalog_operational_tables_alignment`
+- `V3__operational_event_schema_hardening`
+- `V4__operational_enum_constraint_alignment`
+- `V5__full_schema_baseline`
+- `V6__payload_column_type_alignment`
+- `V7__integration_constraint_alignment`
+
+### Simulation package
+
+- `simulation/`
+  - currently present as a package directory with no active runtime class in the current codebase
+
+## 20. What “Fully Covered” Means In This Document
+
+This document now covers:
+
+- the full product-level operational loop
+- the current first-party frontend participation map
+- the current first-party backend participation map
+- the current state vocabulary
+- the current controller -> service -> repository paths
+- the current decision branches for auth, approval, replay, realtime, runtime trust, and proof gating
+
+What it still does not inline line-by-line:
+
+- third-party framework internals from Spring, Redis clients, SockJS, React, or Vite
+- every private helper statement inside every class method
+- every DTO field-by-field serialization detail
+
+Those are implementation details inside the code, not additional system branches.
+For the owned SynapseCore system itself, this document now accounts for the current runtime-capable files and the main way they participate in the end-to-end flow.
