@@ -788,3 +788,920 @@ They move through:
 - proof validation
 
 That is what makes it an operations command platform rather than a simple CRUD or analytics application.
+
+## 12. Role-By-Role Operational Flow
+
+The platform is not one flat user experience.
+Different actors enter different parts of the branching system and are allowed to continue only along the paths their workspace role supports.
+
+```mermaid
+flowchart TD
+    A["Signed-in workspace user"] --> B{"Which actor path?"}
+
+    B -->|Tenant admin| C["Workspace administration"]
+    B -->|General workspace operator| D["Live operations surfaces"]
+    B -->|Scenario requester or planner| E["Scenario planning path"]
+    B -->|Review owner| F["Scenario review path"]
+    B -->|Final approver| G["Final approval path"]
+    B -->|Escalation owner| H["Escalation handling path"]
+    B -->|Integration admin| I["Connector administration path"]
+    B -->|Integration operator| J["Replay and recovery path"]
+
+    C --> C1["Users / operators / workspace / security / warehouses / connector support"]
+    C1 --> C2["AccessController"]
+    C2 --> C3["TenantWorkspaceAdministrationService or AccessAdministrationService"]
+    C3 --> C4["Tenant / AccessUser / AccessOperator / Warehouse / Connector persistence"]
+
+    D --> D1["Dashboard / Orders / Inventory / Alerts / Recommendations / Runtime"]
+    D1 --> D2["DashboardController / OrderController / InventoryController / AlertController / RecommendationController / SystemController"]
+    D2 --> D3["Workspace access + tenant scope checks"]
+    D3 --> D4["Operational read or write services"]
+
+    E --> E1["Scenario compare / preview / save"]
+    E1 --> E2["ScenarioController"]
+    E2 --> E3["ScenarioAnalysisService + ScenarioHistoryService"]
+    E3 --> E4["Preview, saved plan, or pending approval"]
+
+    F --> F1["Approve or reject review-stage plan"]
+    F1 --> F2["ScenarioController approve/reject"]
+    F2 --> F3["AccessControlService requireScenarioActor(REVIEW_OWNER)"]
+    F3 --> F4{"Standard or escalated policy?"}
+    F4 -->|Standard| F5["Approve directly"]
+    F4 -->|Escalated| F6["Advance to final approval stage"]
+
+    G --> G1["Approve escalated plan"]
+    G1 --> G2["AccessControlService requireScenarioActor(FINAL_APPROVER)"]
+    G2 --> G3["Scenario becomes APPROVED and executable"]
+    G3 --> G4["Execute into live order path if chosen"]
+
+    H --> H1["Acknowledge SLA escalation"]
+    H1 --> H2["ScenarioController / acknowledge-escalation"]
+    H2 --> H3["Scenario remains visible until resolved"]
+
+    I --> I1["Connector health / enablement / support ownership"]
+    I1 --> I2["ExternalOrderWebhookController /connectors + admin workspace connector support"]
+    I2 --> I3["IntegrationConnectorService + TenantWorkspaceAdministrationService"]
+
+    J --> J1["Replay queue and manual recovery"]
+    J1 --> J2["ExternalOrderWebhookController /replay/{id}"]
+    J2 --> J3["AccessControlService requireIntegrationOperator"]
+    J3 --> J4["IntegrationReplayService replay"]
+    J4 --> J5{"Replay succeeds?"}
+    J5 -->|Yes| J6["Recovered work re-enters order flow"]
+    J5 -->|No| J7["Replay remains failed or dead-lettered"]
+```
+
+### Role path details
+
+#### Tenant admin
+
+Tenant admins can:
+
+- create or update operators
+- create or update users
+- reset user passwords
+- update workspace metadata
+- update workspace security policy
+- update workspace warehouses
+- update workspace connector support ownership
+- in some environments, create tenant workspaces through onboarding
+
+Primary path:
+
+- `AccessController`
+- `AccessControlService.requireTenantAdmin(...)`
+- `AccessAdministrationService`
+- `TenantWorkspaceAdministrationService`
+- `TenantOnboardingService`
+
+#### General workspace operator
+
+General workspace operators can:
+
+- view dashboard summary and snapshot
+- view alerts, recommendations, orders, inventory, runtime, incidents, recent events, and recent audit history
+- perform basic operational actions that require workspace access rather than elevated admin roles
+
+Primary path:
+
+- `AccessControlService.requireWorkspaceAccess(...)`
+- `DashboardController`
+- `InventoryController`
+- `OrderController`
+- `SystemController`
+- `OperationalViewService`
+
+#### Scenario requester or planner
+
+Scenario requesters or planners can:
+
+- create scenario previews
+- compare alternatives
+- save plans for approval
+- load scenario requests back into the planner
+
+Primary path:
+
+- `ScenarioController`
+- `ScenarioAnalysisService`
+- `ScenarioHistoryService`
+
+#### Review owner
+
+Review owners can:
+
+- approve review-stage plans
+- reject plans with reasons
+- move escalated plans into final approval
+
+Primary path:
+
+- `ScenarioController.approveScenarioPlan(...)`
+- `AccessControlService.requireScenarioActor(REVIEW_OWNER, ...)`
+- `ScenarioHistoryService.approvePlan(...)`
+
+#### Final approver
+
+Final approvers can:
+
+- approve escalated plans that require a higher governance lane
+
+Primary path:
+
+- `ScenarioController.approveScenarioPlan(...)`
+- `AccessControlService.requireScenarioActor(FINAL_APPROVER, ...)`
+- `ScenarioHistoryService.approvePlan(...)`
+
+#### Escalation owner
+
+Escalation owners can:
+
+- acknowledge SLA escalations
+- keep overdue review flows visible until resolved
+
+Primary path:
+
+- `ScenarioController.acknowledgeEscalation(...)`
+- `ScenarioHistoryService.acknowledgeSlaEscalation(...)`
+
+#### Integration admin
+
+Integration admins can:
+
+- create or update connectors
+- manage connector visibility and support ownership
+- control whether a connector is enabled for live ingestion
+
+Primary path:
+
+- `ExternalOrderWebhookController.saveConnector(...)`
+- `AccessControlService.requireIntegrationAdmin(...)`
+- `IntegrationConnectorService.upsertConnector(...)`
+
+#### Integration operator
+
+Integration operators can:
+
+- inspect replay queues
+- manually replay eligible failed inbound work
+
+Primary path:
+
+- `ExternalOrderWebhookController.getReplayQueue(...)`
+- `ExternalOrderWebhookController.replayFailedOrder(...)`
+- `IntegrationReplayService.getReplayQueue(...)`
+- `IntegrationReplayService.replay(...)`
+
+## 13. Exact Capability Universe
+
+This section lists the current state and classification vocabulary the system can actually emit today.
+
+### Current recommendation types
+
+- `REORDER_STOCK`
+- `REORDER_URGENTLY`
+- `TRANSFER_STOCK`
+- `PRIORITIZE_FULFILLMENT`
+- `ESCALATE_LOGISTICS`
+- `INVESTIGATE_LOGISTICS_ANOMALY`
+
+### Current alert types
+
+- `LOW_STOCK`
+- `DEPLETION_RISK`
+- `FULFILLMENT_BACKLOG`
+- `DELIVERY_DELAY_RISK`
+- `FULFILLMENT_ANOMALY`
+
+### Current order statuses
+
+- `CREATED`
+- `RECEIVED`
+- `PROCESSING`
+- `PARTIALLY_FULFILLED`
+- `FULFILLED`
+- `DELIVERED`
+- `CANCELLED`
+- `RETURNED`
+- `FAILED`
+- `BLOCKED`
+
+### Current fulfillment statuses
+
+- `QUEUED`
+- `PICKING`
+- `PACKED`
+- `DISPATCHED`
+- `DELAYED`
+- `DELIVERED`
+- `EXCEPTION`
+
+### Current replay statuses
+
+- `PENDING`
+- `REPLAY_FAILED`
+- `DEAD_LETTERED`
+- `REPLAYED`
+
+### Current inbound ingestion statuses
+
+- `RECEIVED`
+- `ACCEPTED`
+- `REJECTED`
+- `REPLAY_QUEUED`
+- `REPLAYED`
+
+### Current scenario approval statuses
+
+- `NOT_REQUIRED`
+- `PENDING_APPROVAL`
+- `APPROVED`
+- `REJECTED`
+
+### Current scenario approval stages
+
+- `NOT_REQUIRED`
+- `PENDING_REVIEW`
+- `PENDING_FINAL_APPROVAL`
+- `APPROVED`
+- `REJECTED`
+
+### Current scenario approval policies
+
+- `STANDARD`
+- `ESCALATED`
+
+### Current scenario actor roles
+
+- `REQUESTER`
+- `REVIEW_OWNER`
+- `FINAL_APPROVER`
+- `ESCALATION_OWNER`
+
+### Current elevated workspace roles
+
+- `TENANT_ADMIN`
+- `REVIEW_OWNER`
+- `FINAL_APPROVER`
+- `ESCALATION_OWNER`
+- `INTEGRATION_ADMIN`
+- `INTEGRATION_OPERATOR`
+
+### Current dispatch queue statuses
+
+- `PENDING`
+- `PROCESSING`
+- `COMPLETED`
+- `FAILED`
+
+## 14. Microflow Appendix: Exact Controller -> Service -> Repository Paths
+
+This is the most code-grounded view in the document.
+It shows the primary request chains and where truth is stored or fanned out.
+
+### 14.1 Public workspace creation
+
+**User action**
+
+- company admin submits create-workspace flow
+
+**Frontend surface**
+
+- public create workspace page
+
+**Backend path**
+
+- `POST /api/access/tenants`
+- `AccessController.onboardTenant(...)`
+- `TenantOnboardingService.onboardTenant(...)`
+
+**Repositories touched**
+
+- `TenantRepository`
+- `AccessOperatorRepository`
+- `AccessUserRepository`
+- `WarehouseRepository`
+- optionally `ProductRepository`
+- optionally `InventoryRepository`
+
+**Other services**
+
+- `IntegrationConnectorService.seedStarterConnectors(...)`
+- `AuditLogService`
+- `OperationalMetricsService`
+
+**User-visible result**
+
+- tenant workspace created
+- bootstrap admin created
+- executive approver created
+- starter warehouses created
+- optional starter inventory / starter connectors seeded
+
+**Failure modes**
+
+- duplicate tenant code
+- duplicate admin username
+- missing bootstrap authorization
+
+### 14.2 Sign-in and session truth
+
+**User action**
+
+- operator signs in with workspace code, username, and password
+
+**Frontend surface**
+
+- sign-in page
+
+**Backend path**
+
+- `POST /api/auth/session/login`
+- `AuthController.signIn(...)`
+- `AuthSessionService.signIn(...)`
+
+**Repositories touched**
+
+- `AccessUserRepository`
+- `AuditLogRepository`
+
+**Other services**
+
+- `OperationalMetricsService`
+- session storage through servlet session and production Redis-backed session posture
+
+**Success result**
+
+- tenant code stored in session
+- actor and username stored in session
+- session version and security policy version stored
+- frontend can call `GET /api/auth/session`
+- websocket trust becomes possible
+
+**Failure modes**
+
+- missing tenant code
+- bad password
+- inactive operator
+- inactive tenant
+- expired or invalidated session on later checks
+
+### 14.3 Dashboard and snapshot read
+
+**User action**
+
+- operator opens dashboard or refreshes snapshot
+
+**Frontend surface**
+
+- dashboard
+
+**Backend path**
+
+- `GET /api/dashboard/summary`
+- `GET /api/dashboard/snapshot`
+- `DashboardController`
+- `DashboardService.getSummary()` or `OperationalViewService.getSnapshot()`
+
+**Repositories touched**
+
+- `CustomerOrderRepository`
+- `AlertRepository`
+- `InventoryRepository`
+- `RecommendationRepository`
+- `WarehouseRepository`
+- integration repositories through `OperationalViewService`
+- scenario history through `ScenarioHistoryService`
+
+**Other services**
+
+- `FulfillmentService`
+- Redis cache for dashboard summary when enabled
+
+**User-visible result**
+
+- summary cards
+- alerts
+- recommendations
+- inventory health
+- fulfillment overview
+- recent orders
+- recent events
+- audit
+- incidents
+- connectors, imports, replay queue
+- scenario notifications and escalations
+
+**Failure modes**
+
+- backend unavailable
+- degraded snapshot freshness
+- Redis cache miss or Redis cache bypass without breaking summary generation
+
+### 14.4 Product and catalog onboarding
+
+**User action**
+
+- create one product or import many products from CSV
+
+**Frontend surface**
+
+- catalog page
+
+**Backend path**
+
+- `GET /api/products`
+- `POST /api/products`
+- `PUT /api/products/{productId}`
+- `POST /api/products/import`
+- `ProductController`
+- `ProductService`
+
+**Repositories touched**
+
+- `ProductRepository`
+
+**Other services**
+
+- `IdentitySequenceMigrationService`
+- `CatalogWriteConflictResolver`
+- `BusinessEventService`
+- `AuditLogService`
+- `OperationalStateChangePublisher`
+- `OperationalMetricsService`
+
+**User-visible result**
+
+- products appear in catalog
+- import returns created / updated / failed row results
+- dashboard and operational views can consume the catalog truth
+
+**Failure modes**
+
+- invalid or duplicate SKU
+- CSV header issues
+- write conflicts
+
+### 14.5 Inventory update and operational signals
+
+**User action**
+
+- operator updates, receives, adjusts, or reconciles stock
+
+**Frontend surface**
+
+- inventory page
+
+**Backend path**
+
+- `POST /api/inventory/update`
+- `POST /api/inventory/receive`
+- `POST /api/inventory/adjust`
+- `POST /api/inventory/reconcile`
+- `InventoryController`
+- `InventoryService`
+
+**Repositories touched**
+
+- `InventoryRepository`
+- `ProductRepository`
+- `WarehouseRepository`
+
+**Other services**
+
+- `InventoryMonitoringService`
+- `InventoryIntelligenceService`
+- `StockPredictionService`
+- `BusinessEventService`
+- `AuditLogService`
+- `OperationalStateChangePublisher`
+
+**Derived outputs**
+
+- inventory posture updates
+- low-stock or depletion-risk alert sync
+- reorder, urgent reorder, or transfer recommendation generation
+- dashboard refresh
+- realtime publication
+
+**Failure modes**
+
+- warehouse or product not found in tenant scope
+- attempted negative on-hand below reserved commitments
+- reconciliation conflicts
+
+### 14.6 Direct order ingestion
+
+**User action**
+
+- operator creates live order
+
+**Frontend surface**
+
+- orders page or scenario execution downstream
+
+**Backend path**
+
+- `POST /api/orders`
+- `OrderController`
+- `OrderService.createOrder(...)`
+
+**Repositories touched**
+
+- `CustomerOrderRepository`
+- `FulfillmentTaskRepository`
+- inventory rows through `InventoryService`
+
+**Other services**
+
+- `InventoryService.reserveStock(...)`
+- `FulfillmentService.initializeForOrder(...)`
+- `BusinessEventService`
+- `AuditLogService`
+- `OperationalMetricsService`
+- `OperationalStateChangePublisher`
+
+**User-visible result**
+
+- order created
+- inventory reserved
+- fulfillment initialized
+- dashboard/orders/alerts/recommendations update
+
+**Failure modes**
+
+- duplicate external order ID
+- insufficient stock
+- tenant-scope mismatch
+- lock contention retries exhausted
+
+### 14.7 Webhook ingestion path
+
+**User action**
+
+- external system sends order webhook
+
+**Frontend surface**
+
+- not initiated from UI; later visible in orders, integrations, replay, dashboard
+
+**Backend path**
+
+- `POST /api/integrations/orders/webhook`
+- `ExternalOrderWebhookController.ingestOrderWebhook(...)`
+- `ExternalOrderWebhookService.ingest(...)`
+
+**Repositories touched**
+
+- inbound record through `IntegrationInboundRecordService`
+- replay record on failure through `IntegrationReplayRecordRepository`
+- order persistence through `OrderService`
+
+**Other services**
+
+- `IntegrationInboundAccessService`
+- `IntegrationConnectorService`
+- `IntegrationConnectorPolicyService`
+- `IntegrationImportRunService`
+- `IntegrationReplayService`
+- `OperationalMetricsService`
+
+**Success path**
+
+- connector authenticated or workspace authorized
+- inbound record stored as received
+- connector policy prepares normalized order request
+- order created through normal order path
+- inbound marked accepted
+- import run recorded
+
+**Failure path**
+
+- connector invalid or disabled
+- source mismatch
+- payload invalid
+- warehouse or SKU invalid
+- order creation fails
+- inbound marked rejected
+- replay record queued
+- import run recorded as rejected
+
+### 14.8 CSV import path
+
+**User action**
+
+- operator or connector uploads CSV
+
+**Frontend surface**
+
+- integrations page
+
+**Backend path**
+
+- `POST /api/integrations/orders/csv-import`
+- `ExternalOrderWebhookController.importOrdersFromCsv(...)`
+- `ExternalOrderCsvImportService.ingest(...)`
+
+**Repositories touched**
+
+- inbound records
+- import runs
+- replay queue records
+- customer orders through `OrderService`
+
+**Success path**
+
+- CSV parsed
+- rows grouped into orders
+- connector policy prepares normalized order
+- each successful order enters the live order creation path
+- import run summarizes success and failure counts
+
+**Failure path**
+
+- missing file
+- oversized file
+- missing header
+- bad source system
+- connector not configured or disabled
+- grouped order rejected
+- failed order added to replay queue
+
+### 14.9 Replay and recovery path
+
+**User action**
+
+- integration operator opens replay queue and clicks `Replay Into Live Flow`
+
+**Frontend surface**
+
+- replay queue page
+
+**Backend path**
+
+- `GET /api/integrations/orders/replay-queue`
+- `POST /api/integrations/orders/replay/{replayRecordId}`
+- `ExternalOrderWebhookController`
+- `IntegrationReplayService`
+
+**Repositories touched**
+
+- `IntegrationReplayRecordRepository`
+- inbound record updates through `IntegrationInboundRecordService`
+
+**Other services**
+
+- `IntegrationConnectorService`
+- `OrderService`
+- `BusinessEventService`
+- `AuditLogService`
+- `OperationalMetricsService`
+- `OperationalAlertHookService`
+- `OperationalStateChangePublisher`
+
+**Success result**
+
+- replay record moves to `REPLAYED`
+- inbound record can move to replayed/accepted state
+- recovered order enters normal live order flow
+- dashboard/events/audit/replay surfaces update
+
+**Failure result**
+
+- connector still disabled
+- next eligible time not reached
+- replay remains failed
+- record can become dead-lettered after repeated failure
+- operator still sees failure reason instead of false success
+
+### 14.10 Scenario planning, approval, and execution
+
+**User action**
+
+- planner previews impact, saves a plan, review owners approve or reject, final approver handles escalations, approved plan executes into live order flow
+
+**Frontend surface**
+
+- recommendations
+- scenario history
+- approvals
+- action consoles
+
+**Backend path**
+
+- `POST /api/scenarios/order-impact`
+- `POST /api/scenarios/order-impact/compare`
+- `POST /api/scenarios/save`
+- `POST /api/scenarios/{id}/approve`
+- `POST /api/scenarios/{id}/reject`
+- `POST /api/scenarios/{id}/acknowledge-escalation`
+- `POST /api/scenarios/{id}/execute`
+- `GET /api/scenarios/history`
+- `GET /api/scenarios/notifications`
+- `ScenarioController`
+
+**Primary services**
+
+- `ScenarioAnalysisService`
+- `ScenarioHistoryService`
+- `ScenarioExecutionService`
+- `ScenarioProjectionService`
+- `ScenarioRiskPolicyService`
+- `AccessControlService`
+
+**Repositories touched**
+
+- `ScenarioRunRepository`
+- live order persistence through `OrderService` during execution
+
+**Decision branches**
+
+- preview only -> no approval required
+- saved plan -> `PENDING_APPROVAL`
+- standard policy -> review owner can approve directly
+- escalated policy -> review owner advances to final approval
+- rejected plan -> execution stops; planner must resubmit
+- approved plan -> executable live order path
+
+**User-visible result**
+
+- scenario request history
+- approval queues
+- escalation inbox
+- executed scenarios recorded back into history
+
+### 14.11 Runtime trust and incident visibility
+
+**User action**
+
+- operator opens runtime page
+
+**Frontend surface**
+
+- runtime page
+
+**Backend path**
+
+- `GET /api/system/runtime`
+- `GET /api/system/incidents`
+- `SystemController`
+- `SystemRuntimeService`
+- `SystemIncidentService`
+
+**Repositories touched**
+
+- `AlertRepository`
+- `AuditLogRepository`
+- `BusinessEventRepository`
+- `FulfillmentTaskRepository`
+- `IntegrationConnectorRepository`
+- `IntegrationInboundRecordRepository`
+- `IntegrationImportRunRepository`
+- `IntegrationReplayRecordRepository`
+- `OperationalDispatchWorkItemRepository`
+
+**Other services**
+
+- `RealtimeService`
+- `OperationalDispatchQueueService`
+- `OperationalMetricsService`
+- `OperationalAlertHookService`
+
+**User-visible result**
+
+- overall status `UP`, `DEGRADED`, or `DOWN`
+- liveness and readiness posture
+- connector diagnostic summaries
+- replay and inbound failure counts
+- queue backlog / failed dispatch counts
+- broker mode explanation
+
+## 15. Failure, Degraded-State, and Proof-Surface Matrix
+
+This section answers the practical question:
+if something goes wrong, where does it stop, where does it surface, and what path is still open?
+
+| Failure or decision point | Backend result | Data effect | Operator-visible surface | Realtime effect | Proof effect |
+| --- | --- | --- | --- | --- | --- |
+| Invalid workspace code or password | `AuthSessionService` rejects sign-in | no session created | sign-in failure on login page | websocket not trusted | auth proof fails |
+| Session expired or tenant security policy changed | session invalidated during auth check | prior session no longer trusted | session-expired messaging, sign-in required again | websocket reconnect blocked or stale | auth proof blocked |
+| Missing workspace access | `AccessControlService.requireWorkspaceAccess(...)` fails | no mutation | 401 or 403 style blocked state | no publish from rejected action | flow proof fails at auth or role gate |
+| Missing tenant admin role | admin action denied | no admin mutation | users/settings/workspace actions blocked | none | admin proof path fails |
+| Invalid product CSV | product import row rejected | partial import only | catalog import results show failed rows | no successful product fanout for failed rows | catalog proof may fail |
+| Inventory adjustment below reserved floor | `InventoryService` throws conflict | no invalid stock write | inventory error message | no downstream realtime from rejected mutation | inventory proof fails on conflict branch |
+| Insufficient inventory during order creation | `OrderService` rejects create | order not saved | order failure or replay failure depending on source | no order-flow success publish | order/replay proof fails |
+| Webhook or CSV connector disabled | integration policy rejects request | inbound may be recorded, replay queued | integrations + replay queue show failure | integration topics may show replay pressure instead of success | replay proof expected to pause or fail |
+| Replay attempted before `nextEligibleAt` | replay denied with conflict | replay record stays pending | replay queue still shows pending eligibility | no recovered order publish | replay proof fails |
+| Replay succeeds | replay transitions to recovered state | replay + order history updated | replay queue and orders reflect recovery | integration/order topics publish fresh state | replay proof passes |
+| Scenario requires escalated approval | plan remains pending final approval | scenario saved, not executed | approvals and scenario history show gated state | scenario notifications can update | execution proof must wait |
+| Scenario rejected | scenario stops before execution | scenario history retains rejection | approvals/history show rejected plan | no live order fanout | scenario execution proof fails until resubmitted |
+| Scenario approved then executed | execution creates live order | scenario execution history + order persisted | scenario history and orders update | order-flow and scenario notifications update | execution proof passes |
+| Websocket broker degraded or disconnected | snapshots still possible, live push reduced | DB truth may still be correct | runtime warnings, reconnecting state, possibly stale UI | live freshness drops | websocket proof fails |
+| Readiness false while liveness true | app booted but not ready for trusted traffic | data may be inconsistent or dependencies unavailable | runtime shows degraded trust | websocket/auth may not be safe | `PROOF_ALLOWED=false` |
+| DB unavailable or suspended | backend may hang or fail readiness | no reliable persistence | frontend shell may load but login/actions fail | no trustworthy realtime | hosted proof must stop |
+| Redis/session unavailable in production posture | session truth and fanout may degrade | session and cache posture degraded | runtime trust warning and auth issues | websocket/session instability possible | proof blocked on auth/ws trust |
+| Backend unavailable but frontend up | SPA still serves shell | no live backend truth | public shell may render, authenticated actions fail | none or stale | proof paused immediately |
+
+## 16. Recommendation, Alert, and Consequence Paths In One View
+
+Recommendations are not decorative.
+They are one of the main ways the system turns persisted operational truth into visible next-best action.
+
+```mermaid
+flowchart TD
+    A["Inventory or fulfillment state changes"] --> B["InventoryService or FulfillmentService paths"]
+    B --> C["InventoryMonitoringService / InventoryIntelligenceService / StockPredictionService / FulfillmentAssessment"]
+    C --> D{"Condition detected?"}
+
+    D -->|Low stock| E["AlertService sync LOW_STOCK"]
+    D -->|Depletion risk| F["AlertService sync DEPLETION_RISK"]
+    D -->|Backlog pressure| G["AlertService sync FULFILLMENT_BACKLOG"]
+    D -->|Delivery delay| H["AlertService sync DELIVERY_DELAY_RISK"]
+    D -->|Logistics anomaly| I["AlertService sync FULFILLMENT_ANOMALY"]
+
+    E --> J["RecommendationService createForInventory"]
+    F --> J
+    G --> K["RecommendationService createForFulfillment"]
+    H --> K
+    I --> K
+
+    J --> L{"Recommendation type?"}
+    L -->|Transfer candidate found| M["TRANSFER_STOCK"]
+    L -->|Critical low stock| N["REORDER_URGENTLY"]
+    L -->|Standard low stock or depletion risk| O["REORDER_STOCK"]
+
+    K --> P{"Fulfillment recommendation type?"}
+    P -->|Backlog pressure| Q["PRIORITIZE_FULFILLMENT"]
+    P -->|Delay risk| R["ESCALATE_LOGISTICS"]
+    P -->|Anomaly| S["INVESTIGATE_LOGISTICS_ANOMALY"]
+
+    M --> T["RecommendationRepository save"]
+    N --> T
+    O --> T
+    Q --> T
+    R --> T
+    S --> T
+
+    T --> U["BusinessEventService record RECOMMENDATION_GENERATED"]
+    U --> V["Dashboard / Recommendations / Alerts / Runtime / Realtime surfaces"]
+    V --> W["Operator sees both warning and suggested next action"]
+```
+
+### Full recommendation and alert consequence loop
+
+The system can currently move from raw operational truth to operator-visible guidance through all of these paths:
+
+- inventory low stock -> alert -> reorder or transfer recommendation
+- inventory depletion risk -> alert -> reorder recommendation
+- critical low stock -> urgent reorder recommendation
+- fulfillment backlog -> backlog alert -> prioritize fulfillment recommendation
+- delivery delay -> delay alert -> logistics escalation recommendation
+- anomaly or exception pressure -> anomaly alert -> investigate logistics anomaly recommendation
+- scenario projection -> projected alerts and projected recommendations before live execution
+- replay backlog or connector degradation -> visible operational pressure even before a live order is recovered
+
+### Where the guidance finally appears
+
+- dashboard summary and operational lanes
+- alerts page
+- recommendations page
+- runtime trust view
+- recent events and audit context
+- scenario projections before approval or execution
+
+## 17. Full Loop Recap
+
+If someone wants the shortest possible truthful reread of the whole platform, it is this:
+
+1. a company or operator enters through the public frontend
+2. access moves through workspace code, user session, and tenant truth
+3. requests hit real controllers, not fake demo paths
+4. access checks, role checks, and warehouse checks decide whether the action may continue
+5. business services persist truth in PostgreSQL
+6. alerts, recommendations, audit, events, and scenario history react to that truth
+7. realtime and snapshot surfaces expose the new state to operators
+8. if a connector fails, the replay queue preserves recoverable work
+9. if a plan is risky, approvals and escalation gates stop unsafe execution
+10. if runtime trust degrades, the platform is supposed to say so explicitly
+11. hosted proof only runs when readiness, auth, and websocket truth are healthy
+12. success means visible operational completion; failure means visible, classifiable, recoverable truth
