@@ -1,219 +1,790 @@
 # System Flow
 
-## SynapseCore Operating Loop
+This document explains how SynapseCore behaves as a full operational system.
 
-The MVP is built around one visible reaction cycle:
+It is not a marketing summary.
+It is not only an architecture diagram.
 
-1. receive operational activity
-2. update business state
-3. interpret whether the change matters
-4. estimate what happens next
-5. recommend action
-6. push a live dashboard update
+It is the end-to-end flow map for:
 
-## Main MVP Flow
+- public entry
+- workspace access
+- auth and session handling
+- order and inventory processing
+- approvals and execution control
+- integration ingestion
+- replay and recovery
+- realtime and snapshot updates
+- runtime trust and degraded-state behavior
+- hosted proof and validation
 
-### 1. Order arrives
+The goal is to show:
 
-- client sends `POST /api/orders`
-- payload includes warehouse and line items
-- an external system can also send one order through `POST /api/integrations/orders/webhook`
-- an external system can also send a CSV batch through `POST /api/integrations/orders/csv-import`, where rows are grouped into real orders before ingestion
-- connector configuration determines whether a given source system is enabled before SynapseCore accepts the inbound activity
+- what enters the system
+- where it goes
+- what processes it
+- what happens on success
+- what happens on failure
+- what happens if approval is required
+- what happens if replay is needed
+- how operators see the result
+- how proof validates the whole chain
 
-### 2. State changes
+## How To Read This
 
-- `CustomerOrder` is persisted
-- a `FulfillmentTask` is opened so the order enters the warehouse and delivery lane immediately
-- `OrderItem` rows are created
-- matching `Inventory` quantities are reduced
-- `BusinessEvent` records are written
+SynapseCore works through a layered operational model:
 
-### 3. Intelligence evaluates impact
+1. something enters the system
+2. the frontend or API captures intent
+3. the backend validates and classifies it
+4. PostgreSQL stores operational truth
+5. business logic updates the live operational state
+6. alerts, recommendations, audit, and events react
+7. websocket and snapshot surfaces show the result
+8. if trust is degraded, the system should say so honestly
 
-- SynapseCore checks whether `quantityAvailable <= reorderThreshold`
-- SynapseCore checks recent demand to estimate depletion timing
-- SynapseCore checks whether fulfillment backlog is building in the warehouse lane
-- SynapseCore checks whether dispatch SLA or delivery SLA timing is slipping
-- SynapseCore checks whether repeated exceptions or stacked late shipments look anomalous
-- urgency is elevated when stock is critically low or depletion is near
+## Master End-To-End Operational Flow
 
-### 4. Decision layer responds
+```mermaid
+flowchart TD
+    A["External event or operator action"] --> B{"Public entry or authenticated action?"}
 
-- a structured `Alert` is created or refreshed
-- a `Recommendation` is created for replenishment
-- a structured fulfillment or delivery alert is created when backlog or delay pressure becomes material
-- a logistics recommendation is created when warehouse teams should prioritize backlog or escalate a delayed route
+    B -->|Public entry| C["Frontend public pages<br/>Homepage / Create Workspace / Sign In"]
+    B -->|Authenticated action| D["Frontend authenticated shell<br/>Dashboard / Orders / Inventory / Replay / Approvals / Runtime"]
 
-### 5. Dashboard updates live
+    C --> E{"Create workspace or sign in?"}
+    E -->|Create workspace| F["Workspace creation flow<br/>Company info / workspace code / first admin / setup guidance"]
+    E -->|Sign in| G["Sign-in form<br/>workspace code + username + password"]
+    F --> G
 
-- an internal dispatch work item is persisted for the tenant update
-- the dispatch worker drains queued fan-out work in small batches
-- dashboard summary is recalculated and cached
-- the backend publishes dedicated live topics for summary, alerts, recommendations, inventory, recent orders, recent events, audit activity, integration connectors, recent import activity, and scenario escalation state
-- the backend also publishes a dedicated fulfillment overview topic so backlog and delayed shipments update without refresh
-- the React UI updates without refresh
-- recent business events and audit activity are also surfaced in the control-center timeline
-- connector status, recent inbound webhook or CSV runs, and replayable failed inbound orders are also surfaced in the control-center integration lane
+    G --> H["POST /api/auth/session/login"]
+    H --> I{"Tenant and credentials valid?"}
+    I -->|No| J["Auth failure<br/>Show error / stay unauthenticated / no websocket trust"]
+    I -->|Yes| K["Create session<br/>Tenant context + user identity + operator mapping"]
 
-## Inventory Update Flow
+    K --> L["Redis-backed or configured session posture"]
+    L --> M["Frontend receives session state<br/>GET /api/auth/session"]
+    M --> N["Authenticated workspace opens"]
 
-1. `POST /api/inventory/update` sets quantity and threshold
-2. monitoring logic runs immediately
-3. alerts may resolve or appear
-4. focused realtime updates are pushed live
-5. queue failures surface in the system incident inbox instead of disappearing silently
+    D --> O["Frontend action or page load"]
+    N --> O
 
-## Local Development Reseed Flow
+    O --> P{"Snapshot read or state-changing action?"}
+    P -->|Snapshot read| Q["GET request<br/>dashboard / orders / inventory / replay / runtime / users / settings"]
+    P -->|State-changing action| R["POST / PUT request<br/>orders / inventory / connectors / replay / scenarios / approvals"]
 
-1. `POST /api/dev/reseed` resets the local development baseline
-2. the development-only local tenant baseline, catalog, warehouses, and inventory are restored
-3. dashboard, alerts, recommendations, and business events all refresh from the same operational services
+    Q --> S["Backend controller layer"]
+    R --> S
+    S --> T["Tenant enforcement + auth/session check + role check"]
+    T --> U{"Authorized and tenant-safe?"}
+    U -->|No| V["Reject request<br/>403 / 401 / requestId / audit visibility"]
+    U -->|Yes| W["Validation layer<br/>payload shape / connector state / workspace rules / warehouse scope"]
 
-## Fulfillment Update Flow
+    W --> X{"Valid?"}
+    X -->|No| Y["Structured failure<br/>validation error / policy error / failure code"]
+    X -->|Yes| Z["Persist or read operational truth in PostgreSQL"]
 
-1. `POST /api/fulfillment/updates` receives a warehouse or logistics update
-2. SynapseCore validates the payload and resolves the current tenant order
-3. the fulfillment lane is normalized into a consistent internal status
-4. the live fulfillment state is updated
-5. backlog, delay-risk, and anomaly signals are re-evaluated for the warehouse
-6. related alerts, recommendations, business events, audit logs, and realtime topics are refreshed
+    Z --> AA["Business processing layer<br/>orders / inventory / integrations / replay / scenarios / runtime"]
+    AA --> AB{"What kind of flow is this?"}
 
-## Observability Flow
+    AB -->|Normal success path| AC["Write operational state<br/>order / inventory / connector / scenario / alert / recommendation / audit / event"]
+    AB -->|Approval-required path| AD["Save pending action<br/>approval status / stage / owner / due time"]
+    AB -->|Integration failure path| AE["Store failed inbound work<br/>replay record / failure reason / connector context"]
+    AB -->|Runtime unhealthy path| AF["Mark degraded trust posture<br/>readiness false / auth unavailable / websocket degraded"]
 
-1. SynapseCore records operational counters and gauges as activity moves through orders, fulfillment, imports, replay, and dispatch
-2. `GET /api/system/runtime` exposes a tenant-scoped snapshot of queue posture, fulfillment pressure, and recent diagnostics
-3. `GET /api/system/incidents` exposes active trust issues including failed dispatch work
-4. `GET /actuator/prometheus` exposes scrape-friendly metrics for external monitoring
+    AC --> AG["Operational fanout<br/>dashboard summary / recent orders / inventory posture / alerts / recommendations / events / audit"]
+    AG --> AH["Realtime publisher / dispatch path"]
+    AH --> AI["Websocket tenant topics update"]
+    AG --> AJ["Snapshot surfaces read fresh state"]
+    AI --> AK["Frontend live update without refresh"]
+    AJ --> AK
+    AK --> AL["Operator sees successful operational completion"]
 
-## Integration Replay Flow
+    AD --> AM["Approval queue visible in UI"]
+    AM --> AN{"Approved, rejected, or overdue?"}
+    AN -->|Approved| AO["Move to executable state"]
+    AN -->|Rejected| AP["Terminate action<br/>record reason / keep history / allow refinement"]
+    AN -->|Overdue or escalated| AQ["Escalation path<br/>notification / acknowledgment / final approval lane"]
+    AO --> AR["Execution action sent through real backend flow"]
+    AR --> AC
+    AQ --> AM
 
-1. a webhook order or grouped CSV order fails after SynapseCore can normalize it into a real inbound order request
-2. the failed normalized request is stored in the integration replay queue with the failure reason
-3. operators fix the blocking condition, such as enabling a connector or restoring missing product or inventory data
-4. `POST /api/integrations/orders/replay/{replayRecordId}` replays the stored request through the normal order ingestion flow
-5. if replay succeeds, the queue item resolves and the live dashboard reflects the new order, inventory, alerts, recommendations, and integration telemetry
+    AE --> AS["Replay queue visible in UI"]
+    AS --> AT{"Blocking condition repaired?"}
+    AT -->|No| AU["Stay pending<br/>manual review / degraded connector visibility / trust warning"]
+    AT -->|Yes| AV["Operator chooses Replay Into Live Flow"]
+    AV --> AW["Replay service reprocesses stored inbound request"]
+    AW --> AX{"Replay succeeds?"}
+    AX -->|No| AY["Replay remains failed or pending<br/>update failure reason / keep visibility"]
+    AX -->|Yes| AZ["Recovered work enters normal live order flow"]
+    AZ --> AC
 
-## What-If Scenario Flow
+    AF --> BA["Frontend shows degraded state<br/>waiting / reconnecting / backend unavailable / stale trust"]
+    BA --> BB["Runtime and incident surfaces reflect trust warning"]
+    BB --> BC["Operators can classify state before acting"]
 
-1. `POST /api/scenarios/order-impact` receives a proposed order shape or multi-line order mix
-2. SynapseCore validates warehouse, SKU, and available inventory
-3. projected inventory levels are calculated without persisting a real order
-4. prediction, intelligence, alert, and recommendation logic run against the projected state
-5. the dashboard planner shows the likely operational impact before a live commit
+    AI --> BD{"Websocket healthy?"}
+    BD -->|Yes| BE["Live command-center freshness maintained"]
+    BD -->|No| BF["Reconnect / stale snapshot / runtime trust warning"]
+    BF --> BB
 
-## Scenario Comparison Flow
+    BG["Hosted proof / validation scripts"] --> BH["Live connection checks"]
+    BH --> BI{"Readiness + auth + websocket healthy?"}
+    BI -->|No| BJ["PROOF_ALLOWED = false<br/>Pause hosted proof / classify backend dependency issue"]
+    BI -->|Yes| BK["Prepare hosted proof"]
+    BK --> BL["Playwright hosted proof"]
+    BL --> BM{"Critical flows pass?"}
+    BM -->|Yes| BN["Proof pass<br/>deployed system validated"]
+    BM -->|No| BO["Proof fail<br/>selector drift / runtime issue / replay issue / backend issue"]
+```
 
-1. `POST /api/scenarios/order-impact/compare` receives two proposed order plans
-2. SynapseCore evaluates both plans against current live inventory
-3. each plan gets its own projected inventory, alerts, and recommendations
-4. a risk-score comparison is generated
-5. the dashboard recommends the operationally safer option before anything is committed
+## 1. Public Entry Flow
 
-## Scenario History Flow
+Public entry is how a company or operator reaches SynapseCore before any protected operational action happens.
 
-1. every preview or comparison is recorded as a scenario run
-2. SynapseCore stores a concise planning summary and recommended option
-3. `GET /api/scenarios/history` returns the recent planning memory
-4. the dashboard snapshot includes recent scenario history so operators can see what-if activity alongside live operations
+```mermaid
+flowchart TD
+    A["User opens SynapseCore frontend"] --> B{"Purpose?"}
+    B -->|Learn platform| C["Homepage<br/>public product explanation"]
+    B -->|Start pilot or workspace| D["Create Workspace flow"]
+    B -->|Enter existing company workspace| E["Sign In flow"]
 
-## Scenario Reload Flow
+    D --> F["Collect company info / workspace code / first admin details"]
+    F --> G["Explain guided setup path<br/>catalog / inventory / operators / integrations"]
+    G --> E
 
-1. an operator chooses a loadable preview or saved plan from recent scenario history
-2. `GET /api/scenarios/{scenarioRunId}/request` returns the stored preview request
-3. the planner reloads that request into Scenario A
-4. the operator can refine, rerun, compare, or execute the updated plan without rebuilding it from scratch
+    E --> H["Enter workspace code + username + password"]
+    H --> I["Auth request sent to backend"]
+    I --> J{"Valid workspace and credentials?"}
+    J -->|No| K["Stay on sign-in<br/>show auth failure / no workspace access"]
+    J -->|Yes| L["Enter authenticated workspace shell"]
+```
 
-## Scenario Save Flow
+### What this part does
 
-1. an operator names Scenario A and saves it
-2. `POST /api/scenarios/save` stores the request as a named executable plan
-3. SynapseCore records the saved plan in scenario history and business events
-4. the saved plan becomes reloadable from planning memory and waits for approval before execution
+- explains the platform before login
+- lets a new company understand the workspace model
+- routes an existing operator into the authenticated workspace
 
-## Scenario Approval Flow
+### Failure modes
 
-1. an operator or lead approves a saved plan
-2. `POST /api/scenarios/{scenarioRunId}/approve` records the approver and approval time
-3. standard plans move directly to `APPROVED`
-4. critical plans enforce staged escalated approval policy, so the assigned review owner must complete owner review first with a review note and cannot be the original requester
-5. owner review uses the `REVIEW_OWNER` role boundary, and after that the plan moves to `PENDING_FINAL_APPROVAL` with an assigned final approval owner
-6. final release uses the `FINAL_APPROVER` role boundary, and the assigned final approval owner is still distinct from both requester and owner reviewer
-7. each pending stage carries a due time so overdue approvals can be surfaced without guessing in the UI
-8. if a critical final approval becomes overdue, SynapseCore reroutes it once to an executive fallback approver and records an SLA escalation event
-9. the rerouted plan appears in the live SLA escalation inbox so operators can act without digging through history filters
-10. the reroute also appears in the dedicated scenario notification feed so it is visible as an operational notice in the control center
-11. an operator using the `ESCALATION_OWNER` role boundary can acknowledge the escalation to mark it as owned, which removes it from the live inbox while preserving the handoff in scenario history and notifications
-12. SynapseCore marks the plan as approved in scenario history
-13. the plan becomes executable through the live order path
+- wrong workspace code
+- wrong password
+- backend unavailable
+- session endpoint unavailable
 
-## Scenario Rejection Flow
+## 2. Auth And Session Flow
 
-1. an operator or lead rejects a saved plan with a review note
-2. `POST /api/scenarios/{scenarioRunId}/reject` records the reviewer, rejection time, and reason
-3. SynapseCore marks the plan as rejected in scenario history
-4. the plan stays loadable for refinement but is blocked from live execution
+Auth is not only login. It also controls workspace access, session truth, and websocket trust.
 
-## Scenario Revision Flow
+```mermaid
+flowchart TD
+    A["Frontend sign-in submission"] --> B["POST /api/auth/session/login"]
+    B --> C["Backend auth controller"]
+    C --> D["Tenant lookup"]
+    D --> E["User lookup"]
+    E --> F["Operator mapping lookup"]
+    F --> G{"Valid tenant + user + password + active operator?"}
 
-1. an operator loads a rejected saved plan back into Scenario A
-2. the planner enters revision mode and keeps the rejected plan as the revision source
-3. `POST /api/scenarios/save` creates a new pending saved plan with `revisionOfScenarioRunId`
-4. SynapseCore records the new revision in scenario history and keeps the lineage visible for the next review cycle
+    G -->|No| H["Reject login<br/>auth failure / session not created"]
+    G -->|Yes| I["Create session"]
+    I --> J["Redis-backed or configured session storage"]
+    J --> K["Frontend loads GET /api/auth/session"]
+    K --> L["Authenticated shell and role context available"]
+    L --> M["Frontend opens websocket /ws"]
+    M --> N{"Session still valid for websocket?"}
+    N -->|No| O["No live trust<br/>reconnect blocked / auth warning"]
+    N -->|Yes| P["Tenant-scoped live updates enabled"]
+```
 
-## Scenario Review Queue Flow
+### What this part does
 
-1. an operator saves a plan with an assigned review owner
-2. SynapseCore assigns a review priority, risk score, approval policy, and approval stage from the projected operational impact
-3. planning history can be filtered by `reviewOwner`, `finalApprovalOwner`, `PENDING_APPROVAL`, `approvalPolicy`, `approvalStage`, `minimumReviewPriority`, `overdueOnly`, and `slaEscalatedOnly`
-4. the dashboard quick actions let reviewers jump straight to their pending review queue, high-risk queue, escalated queue, final approval queue, their own final-approval queue, the overdue queue, or the SLA-escalated queue
-5. review ownership, final approval ownership, triage priority, approval policy, approval stage, due-time status, SLA-escalation state, and escalation acknowledgment state stay visible across approval, rejection, and revision cycles
+- establishes the tenant workspace context
+- binds the signed-in user to operator roles
+- makes backend API access and websocket trust possible
 
-## Scenario Execution Flow
+### Failure modes
 
-1. an operator chooses an executable preview or approved saved plan from recent scenario history
-2. `POST /api/scenarios/{scenarioRunId}/execute` loads the stored request payload
-3. SynapseCore sends that request through the real order ingestion flow
-4. live inventory changes, intelligence re-runs, and alerts/recommendations update
-5. execution is recorded in scenario history and business events so planning-to-action remains traceable
+- invalid credentials
+- inactive user or operator
+- Redis/session issue in production-like mode
+- auth endpoint unavailable
 
-## Reseed Flow
+## 3. Operational Processing Flow
 
-1. `POST /api/dev/reseed` clears current local operational data
-2. the local development baseline products, warehouses, and inventory are restored
-3. dashboard summary is recalculated
-4. fresh realtime operational updates are pushed to connected clients
+This is the core business path for orders, inventory updates, connector actions, and most operational state changes.
 
-## Control Access Flow
+```mermaid
+flowchart TD
+    A["Operator action or inbound event"] --> B["Frontend page or integration endpoint"]
+    B --> C["Backend controller"]
+    C --> D["Tenant enforcement + auth + role checks"]
+    D --> E{"Authorized?"}
+    E -->|No| F["Return 401 / 403<br/>requestId + audit trace"]
+    E -->|Yes| G["Validation layer"]
+    G --> H{"Valid payload and policy state?"}
+    H -->|No| I["Return structured validation failure"]
+    H -->|Yes| J["Persist or read PostgreSQL state"]
+    J --> K["Business service processing"]
+    K --> L["Update domain objects<br/>orders / inventory / connectors / scenarios"]
+    L --> M["Write audit and business events"]
+    M --> N["Recalculate alerts and recommendations where needed"]
+    N --> O["Refresh dashboard and operational views"]
+    O --> P["Publish realtime topics"]
+    P --> Q["Frontend live update"]
+    O --> R["Frontend snapshot reads current state"]
+    Q --> S["Operator sees updated operational truth"]
+    R --> S
+```
 
-1. users sign in through `POST /api/auth/session/login`
-2. the backend validates the supplied tenant username and password, resolves the mapped operator through the operator directory, and stores the session identity
-3. sensitive review and integration actions resolve the actor from the signed-in session first
-4. header fallback with `X-Synapse-Actor` and `X-Synapse-Roles` still exists for test and non-UI flows when no session is present, but it is disabled by default in the `prod` profile
-5. backend access control validates that the acting operator and declared role match the requested control action
-6. scenario review actions must use the same role in the request body as the mapped signed-in operator or enabled header fallback is allowed to perform
-7. connector updates require `INTEGRATION_ADMIN`
-8. replaying failed inbound orders requires `INTEGRATION_OPERATOR` or `INTEGRATION_ADMIN`
-9. rejected or unauthorized control actions still produce traceable request IDs and audit visibility
+### What can enter here
 
-## What The User Should Feel
+- `POST /api/orders`
+- `POST /api/inventory/update`
+- `POST /api/integrations/orders/webhook`
+- `POST /api/integrations/orders/csv-import`
+- scenario approval or execution actions
+- connector configuration actions
 
-When a real order is posted or replayed, the user should see:
+### What success produces
 
-- order count rise
-- inventory levels drop
-- low-stock risk appear
-- recommendations surface
-- the business event timeline advance
-- the audit trail record the request and system reaction
-- the dashboard change in place
+- persisted operational state
+- audit trail
+- business events
+- alerts and recommendations when conditions warrant
+- updated dashboard, orders, inventory, and other command-center surfaces
 
-## Validation Flow
+### Failure modes
 
-The recommended MVP verification sequence is:
+- auth or role denial
+- validation failure
+- missing SKU or warehouse
+- connector disabled
+- backend/runtime unavailable
 
-1. fetch `GET /api/inventory`
-2. create an order through `POST /api/orders`
-3. confirm `GET /api/alerts` and `GET /api/recommendations` changed
-4. confirm `GET /api/dashboard/summary` changed
-5. confirm the UI updated through WebSocket subscriptions
+## 4. Approval Flow
+
+Some actions are not allowed to go directly into live execution. They must pass through a governed approval lane.
+
+```mermaid
+flowchart TD
+    A["Planner or operator saves scenario"] --> B["Scenario stored as pending"]
+    B --> C["Approval queue visible in UI"]
+    C --> D{"Approval policy?"}
+    D -->|Standard| E["Single review lane"]
+    D -->|Escalated / staged| F["Owner review then final approval lane"]
+
+    E --> G{"Approve or reject?"}
+    F --> H{"Owner review complete?"}
+    H -->|No| I["Stay pending review"]
+    H -->|Yes| J["Move to final approval"]
+    J --> K{"Final approver approves?"}
+
+    G -->|Approve| L["Executable state"]
+    G -->|Reject| M["Rejected state<br/>store reason / stop execution"]
+    K -->|Yes| L
+    K -->|No| M
+
+    C --> N{"Approval overdue?"}
+    N -->|Yes| O["Escalation notification / queue / acknowledgment path"]
+    N -->|No| P["Normal review timing"]
+    O --> C
+
+    L --> Q["Operator executes approved scenario"]
+    Q --> R["Execution enters real order flow"]
+```
+
+### What happens on approval
+
+- the scenario becomes executable
+- execution uses the real order and inventory path
+- the decision stays visible in history, notifications, and audit
+
+### What happens on rejection
+
+- execution terminates
+- rejection reason is stored
+- the saved plan can be revised and resubmitted later
+
+## 5. Alert And Recommendation Flow
+
+Alerts and recommendations are a core branch of the operational loop.
+
+They exist to answer:
+
+- what is at risk
+- how urgent it is
+- what the next best action should be
+- whether an operator should wait, replenish, transfer, approve, or escalate
+
+```mermaid
+flowchart TD
+    A["Operational state changes<br/>orders / inventory / fulfillment / scenarios / replay outcomes"] --> B["Monitoring and intelligence layer"]
+    B --> C{"What condition is detected?"}
+
+    C -->|Inventory below threshold| D["Low-stock alert path"]
+    C -->|Projected depletion risk| E["Depletion-risk alert path"]
+    C -->|Inventory shortfall but another warehouse has surplus| F["Transfer recommendation path"]
+    C -->|Reorder needed| G["Reorder recommendation path"]
+    C -->|Reorder urgently needed| H["Urgent reorder recommendation path"]
+    C -->|Fulfillment backlog or delivery risk| I["Fulfillment risk alert path"]
+    C -->|Scenario projection shows risk before execution| J["Projected alert / recommendation path"]
+    C -->|No major risk| K["Refresh summary without creating new action item"]
+
+    D --> L["Persist alert"]
+    E --> L
+    I --> L
+    J --> M["Persist scenario-visible projections"]
+    F --> N["Persist recommendation type: TRANSFER_STOCK"]
+    G --> O["Persist recommendation type: REORDER_STOCK"]
+    H --> P["Persist recommendation type: REORDER_URGENTLY"]
+
+    L --> Q["Write business event and audit history"]
+    N --> Q
+    O --> Q
+    P --> Q
+    M --> Q
+    K --> R["Refresh dashboard posture only"]
+
+    Q --> S["Refresh dashboard, alerts, recommendations, and recent events"]
+    R --> S
+    S --> T["Publish realtime topics<br/>alerts / recommendations / dashboard / events"]
+    T --> U["Operators see risk and next-best action in the UI"]
+```
+
+### Current explicit recommendation types
+
+The current explicit recommendation types documented in the system are:
+
+- `REORDER_STOCK`
+- `REORDER_URGENTLY`
+- `TRANSFER_STOCK`
+
+### What can trigger recommendations
+
+- low stock crossing threshold
+- predicted near-term stockout pressure
+- cross-warehouse surplus that can cover a shortfall
+- scenario projection before live execution
+- fulfillment pressure that changes operator urgency even when inventory is not the only issue
+
+### What can trigger alerts
+
+- low stock
+- depletion risk
+- fulfillment backlog growth
+- delayed shipment or delivery pressure
+- anomaly or repeated exception patterns where modeled
+- runtime or trust degradation on the platform side
+
+## 6. Replay And Recovery Flow
+
+Replay exists because failed inbound work must remain visible and recoverable rather than disappearing into logs or manual cleanup.
+
+```mermaid
+flowchart TD
+    A["Inbound webhook / CSV / scheduled pull event"] --> B["Connector and payload validation"]
+    B --> C{"Connector enabled and payload acceptable?"}
+
+    C -->|Yes| D["Normal ingestion flow"]
+    D --> E["Persist order / update inventory / generate alerts and recommendations"]
+    E --> F["Publish realtime and snapshot updates"]
+
+    C -->|No: recoverable failure| G["Store failed inbound record"]
+    G --> H["Create replay record with failure reason"]
+    H --> I["Replay queue visible in UI"]
+    I --> J{"Operator repaired blocking condition?"}
+    J -->|No| K["Record remains pending<br/>manual review / runtime truth visible"]
+    J -->|Yes| L["Operator clicks Replay Into Live Flow"]
+    L --> M["Replay service reloads stored request"]
+    M --> N{"Replay succeeds?"}
+    N -->|No| O["Update failure / keep record visible"]
+    N -->|Yes| P["Replay resolves into live order flow"]
+    P --> E
+
+    C -->|No: unrecoverable validation failure| Q["Structured failure returned<br/>no false success"]
+```
+
+### What replay is for
+
+- connector-disabled recovery
+- recoverable inbound failures after configuration or data repair
+- deliberate operator-owned recovery
+
+### What replay is not for
+
+- pretending malformed or unrecoverable data was safely ingested
+- hiding failed inbound work
+
+## 7. Realtime And Runtime Truth Flow
+
+SynapseCore uses both snapshot reads and websocket updates. Runtime trust explains whether the live view is truly safe to act on.
+
+```mermaid
+flowchart TD
+    A["Frontend loads dashboard or page"] --> B["Snapshot request"]
+    B --> C["Backend returns current view"]
+    C --> D["Frontend renders snapshot"]
+    D --> E["Frontend opens websocket /ws"]
+    E --> F{"Websocket and session healthy?"}
+    F -->|Yes| G["Receive tenant-scoped live topics"]
+    G --> H["Dashboard / alerts / recommendations / orders / replay / runtime stay fresh"]
+    F -->|No| I["Reconnect / stale state / live trust warning"]
+    I --> J["Runtime and incident surfaces show degraded truth"]
+
+    K["Backend health, readiness, auth, and Redis posture"] --> L{"Healthy?"}
+    L -->|Yes| M["Runtime trust supports normal live operations"]
+    L -->|No| N["Backend degraded or unavailable"]
+    N --> O["Frontend shows waiting / reconnecting / backend unavailable / trust warning"]
+    O --> P["Operators can classify before acting"]
+```
+
+### What snapshot does
+
+- gives the frontend a coherent current state
+- supports initial loads and refreshes
+
+### What websocket does
+
+- pushes live tenant updates
+- reduces the need for manual refresh
+
+### What degraded-state UX does
+
+- shows when live truth is stale or unavailable
+- avoids fake success
+- keeps runtime trust part of the product
+
+## 8. Full Surface And Output Map
+
+The easiest way to understand the whole system is to see where processed truth ends up.
+
+```mermaid
+flowchart TD
+    A["Operational truth store<br/>PostgreSQL + runtime state"] --> B["Dashboard summary"]
+    A --> C["Dashboard snapshot"]
+    A --> D["Orders page"]
+    A --> E["Inventory page"]
+    A --> F["Catalog page"]
+    A --> G["Alerts page"]
+    A --> H["Recommendations page"]
+    A --> I["Replay queue page"]
+    A --> J["Integrations page"]
+    A --> K["Scenario history page"]
+    A --> L["Approvals page"]
+    A --> M["Runtime and incidents page"]
+    A --> N["Users / profile / settings pages"]
+    A --> O["Recent events and audit history"]
+
+    P["Realtime publisher"] --> B
+    P --> G
+    P --> H
+    P --> D
+    P --> E
+    P --> I
+    P --> J
+    P --> K
+    P --> L
+    P --> M
+    P --> O
+```
+
+### What each operational surface is fed by
+
+#### Dashboard
+
+Shows:
+
+- summary metrics
+- alerts
+- recommendations
+- inventory risk
+- replay pressure
+- connector posture
+- recent events
+- audit activity
+- runtime trust cues
+
+#### Orders
+
+Shows:
+
+- live order flow
+- recent order processing
+- warehouse and fulfillment context
+
+#### Inventory
+
+Shows:
+
+- stock posture
+- threshold risk
+- projected urgency
+- recommendation context
+
+#### Catalog
+
+Shows:
+
+- product readiness
+- import outcomes
+- SKU-level prerequisites for operational flows
+
+#### Alerts
+
+Shows:
+
+- active operational warnings
+- severity
+- recommended response
+
+#### Recommendations
+
+Shows:
+
+- explicit next-best actions
+- policy explanation
+- priority and recency
+
+#### Replay Queue
+
+Shows:
+
+- failed inbound records
+- failure codes and reasons
+- replay eligibility
+- manual recovery path
+
+#### Integrations
+
+Shows:
+
+- connector health
+- enablement state
+- import history
+- replay pressure
+- failure detail
+
+#### Scenario History And Approvals
+
+Shows:
+
+- saved plans
+- review stage
+- approval or rejection state
+- escalation state
+- execution readiness
+
+#### Runtime
+
+Shows:
+
+- health and readiness posture
+- auth and websocket trust cues
+- connector and replay diagnostics
+- incident visibility
+
+#### Users, Profile, Settings
+
+Shows:
+
+- workspace identity
+- operator identity
+- role and policy context
+- admin and support controls
+
+## 9. Proof And Testing Flow
+
+Hosted proof exists to validate the real deployed frontend and backend together. It should stop when trust prerequisites are missing.
+
+```mermaid
+flowchart TD
+    A["Operator or engineer wants hosted proof"] --> B["Run check-live-connections.ps1"]
+    B --> C["Check frontend URL"]
+    B --> D["Check backend health"]
+    B --> E["Check readiness"]
+    B --> F["Check auth session endpoint"]
+    B --> G["Check websocket info endpoint"]
+
+    C --> H{"FRONTEND_UP?"}
+    D --> I{"BACKEND_UP?"}
+    E --> J{"DB_READY?"}
+    F --> K{"AUTH_READY?"}
+    G --> L{"WS_READY?"}
+
+    H --> M{"All trust checks true?"}
+    I --> M
+    J --> M
+    K --> M
+    L --> M
+
+    M -->|No| N["PROOF_ALLOWED = false<br/>Pause hosted proof / classify infrastructure problem"]
+    M -->|Yes| O["Run prepare-hosted-proof.ps1"]
+    O --> P["Run Playwright hosted proof"]
+    P --> Q{"Critical flows pass?"}
+
+    Q -->|Yes| R["Proof pass<br/>real deployed platform validated"]
+    Q -->|No| S["Proof fail<br/>selector drift / backend issue / replay issue / runtime issue"]
+```
+
+### What proof validates
+
+- public and authenticated routes
+- auth/session behavior
+- dashboard and realtime behavior
+- replay and recovery behavior
+- approval and execution behavior
+- runtime trust prerequisites
+
+### When proof must not run
+
+- frontend is up but backend is timing out
+- readiness is down
+- auth session is not responding
+- websocket info is not responding
+- DB or Redis are unavailable
+
+## 10. Deployment And Environment Flow
+
+The system can run locally or through Render-style hosted deployment, but the communication chain stays the same.
+
+```mermaid
+flowchart TD
+    A["Frontend SPA"] --> B["Backend API"]
+    A --> C["Websocket / SockJS endpoint"]
+    B --> D["PostgreSQL"]
+    B --> E["Redis"]
+    B --> F["Business services<br/>orders / inventory / replay / scenarios / runtime"]
+    F --> D
+    F --> E
+    F --> C
+
+    G["Local host mode"] --> A
+    H["Docker infra mode"] --> D
+    H --> E
+    I["Render frontend service"] --> A
+    J["Render backend service"] --> B
+
+    K{"DB available?"} -->|Yes| L["Backend can reach readiness"]
+    K -->|No| M["Backend trust degraded or unavailable"]
+    M --> N["Frontend may still load<br/>but hosted proof must pause"]
+```
+
+### Local paths
+
+- frontend on `localhost:5173`
+- backend on `localhost:8080`
+- Postgres on `5432`
+- Redis on `6379`
+
+### Hosted paths
+
+- frontend on Render
+- backend on Render
+- DB and Redis as backend dependencies
+
+### Important current truth
+
+- frontend can be reachable while backend is not trustworthy
+- DB and Redis health affect readiness, auth, and websocket trust
+- hosted proof is a validation step, not a wake-up command
+
+## 11. Full Capability Path Summary
+
+The platform can currently do all of these operational paths:
+
+- public homepage education
+- create workspace guidance
+- company workspace sign-in
+- tenant-safe session establishment
+- dashboard snapshot loading
+- websocket-based live updates
+- catalog onboarding
+- inventory update and risk reaction
+- order ingestion
+- webhook order ingestion
+- CSV import ingestion
+- scheduled pull ingestion
+- fulfillment state and delay-risk reaction
+- integration connector visibility
+- structured inbound failure handling
+- replay queue visibility
+- manual replay into live flow
+- scenario save, approval, rejection, escalation, and execution
+- alerts and recommendations
+- runtime and incident visibility
+- audit and business-event traceability
+- user, profile, and workspace administration
+- local verification
+- hosted proof when live trust is healthy
+
+## What Operators See At The End
+
+If the system is healthy and the action succeeds, operators should see:
+
+- updated operational state
+- dashboard changes
+- orders or inventory changes
+- alerts and recommendations adjusted
+- audit and history updated
+- realtime reflecting the new truth
+
+If the action fails, operators should see:
+
+- structured failure
+- replay queue visibility if recoverable
+- approval-blocked state if governance is required
+- degraded runtime warning if the system itself is unhealthy
+
+## Recommendations And What The System Can Do
+
+The system can generate or support:
+
+- low-stock alerts
+- depletion-risk signals
+- reorder recommendations
+- urgent reorder recommendations
+- transfer or replenishment guidance where modeled
+- fulfillment and delay-risk alerts
+- approval-required control gates
+- escalation notifications
+- connector degradation visibility
+- replay and recovery guidance
+- runtime trust warnings
+- snapshot-based operational visibility
+- websocket-based live operational freshness
+- audit and business-event traceability
+
+### Full operational consequence loop
+
+For almost every important operational action, the system can:
+
+1. accept or reject the action
+2. validate workspace, role, and payload truth
+3. persist the resulting state
+4. classify success, failure, waiting, approval, replay, or degraded trust
+5. write audit and business events
+6. generate alerts or recommendations where conditions warrant
+7. refresh dashboard and page-level views
+8. publish realtime updates
+9. expose the resulting truth to operators, planners, admins, runtime reviewers, and proof tooling
+
+The important principle is that recommendations are part of an operational decision loop, not just passive dashboard decoration.
+
+## Bottom Line
+
+SynapseCore is a branching operational control system.
+
+Data and actions do not simply arrive and get stored.
+They move through:
+
+- workspace trust
+- validation
+- persistence
+- business processing
+- approval and replay branches
+- realtime and snapshot presentation
+- runtime truth classification
+- proof validation
+
+That is what makes it an operations command platform rather than a simple CRUD or analytics application.
