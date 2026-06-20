@@ -47,12 +47,16 @@ This index links the main product, architecture, runbook, proof, and operator do
 - [system-architecture.md](system-architecture.md)
 - [infrastructure-handbook.md](infrastructure-handbook.md)
 - [infrastructure-communication-map.md](infrastructure-communication-map.md)
+- [known-operational-risks.md](known-operational-risks.md)
 - [system-communication-map.md](system-communication-map.md)
 - [environment-reference.md](environment-reference.md)
 - [database-and-migrations.md](database-and-migrations.md)
+- [data-governance-and-retention.md](data-governance-and-retention.md)
+- [backup-restore-runbook.md](backup-restore-runbook.md)
 - [frontend-flow.md](frontend-flow.md)
 - [backend-flow.md](backend-flow.md)
 - [runtime-observability.md](runtime-observability.md)
+- [observability-and-metrics-reference.md](observability-and-metrics-reference.md)
 
 ## API Reference
 
@@ -71,6 +75,7 @@ This index links the main product, architecture, runbook, proof, and operator do
 
 - [system-communication-map.md](system-communication-map.md)
 - [infrastructure-communication-map.md](infrastructure-communication-map.md)
+- [known-operational-risks.md](known-operational-risks.md)
 - [data-flow-playbook.md](data-flow-playbook.md)
 
 ## Technical Review
@@ -78,6 +83,7 @@ This index links the main product, architecture, runbook, proof, and operator do
 - [technical-reviewer-guide.md](technical-reviewer-guide.md)
 - [operations-reliability.md](operations-reliability.md)
 - [infrastructure-communication-map.md](infrastructure-communication-map.md)
+- [known-operational-risks.md](known-operational-risks.md)
 
 ## Security / Trust
 
@@ -85,12 +91,14 @@ This index links the main product, architecture, runbook, proof, and operator do
 - [security-test-plan.md](security-test-plan.md)
 - [leakage-audit.md](leakage-audit.md)
 - [runtime-observability.md](runtime-observability.md)
+- [observability-and-metrics-reference.md](observability-and-metrics-reference.md)
 
 ## Recovery / Resilience
 
 - [deployment-recovery-guide.md](deployment-recovery-guide.md)
 - [render-recovery-playbook.md](render-recovery-playbook.md)
 - [local-recovery-playbook.md](local-recovery-playbook.md)
+- [backup-restore-runbook.md](backup-restore-runbook.md)
 - [resilience-philosophy.md](resilience-philosophy.md)
 - [operations-reliability.md](operations-reliability.md)
 
@@ -98,12 +106,14 @@ This index links the main product, architecture, runbook, proof, and operator do
 
 - [operator-incident-guide.md](operator-incident-guide.md)
 - [runtime-observability.md](runtime-observability.md)
+- [observability-and-metrics-reference.md](observability-and-metrics-reference.md)
 - [render-recovery-playbook.md](render-recovery-playbook.md)
 
 ## Failure Classification
 
 - [failure-classification-matrix.md](failure-classification-matrix.md)
 - [deployment-recovery-guide.md](deployment-recovery-guide.md)
+- [known-operational-risks.md](known-operational-risks.md)
 - [current-limitations.md](current-limitations.md)
 
 ## Deployment Recovery
@@ -139,6 +149,7 @@ This index links the main product, architecture, runbook, proof, and operator do
 - [pilot-onboarding-pack.md](pilot-onboarding-pack.md)
 - [pilot-operations-runbook.md](pilot-operations-runbook.md)
 - [pilot-adoption-roadmap.md](pilot-adoption-roadmap.md)
+- [pilot-acceptance-criteria.md](pilot-acceptance-criteria.md)
 - [pilot-faq.md](pilot-faq.md)
 
 ## Executive Overview
@@ -176,6 +187,7 @@ This index links the main product, architecture, runbook, proof, and operator do
 - [local-runbook.md](local-runbook.md)
 - [render-ops-runbook.md](render-ops-runbook.md)
 - [live-deployment-runbook.md](live-deployment-runbook.md)
+- [backup-restore-runbook.md](backup-restore-runbook.md)
 - [deployment.md](deployment.md)
 - [render-deployment.md](render-deployment.md)
 - [go-live-checklist.md](go-live-checklist.md)
@@ -210,6 +222,7 @@ This index links the main product, architecture, runbook, proof, and operator do
 - [security-test-plan.md](security-test-plan.md)
 - [leakage-audit.md](leakage-audit.md)
 - [operational-hardening-audit.md](operational-hardening-audit.md)
+- [data-governance-and-retention.md](data-governance-and-retention.md)
 - [schema-migration-roadmap.md](schema-migration-roadmap.md)
 
 ## Enterprise Hardening
@@ -254,12 +267,14 @@ This index links the main product, architecture, runbook, proof, and operator do
 
 - [current-limitations.md](current-limitations.md)
 - [enterprise-hardening-roadmap.md](enterprise-hardening-roadmap.md)
+- [known-operational-risks.md](known-operational-risks.md)
 
 ## Onboarding And Pilot
 
 - [onboarding-playbook.md](onboarding-playbook.md)
 - [pilot-onboarding-pack.md](pilot-onboarding-pack.md)
 - [pilot-operations-runbook.md](pilot-operations-runbook.md)
+- [pilot-acceptance-criteria.md](pilot-acceptance-criteria.md)
 - [company-fit-playbook.md](company-fit-playbook.md)
 
 ## Operations Domains
@@ -267,6 +282,8 @@ This index links the main product, architecture, runbook, proof, and operator do
 - [integration-operations.md](integration-operations.md)
 - [replay-recovery.md](replay-recovery.md)
 - [runtime-observability.md](runtime-observability.md)
+- [data-governance-and-retention.md](data-governance-and-retention.md)
+- [observability-and-metrics-reference.md](observability-and-metrics-reference.md)
 
 ## Generated Company-Fit Outputs
 

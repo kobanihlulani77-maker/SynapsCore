@@ -2,7 +2,7 @@
 
 This document helps readers navigate the SynapseCore documentation without getting lost in overlap.
 
-The repo now contains product, architecture, recovery, proof, pilot, roadmap, and reviewer material. That is useful, but only if people know where to start.
+The repo contains product, architecture, recovery, proof, pilot, roadmap, reviewer, governance, observability, and risk material. That is useful only if people know where to start.
 
 ## Recommended Reading Path
 
@@ -18,7 +18,7 @@ If someone is new to the project, the recommended reading order is:
 8. [deployment-recovery-guide.md](deployment-recovery-guide.md)
 9. [master-product-roadmap.md](master-product-roadmap.md)
 
-That path gives a good sequence from high-level meaning to real architecture, then into trust, recovery, and long-term direction.
+That path moves from high-level meaning into real architecture, trust, recovery, and long-term direction.
 
 ## If You Are An Engineer
 
@@ -48,8 +48,10 @@ Read first:
 - [company-explainer.md](company-explainer.md)
 - [operator-incident-guide.md](operator-incident-guide.md)
 - [deployment-recovery-guide.md](deployment-recovery-guide.md)
+- [failure-classification-matrix.md](failure-classification-matrix.md)
 - [render-recovery-playbook.md](render-recovery-playbook.md)
 - [local-recovery-playbook.md](local-recovery-playbook.md)
+- [backup-restore-runbook.md](backup-restore-runbook.md)
 
 Use these when:
 
@@ -65,6 +67,7 @@ Read first:
 - [company-explainer.md](company-explainer.md)
 - [buyer-due-diligence-guide.md](buyer-due-diligence-guide.md)
 - [pilot-adoption-roadmap.md](pilot-adoption-roadmap.md)
+- [pilot-acceptance-criteria.md](pilot-acceptance-criteria.md)
 - [pilot-faq.md](pilot-faq.md)
 
 Use these when:
@@ -81,6 +84,9 @@ Read first:
 - [security-and-trust-model.md](security-and-trust-model.md)
 - [operations-reliability.md](operations-reliability.md)
 - [proof-and-validation.md](proof-and-validation.md)
+- [observability-and-metrics-reference.md](observability-and-metrics-reference.md)
+- [data-governance-and-retention.md](data-governance-and-retention.md)
+- [known-operational-risks.md](known-operational-risks.md)
 - [current-limitations.md](current-limitations.md)
 
 Use these when:
@@ -88,6 +94,7 @@ Use these when:
 - evaluating trust posture
 - reviewing architecture discipline
 - checking how honestly limitations are handled
+- understanding evidence, retention, observability, and operational risk posture
 
 ## If You Need Recovery Guidance
 
@@ -97,6 +104,7 @@ Core docs:
 - [failure-classification-matrix.md](failure-classification-matrix.md)
 - [render-recovery-playbook.md](render-recovery-playbook.md)
 - [local-recovery-playbook.md](local-recovery-playbook.md)
+- [backup-restore-runbook.md](backup-restore-runbook.md)
 - [resilience-philosophy.md](resilience-philosophy.md)
 - [troubleshooting-index.md](troubleshooting-index.md)
 
@@ -106,6 +114,7 @@ Use these when:
 - readiness is failing
 - DB or Redis are degraded
 - proof must be paused
+- restore posture needs to be classified
 
 ## If You Need Proof And Testing Guidance
 
@@ -151,8 +160,11 @@ These are stronger reference-style docs rather than first-read docs:
 - [system-communication-map.md](system-communication-map.md)
 - [master-project-tree.md](master-project-tree.md)
 - [runtime-observability.md](runtime-observability.md)
+- [observability-and-metrics-reference.md](observability-and-metrics-reference.md)
 - [integration-operations.md](integration-operations.md)
 - [database-and-migrations.md](database-and-migrations.md)
+- [data-governance-and-retention.md](data-governance-and-retention.md)
+- [known-operational-risks.md](known-operational-risks.md)
 
 ## If You Need Release Or Environment Guidance
 
@@ -161,7 +173,23 @@ Read first:
 - [environment-reference.md](environment-reference.md)
 - [release-process.md](release-process.md)
 - [go-live-checklist.md](go-live-checklist.md)
+- [backup-restore-runbook.md](backup-restore-runbook.md)
 - [troubleshooting-index.md](troubleshooting-index.md)
+
+## If You Need Pilot Acceptance Guidance
+
+Read first:
+
+- [pilot-program-guide.md](pilot-program-guide.md)
+- [pilot-adoption-roadmap.md](pilot-adoption-roadmap.md)
+- [pilot-acceptance-criteria.md](pilot-acceptance-criteria.md)
+- [known-operational-risks.md](known-operational-risks.md)
+
+Use these when:
+
+- deciding whether a pilot is actually accepted
+- separating local success from hosted readiness
+- defining expansion criteria before adding more sites, connectors, or operators
 
 ## Overlap Guidance
 
@@ -174,6 +202,8 @@ Examples:
 - [technical-reviewer-guide.md](technical-reviewer-guide.md) is the engineering credibility layer
 - [proof-and-validation.md](proof-and-validation.md) is proof philosophy and verification discipline
 - [deployment-recovery-guide.md](deployment-recovery-guide.md) is operational recovery guidance
+- [data-governance-and-retention.md](data-governance-and-retention.md) is the data responsibility layer
+- [known-operational-risks.md](known-operational-risks.md) is the living operational risk register
 
 The goal is not zero overlap. The goal is that each document has a distinct audience and job.
 
