@@ -1,6 +1,6 @@
 # SynapseCore
 
-SynapseCore is a real-time operations control platform built as a tenant-based SaaS system.
+SynapseCore is a real-time Operations Control System delivered as a multi-tenant SaaS platform.
 
 It gives operations teams one governed place to see live state, recover failed inbound work, route approvals, track incidents, and keep tenant-scoped operational truth visible across orders, inventory, integrations, replay, alerts, recommendations, and runtime trust surfaces.
 
