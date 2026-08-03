@@ -1,6 +1,4 @@
 import { useState } from 'react'
-import LoadingState from '../components/LoadingState'
-
 export default function SignInPage({ context }) {
   const {
     effectivePageMeta,
@@ -85,11 +83,16 @@ export default function SignInPage({ context }) {
             ))}
           </div>
         </article>
-        <article className="public-signin-card">
+        <article className="public-signin-card enterprise-signin-form">
           <p className="panel-kicker">Company sign in</p>
           <h2>Enter the operational platform</h2>
           <p className="muted-text">Sign in with workspace code, username, and password. If access fails, the company workspace admin manages resets and role changes.</p>
-          {tenantDirectoryState.loading && !tenantDirectoryState.items.length ? <LoadingState label="Loading available workspaces..." /> : null}
+          {tenantDirectoryState.loading && !tenantDirectoryState.items.length ? (
+            <div className="signin-readiness-note" aria-live="polite">
+              <strong>Checking workspace directory</strong>
+              <p>The sign-in form remains available while SynapseCore checks live workspace options.</p>
+            </div>
+          ) : null}
           <form className="signin-form-shell" onSubmit={submitWithValidation}>
             <div className="signin-form-grid">
               <label className="field">

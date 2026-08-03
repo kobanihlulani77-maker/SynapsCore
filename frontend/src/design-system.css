@@ -1099,7 +1099,23 @@ tbody tr:hover {
 }
 
 .public-topbar {
-  padding: 14px 0 18px;
+  width: min(100%, 1360px);
+  padding: 12px 0 16px;
+}
+
+.public-shell {
+  min-width: 320px;
+  overflow-wrap: anywhere;
+}
+
+.public-nav {
+  min-width: 0;
+  align-items: center;
+  justify-content: flex-end;
+}
+
+.public-nav button {
+  white-space: nowrap;
 }
 
 .public-signin-card,
@@ -1157,11 +1173,18 @@ tbody tr:hover {
   align-items: stretch;
 }
 
+.enterprise-public-hero {
+  grid-template-columns: minmax(0, 1fr) minmax(340px, 0.82fr);
+  gap: 22px;
+  padding-top: 24px;
+}
+
 .public-hero-copy {
   display: grid;
-  gap: 22px;
-  align-content: center;
+  gap: 18px;
+  align-content: start;
   min-width: 0;
+  padding-top: 14px;
 }
 
 .public-hero-copy > p {
@@ -1180,6 +1203,7 @@ tbody tr:hover {
 
 .public-hero-metrics {
   grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 14px;
 }
 
 .public-hero-metric-card,
@@ -1220,6 +1244,7 @@ tbody tr:hover {
   background:
     radial-gradient(circle at top right, rgba(80, 216, 171, 0.08), transparent 34%),
     linear-gradient(180deg, rgba(15, 30, 45, 0.92), rgba(8, 18, 30, 0.94));
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.03);
 }
 
 .public-positioning-card p {
@@ -1265,7 +1290,10 @@ tbody tr:hover {
 .public-section-shell {
   display: grid;
   gap: 22px;
+  width: min(100%, 1360px);
   margin-top: 34px;
+  margin-right: auto;
+  margin-left: auto;
 }
 
 .public-section-shell-split {
@@ -1300,13 +1328,13 @@ tbody tr:hover {
   position: relative;
   display: grid;
   gap: 18px;
-  padding: 24px;
+  padding: 22px;
   border-radius: var(--radius-xl);
   border: 1px solid rgba(121, 156, 194, 0.14);
   background:
     radial-gradient(circle at top right, rgba(99, 216, 255, 0.16), transparent 28%),
     linear-gradient(180deg, rgba(14, 25, 40, 0.96), rgba(8, 17, 29, 0.98));
-  box-shadow: var(--shadow-raised);
+  box-shadow: 0 24px 56px rgba(1, 7, 15, 0.34);
   overflow: hidden;
 }
 
@@ -1406,6 +1434,7 @@ tbody tr:hover {
   display: grid;
   gap: 12px;
   min-height: 188px;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.03);
 }
 
 .public-onboarding-card {
@@ -1446,6 +1475,49 @@ tbody tr:hover {
   display: grid;
   gap: 10px;
   max-width: 64ch;
+}
+
+.enterprise-signin-shell {
+  grid-template-columns: minmax(0, 0.78fr) minmax(420px, 1.22fr);
+}
+
+.enterprise-signin-story {
+  display: grid;
+  gap: 16px;
+  align-content: start;
+}
+
+.enterprise-signin-story .public-positioning-card {
+  padding: 16px 18px;
+}
+
+.enterprise-signin-story .public-feature-stack {
+  gap: 10px;
+}
+
+.enterprise-signin-story .public-feature-card {
+  min-height: auto;
+  padding: 14px 16px;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.03);
+}
+
+.enterprise-signin-form {
+  box-shadow: 0 28px 68px rgba(1, 7, 15, 0.4);
+}
+
+.signin-readiness-note {
+  display: grid;
+  gap: 6px;
+  margin: 14px 0;
+  padding: 12px 14px;
+  border-radius: var(--radius-sm);
+  border: 1px solid rgba(99, 216, 255, 0.16);
+  background: rgba(99, 216, 255, 0.055);
+}
+
+.signin-readiness-note p {
+  margin: 0;
+  font-size: 0.92rem;
 }
 
 .field-control {
@@ -2704,6 +2776,37 @@ tbody tr:hover {
   }
 }
 
+@media (max-width: 860px) {
+  .enterprise-public-hero,
+  .enterprise-signin-shell,
+  .public-section-shell-split {
+    grid-template-columns: 1fr;
+  }
+
+  .public-hero-copy {
+    padding-top: 0;
+  }
+
+  .public-section-card {
+    padding: 20px;
+  }
+
+  .public-capability-card,
+  .public-proof-card,
+  .public-onboarding-card,
+  .public-domain-card {
+    min-height: auto;
+  }
+
+  .enterprise-signin-form {
+    order: 1;
+  }
+
+  .enterprise-signin-story {
+    order: 2;
+  }
+}
+
 @media (max-width: 720px) {
   :root {
     --workspace-pad-inline: 16px;
@@ -2719,6 +2822,9 @@ tbody tr:hover {
 
   .public-topbar {
     min-width: 0;
+    gap: 12px;
+    margin-bottom: 18px;
+    padding: 12px;
   }
 
   .workspace-utility-rail,
@@ -2776,6 +2882,21 @@ tbody tr:hover {
 
   .public-topbar .brand-lockup {
     width: 100%;
+  }
+
+  .public-nav {
+    display: grid;
+    width: 100%;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 8px;
+  }
+
+  .public-nav > * {
+    width: auto;
+  }
+
+  .public-nav .primary-button {
+    grid-column: 1 / -1;
   }
 
   .public-topbar .brand-lockup small,
@@ -2841,6 +2962,23 @@ tbody tr:hover {
 
   .public-command-header {
     flex-direction: column;
+  }
+
+  .public-command-visual {
+    padding: 18px;
+  }
+
+  .public-hero {
+    padding-top: 18px;
+  }
+
+  .public-hero-metrics,
+  .public-command-signals {
+    gap: 10px;
+  }
+
+  .enterprise-signin-story {
+    gap: 12px;
   }
 
   .workspace-wizard-header,

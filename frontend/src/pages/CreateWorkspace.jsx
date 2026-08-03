@@ -120,12 +120,14 @@ export default function CreateWorkspacePage({ context }) {
   const [manualWorkspaceCode, setManualWorkspaceCode] = useState(false)
   const [showPassword, setShowPassword] = useState(false)
   const [workspacePrepared, setWorkspacePrepared] = useState(false)
+  const [touchedFields, setTouchedFields] = useState({})
 
   const activeStep = setupSteps[currentStepIndex]
   const fieldError = getFieldError(activeStep.key, draft)
   const canAdvance = !fieldError
 
   const updateDraft = (field, value) => {
+    setTouchedFields((current) => ({ ...current, [field]: true }))
     setDraft((current) => {
       const nextDraft = { ...current, [field]: value }
       if (field === 'companyName' && !manualWorkspaceCode) {
@@ -134,6 +136,25 @@ export default function CreateWorkspacePage({ context }) {
       return nextDraft
     })
   }
+
+  const markFieldTouched = (field) => {
+    setTouchedFields((current) => ({ ...current, [field]: true }))
+  }
+
+  const stepHasVisibleValidation = (() => {
+    switch (activeStep.key) {
+      case 'company':
+        return touchedFields.companyName
+      case 'workspace':
+        return touchedFields.workspaceCode
+      case 'admin':
+        return touchedFields.adminName || touchedFields.adminEmail || touchedFields.username || touchedFields.password
+      case 'profile':
+        return touchedFields.teamShape || touchedFields.launchPriority
+      default:
+        return false
+    }
+  })()
 
   const moveToNextStep = () => {
     if (!canAdvance) return
@@ -230,6 +251,7 @@ export default function CreateWorkspacePage({ context }) {
                   type="text"
                   value={draft.companyName}
                   onChange={(event) => updateDraft('companyName', event.target.value)}
+                  onBlur={() => markFieldTouched('companyName')}
                   placeholder="Acme Distribution Group"
                 />
                 <span className="field-hint">This is the company or operating group that will own the workspace.</span>
@@ -256,6 +278,7 @@ export default function CreateWorkspacePage({ context }) {
                       setManualWorkspaceCode(true)
                       updateDraft('workspaceCode', slugifyWorkspaceCode(event.target.value))
                     }}
+                    onBlur={() => markFieldTouched('workspaceCode')}
                     placeholder="ACME-OPS"
                   />
                   <button
@@ -295,6 +318,7 @@ export default function CreateWorkspacePage({ context }) {
                   type="text"
                   value={draft.adminName}
                   onChange={(event) => updateDraft('adminName', event.target.value)}
+                  onBlur={() => markFieldTouched('adminName')}
                   placeholder="Amina Dlamini"
                 />
               </label>
@@ -304,6 +328,7 @@ export default function CreateWorkspacePage({ context }) {
                   type="email"
                   value={draft.adminEmail}
                   onChange={(event) => updateDraft('adminEmail', event.target.value)}
+                  onBlur={() => markFieldTouched('adminEmail')}
                   placeholder="amina@acmeops.com"
                 />
               </label>
@@ -313,6 +338,7 @@ export default function CreateWorkspacePage({ context }) {
                   type="text"
                   value={draft.username}
                   onChange={(event) => updateDraft('username', event.target.value)}
+                  onBlur={() => markFieldTouched('username')}
                   placeholder="amina.admin"
                 />
                 <span className="field-hint">This is the first company operator identity that will enter the workspace.</span>
@@ -324,6 +350,7 @@ export default function CreateWorkspacePage({ context }) {
                     type={showPassword ? 'text' : 'password'}
                     value={draft.password}
                     onChange={(event) => updateDraft('password', event.target.value)}
+                    onBlur={() => markFieldTouched('password')}
                     placeholder="Choose a strong setup password"
                   />
                   <button className="field-inline-button" onClick={() => setShowPassword((current) => !current)} type="button">
@@ -343,6 +370,7 @@ export default function CreateWorkspacePage({ context }) {
                   type="text"
                   value={draft.teamShape}
                   onChange={(event) => updateDraft('teamShape', event.target.value)}
+                  onBlur={() => markFieldTouched('teamShape')}
                   placeholder="Operations planners, warehouse leads, and tenant admins"
                 />
               </label>
@@ -351,6 +379,7 @@ export default function CreateWorkspacePage({ context }) {
                 <textarea
                   value={draft.launchPriority}
                   onChange={(event) => updateDraft('launchPriority', event.target.value)}
+                  onBlur={() => markFieldTouched('launchPriority')}
                   placeholder="Catalog, users, inventory, or integration stability"
                   rows={4}
                 />
@@ -403,7 +432,7 @@ export default function CreateWorkspacePage({ context }) {
             </div>
           ) : null}
 
-          {fieldError && activeStep.key !== 'next' ? <p className="error-text">{fieldError}</p> : null}
+          {fieldError && activeStep.key !== 'next' && stepHasVisibleValidation ? <p className="error-text">{fieldError}</p> : null}
 
           <div className="workspace-wizard-actions">
             <button className="ghost-button" disabled={currentStepIndex === 0} onClick={moveToPreviousStep} type="button">Back</button>
