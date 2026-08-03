@@ -222,6 +222,15 @@ Get-NetTCPConnection -LocalPort 8080 -State Listen
 Get-NetTCPConnection -LocalPort 5173 -State Listen
 ```
 
+If `Get-NetTCPConnection` looks wrong on Windows, verify real connectability instead:
+
+```powershell
+Test-NetConnection 127.0.0.1 -Port 5432
+Test-NetConnection 127.0.0.1 -Port 6379
+Test-NetConnection 127.0.0.1 -Port 8080
+Test-NetConnection 127.0.0.1 -Port 5173
+```
+
 Interpretation:
 
 - if `5432` is already owned by Windows PostgreSQL, Docker Postgres may collide
@@ -291,11 +300,13 @@ The backend container is already part of the lane.
 Verify:
 
 ```powershell
-curl.exe http://localhost:8080/actuator/health
-curl.exe http://localhost:8080/actuator/health/readiness
-curl.exe http://localhost:8080/api/auth/session
-curl.exe http://localhost:8080/ws/info
+curl.exe http://127.0.0.1:8080/actuator/health
+curl.exe http://127.0.0.1:8080/actuator/health/readiness
+curl.exe http://127.0.0.1:8080/api/auth/session
+curl.exe http://127.0.0.1:8080/ws/info
 ```
+
+Docker backend startup can take around `60-70` seconds. Do not classify empty replies during that window as product failures until readiness is rechecked after startup.
 
 ### Lane B
 
@@ -355,8 +366,8 @@ For any lane where the frontend runs on the host:
 local frontend should point at:
 
 ```text
-VITE_API_URL=http://localhost:8080
-VITE_WS_URL=http://localhost:8080/ws
+VITE_API_URL=http://127.0.0.1:8080
+VITE_WS_URL=http://127.0.0.1:8080/ws
 ```
 
 The local env file must stay local-only:
@@ -372,23 +383,28 @@ cd C:\Users\asus\Downloads\synapsecore_starter\synapsecore\frontend
 npm.cmd run dev
 ```
 
+Expected output:
+
+- Vite reports `Local: http://127.0.0.1:5173/`
+- the frontend shell responds at `http://127.0.0.1:5173`
+
 ## Stage 5: Hard Health Gates
 
 Before we open the UI and start blaming screens, these endpoints must be checked:
 
 ```powershell
-curl.exe http://localhost:8080/actuator/health
-curl.exe http://localhost:8080/actuator/health/readiness
-curl.exe http://localhost:8080/api/auth/session
-curl.exe http://localhost:8080/ws/info
-curl.exe http://localhost:5173
+curl.exe http://127.0.0.1:8080/actuator/health
+curl.exe http://127.0.0.1:8080/actuator/health/readiness
+curl.exe http://127.0.0.1:8080/api/auth/session
+curl.exe http://127.0.0.1:8080/ws/info
+curl.exe http://127.0.0.1:5173
 ```
 
 Then run:
 
 ```powershell
 cd C:\Users\asus\Downloads\synapsecore_starter\synapsecore
-powershell -ExecutionPolicy Bypass -File scripts\check-local-connections.ps1
+powershell -ExecutionPolicy Bypass -File scripts\check-local-connections.ps1 -FrontendUrl http://127.0.0.1:5173 -BackendUrl http://127.0.0.1:8080
 ```
 
 Success interpretation:
@@ -400,6 +416,12 @@ Success interpretation:
 - `WS_READY=True`
 
 If those are not true, do not jump into page debugging yet.
+
+Local startup note:
+
+- Docker backend startup can take about `60-70` seconds before readiness is trustworthy.
+- An early empty reply or closed connection can be normal while Spring Boot is still starting.
+- Recheck readiness after the startup window before classifying a backend bug.
 
 ## Stage 6: Auth And Session Gates
 
@@ -492,14 +514,14 @@ After manual shell validation, run the local verification scripts in this order.
 
 ```powershell
 cd C:\Users\asus\Downloads\synapsecore_starter\synapsecore
-powershell -ExecutionPolicy Bypass -File scripts\check-local-connections.ps1
+powershell -ExecutionPolicy Bypass -File scripts\check-local-connections.ps1 -FrontendUrl http://127.0.0.1:5173 -BackendUrl http://127.0.0.1:8080
 ```
 
 ### 2. Deployment Smoke
 
 ```powershell
 cd C:\Users\asus\Downloads\synapsecore_starter\synapsecore
-powershell -ExecutionPolicy Bypass -File scripts\verify-deployment.ps1 -FrontendUrl http://127.0.0.1 -BackendUrl http://127.0.0.1:8080
+powershell -ExecutionPolicy Bypass -File scripts\verify-deployment.ps1 -FrontendUrl http://127.0.0.1:5173 -BackendUrl http://127.0.0.1:8080
 ```
 
 This verifies:
@@ -517,7 +539,7 @@ This verifies:
 
 ```powershell
 cd C:\Users\asus\Downloads\synapsecore_starter\synapsecore
-powershell -ExecutionPolicy Bypass -File scripts\verify-realtime.ps1 -FrontendUrl http://localhost -BackendUrl http://127.0.0.1:8080
+powershell -ExecutionPolicy Bypass -File scripts\verify-realtime.ps1 -FrontendUrl http://127.0.0.1:5173 -BackendUrl http://127.0.0.1:8080
 ```
 
 This verifies:
@@ -528,7 +550,7 @@ This verifies:
 
 ```powershell
 cd C:\Users\asus\Downloads\synapsecore_starter\synapsecore
-powershell -ExecutionPolicy Bypass -File scripts\verify-company-readiness.ps1 -FrontendUrl http://127.0.0.1 -BackendUrl http://127.0.0.1:8080
+powershell -ExecutionPolicy Bypass -File scripts\verify-company-readiness.ps1 -FrontendUrl http://127.0.0.1:5173 -BackendUrl http://127.0.0.1:8080
 ```
 
 This is the broadest local rehearsal and should be treated as a serious end-to-end lane.

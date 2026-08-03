@@ -4558,7 +4558,16 @@ class MvpFlowIntegrationTest {
 
     @Test
     void systemRuntimeEndpointReportsCurrentTrustSurface() throws Exception {
-        mockMvc.perform(get("/api/system/runtime"))
+        Tenant runtimeTenant = tenantRepository.save(Tenant.builder()
+            .code("RUNTIME-CLEAN-OPS")
+            .name("Runtime Clean Tenant")
+            .description("Tenant used to keep runtime baseline diagnostics isolated from proof mutations.")
+            .active(true)
+            .build());
+        entityManager.flush();
+
+        mockMvc.perform(get("/api/system/runtime")
+                .header("X-Synapse-Tenant", runtimeTenant.getCode()))
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.applicationName").value("synapsecore-backend"))
             .andExpect(jsonPath("$.activeProfiles[0]").value("test"))

@@ -7,6 +7,13 @@ spring:
   jpa:
     hibernate:
       ddl-auto: validate
+  autoconfigure:
+    exclude: org.springframework.boot.autoconfigure.session.SessionAutoConfiguration
+  session:
+    store-type: none
+  task:
+    scheduling:
+      enabled: false
   data:
     redis:
       host: localhost
@@ -32,6 +39,7 @@ synapsecore:
       enabled: false
   dashboard:
     cache-enabled: false
+  # use the default diagnostics window for tests (24h)
   integration:
     pull-worker:
       enabled: false

@@ -21,12 +21,12 @@ public class TenantOperationalPolicyService {
     private final TenantRepository tenantRepository;
     private final TenantContextService tenantContextService;
 
-    @Transactional(readOnly = true)
+    @Transactional
     public TenantOperationalPolicy getCurrentPolicy() {
         return getPolicy(tenantContextService.getCurrentTenantCodeOrDefault());
     }
 
-    @Transactional(readOnly = true)
+    @Transactional
     public TenantOperationalPolicy getPolicy(String tenantCode) {
         return tenantOperationalPolicyRepository.findByTenant_CodeIgnoreCase(tenantCode)
             .orElseGet(() -> createDefaultPolicyForTenant(tenantCode));

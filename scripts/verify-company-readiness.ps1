@@ -1,5 +1,5 @@
 param(
-    [string]$FrontendUrl = "http://127.0.0.1",
+    [string]$FrontendUrl = "http://127.0.0.1:5173",
     [string]$BackendUrl = "http://127.0.0.1:8080",
     [string]$SeedTenantCode = "STARTER-OPS",
     [string]$SeedAdminUsername = "operations.lead",
@@ -36,6 +36,35 @@ function Assert-True {
     if (-not $Condition) {
         throw $Message
     }
+}
+
+function Wait-ForCondition {
+    param(
+        [scriptblock]$Probe,
+        [scriptblock]$Condition,
+        [string]$FailureMessage,
+        [int]$MaxAttempts = 20,
+        [int]$SleepSeconds = 3
+    )
+
+    $lastResult = $null
+    for ($attempt = 1; $attempt -le $MaxAttempts; $attempt++) {
+        $lastResult = & $Probe
+        if (& $Condition $lastResult) {
+            return $lastResult
+        }
+        if ($attempt -lt $MaxAttempts) {
+            Start-Sleep -Seconds $SleepSeconds
+        }
+    }
+
+    $detail = try {
+        $lastResult | ConvertTo-Json -Depth 12 -Compress
+    } catch {
+        [string]$lastResult
+    }
+
+    throw "$FailureMessage Last result: $detail"
 }
 
 function Get-ResponseBody {
@@ -352,7 +381,7 @@ $northWebhookConnector = Invoke-JsonRequest -Method Post -Url "$BackendUrl/api/i
     type                          = "WEBHOOK_ORDER"
     displayName                   = "North Webhook Ingress"
     enabled                       = $true
-    syncMode                      = "PUSH_WEBHOOK"
+    syncMode                      = "REALTIME_PUSH"
     validationPolicy              = "STRICT"
     transformationPolicy          = "NORMALIZE_CODES"
     allowDefaultWarehouseFallback = $false
@@ -393,6 +422,7 @@ Assert-True (-not $replayConnector.Json.enabled) "Replay connector should start 
 $webhookOrder = Invoke-JsonRequest -Method Post -Url "$BackendUrl/api/integrations/orders/webhook" -Session $adminSession -Body @{
     sourceSystem    = $northWebhookSource
     externalOrderId = "LIVE-WH-$timestamp"
+    warehouseCode   = "WH-NORTH"
     customerReference = "CUST-$timestamp"
     occurredAt      = (Get-Date).ToUniversalTime().ToString("o")
     items           = @(
@@ -559,15 +589,29 @@ Assert-True ($escalatedExecution.Json.order.warehouseCode -eq "WH-COAST") "Escal
 $companySummary.escalatedPlanningVerified = $true
 
 Write-Step "Verify runtime trust, audit, events, and dashboard surfaces"
-$summary = Invoke-JsonRequest -Method Get -Url "$BackendUrl/api/dashboard/summary" -Session $adminSession
-$snapshot = Invoke-JsonRequest -Method Get -Url "$BackendUrl/api/dashboard/snapshot" -Session $adminSession
+$summary = Wait-ForCondition -FailureMessage "Expected multiple live orders after the company workflow." `
+    -Probe {
+        Invoke-JsonRequest -Method Get -Url "$BackendUrl/api/dashboard/summary" -Session $adminSession
+    } `
+    -Condition {
+        param($result)
+        $result.StatusCode -eq 200 -and $result.Json.totalOrders -ge 4
+    }
+
+$snapshot = Wait-ForCondition -FailureMessage "Snapshot should include tenant integration connectors." `
+    -Probe {
+        Invoke-JsonRequest -Method Get -Url "$BackendUrl/api/dashboard/snapshot" -Session $adminSession
+    } `
+    -Condition {
+        param($result)
+        $result.StatusCode -eq 200 -and $result.Json.integrationConnectors.Count -ge 4
+    }
+
 $runtime = Invoke-JsonRequest -Method Get -Url "$BackendUrl/api/system/runtime" -Session $adminSession
 $incidents = Invoke-JsonRequest -Method Get -Url "$BackendUrl/api/system/incidents" -Session $adminSession
 $events = Invoke-JsonRequest -Method Get -Url "$BackendUrl/api/events/recent" -Session $adminSession
 $audit = Invoke-JsonRequest -Method Get -Url "$BackendUrl/api/audit/recent" -Session $adminSession
 
-Assert-True ($summary.Json.totalOrders -ge 4) "Expected multiple live orders after the company workflow."
-Assert-True ($snapshot.Json.integrationConnectors.Count -ge 4) "Snapshot should include tenant integration connectors."
 Assert-True ($runtime.Json.overallStatus -eq "UP") "Runtime endpoint did not report UP."
 Assert-True ($runtime.Json.metrics.ordersIngested -ge 1) "Runtime metrics did not reflect order ingestion."
 Assert-True ($events.Json.Count -ge 1) "Recent events feed is empty."

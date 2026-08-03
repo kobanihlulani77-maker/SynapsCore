@@ -55,10 +55,11 @@ Purpose:
 
 What it checks:
 
-- localhost frontend
-- localhost backend health/readiness/auth/ws
+- local frontend, usually `http://127.0.0.1:5173`
+- local backend health/readiness/auth/ws, usually `http://127.0.0.1:8080`
 - ports `5173`, `8080`, `5432`, `6379`
 - Docker Compose service posture when available
+- TCP connectability for port posture, because Windows port enumeration can be misleading
 
 Safe to run anytime:
 
@@ -71,6 +72,12 @@ Changes anything:
 Requires backend or DB:
 
 - only for healthy results
+
+Recommended Windows local command:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File scripts\check-local-connections.ps1 -FrontendUrl http://127.0.0.1:5173 -BackendUrl http://127.0.0.1:8080
+```
 
 ## `scripts\explain-system.ps1`
 
@@ -328,6 +335,7 @@ Purpose:
 Use when:
 
 - checking whether frontend and backend are coherently reachable
+- running the local/self-host smoke after frontend and backend are both up
 
 Safe to run anytime:
 
@@ -341,6 +349,12 @@ Requires backend or DB:
 
 - for meaningful success, yes
 
+Recommended Windows local command:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File scripts\verify-deployment.ps1 -FrontendUrl http://127.0.0.1:5173 -BackendUrl http://127.0.0.1:8080
+```
+
 ## `scripts\verify-realtime.ps1`
 
 Purpose:
@@ -350,6 +364,7 @@ Purpose:
 Use when:
 
 - validating local or live realtime behavior
+- confirming the dashboard can update through realtime without a browser refresh
 
 Safe to run anytime:
 
@@ -362,6 +377,12 @@ Changes anything:
 Requires backend or DB:
 
 - yes, for meaningful success
+
+Recommended Windows local command:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File scripts\verify-realtime.ps1 -FrontendUrl http://127.0.0.1:5173 -BackendUrl http://127.0.0.1:8080
+```
 
 ## `frontend\scripts\frontend-check.mjs`
 
@@ -399,7 +420,7 @@ For repo hygiene:
 For local stack understanding:
 
 - `scripts\explain-system.ps1`
-- `scripts\check-local-connections.ps1`
+- `scripts\check-local-connections.ps1 -FrontendUrl http://127.0.0.1:5173 -BackendUrl http://127.0.0.1:8080`
 
 For live deployment understanding:
 

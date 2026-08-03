@@ -32,9 +32,9 @@ Write-Host ""
 
 Write-Host "Local Check Commands"
 Write-Host "--------------------"
-Write-Host "- powershell -ExecutionPolicy Bypass -File scripts\\check-local-connections.ps1"
-Write-Host "- powershell -ExecutionPolicy Bypass -File scripts\\verify-deployment.ps1"
-Write-Host "- powershell -ExecutionPolicy Bypass -File scripts\\verify-realtime.ps1"
+Write-Host "- powershell -ExecutionPolicy Bypass -File scripts\\check-local-connections.ps1 -FrontendUrl http://127.0.0.1:5173 -BackendUrl http://127.0.0.1:8080"
+Write-Host "- powershell -ExecutionPolicy Bypass -File scripts\\verify-deployment.ps1 -FrontendUrl http://127.0.0.1:5173 -BackendUrl http://127.0.0.1:8080"
+Write-Host "- powershell -ExecutionPolicy Bypass -File scripts\\verify-realtime.ps1 -FrontendUrl http://127.0.0.1:5173 -BackendUrl http://127.0.0.1:8080"
 Write-Host ""
 
 Write-Host "Readiness / Auth / WS Endpoints"

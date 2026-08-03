@@ -1,5 +1,5 @@
 param(
-    [string]$FrontendUrl = "http://127.0.0.1",
+    [string]$FrontendUrl = "http://127.0.0.1:5173",
     [string]$BackendUrl = "http://127.0.0.1:8080",
     [string]$OutputFile = "docs/verification-status.md",
     [switch]$RunBackendTests,

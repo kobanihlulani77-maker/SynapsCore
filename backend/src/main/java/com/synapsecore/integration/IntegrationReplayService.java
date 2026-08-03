@@ -21,6 +21,7 @@ import com.synapsecore.integration.dto.IntegrationReplayResultResponse;
 import com.synapsecore.observability.OperationalAlertHookService;
 import com.synapsecore.observability.OperationalMetricsService;
 import com.synapsecore.tenant.TenantContextService;
+import java.math.BigDecimal;
 import java.time.Instant;
 import java.util.EnumSet;
 import java.util.List;
@@ -216,6 +217,12 @@ public class IntegrationReplayService {
             return 0;
         }
         OrderCreateRequest request = deserializeRequest(record);
+        IntegrationFailureCodes.IntegrationFailureExceptionDetails validationFailure =
+            validateAutomatedReplayRequest(request);
+        if (validationFailure != null) {
+            recordAutomatedReplayFailure(record, attemptedAt, validationFailure);
+            return 0;
+        }
         String previousRequestId = requestTraceContext.getCurrentRequestId().orElse(null);
         String previousActor = requestTraceContext.getCurrentActor().orElse(null);
         String previousTenant = requestTraceContext.getCurrentTenant().orElse(null);
@@ -233,6 +240,95 @@ public class IntegrationReplayService {
             restoreTraceValue(previousActor, requestTraceContext::setCurrentActor);
             restoreTraceValue(previousTenant, requestTraceContext::setCurrentTenant);
         }
+    }
+
+    private IntegrationFailureCodes.IntegrationFailureExceptionDetails validateAutomatedReplayRequest(
+        OrderCreateRequest request
+    ) {
+        if (request.warehouseCode() == null || request.warehouseCode().isBlank()) {
+            return new IntegrationFailureCodes.IntegrationFailureExceptionDetails(
+                IntegrationFailureCode.MISSING_WAREHOUSE_CODE,
+                "warehouseCode is required for automated replay."
+            );
+        }
+        if (request.items() == null || request.items().isEmpty()) {
+            return new IntegrationFailureCodes.IntegrationFailureExceptionDetails(
+                IntegrationFailureCode.MISSING_ITEMS,
+                "At least one line item is required for automated replay."
+            );
+        }
+        for (var item : request.items()) {
+            if (item.productSku() == null || item.productSku().isBlank()) {
+                return new IntegrationFailureCodes.IntegrationFailureExceptionDetails(
+                    IntegrationFailureCode.MISSING_PRODUCT_SKU,
+                    "productSku is required for every automated replay line item."
+                );
+            }
+            if (item.quantity() == null || item.quantity() < 1) {
+                return new IntegrationFailureCodes.IntegrationFailureExceptionDetails(
+                    IntegrationFailureCode.INVALID_QUANTITY,
+                    "quantity must be at least 1 for every automated replay line item."
+                );
+            }
+            if (item.unitPrice() == null || item.unitPrice().compareTo(BigDecimal.ZERO) <= 0) {
+                return new IntegrationFailureCodes.IntegrationFailureExceptionDetails(
+                    IntegrationFailureCode.INVALID_UNIT_PRICE,
+                    "unitPrice must be greater than zero for every automated replay line item."
+                );
+            }
+        }
+        return null;
+    }
+
+    private void recordAutomatedReplayFailure(IntegrationReplayRecord record,
+                                              Instant attemptedAt,
+                                              IntegrationFailureCodes.IntegrationFailureExceptionDetails failure) {
+        String tenantCode = record.getTenantCode();
+        int nextAttemptCount = record.getReplayAttemptCount() + 1;
+        record.setReplayAttemptCount(nextAttemptCount);
+        record.setLastAttemptedAt(attemptedAt);
+        record.setFailureCode(failure.failureCode());
+        boolean exhausted = nextAttemptCount >= Math.max(maxReplayAttempts, 1);
+        if (exhausted) {
+            record.setStatus(IntegrationReplayStatus.DEAD_LETTERED);
+            record.setDeadLetteredAt(attemptedAt);
+            record.setNextEligibleAt(null);
+            record.setLastReplayMessage(limit(failure.failureMessage() + " Dead-lettered after " + nextAttemptCount + " attempts."));
+        } else {
+            record.setStatus(IntegrationReplayStatus.REPLAY_FAILED);
+            record.setNextEligibleAt(nextEligibleAt(attemptedAt, nextAttemptCount));
+            record.setLastReplayMessage(limit(failure.failureMessage()));
+        }
+        record = integrationReplayRecordRepository.save(record);
+        if (exhausted) {
+            operationalAlertHookService.emit(
+                "INTEGRATION_REPLAY_DEAD_LETTERED",
+                "HIGH",
+                "Integration replay " + record.getId() + " was dead-lettered.",
+                "Tenant " + tenantCode + " source " + record.getSourceSystem() + " order " + record.getExternalOrderId() + " failed with " + failure.failureCode() + "."
+            );
+        }
+
+        businessEventService.recordForTenant(
+            tenantCode,
+            BusinessEventType.INTEGRATION_REPLAY_FAILED,
+            "integration-replay",
+            "Replay failed for " + record.getExternalOrderId() + " from " + record.getSourceSystem()
+                + " by " + AUTO_REPLAY_ACTOR + ". Reason: " + failure.failureMessage()
+        );
+        auditLogService.recordFailure(
+            "INTEGRATION_REPLAY_FAILED",
+            AUTO_REPLAY_ACTOR,
+            "integration-replay",
+            "IntegrationReplayRecord",
+            String.valueOf(record.getId()),
+            "Replay failed for inbound order " + record.getExternalOrderId() + ". Reason: "
+                + failure.failureMessage()
+        );
+        operationalMetricsService.recordReplayAttempt(tenantCode, false);
+        operationalStateChangePublisher.publish(OperationalUpdateType.INTEGRATION_STATE, "integration-replay");
+        log.warn("Integration replay {} failed automated preflight for tenant {} source {}: {}",
+            record.getId(), tenantCode, record.getSourceSystem(), failure.failureMessage());
     }
 
     private boolean isEligibleForAutomatedReplay(IntegrationReplayRecord record, Instant attemptedAt) {

@@ -171,13 +171,15 @@ Being explicit about this increases trust rather than reducing it.
 
 ```powershell
 cd C:\Users\asus\Downloads\synapsecore_starter\synapsecore
-powershell -ExecutionPolicy Bypass -File scripts\check-local-connections.ps1
-powershell -ExecutionPolicy Bypass -File scripts\verify-deployment.ps1
-powershell -ExecutionPolicy Bypass -File scripts\verify-realtime.ps1
+powershell -ExecutionPolicy Bypass -File scripts\check-local-connections.ps1 -FrontendUrl http://127.0.0.1:5173 -BackendUrl http://127.0.0.1:8080
+powershell -ExecutionPolicy Bypass -File scripts\verify-deployment.ps1 -FrontendUrl http://127.0.0.1:5173 -BackendUrl http://127.0.0.1:8080
+powershell -ExecutionPolicy Bypass -File scripts\verify-realtime.ps1 -FrontendUrl http://127.0.0.1:5173 -BackendUrl http://127.0.0.1:8080
 
 cd frontend
 npm.cmd run verify
 ```
+
+On Windows local debugging, prefer `127.0.0.1` over `localhost` if endpoint checks disagree with port or service posture.
 
 ## Hosted Proof Commands
 

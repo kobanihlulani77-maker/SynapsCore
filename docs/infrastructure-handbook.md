@@ -32,6 +32,7 @@ Typical use:
 Default URL:
 
 - `http://localhost:5173`
+- debug-safe URL: `http://127.0.0.1:5173`
 
 ### Local host backend
 
@@ -48,6 +49,7 @@ Typical use:
 Default URL:
 
 - `http://localhost:8080`
+- debug-safe URL: `http://127.0.0.1:8080`
 
 ### Docker infra
 
@@ -129,10 +131,12 @@ Important:
 
 ### Local endpoint examples
 
-- frontend: `http://localhost:5173`
-- backend health: `http://localhost:8080/actuator/health`
-- backend readiness: `http://localhost:8080/actuator/health/readiness`
-- backend websocket info: `http://localhost:8080/ws/info`
+- frontend: `http://127.0.0.1:5173`
+- backend health: `http://127.0.0.1:8080/actuator/health`
+- backend readiness: `http://127.0.0.1:8080/actuator/health/readiness`
+- backend websocket info: `http://127.0.0.1:8080/ws/info`
+
+Use `localhost` when it behaves normally. Use `127.0.0.1` for local verification and debugging when Windows host resolution, IPv6 routing, or Docker port publishing looks suspicious.
 
 ## 3. Communication Map
 
@@ -508,7 +512,7 @@ powershell -ExecutionPolicy Bypass -File scripts\check-live-connections.ps1
 
 ```powershell
 cd C:\Users\asus\Downloads\synapsecore_starter\synapsecore
-powershell -ExecutionPolicy Bypass -File scripts\check-local-connections.ps1
+powershell -ExecutionPolicy Bypass -File scripts\check-local-connections.ps1 -FrontendUrl http://127.0.0.1:5173 -BackendUrl http://127.0.0.1:8080
 ```
 
 ### Start local frontend
@@ -518,13 +522,19 @@ cd C:\Users\asus\Downloads\synapsecore_starter\synapsecore\frontend
 npm.cmd run dev
 ```
 
+Expected local frontend URL:
+
+- `http://127.0.0.1:5173`
+
 ### Start Docker Postgres / Redis
 
 ```powershell
 cd C:\Users\asus\Downloads\synapsecore_starter\synapsecore\infrastructure
-docker compose up -d postgres redis
+docker compose up -d postgres redis backend
 docker compose ps
 ```
+
+The Docker backend can take around `60-70` seconds before readiness is trustworthy.
 
 ### Stop backend container
 
@@ -552,6 +562,15 @@ psql -h 127.0.0.1 -p 5432 -U postgres -d synapsecore -c "select current_user, cu
 ```powershell
 cd C:\Users\asus\Downloads\synapsecore_starter\synapsecore\frontend
 npm.cmd run verify
+```
+
+### Run local smoke and workflow proof-style checks
+
+```powershell
+cd C:\Users\asus\Downloads\synapsecore_starter\synapsecore
+powershell -ExecutionPolicy Bypass -File scripts\verify-deployment.ps1 -FrontendUrl http://127.0.0.1:5173 -BackendUrl http://127.0.0.1:8080
+powershell -ExecutionPolicy Bypass -File scripts\verify-realtime.ps1 -FrontendUrl http://127.0.0.1:5173 -BackendUrl http://127.0.0.1:8080
+powershell -ExecutionPolicy Bypass -File scripts\verify-company-readiness.ps1 -FrontendUrl http://127.0.0.1:5173 -BackendUrl http://127.0.0.1:8080
 ```
 
 ### Run hosted proof only when allowed

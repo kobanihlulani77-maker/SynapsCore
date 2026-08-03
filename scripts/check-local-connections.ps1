@@ -1,6 +1,6 @@
 param(
-    [string]$FrontendUrl = "http://localhost:5173",
-    [string]$BackendUrl = "http://localhost:8080",
+    [string]$FrontendUrl = "http://127.0.0.1:5173",
+    [string]$BackendUrl = "http://127.0.0.1:8080",
     [string]$DockerInfrastructureDir = "C:\Users\asus\Downloads\synapsecore_starter\synapsecore\infrastructure",
     [int]$TimeoutSeconds = 10
 )
@@ -41,14 +41,29 @@ function Invoke-LocalHttpCheck {
 function Test-LocalPort {
     param(
         [Parameter(Mandatory = $true)]
-        [int]$Port
+        [int]$Port,
+        [string]$HostName = "127.0.0.1",
+        [int]$TimeoutMs = 1500
     )
 
+    $client = $null
+
     try {
-        return [bool](Get-NetTCPConnection -LocalPort $Port -State Listen -ErrorAction Stop | Select-Object -First 1)
+        $client = [System.Net.Sockets.TcpClient]::new()
+        $connectTask = $client.ConnectAsync($HostName, $Port)
+        if (-not $connectTask.Wait($TimeoutMs)) {
+            return $false
+        }
+
+        return $client.Connected
     }
     catch {
         return $false
+    }
+    finally {
+        if ($null -ne $client) {
+            $client.Dispose()
+        }
     }
 }
 

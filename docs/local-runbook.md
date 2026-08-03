@@ -33,11 +33,13 @@ Expected local ports:
 
 Useful local URLs:
 
-- frontend: `http://localhost:5173`
-- backend: `http://localhost:8080`
-- health: `http://localhost:8080/actuator/health`
-- readiness: `http://localhost:8080/actuator/health/readiness`
-- websocket info: `http://localhost:8080/ws/info`
+- frontend: `http://127.0.0.1:5173`
+- backend: `http://127.0.0.1:8080`
+- health: `http://127.0.0.1:8080/actuator/health`
+- readiness: `http://127.0.0.1:8080/actuator/health/readiness`
+- websocket info: `http://127.0.0.1:8080/ws/info`
+
+`localhost` may work, but prefer `127.0.0.1` during Windows local debugging because it avoids host-name and IPv6 routing ambiguity.
 
 Seeded local workspace commonly used by local verification scripts:
 
@@ -101,8 +103,8 @@ npm.cmd run dev
 If you use a local env file, it should point at:
 
 ```text
-VITE_API_URL=http://localhost:8080
-VITE_WS_URL=http://localhost:8080/ws
+VITE_API_URL=http://127.0.0.1:8080
+VITE_WS_URL=http://127.0.0.1:8080/ws
 ```
 
 ## Path B — Full Docker Compose
@@ -126,17 +128,17 @@ Expected services:
 
 Default URLs:
 
-- frontend: `http://localhost:5173`
-- backend: `http://localhost:8080`
+- frontend: `http://127.0.0.1:5173`
+- backend: `http://127.0.0.1:8080`
 
 ### Verify
 
 ```powershell
-curl.exe http://localhost:8080/actuator/health
-curl.exe http://localhost:8080/actuator/health/readiness
-curl.exe http://localhost:8080/api/auth/session
-curl.exe http://localhost:8080/ws/info
-curl.exe http://localhost:5173
+curl.exe http://127.0.0.1:8080/actuator/health
+curl.exe http://127.0.0.1:8080/actuator/health/readiness
+curl.exe http://127.0.0.1:8080/api/auth/session
+curl.exe http://127.0.0.1:8080/ws/info
+curl.exe http://127.0.0.1:5173
 ```
 
 ## Path C — Host-Only Fallback
@@ -153,6 +155,15 @@ Useful checks:
 ```powershell
 Get-NetTCPConnection -LocalPort 5432 -State Listen
 Get-NetTCPConnection -LocalPort 6379 -State Listen
+```
+
+If Windows port enumeration looks stale or misleading, use real TCP checks:
+
+```powershell
+Test-NetConnection 127.0.0.1 -Port 5432
+Test-NetConnection 127.0.0.1 -Port 6379
+Test-NetConnection 127.0.0.1 -Port 8080
+Test-NetConnection 127.0.0.1 -Port 5173
 ```
 
 Then start backend and frontend on host using the same commands described in Path A.
@@ -271,11 +282,13 @@ docker compose ps
 After backend startup:
 
 ```powershell
-curl.exe http://localhost:8080/actuator/health
-curl.exe http://localhost:8080/actuator/health/readiness
-curl.exe http://localhost:8080/api/auth/session
-curl.exe http://localhost:8080/ws/info
+curl.exe http://127.0.0.1:8080/actuator/health
+curl.exe http://127.0.0.1:8080/actuator/health/readiness
+curl.exe http://127.0.0.1:8080/api/auth/session
+curl.exe http://127.0.0.1:8080/ws/info
 ```
+
+Spring Boot can take roughly `60-70` seconds locally before readiness is trustworthy after Docker starts the backend container. Empty replies during that window should be rechecked before being classified as backend failures.
 
 ## Local Verification Scripts
 
@@ -290,7 +303,7 @@ Recommended first run:
 
 ```powershell
 cd C:\Users\asus\Downloads\synapsecore_starter\synapsecore
-powershell -ExecutionPolicy Bypass -File scripts\check-local-connections.ps1
+powershell -ExecutionPolicy Bypass -File scripts\check-local-connections.ps1 -FrontendUrl http://127.0.0.1:5173 -BackendUrl http://127.0.0.1:8080
 ```
 
 ## Local Bottom Line

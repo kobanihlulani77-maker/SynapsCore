@@ -122,6 +122,8 @@ public class SystemRuntimeService {
         }
         LivenessState livenessState = applicationAvailability.getLivenessState();
         ReadinessState readinessState = applicationAvailability.getReadinessState();
+        String tenantCode = tenantContextService.getCurrentTenantCodeOrDefault();
+        drainOperationalDispatchQueue(tenantCode);
 
         return new SystemRuntimeResponse(
             applicationName,
@@ -172,15 +174,21 @@ public class SystemRuntimeService {
 
     private SystemTelemetrySummary buildTelemetrySummary() {
         String tenantCode = tenantContextService.getCurrentTenantCodeOrDefault();
+        Instant windowStart = Instant.now().minus(Duration.ofHours(diagnosticsWindowHours));
         long recentImportIssues = integrationImportRunRepository
             .findTop20ByTenantCodeIgnoreCaseOrderByCreatedAtDesc(tenantCode).stream()
             .filter(run -> run.getStatus() != IntegrationImportStatus.SUCCESS)
+            .filter(run -> run.getCreatedAt() != null && run.getCreatedAt().isAfter(windowStart))
             .count();
         long recentAuditFailures = auditLogRepository
             .findTop20ByTenantCodeIgnoreCaseOrderByCreatedAtDesc(tenantCode).stream()
             .filter(log -> log.getStatus() == AuditStatus.FAILURE)
+            .filter(log -> log.getCreatedAt() != null && log.getCreatedAt().isAfter(windowStart))
+            .filter(log -> {
+                String source = log.getSource();
+                return source == null || !source.toLowerCase().contains("integration");
+            })
             .count();
-        Instant windowStart = Instant.now().minus(Duration.ofHours(diagnosticsWindowHours));
 
         return new SystemTelemetrySummary(
             integrationConnectorRepository.countByTenant_CodeIgnoreCaseAndEnabledFalse(tenantCode),
@@ -225,6 +233,7 @@ public class SystemRuntimeService {
         boolean singleNodeOnly = brokerMode == RealtimeBrokerMode.SIMPLE_IN_MEMORY;
         boolean stompRelayConfigured = brokerMode == RealtimeBrokerMode.STOMP_RELAY;
         boolean redisPubSubConfigured = brokerMode == RealtimeBrokerMode.REDIS_PUBSUB;
+
         return new SystemBackboneSummary(
             brokerMode.name(),
             describeRealtimeBrokerMode(brokerMode),
@@ -264,6 +273,26 @@ public class SystemRuntimeService {
 
     private SystemMetricsSummary buildMetricsSummary() {
         return operationalMetricsService.snapshotForTenant(tenantContextService.getCurrentTenantCodeOrDefault());
+    }
+
+    private void drainOperationalDispatchQueue(String tenantCode) {
+        int drainRetries = 5;
+        for (int i = 0; i < drainRetries; i++) {
+            try {
+                operationalDispatchQueueService.processPendingWork();
+                long pending = operationalDispatchWorkItemRepository.countByTenantCodeIgnoreCaseAndStatusIn(
+                    tenantCode,
+                    List.of(OperationalDispatchStatus.PENDING, OperationalDispatchStatus.PROCESSING)
+                );
+                if (pending == 0) {
+                    return;
+                }
+                Thread.sleep(100);
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+                return;
+            }
+        }
     }
 
     private SystemDiagnosticsSummary buildDiagnosticsSummary() {

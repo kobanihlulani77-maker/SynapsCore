@@ -115,9 +115,9 @@ echo "  Hosted proof     : cd frontend && npm.cmd run test:e2e:prod"
 echo
 echo "Supplemental self-host smoke"
 echo "  Start            : BACKEND_ENV_FILE=$BACKEND_ENV_FILE FRONTEND_ENV_FILE=$FRONTEND_ENV_FILE bash scripts/start-prod.sh"
-echo "  Smoke verify     : FRONTEND_URL=http://localhost BACKEND_URL=http://localhost:8080 bash scripts/verify-deployment.sh"
-echo "  Realtime smoke   : powershell -ExecutionPolicy Bypass -File scripts/verify-realtime.ps1 -FrontendUrl http://localhost -BackendUrl http://localhost:8080"
-echo "  Workflow smoke   : powershell -ExecutionPolicy Bypass -File scripts/verify-company-readiness.ps1 -FrontendUrl http://localhost -BackendUrl http://localhost:8080"
+echo "  Smoke verify     : FRONTEND_URL=http://127.0.0.1:5173 BACKEND_URL=http://127.0.0.1:8080 bash scripts/verify-deployment.sh"
+echo "  Realtime smoke   : powershell -ExecutionPolicy Bypass -File scripts/verify-realtime.ps1 -FrontendUrl http://127.0.0.1:5173 -BackendUrl http://127.0.0.1:8080"
+echo "  Workflow smoke   : powershell -ExecutionPolicy Bypass -File scripts/verify-company-readiness.ps1 -FrontendUrl http://127.0.0.1:5173 -BackendUrl http://127.0.0.1:8080"
 echo
 echo "Recovery / operations"
 echo "  Backup           : bash scripts/backup-postgres.sh"

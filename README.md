@@ -114,8 +114,10 @@ docker compose up --build
 
 Local default endpoints:
 
-- frontend: `http://localhost:5173`
-- backend: `http://localhost:8080`
+- frontend: `http://127.0.0.1:5173`
+- backend: `http://127.0.0.1:8080`
+
+`localhost` may work, but `127.0.0.1` is the preferred Windows local-debug target when Docker or host routing is ambiguous.
 
 Local env files used by the compose stack:
 
@@ -125,6 +127,8 @@ Local env files used by the compose stack:
 Useful local checks:
 
 ```powershell
+powershell -ExecutionPolicy Bypass -File scripts\check-local-connections.ps1 -FrontendUrl http://127.0.0.1:5173 -BackendUrl http://127.0.0.1:8080
+
 cd frontend
 npm.cmd run build
 

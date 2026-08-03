@@ -327,9 +327,9 @@ async function signOutViaUi(page) {
 }
 
 async function fillSignInForm(signInCard, credentials, password) {
-  const tenantField = signInCard.getByRole('combobox', { name: 'Tenant workspace', exact: true })
-  const usernameField = signInCard.getByRole('textbox', { name: 'Username', exact: true })
-  const passwordField = signInCard.getByLabel('Password', { exact: true })
+  const tenantField = await resolveTenantField(signInCard)
+  const usernameField = await resolveUsernameField(signInCard)
+  const passwordField = await resolvePasswordField(signInCard)
   const submitButton = signInCard.getByRole('button', { name: 'Enter Platform' })
 
   let lastError = null
@@ -354,9 +354,45 @@ async function fillSignInForm(signInCard, credentials, password) {
 }
 
 async function waitForSignInReady(signInCard) {
-  await expect(signInCard.getByRole('combobox', { name: 'Tenant workspace', exact: true })).toBeEnabled()
-  await expect(signInCard.getByRole('textbox', { name: 'Username', exact: true })).toBeEnabled()
-  await expect(signInCard.getByLabel('Password', { exact: true })).toBeEnabled()
+  await expect(await resolveTenantField(signInCard)).toBeEnabled()
+  await expect(await resolveUsernameField(signInCard)).toBeEnabled()
+  await expect(await resolvePasswordField(signInCard)).toBeEnabled()
+}
+
+async function resolveFirstAvailable(candidates, description) {
+  for (const candidate of candidates) {
+    const field = candidate.first()
+    if (await field.count()) {
+      return field
+    }
+  }
+
+  throw new Error(`Unable to locate the ${description} on the sign-in form.`)
+}
+
+async function resolveTenantField(signInCard) {
+  return resolveFirstAvailable([
+    signInCard.getByRole('combobox', { name: /Company workspace code/i }),
+    signInCard.getByLabel(/Company workspace code/i),
+    signInCard.locator('input[list="tenant-workspace-options"]'),
+    signInCard.locator('input[name="tenantCode"], input#tenant-code, input[autocomplete="organization"]'),
+  ], 'workspace code input')
+}
+
+async function resolveUsernameField(signInCard) {
+  return resolveFirstAvailable([
+    signInCard.getByRole('textbox', { name: /^Username\b/i }),
+    signInCard.getByLabel(/^Username\b/i),
+    signInCard.locator('input[name="username"], input[autocomplete="username"]'),
+  ], 'username input')
+}
+
+async function resolvePasswordField(signInCard) {
+  return resolveFirstAvailable([
+    signInCard.locator('input[type="password"]'),
+    signInCard.getByLabel(/^Password\b/i),
+    signInCard.locator('input[name="password"], input[autocomplete="current-password"]'),
+  ], 'password input')
 }
 
 async function expectSignInErrorAndRecovery(signInCard, message) {

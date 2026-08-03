@@ -11,6 +11,6 @@ if [ -f "$template" ]; then
 fi
 
 if [ -f "$nginx_template" ]; then
-  PORT="${PORT:-80}"
+  export PORT="${PORT:-80}"
   envsubst '${PORT}' < "$nginx_template" > "$nginx_output"
 fi

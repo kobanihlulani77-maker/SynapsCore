@@ -5,7 +5,7 @@ set -euo pipefail
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 FRONTEND_DIR="$ROOT_DIR/frontend"
 BACKEND_DIR="$ROOT_DIR/backend"
-FRONTEND_URL="http://127.0.0.1"
+FRONTEND_URL="http://127.0.0.1:5173"
 BACKEND_URL="http://127.0.0.1:8080"
 OUTPUT_FILE="$ROOT_DIR/docs/verification-status.md"
 RUN_BACKEND_TESTS="false"

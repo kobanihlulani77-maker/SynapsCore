@@ -21,7 +21,7 @@ powershell -ExecutionPolicy Bypass -File scripts\repo-health.ps1
 ```
 
 ```powershell
-powershell -ExecutionPolicy Bypass -File scripts\check-local-connections.ps1
+powershell -ExecutionPolicy Bypass -File scripts\check-local-connections.ps1 -FrontendUrl http://127.0.0.1:5173 -BackendUrl http://127.0.0.1:8080
 ```
 
 ```powershell
@@ -48,6 +48,10 @@ Run:
 - `scripts/check-local-connections.ps1`
 - `scripts/check-live-connections.ps1`
 
+Windows local note:
+
+- if `localhost` fails but `127.0.0.1` works, classify it as local routing/name-resolution ambiguity before changing product code
+
 ## Backend Health Times Out
 
 Likely areas:
@@ -56,6 +60,7 @@ Likely areas:
 - Redis unavailable
 - backend startup hung
 - hosting/runtime issue
+- Docker Desktop engine stopped or restarted during local validation
 
 Read:
 
@@ -67,6 +72,12 @@ Run:
 
 - `scripts/check-live-connections.ps1`
 - `scripts/recovery-checklist.ps1`
+
+For local Docker backend:
+
+- wait roughly `60-70` seconds after `docker compose up -d postgres redis backend`
+- early empty replies can happen before Spring Boot has finished startup
+- confirm with `curl.exe http://127.0.0.1:8080/actuator/health/readiness`
 
 ## Readiness Fails But Liveness Works
 
