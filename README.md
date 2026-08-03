@@ -295,6 +295,11 @@ Generated showcase:
 ## Important Docs
 
 - [docs/documentation-map.md](docs/documentation-map.md)
+- [docs/product-knowledge-base.md](docs/product-knowledge-base.md)
+- [docs/operational-concepts.md](docs/operational-concepts.md)
+- [docs/synapsecore-dictionary.md](docs/synapsecore-dictionary.md)
+- [docs/business-process-library.md](docs/business-process-library.md)
+- [docs/executive-product-guide.md](docs/executive-product-guide.md)
 - [docs/repository-review-report.md](docs/repository-review-report.md)
 - [docs/scripts-reference.md](docs/scripts-reference.md)
 - [docs/INDEX.md](docs/INDEX.md)

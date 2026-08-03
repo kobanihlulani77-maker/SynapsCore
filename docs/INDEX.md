@@ -14,6 +14,10 @@ This index links the main product, architecture, runbook, proof, and operator do
 
 ## Product Understanding
 
+- [product-knowledge-base.md](product-knowledge-base.md)
+- [operational-concepts.md](operational-concepts.md)
+- [synapsecore-dictionary.md](synapsecore-dictionary.md)
+- [business-process-library.md](business-process-library.md)
 - [product-purpose.md](product-purpose.md)
 - [why-synapsecore-exists.md](why-synapsecore-exists.md)
 - [founder-brief.md](founder-brief.md)
@@ -23,9 +27,31 @@ This index links the main product, architecture, runbook, proof, and operator do
 
 ## Product Vision
 
+- [future-product-vision.md](future-product-vision.md)
 - [final-product-vision.md](final-product-vision.md)
 - [product-purpose.md](product-purpose.md)
 - [why-synapsecore-exists.md](why-synapsecore-exists.md)
+
+## Enterprise Product Knowledge Base
+
+- [product-knowledge-base.md](product-knowledge-base.md)
+- [operational-concepts.md](operational-concepts.md)
+- [synapsecore-dictionary.md](synapsecore-dictionary.md)
+- [business-process-library.md](business-process-library.md)
+- [executive-product-guide.md](executive-product-guide.md)
+- [operations-manager-guide.md](operations-manager-guide.md)
+- [warehouse-manager-guide.md](warehouse-manager-guide.md)
+- [it-administrator-guide.md](it-administrator-guide.md)
+- [solution-architect-guide.md](solution-architect-guide.md)
+- [future-product-vision.md](future-product-vision.md)
+
+## Industry Product Guides
+
+- [industry-guide-retail.md](industry-guide-retail.md)
+- [industry-guide-manufacturing.md](industry-guide-manufacturing.md)
+- [industry-guide-distribution.md](industry-guide-distribution.md)
+- [industry-guide-logistics.md](industry-guide-logistics.md)
+- [industry-guide-ecommerce.md](industry-guide-ecommerce.md)
 
 ## Market Positioning
 
@@ -170,6 +196,7 @@ This index links the main product, architecture, runbook, proof, and operator do
 ## Executive Overview
 
 - [executive-summary.md](executive-summary.md)
+- [executive-product-guide.md](executive-product-guide.md)
 - [final-product-vision.md](final-product-vision.md)
 - [render-ops-runbook.md](render-ops-runbook.md)
 
@@ -188,6 +215,8 @@ This index links the main product, architecture, runbook, proof, and operator do
 ## Operational Value
 
 - [operational-value-guide.md](operational-value-guide.md)
+- [operations-manager-guide.md](operations-manager-guide.md)
+- [warehouse-manager-guide.md](warehouse-manager-guide.md)
 - [platform-differentiation.md](platform-differentiation.md)
 - [company-explainer.md](company-explainer.md)
 
@@ -230,6 +259,7 @@ This index links the main product, architecture, runbook, proof, and operator do
 
 - [architecture.md](architecture.md)
 - [system-flow.md](system-flow.md)
+- [solution-architect-guide.md](solution-architect-guide.md)
 - [api-spec.md](api-spec.md)
 - [operations-story-pack.md](operations-story-pack.md)
 - [founder-brief.md](founder-brief.md)
@@ -303,6 +333,7 @@ This index links the main product, architecture, runbook, proof, and operator do
 ## Onboarding And Pilot
 
 - [onboarding-playbook.md](onboarding-playbook.md)
+- [product-knowledge-base.md](product-knowledge-base.md)
 - [pilot-onboarding-pack.md](pilot-onboarding-pack.md)
 - [pilot-operations-runbook.md](pilot-operations-runbook.md)
 - [pilot-acceptance-criteria.md](pilot-acceptance-criteria.md)

@@ -11,12 +11,13 @@ If someone is new to the project, the recommended reading order is:
 1. [README.md](../README.md)
 2. [repository-review-report.md](repository-review-report.md)
 3. [executive-summary.md](executive-summary.md)
-4. [company-explainer.md](company-explainer.md)
-5. [system-architecture.md](system-architecture.md)
-6. [infrastructure-handbook.md](infrastructure-handbook.md)
-7. [proof-and-validation.md](proof-and-validation.md)
-8. [deployment-recovery-guide.md](deployment-recovery-guide.md)
-9. [master-product-roadmap.md](master-product-roadmap.md)
+4. [product-knowledge-base.md](product-knowledge-base.md)
+5. [company-explainer.md](company-explainer.md)
+6. [system-architecture.md](system-architecture.md)
+7. [infrastructure-handbook.md](infrastructure-handbook.md)
+8. [proof-and-validation.md](proof-and-validation.md)
+9. [deployment-recovery-guide.md](deployment-recovery-guide.md)
+10. [master-product-roadmap.md](master-product-roadmap.md)
 
 That path moves from high-level meaning into real architecture, trust, recovery, and long-term direction.
 
@@ -44,6 +45,55 @@ Use these when:
 - protecting proof selectors
 - understanding runtime trust
 - following quality gates before release
+
+## If You Need Product Knowledge
+
+Read first:
+
+- [product-knowledge-base.md](product-knowledge-base.md)
+- [operational-concepts.md](operational-concepts.md)
+- [synapsecore-dictionary.md](synapsecore-dictionary.md)
+- [business-process-library.md](business-process-library.md)
+- [future-product-vision.md](future-product-vision.md)
+
+Use these when:
+
+- defining product terms consistently
+- explaining how operations move through SynapseCore
+- onboarding a customer, partner, or internal teammate
+- separating current product scope from future vision
+
+## If You Need Role-Based Product Guidance
+
+Read first:
+
+- [executive-product-guide.md](executive-product-guide.md)
+- [operations-manager-guide.md](operations-manager-guide.md)
+- [warehouse-manager-guide.md](warehouse-manager-guide.md)
+- [it-administrator-guide.md](it-administrator-guide.md)
+- [solution-architect-guide.md](solution-architect-guide.md)
+
+Use these when:
+
+- explaining SynapseCore to a specific stakeholder
+- preparing pilot enablement material
+- helping non-engineers understand what they should do in the product
+
+## If You Need Industry Product Guidance
+
+Read first:
+
+- [industry-guide-retail.md](industry-guide-retail.md)
+- [industry-guide-manufacturing.md](industry-guide-manufacturing.md)
+- [industry-guide-distribution.md](industry-guide-distribution.md)
+- [industry-guide-logistics.md](industry-guide-logistics.md)
+- [industry-guide-ecommerce.md](industry-guide-ecommerce.md)
+
+Use these when:
+
+- evaluating company fit by industry
+- preparing pilot conversations
+- showing what changes by sector and what stays common in SynapseCore
 
 ## If You Are Supporting A Pilot
 
@@ -86,7 +136,9 @@ Use these when:
 Read first:
 
 - [executive-summary.md](executive-summary.md)
+- [executive-product-guide.md](executive-product-guide.md)
 - [company-explainer.md](company-explainer.md)
+- [product-knowledge-base.md](product-knowledge-base.md)
 - [buyer-due-diligence-guide.md](buyer-due-diligence-guide.md)
 - [pilot-adoption-roadmap.md](pilot-adoption-roadmap.md)
 - [pilot-acceptance-criteria.md](pilot-acceptance-criteria.md)
