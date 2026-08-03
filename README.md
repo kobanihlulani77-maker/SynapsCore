@@ -112,6 +112,30 @@ Pilot RC entry points:
 
 The pilot RC is for controlled company evaluation within the current supported scope. It is not an unrestricted enterprise production rollout claim.
 
+## Engineering Excellence
+
+After the Pilot Release Candidate milestone, the next operating mode is engineering maturity rather than scope expansion.
+
+Start here for the engineering-readiness layer:
+
+- [docs/engineering-review.md](docs/engineering-review.md)
+- [docs/maintainability-guide.md](docs/maintainability-guide.md)
+- [docs/support-playbook.md](docs/support-playbook.md)
+- [docs/operations-handbook.md](docs/operations-handbook.md)
+- [docs/change-management.md](docs/change-management.md)
+- [docs/release-engineering.md](docs/release-engineering.md)
+- [docs/quality-gates.md](docs/quality-gates.md)
+- [docs/future-engineering-strategy.md](docs/future-engineering-strategy.md)
+- [docs/repository-maturity.md](docs/repository-maturity.md)
+
+Engineering readiness check:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File scripts\engineering-readiness.ps1
+```
+
+This command is informational. It does not deploy, tag, edit the database, or run hosted proof.
+
 ## Current Supported Scope
 
 SynapseCore is fully real for its current supported scope.
@@ -300,6 +324,7 @@ powershell -ExecutionPolicy Bypass -File scripts\explain-infrastructure.ps1
 powershell -ExecutionPolicy Bypass -File scripts\env-sanity-check.ps1
 powershell -ExecutionPolicy Bypass -File scripts\docs-link-check.ps1
 powershell -ExecutionPolicy Bypass -File scripts\script-help.ps1
+powershell -ExecutionPolicy Bypass -File scripts\engineering-readiness.ps1
 ```
 
 These commands are informational only. They do not modify runtime behavior or delete files.

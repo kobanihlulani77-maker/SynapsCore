@@ -266,9 +266,23 @@ This index links the main product, architecture, runbook, proof, and operator do
 - [proof-system-evolution.md](proof-system-evolution.md)
 - [current-limitations.md](current-limitations.md)
 
+## Engineering Excellence / Operational Readiness
+
+- [engineering-review.md](engineering-review.md)
+- [maintainability-guide.md](maintainability-guide.md)
+- [support-playbook.md](support-playbook.md)
+- [operations-handbook.md](operations-handbook.md)
+- [change-management.md](change-management.md)
+- [release-engineering.md](release-engineering.md)
+- [quality-gates.md](quality-gates.md)
+- [future-engineering-strategy.md](future-engineering-strategy.md)
+- [repository-maturity.md](repository-maturity.md)
+- `scripts\engineering-readiness.ps1`
+
 ## Contributor Guidance
 
 - [contributor-guide.md](contributor-guide.md)
+- [maintainability-guide.md](maintainability-guide.md)
 - [scripts-reference.md](scripts-reference.md)
 - [technical-reviewer-guide.md](technical-reviewer-guide.md)
 - [proof-and-validation.md](proof-and-validation.md)
@@ -317,6 +331,7 @@ This index links the main product, architecture, runbook, proof, and operator do
 - `scripts\explain-proof-system.ps1`
 - `scripts\project-map.ps1`
 - `scripts\repo-health.ps1`
+- `scripts\engineering-readiness.ps1`
 - `scripts\env-sanity-check.ps1`
 - `scripts\docs-link-check.ps1`
 - `scripts\script-help.ps1`

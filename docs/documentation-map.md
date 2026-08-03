@@ -25,6 +25,9 @@ That path moves from high-level meaning into real architecture, trust, recovery,
 Read first:
 
 - [system-architecture.md](system-architecture.md)
+- [engineering-review.md](engineering-review.md)
+- [maintainability-guide.md](maintainability-guide.md)
+- [quality-gates.md](quality-gates.md)
 - [environment-reference.md](environment-reference.md)
 - [frontend-flow.md](frontend-flow.md)
 - [backend-flow.md](backend-flow.md)
@@ -40,6 +43,25 @@ Use these when:
 - changing frontend or backend behavior
 - protecting proof selectors
 - understanding runtime trust
+- following quality gates before release
+
+## If You Are Supporting A Pilot
+
+Read first:
+
+- [support-playbook.md](support-playbook.md)
+- [operations-handbook.md](operations-handbook.md)
+- [change-management.md](change-management.md)
+- [release-engineering.md](release-engineering.md)
+- [repository-maturity.md](repository-maturity.md)
+
+Use these when:
+
+- classifying incidents
+- preparing releases
+- collecting evidence
+- deciding whether a change is safe to deploy
+- understanding current maturity without inflated enterprise claims
 
 ## If You Are An Operator
 
@@ -88,6 +110,7 @@ Read first:
 - [data-governance-and-retention.md](data-governance-and-retention.md)
 - [known-operational-risks.md](known-operational-risks.md)
 - [current-limitations.md](current-limitations.md)
+- [repository-maturity.md](repository-maturity.md)
 
 Use these when:
 
@@ -172,6 +195,8 @@ Read first:
 
 - [environment-reference.md](environment-reference.md)
 - [release-process.md](release-process.md)
+- [release-engineering.md](release-engineering.md)
+- [quality-gates.md](quality-gates.md)
 - [go-live-checklist.md](go-live-checklist.md)
 - [backup-restore-runbook.md](backup-restore-runbook.md)
 - [troubleshooting-index.md](troubleshooting-index.md)

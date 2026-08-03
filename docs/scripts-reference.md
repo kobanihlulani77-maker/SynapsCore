@@ -304,6 +304,49 @@ Requires backend or DB:
 
 - no
 
+## `scripts\engineering-readiness.ps1`
+
+Purpose:
+
+- checks whether the repository is in engineering-ready shape after the Pilot Release Candidate milestone
+
+What it checks:
+
+- local repository alignment with `origin/main`
+- uncommitted production changes
+- tracked risky artifacts or env files
+- engineering, release, proof, and operational documentation presence
+- required operational scripts
+- replacement-database hosted proof evidence
+- docs link health
+- frontend verify
+- live connection posture when not skipped
+
+Outputs:
+
+- `ENGINEERING_READY=True`
+- `ENGINEERING_READY=False`
+- blockers and warnings
+
+Safe to run anytime:
+
+- yes
+
+Changes anything:
+
+- no
+
+Requires backend or DB:
+
+- yes for full readiness, because live connection readiness is part of the gate
+- no if run with `-SkipLiveCheck`, but that is not a full engineering-ready result
+
+Recommended command:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File scripts\engineering-readiness.ps1
+```
+
 ## `scripts\prepare-hosted-proof.ps1`
 
 Purpose:
@@ -423,6 +466,7 @@ Requires backend or DB:
 For repo hygiene:
 
 - `scripts\repo-health.ps1`
+- `scripts\engineering-readiness.ps1`
 - `scripts\docs-link-check.ps1`
 
 For local stack understanding:
