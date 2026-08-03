@@ -22,6 +22,8 @@ export default function PlatformAdminPage({ context }) {
   } = context
 
   if (!isAuthenticated || !isPlatformPage) return null
+  const runtimeLabel = runtime?.overallStatus || 'Loading'
+  const platformAttentionCount = systemIncidents.length + pendingReplayCount + (runtime?.backbone?.failedDispatchCount ?? 0)
 
   return (
     <section className="content-grid">
@@ -34,26 +36,38 @@ export default function PlatformAdminPage({ context }) {
           <span className={`panel-badge ${runtime ? getRuntimeStatusClassName(runtime.overallStatus) : 'audit-badge'}`}>{runtime ? runtime.overallStatus : 'Loading'}</span>
         </div>
 
-        <div className="ops-command-hero">
-          <div className="ops-command-copy">
+        <div className="workflow-decision-hero platform-admin-hero">
+          <div className="workflow-decision-copy">
             <strong>Global operating posture</strong>
             <p>
-              Platform operators should be able to judge tenant rollout health, release trust, and cross-tenant runtime pressure
-              without losing the grounded operational language the rest of the app uses.
+              This is a platform-scope view. Use it to inspect workspace rollout posture, release trust, incidents,
+              and queue pressure without confusing it with tenant-level operations.
             </p>
             <div className="ops-pill-row">
-              <span className="workspace-meta-pill">Cross-tenant view</span>
-              <span className="workspace-meta-pill">Release aware</span>
-              <span className="workspace-meta-pill">Queue visible</span>
+              <span className="workspace-meta-pill">Platform administrator scope</span>
+              <span className="workspace-meta-pill">{runtimeLabel}</span>
+              <span className="workspace-meta-pill">{platformAttentionCount} attention signals</span>
             </div>
           </div>
-          <div className="ops-command-actions">
-            <button className="secondary-button" onClick={() => navigateToPage('tenants')} type="button">
-              Open workspace rollout
-            </button>
-            <button className="ghost-button" onClick={() => navigateToPage('releases')} type="button">
-              Open releases
-            </button>
+          <div className="workflow-action-console">
+            <div className="workflow-action-card">
+              <span>Scope boundary</span>
+              <strong>Cross-tenant evidence</strong>
+              <p>This page reviews portfolio posture; it does not impersonate tenants or edit hidden production state.</p>
+            </div>
+            <div className="workflow-action-card">
+              <span>Current tenant context</span>
+              <strong>{signedInSession?.tenantCode || 'Not reported'}</strong>
+              <p>Tenant identity remains visible so platform review does not blur workspace boundaries.</p>
+            </div>
+            <div className="ops-command-actions">
+              <button className="secondary-button" onClick={() => navigateToPage('tenants')} type="button">
+                Open workspace rollout
+              </button>
+              <button className="ghost-button" onClick={() => navigateToPage('releases')} type="button">
+                Open releases
+              </button>
+            </div>
           </div>
         </div>
 
@@ -65,11 +79,12 @@ export default function PlatformAdminPage({ context }) {
         </div>
 
         <div className="experience-grid experience-grid-three">
-          <article className="stack-card section-card" id="platform-portfolio">
+          <article className="stack-card section-card admin-list-panel" id="platform-portfolio">
             <div className="stack-title-row"><strong>Workspace portfolio</strong><span className="scenario-type-tag">{tenantDirectoryState.items.length}</span></div>
+            <p className="muted-text">Platform-level workspace list. Company identity stays primary; internal codes remain secondary.</p>
             <div className="signal-list">
               {tenantDirectoryState.items.length ? tenantDirectoryState.items.map((tenant) => (
-                <button key={tenant.code} className={`signal-list-item selectable-card system-select-card ${selectedTenantPortfolio?.code === tenant.code ? 'is-selected' : ''}`} onClick={() => setSelectedTenantPortfolioCode(tenant.code)} type="button">
+                <button key={tenant.code} className={`signal-list-item selectable-card system-select-card admin-subject-card ${selectedTenantPortfolio?.code === tenant.code ? 'is-selected' : ''}`} onClick={() => setSelectedTenantPortfolioCode(tenant.code)} type="button">
                   <div className="stack-title-row">
                     <strong>{tenant.name}</strong>
                     <span className={`status-tag ${signedInSession?.tenantCode === tenant.code ? 'status-success' : 'status-partial'}`}>{tenant.code}</span>
@@ -81,7 +96,7 @@ export default function PlatformAdminPage({ context }) {
             </div>
           </article>
 
-          <article className="stack-card section-card">
+          <article className="stack-card section-card admin-risk-panel">
             <div className="stack-title-row"><strong>Platform incidents</strong><span className="scenario-type-tag">{systemIncidents.length}</span></div>
             <div className="signal-list">
               {systemIncidents.length ? systemIncidents.slice(0, 4).map((incident) => (
@@ -97,7 +112,7 @@ export default function PlatformAdminPage({ context }) {
             </div>
           </article>
 
-          <article className="stack-card section-card">
+          <article className="stack-card section-card admin-form-panel">
             <div className="stack-title-row"><strong>Release trust</strong><span className={`status-tag ${runtime?.secureSessionCookies ? 'status-success' : 'status-partial'}`}>{runtime?.secureSessionCookies ? 'Secure cookies' : 'Local HTTP'}</span></div>
             <div className="signal-list">
               <div className="signal-list-item">
@@ -115,7 +130,7 @@ export default function PlatformAdminPage({ context }) {
         </div>
 
         <div className="experience-grid experience-grid-split">
-          <article className="stack-card section-card" id="platform-focus">
+          <article className="stack-card section-card workflow-selected-panel admin-focus-panel" id="platform-focus">
             <div className="stack-title-row"><strong>Workspace focus</strong><span className="scenario-type-tag">{selectedTenantPortfolio?.code || 'Waiting'}</span></div>
             {selectedTenantPortfolio ? (
               <div className="signal-list">

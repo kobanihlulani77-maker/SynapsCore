@@ -28,6 +28,12 @@ export default function ProfilePage({ context }) {
   if (!isAuthenticated || !isProfilePage) return null
 
   const sessionHealthNeedsAction = passwordChangeRequired || passwordRotationRequired
+  const currentRoleLabel = signedInRoles.length ? signedInRoles.map((role) => formatCodeLabel(role)).join(', ') : 'Role unavailable'
+  const sessionActionLabel = passwordChangeRequired
+    ? 'Password change required'
+    : passwordRotationRequired
+      ? 'Password rotation due'
+      : 'No security action'
   const sessionQuickActions = [
     { title: 'Open alerts', note: `${activeAlerts.length} active alert${activeAlerts.length === 1 ? '' : 's'} in the workspace`, target: 'alerts' },
     { title: 'Open approvals', note: `${pendingApprovalScenarios.length} decision${pendingApprovalScenarios.length === 1 ? '' : 's'} waiting on review`, target: 'approvals' },
@@ -45,26 +51,38 @@ export default function ProfilePage({ context }) {
           <span className="panel-badge audit-badge">{signedInSession ? 'Active' : 'Signed Out'}</span>
         </div>
 
-        <div className="ops-command-hero">
-          <div className="ops-command-copy">
+        <div className="workflow-decision-hero admin-trust-hero">
+          <div className="workflow-decision-copy">
             <strong>My workspace identity</strong>
             <p>
-              This page should make it obvious who is signed in, what workspace they are operating inside, what roles they
-              currently hold, and whether any security action is needed before continuing.
+              Confirm the signed-in person, active workspace, role posture, and session safety before operating inside the
+              command center.
             </p>
             <div className="ops-pill-row">
-              <span className="workspace-meta-pill">Operator identity</span>
-              <span className="workspace-meta-pill">Session aware</span>
-              <span className="workspace-meta-pill">Security guided</span>
+              <span className="workspace-meta-pill">{signedInSession?.tenantCode || 'Workspace unavailable'}</span>
+              <span className="workspace-meta-pill">{sessionActionLabel}</span>
+              <span className="workspace-meta-pill">{signedInWarehouseScopes.length || 'All'} warehouse scope</span>
             </div>
           </div>
-          <div className="ops-command-actions">
-            <button className="secondary-button" onClick={() => navigateToPage('settings')} type="button">
-              Open company settings
-            </button>
-            <button className="ghost-button" onClick={signOutOperator} disabled={authSessionState.loading} type="button">
-              {authSessionState.action === 'signout' ? 'Signing Out...' : 'Sign Out'}
-            </button>
+          <div className="workflow-action-console">
+            <div className="workflow-action-card">
+              <span>Signed in as</span>
+              <strong>{signedInSession?.displayName || signedInSession?.username || 'No active session'}</strong>
+              <p>{signedInSession ? `${signedInSession.username} in ${signedInSession.tenantName || signedInSession.tenantCode}` : 'Session data is not available.'}</p>
+            </div>
+            <div className="workflow-action-card">
+              <span>Session attention</span>
+              <strong>{sessionActionLabel}</strong>
+              <p>{sessionHealthNeedsAction ? 'Resolve the security action before treating this as a clean operator session.' : 'Session posture is inside the current workspace policy.'}</p>
+            </div>
+            <div className="ops-command-actions">
+              <button className="secondary-button" onClick={() => navigateToPage('settings')} type="button">
+                Open company settings
+              </button>
+              <button className="ghost-button" onClick={signOutOperator} disabled={authSessionState.loading} type="button">
+                {authSessionState.action === 'signout' ? 'Signing Out...' : 'Sign Out'}
+              </button>
+            </div>
           </div>
         </div>
 
@@ -76,28 +94,35 @@ export default function ProfilePage({ context }) {
         </div>
 
         <div className="experience-grid experience-grid-split">
-          <article className="stack-card section-card">
+          <article className="stack-card section-card workflow-selected-panel admin-focus-panel">
             <div className="stack-title-row">
-              <strong>Workspace identity</strong>
+              <strong>Current identity</strong>
               <span className={`status-tag ${sessionHealthNeedsAction ? 'status-failure' : 'status-success'}`}>{sessionHealthNeedsAction ? 'Action needed' : 'Healthy'}</span>
             </div>
             <div className="signal-list">
               <div className="signal-list-item">
                 <strong>{signedInSession?.displayName || 'No active session'}</strong>
                 <p>{signedInSession ? `${signedInSession.username} in ${signedInSession.tenantName || signedInSession.tenantCode}` : 'Sign in to manage your operator identity.'}</p>
-                <p className="muted-text">Actor {signedInSession?.actorName || 'Unavailable'} | Roles {signedInRoles.length ? signedInRoles.map((role) => formatCodeLabel(role)).join(', ') : 'None'}</p>
+                <p className="muted-text">Actor {signedInSession?.actorName || 'Unavailable'} | Roles {currentRoleLabel}</p>
                 <p className="muted-text">Workspace scope {signedInWarehouseScopes.length ? signedInWarehouseScopes.join(', ') : 'All warehouses in company scope'}.</p>
                 <p className="muted-text">Session expires {signedInSessionExpiresAt ? formatTimestamp(signedInSessionExpiresAt) : 'per workspace policy'}.</p>
                 <p className="muted-text">Password expires {signedInPasswordExpiresAt ? formatTimestamp(signedInPasswordExpiresAt) : 'per workspace policy'}.</p>
               </div>
+              <div className="utility-metric-grid">
+                <div><span>Workspace</span><strong>{signedInSession?.tenantCode || 'Unavailable'}</strong></div>
+                <div><span>Roles</span><strong>{signedInRoles.length}</strong></div>
+                <div><span>Session</span><strong>{signedInSession ? 'Active' : 'Unavailable'}</strong></div>
+                <div><span>Security</span><strong>{sessionHealthNeedsAction ? 'Action' : 'Current'}</strong></div>
+              </div>
             </div>
           </article>
 
-          <article className="stack-card section-card">
+          <article className="stack-card section-card admin-risk-panel">
             <div className="stack-title-row">
               <strong>Change password</strong>
-              <span className="scenario-type-tag">Secure session</span>
+              <span className={`status-tag ${sessionHealthNeedsAction ? 'status-failure' : 'status-partial'}`}>{sessionActionLabel}</span>
             </div>
+            <p className="muted-text">This only updates your signed-in account password. It does not change tenant roles, warehouse scope, or another operator account.</p>
             <div className="session-control-row">
               <label className="field session-field">
                 <span>Current Password</span>

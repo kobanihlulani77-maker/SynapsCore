@@ -10,6 +10,16 @@ export default function SystemConfigPage({ context }) {
   } = context
 
   if (!isAuthenticated || !isSystemConfigPage) return null
+  const runtimeReady = runtime?.readinessState === 'UP' || runtime?.overallStatus === 'UP'
+  const queueAttention = (runtime?.backbone?.failedDispatchCount ?? 0) > 0 || (runtime?.backbone?.oldestPendingAgeSeconds ?? 0) > 0
+  const originAttention = runtime && !runtime.allowedOrigins?.length
+  const configPosture = !runtime
+    ? 'Unavailable'
+    : runtimeReady && !queueAttention && !originAttention
+      ? 'Safe'
+      : queueAttention || originAttention
+        ? 'Watch'
+        : 'Incomplete'
 
   return (
     <section className="content-grid">
@@ -22,17 +32,29 @@ export default function SystemConfigPage({ context }) {
           <span className="panel-badge audit-badge">{runtime?.activeProfiles?.join(', ') || 'Loading'}</span>
         </div>
 
-        <div className="ops-command-hero">
-          <div className="ops-command-copy">
+        <div className="workflow-decision-hero config-trust-hero">
+          <div className="workflow-decision-copy">
             <strong>Platform operating envelope</strong>
             <p>
-              This page explains how the platform is configured to behave: queue cadence, origin posture, session handling,
-              and telemetry boundaries. It should feel understandable, not like a raw config dump.
+              Translate runtime configuration into operational trust: which environment is visible, which capability could
+              be affected, and what a technical administrator should check next.
             </p>
             <div className="ops-pill-row">
-              <span className="workspace-meta-pill">Runtime defaults</span>
-              <span className="workspace-meta-pill">Origin aware</span>
-              <span className="workspace-meta-pill">Queue backed</span>
+              <span className="workspace-meta-pill">Posture {configPosture}</span>
+              <span className="workspace-meta-pill">{runtime?.activeProfiles?.join(', ') || 'Environment not reported'}</span>
+              <span className="workspace-meta-pill">{runtime?.allowedOrigins?.length ?? 0} allowed origins</span>
+            </div>
+          </div>
+          <div className="workflow-action-console">
+            <div className="workflow-action-card">
+              <span>Primary capability</span>
+              <strong>{queueAttention ? 'Realtime dispatch needs review' : 'Realtime dispatch configured'}</strong>
+              <p>Queue cadence and dispatch pressure affect how operational updates fan out across the workspace.</p>
+            </div>
+            <div className="workflow-action-card">
+              <span>Technical next check</span>
+              <strong>{originAttention ? 'Review allowed origins' : runtimeReady ? 'Monitor runtime evidence' : 'Confirm readiness'}</strong>
+              <p>Only display-safe configuration is shown here; secrets and credentials stay out of the browser.</p>
             </div>
           </div>
         </div>
@@ -45,12 +67,13 @@ export default function SystemConfigPage({ context }) {
         </div>
 
         <div className="experience-grid experience-grid-split">
-          <article className="stack-card section-card">
-            <div className="stack-title-row"><strong>Realtime and queue backbone</strong><span className="status-tag status-success">Configured</span></div>
+          <article className="stack-card section-card workflow-selected-panel admin-focus-panel">
+            <div className="stack-title-row"><strong>Realtime and queue backbone</strong><span className={`status-tag ${queueAttention ? 'status-partial' : 'status-success'}`}>{queueAttention ? 'Watch' : 'Configured'}</span></div>
             <div className="signal-list">
               <div className="signal-list-item">
                 <strong>Dispatch cadence</strong>
                 <p>Dispatch queue drains every {runtime?.backbone?.dispatchIntervalMs ?? '...'} ms in batches of {runtime?.backbone?.batchSize ?? '...'}.</p>
+                <p className="muted-text">Operational impact: realtime dashboard and incident updates depend on this fan-out path.</p>
                 <p className="muted-text">Oldest queued work {runtime?.backbone?.oldestPendingAgeSeconds == null ? 'clear' : `${runtime.backbone.oldestPendingAgeSeconds}s`} | Failed dispatch {runtime?.backbone?.failedDispatchCount ?? 0}</p>
               </div>
               <div className="signal-list-item">
@@ -61,12 +84,12 @@ export default function SystemConfigPage({ context }) {
             </div>
           </article>
 
-          <article className="stack-card section-card">
+          <article className="stack-card section-card admin-risk-panel">
             <div className="stack-title-row"><strong>Session and origin posture</strong><span className={`status-tag ${runtime?.secureSessionCookies ? 'status-success' : 'status-partial'}`}>{runtime?.secureSessionCookies ? 'Secure' : 'Local HTTP'}</span></div>
             <div className="signal-list">
               <div className="signal-list-item">
                 <strong>Allowed origins</strong>
-                <p>{runtime?.allowedOrigins?.join(', ') || 'Loading'}</p>
+                <p>{runtime?.allowedOrigins?.join(', ') || 'Configuration value not reported'}</p>
                 <p className="muted-text">Review this before rollout to ensure browser sessions, CORS, and realtime connect cleanly.</p>
               </div>
               <div className="signal-list-item">
@@ -79,7 +102,7 @@ export default function SystemConfigPage({ context }) {
         </div>
 
         <div className="experience-grid experience-grid-three">
-          <article className="stack-card section-card">
+          <article className="stack-card section-card admin-form-panel">
             <div className="stack-title-row"><strong>Request and access posture</strong><span className="scenario-type-tag">{runtime?.activeProfiles?.join(', ') || 'Loading'}</span></div>
             <div className="signal-list">
               <div className="signal-list-item">
@@ -95,7 +118,7 @@ export default function SystemConfigPage({ context }) {
             </div>
           </article>
 
-          <article className="stack-card section-card">
+          <article className="stack-card section-card admin-form-panel">
             <div className="stack-title-row"><strong>Dispatch envelope</strong><span className="scenario-type-tag">Queue-backed</span></div>
             <div className="signal-list">
               <div className="signal-list-item">
@@ -111,7 +134,7 @@ export default function SystemConfigPage({ context }) {
             </div>
           </article>
 
-          <article className="stack-card section-card">
+          <article className="stack-card section-card admin-risk-panel">
             <div className="stack-title-row"><strong>Failure signals</strong><span className="scenario-type-tag">Operator readable</span></div>
             <div className="signal-list">
               <div className="signal-list-item">

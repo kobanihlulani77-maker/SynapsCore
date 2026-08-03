@@ -37,6 +37,9 @@ export default function SettingsPage({ context }) {
   const supportedWorkspaceConnectorModes = selectedWorkspaceConnector?.supportedSyncModes?.length
     ? selectedWorkspaceConnector.supportedSyncModes
     : ['REALTIME_PUSH']
+  const settingsReviewCount = (workspaceAdmin?.supportDiagnostics?.connectorsWithoutSupportOwner || 0)
+    + (workspaceAdmin?.supportDiagnostics?.activeUsersRequiringPasswordChange || 0)
+  const workspaceScopeLabel = signedInSession?.tenantName || signedInSession?.tenantCode || 'Workspace unavailable'
 
   return (
     <section className="content-grid">
@@ -49,26 +52,30 @@ export default function SettingsPage({ context }) {
           <span className="panel-badge scenario-badge">{workspaceAdmin?.warehouses?.length || 0}</span>
         </div>
 
-        <div className="ops-command-hero">
-          <div className="ops-command-copy">
+        <div className="workflow-decision-hero admin-trust-hero">
+          <div className="workflow-decision-copy">
             <strong>Company workspace configuration</strong>
             <p>
-              This surface should explain what company-level settings affect operations, security, warehouse scope, and connector behavior
-              without turning workspace configuration into a raw admin console.
+              Every control on this page affects the signed-in company workspace. Keep the affected scope, consequence,
+              and save path visible before changing security, warehouse, or connector policy.
             </p>
             <div className="ops-pill-row">
-              <span className="workspace-meta-pill">{signedInSession?.tenantCode || 'Workspace code pending'}</span>
+              <span className="workspace-meta-pill">{workspaceScopeLabel}</span>
               <span className="workspace-meta-pill">{canManageTenantAccess ? 'Admin editing enabled' : 'Read-only access'}</span>
-              <span className="workspace-meta-pill">Tenant boundary enforced</span>
+              <span className="workspace-meta-pill">{settingsReviewCount} review signals</span>
             </div>
           </div>
-          <div className="ops-command-actions">
-            <button className="secondary-button" onClick={saveWorkspaceSettings} disabled={accessAdminState.loading || !canManageTenantAccess || !workspaceSettingsForm.tenantName.trim()} type="button">
-              {accessAdminState.loading ? 'Working...' : 'Save Workspace'}
-            </button>
-            <button className="ghost-button" onClick={saveWorkspaceSecuritySettings} disabled={accessAdminState.loading || !canManageTenantAccess} type="button">
-              {accessAdminState.loading ? 'Working...' : 'Save Security Policy'}
-            </button>
+          <div className="workflow-action-console">
+            <div className="workflow-action-card">
+              <span>Workspace scope</span>
+              <strong>{signedInSession?.tenantCode || 'Not reported'}</strong>
+              <p>Changes are tenant-scoped and apply inside this company workspace boundary.</p>
+            </div>
+            <div className="workflow-action-card">
+              <span>High-impact controls</span>
+              <strong>Security and connectors</strong>
+              <p>Session policy, connector mode, and support ownership can affect operational access or data flow.</p>
+            </div>
           </div>
         </div>
 
@@ -83,8 +90,9 @@ export default function SettingsPage({ context }) {
         {accessAdminState.success ? <p className="success-text">{accessAdminState.success}</p> : null}
 
         <div className="experience-grid experience-grid-split">
-          <article className="stack-card section-card" id="settings-profile">
+          <article className="stack-card section-card admin-form-panel" id="settings-profile">
             <div className="stack-title-row"><strong>Workspace profile</strong><span className="status-tag status-success">Admin controlled</span></div>
+            <p className="muted-text">Descriptive company identity. Applies to this workspace after the save request succeeds.</p>
             <div className="session-control-row">
               <label className="field planner-name-field">
                 <span>Company workspace name</span>
@@ -95,11 +103,16 @@ export default function SettingsPage({ context }) {
                 <input value={workspaceSettingsForm.description} onChange={(event) => setWorkspaceSettingsForm((current) => ({ ...current, description: event.target.value }))} placeholder="Operational workspace summary" disabled={accessAdminState.loading || !canManageTenantAccess} />
               </label>
             </div>
-            <p className="muted-text">Workspace identity explains what company environment operators are entering and what operational boundary this configuration governs.</p>
+            <div className="history-action-row">
+              <button className="secondary-button" onClick={saveWorkspaceSettings} disabled={accessAdminState.loading || !canManageTenantAccess || !workspaceSettingsForm.tenantName.trim()} type="button">
+                {accessAdminState.loading ? 'Working...' : 'Save Workspace'}
+              </button>
+            </div>
           </article>
 
-          <article className="stack-card section-card" id="settings-security">
+          <article className="stack-card section-card admin-risk-panel" id="settings-security">
             <div className="stack-title-row"><strong>Security policy</strong><span className="status-tag status-partial">Workspace policy</span></div>
+            <p className="muted-text">High-impact settings. These values affect workspace session safety and password hygiene after the backend confirms the update.</p>
             <div className="session-control-row">
               <label className="field planner-name-field">
                 <span>Password rotation days</span>
@@ -114,16 +127,21 @@ export default function SettingsPage({ context }) {
                 <input className="checkbox-input" type="checkbox" checked={workspaceSecurityForm.invalidateOtherSessions} onChange={(event) => setWorkspaceSecurityForm((current) => ({ ...current, invalidateOtherSessions: event.target.checked }))} disabled={accessAdminState.loading || !canManageTenantAccess} />
               </label>
             </div>
-            <p className="muted-text">These settings directly shape session safety and password hygiene for everyone inside the company workspace.</p>
+            <div className="history-action-row">
+              <button className="secondary-button" onClick={saveWorkspaceSecuritySettings} disabled={accessAdminState.loading || !canManageTenantAccess} type="button">
+                {accessAdminState.loading ? 'Working...' : 'Save Security Policy'}
+              </button>
+            </div>
           </article>
         </div>
 
         <div className="experience-grid experience-grid-split">
-          <article className="stack-card section-card">
+          <article className="stack-card section-card admin-form-panel">
             <div className="stack-title-row"><strong>Warehouse focus</strong><span className="scenario-type-tag">{selectedWorkspaceWarehouse?.code || 'Waiting'}</span></div>
+            <p className="muted-text">Operational site identity. Save only updates the selected warehouse lane.</p>
             <div className="signal-list">
               {workspaceAdmin?.warehouses?.length ? workspaceAdmin.warehouses.map((warehouse) => (
-                <button key={warehouse.id} className={`signal-list-item selectable-card system-select-card ${selectedWorkspaceWarehouse?.id === warehouse.id ? 'is-selected' : ''}`} onClick={() => setSelectedWorkspaceWarehouseId(warehouse.id)} type="button">
+                  <button key={warehouse.id} className={`signal-list-item selectable-card system-select-card admin-subject-card ${selectedWorkspaceWarehouse?.id === warehouse.id ? 'is-selected' : ''}`} onClick={() => setSelectedWorkspaceWarehouseId(warehouse.id)} type="button">
                   <strong>{warehouse.name}</strong>
                   <p>{warehouse.code}</p>
                   <p className="muted-text">{warehouse.location || 'Location not defined yet'}</p>
@@ -149,14 +167,19 @@ export default function SettingsPage({ context }) {
             ) : null}
           </article>
 
-          <article className="stack-card section-card" id="settings-connectors">
+          <article className="stack-card section-card admin-risk-panel" id="settings-connectors">
             <div className="stack-title-row"><strong>Connector focus</strong><span className="scenario-type-tag">{selectedWorkspaceConnector ? formatCodeLabel(selectedWorkspaceConnector.syncMode) : 'Waiting'}</span></div>
+            <p className="muted-text">High-impact integration settings. Changes can affect inbound data handling, validation, cadence, and recovery ownership.</p>
             <div className="signal-list">
               {workspaceAdmin?.connectors?.length ? workspaceAdmin.connectors.map((connector) => (
-                <button key={connector.id} className={`signal-list-item selectable-card system-select-card ${selectedWorkspaceConnector?.id === connector.id ? 'is-selected' : ''}`} onClick={() => setSelectedWorkspaceConnectorId(connector.id)} type="button">
+                <button key={connector.id} className={`signal-list-item selectable-card system-select-card admin-subject-card ${selectedWorkspaceConnector?.id === connector.id ? 'is-selected' : ''}`} onClick={() => setSelectedWorkspaceConnectorId(connector.id)} type="button">
                   <strong>{connector.displayName}</strong>
                   <p>{connector.sourceSystem} | {formatCodeLabel(connector.syncMode)}</p>
                   <p className="muted-text">{connector.supportOwnerDisplayName || 'No support owner assigned yet'}</p>
+                  <div className="attention-card-meta">
+                    <span>{connector.supportOwnerDisplayName ? 'Owner assigned' : 'Ownership needed'}</span>
+                    <span>{formatCodeLabel(connector.validationPolicy)}</span>
+                  </div>
                 </button>
               )) : <EmptyState>Connector policy cards will appear here once integration lanes are created for the workspace.</EmptyState>}
             </div>

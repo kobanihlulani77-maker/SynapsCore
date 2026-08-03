@@ -19,6 +19,10 @@ export default function ReleasesPage({ context }) {
   } = context
 
   if (!isAuthenticated || !isReleasesPage) return null
+  const runtimeStatus = runtime?.overallStatus || 'Not reported'
+  const backendVersion = formatBuildValue(runtime?.build?.version)
+  const backendCommit = formatBuildValue(runtime?.build?.commit)
+  const releaseEvidenceLabel = runtime?.readinessState ? formatCodeLabel(runtime.readinessState) : 'Unavailable'
 
   return (
     <section className="content-grid">
@@ -31,35 +35,47 @@ export default function ReleasesPage({ context }) {
           <span className={`panel-badge ${runtime ? getRuntimeStatusClassName(runtime.overallStatus) : 'audit-badge'}`}>{runtime ? runtime.overallStatus : 'Loading'}</span>
         </div>
 
-        <div className="ops-command-hero">
-          <div className="ops-command-copy">
+        <div className="workflow-decision-hero release-trust-hero">
+          <div className="workflow-decision-copy">
             <strong>Release trust surface</strong>
             <p>
-              This page should make deployment identity feel trustworthy and readable: what is running, when it was built,
-              what endpoints the frontend expects, and whether the current runtime posture still looks safe.
+              Confirm what version is running, which commit it reports, which endpoints the frontend is using, and what
+              live runtime evidence is available before treating this environment as trusted.
             </p>
             <div className="ops-pill-row">
-              <span className="workspace-meta-pill">Build fingerprint</span>
-              <span className="workspace-meta-pill">Endpoint aware</span>
-              <span className="workspace-meta-pill">Runtime linked</span>
+              <span className="workspace-meta-pill">{runtimeStatus}</span>
+              <span className="workspace-meta-pill">Evidence {releaseEvidenceLabel}</span>
+              <span className="workspace-meta-pill">{backendCommit === 'untracked' ? 'Commit not reported' : backendCommit.slice(0, 7)}</span>
+            </div>
+          </div>
+          <div className="workflow-action-console">
+            <div className="workflow-action-card">
+              <span>Current backend</span>
+              <strong>{backendVersion}</strong>
+              <p>Commit {backendCommit}. Built {formatBuildValue(runtime?.build?.builtAt)}.</p>
+            </div>
+            <div className="workflow-action-card">
+              <span>Current frontend</span>
+              <strong>{formatBuildValue(frontendBuildVersion)}</strong>
+              <p>Commit {formatBuildValue(frontendBuildCommit)}. Built {formatBuildValue(frontendBuildTime)}.</p>
             </div>
           </div>
         </div>
 
         <div className="summary-grid compact-summary-grid">
-          <MetricCard label="Backend version" value={formatBuildValue(runtime?.build?.version)} accent="blue" note="Version currently served by the live backend runtime." />
+          <MetricCard label="Backend version" value={backendVersion} accent="blue" note="Version currently served by the live backend runtime." />
           <MetricCard label="Frontend version" value={formatBuildValue(frontendBuildVersion)} accent="teal" note="Version currently loaded by the workspace frontend." />
-          <MetricCard label="Commit" value={formatBuildValue(runtime?.build?.commit).slice(0, 7)} accent="amber" note="Short backend commit fingerprint for release verification." />
-          <MetricCard label="Profiles" value={runtime?.activeProfiles?.join(', ') || '...'} accent="rose" note="Runtime profile posture currently active in the environment." />
+          <MetricCard label="Readiness" value={releaseEvidenceLabel} accent="amber" note="Runtime readiness evidence reported by the backend." />
+          <MetricCard label="Profiles" value={runtime?.activeProfiles?.join(', ') || 'Not reported'} accent="rose" note="Runtime profile posture currently active in the environment." />
         </div>
 
         <div className="experience-grid experience-grid-split">
-          <article className="stack-card section-card" id="releases-builds">
-            <div className="stack-title-row"><strong>Backend build</strong><span className="status-tag status-success">{formatBuildValue(runtime?.build?.version)}</span></div>
+          <article className="stack-card section-card workflow-selected-panel admin-focus-panel" id="releases-builds">
+            <div className="stack-title-row"><strong>Backend build</strong><span className={`status-tag ${runtime ? getRuntimeStatusClassName(runtime.overallStatus) : 'status-partial'}`}>{backendVersion}</span></div>
             <div className="signal-list">
               <div className="signal-list-item">
                 <strong>Release identity</strong>
-                <p>Commit {formatBuildValue(runtime?.build?.commit)} | Built {formatBuildValue(runtime?.build?.builtAt)}</p>
+                <p>Commit {backendCommit} | Built {formatBuildValue(runtime?.build?.builtAt)}</p>
                 <p className="muted-text">Observed {formatTimestamp(runtime?.observedAt)}</p>
               </div>
               <div className="signal-list-item">
@@ -70,8 +86,8 @@ export default function ReleasesPage({ context }) {
             </div>
           </article>
 
-          <article className="stack-card section-card">
-            <div className="stack-title-row"><strong>Frontend build</strong><span className="status-tag status-success">{formatBuildValue(frontendBuildVersion)}</span></div>
+          <article className="stack-card section-card admin-form-panel">
+            <div className="stack-title-row"><strong>Frontend build</strong><span className="status-tag status-partial">{formatBuildValue(frontendBuildVersion)}</span></div>
             <div className="signal-list">
               <div className="signal-list-item">
                 <strong>Release identity</strong>
@@ -88,12 +104,12 @@ export default function ReleasesPage({ context }) {
         </div>
 
         <div className="experience-grid experience-grid-three">
-          <article className="stack-card section-card" id="releases-checklist">
+          <article className="stack-card section-card admin-risk-panel" id="releases-checklist">
             <div className="stack-title-row"><strong>Environment checklist</strong><span className="scenario-type-tag">{runtime?.activeProfiles?.join(', ') || 'Loading'}</span></div>
             <div className="signal-list">
               <div className="signal-list-item">
                 <strong>Runtime readiness</strong>
-                <p>{runtime ? formatCodeLabel(runtime.readinessState) : 'Loading'}</p>
+                <p>{runtime ? formatCodeLabel(runtime.readinessState) : 'Unavailable'}</p>
                 <p className="muted-text">The environment should report UP before teams start using the control center live.</p>
               </div>
               <div className="signal-list-item">

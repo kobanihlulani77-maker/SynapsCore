@@ -2332,6 +2332,66 @@ tbody tr:hover {
   padding: 0 2px 2px;
 }
 
+.admin-trust-hero,
+.platform-admin-hero,
+.release-trust-hero,
+.config-trust-hero {
+  background:
+    radial-gradient(circle at top right, rgba(121, 156, 194, 0.11), transparent 30%),
+    linear-gradient(180deg, rgba(14, 27, 43, 0.97), rgba(9, 18, 30, 0.99));
+}
+
+.platform-admin-hero {
+  border-color: rgba(250, 204, 21, 0.22);
+}
+
+.admin-list-panel,
+.admin-form-panel,
+.admin-risk-panel,
+.admin-focus-panel,
+.admin-subject-card,
+.admin-form-section,
+.admin-review-card {
+  display: grid;
+  gap: 12px;
+}
+
+.admin-subject-card {
+  align-content: start;
+}
+
+.admin-focus-panel {
+  border-color: rgba(80, 216, 171, 0.24);
+  background:
+    radial-gradient(circle at top right, rgba(80, 216, 171, 0.07), transparent 32%),
+    rgba(8, 18, 30, 0.9);
+}
+
+.admin-risk-panel {
+  border-color: rgba(250, 204, 21, 0.22);
+  background:
+    radial-gradient(circle at top right, rgba(250, 204, 21, 0.07), transparent 30%),
+    rgba(9, 18, 30, 0.92);
+}
+
+.admin-form-section,
+.admin-review-card {
+  padding: 14px;
+  border-radius: var(--radius-md);
+  border: 1px solid rgba(121, 156, 194, 0.14);
+  background: rgba(5, 14, 23, 0.46);
+}
+
+.admin-form-section > div:first-child p,
+.admin-review-card p {
+  margin: 4px 0 0;
+  line-height: 1.5;
+}
+
+.admin-review-card {
+  border-color: rgba(80, 216, 171, 0.18);
+}
+
 .compact-action-button {
   min-height: 36px;
   padding: 0 12px;
