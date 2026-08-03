@@ -13,12 +13,13 @@ That claim is grounded in:
 - backend automated proof
 - frontend production build proof
 - hosted tenant preparation proof
-- two consecutive full hosted browser-proof passes on Render
+- three full hosted browser-proof passes on Render, including replacement-database revalidation
 
 Historical hosted Render evidence:
 
 - run 1: `6 passed (6.3m)`
 - run 2: `6 passed (4.3m)`
+- replacement DB run: `6 passed (4.1m)` on August 3, 2026 using proof tenant `HOSTED-PROOF-2`
 
 ## Live Hosted Proof Coverage
 
@@ -48,7 +49,7 @@ The historical live passes covered:
 | Runtime / incidents / audit | `FULLY REAL` | Runtime diagnostics, incidents, audit traceability, and recovery visibility are live trust surfaces. |
 | Websocket / realtime | `FULLY PROVEN` | Tenant-scoped realtime is proven live on Render using STOMP over SockJS with Redis pub/sub fanout. |
 | Deployment safety | `FULLY REAL` | Production startup uses Flyway plus JPA validate, root `/` is safe, and runtime build identity is exposed through backend runtime metadata. |
-| Hosted authenticated proof | `FULLY PROVEN` | The full six-test hosted proof pack passed twice consecutively on Render. |
+| Hosted authenticated proof | `FULLY PROVEN` | The full six-test hosted proof pack passed against the replacement Render database on August 3, 2026. |
 
 ## Current Replacement-Database Revalidation
 
@@ -64,15 +65,14 @@ Current live infrastructure status after the Render trial database was deleted a
 
 Current proof-preparation status:
 
-- the replacement PostgreSQL database is clean and empty
-- `/api/access/tenants` currently returns an empty tenant list
-- `scripts\prepare-hosted-proof.ps1` now generates and persists proof tenant/operator values into ignored local proof state
-- first-tenant creation on the empty replacement database still requires the private backend bootstrap token, supplied through `SYNAPSECORE_BOOTSTRAP_INITIAL_TOKEN`
-- current hosted browser proof has not yet been rerun against the replacement database
+- the replacement PostgreSQL database has been bootstrapped through supported APIs
+- `scripts\prepare-hosted-proof.ps1` generates and persists proof tenant/operator values into ignored local proof state
+- hosted proof revalidation passed against proof tenant `HOSTED-PROOF-2`
+- current browser proof result is `6 passed (4.1m)`
 
-Required next step:
+Evidence note:
 
-- load only the private backend bootstrap token, run `scripts\prepare-hosted-proof.ps1`, then run `cd frontend` and `npm.cmd run test:e2e:prod`
+- [release-evidence-2026-08-03.md](release-evidence-2026-08-03.md)
 
 ## Final Platform Truths
 
@@ -92,7 +92,7 @@ They should not be treated as product failure by themselves.
 ## Final Verdict
 
 - `FRONTEND_BACKEND_CONNECTION = FULLY PROVEN`
-- `HOSTED_PROOF = HISTORICALLY FULLY PROVEN; REVALIDATION PENDING ON REPLACEMENT DB`
+- `HOSTED_PROOF = FULLY PROVEN ON REPLACEMENT DB`
 - `REPLAY_RECOVERY = FULLY PROVEN`
 - `REALTIME = FULLY PROVEN`
 - `WHOLE_PROJECT = FULLY REAL`

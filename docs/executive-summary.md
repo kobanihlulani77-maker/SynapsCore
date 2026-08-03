@@ -59,10 +59,10 @@ Current live truth in this project phase:
 - frontend deployment is live and responding
 - backend deployment is live and responding after replacement PostgreSQL provisioning
 - live readiness, auth session, and websocket info are responding cleanly
-- the replacement database is clean and empty, so hosted proof preparation must bootstrap a tenant through supported APIs
-- hosted proof rerun is pending the private backend bootstrap token required only for first-tenant creation on the empty replacement database
+- the replacement database was bootstrapped through supported APIs
+- hosted proof revalidation passed against the replacement database with `6 passed (4.1m)`
 
-That means the system is being treated honestly: live readiness is back, but current hosted proof is not considered refreshed until preparation and browser proof pass against the replacement database.
+That means the system is being treated honestly: live readiness is back and current hosted proof has been refreshed against the replacement database.
 
 ## Why The Architecture Matters
 

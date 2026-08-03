@@ -199,6 +199,7 @@ This index links the main product, architecture, runbook, proof, and operator do
 - [hosted-proof.md](hosted-proof.md)
 - [proof-and-validation.md](proof-and-validation.md)
 - [verification-status.md](verification-status.md)
+- [release-evidence-2026-08-03.md](release-evidence-2026-08-03.md)
 - [frontend-demo-guide.md](frontend-demo-guide.md)
 - [frontend-qa-checklist.md](frontend-qa-checklist.md)
 - [frontend-demo-mode.md](frontend-demo-mode.md)
@@ -207,6 +208,7 @@ This index links the main product, architecture, runbook, proof, and operator do
 
 - [proof-and-validation.md](proof-and-validation.md)
 - [hosted-proof.md](hosted-proof.md)
+- [release-evidence-2026-08-03.md](release-evidence-2026-08-03.md)
 - [technical-reviewer-guide.md](technical-reviewer-guide.md)
 
 ## Product And Architecture

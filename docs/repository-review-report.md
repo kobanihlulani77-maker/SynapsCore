@@ -76,12 +76,12 @@ Current honest posture:
 - the platform has historical hosted proof evidence
 - the replacement Render PostgreSQL database has been provisioned and the backend is responding again
 - live health, readiness, auth/session, and websocket info are currently healthy when `scripts\check-live-connections.ps1` reports `PROOF_ALLOWED=True`
-- the replacement database is clean and empty, so hosted proof preparation must bootstrap the proof tenant through supported APIs
-- current hosted browser proof against the replacement database is pending the private backend bootstrap token for first-tenant creation
+- the replacement database was bootstrapped through supported APIs
+- current hosted browser proof against the replacement database passed with `6 passed (4.1m)`
 
 This is an important reviewer truth:
 
-historical proof success, current live readiness, and replacement-database proof revalidation are related, but not the same thing.
+historical proof success, current live readiness, and replacement-database proof revalidation are related, but not the same thing; as of August 3, 2026, all three are aligned again.
 
 ## Recommended First-Read Path
 
@@ -104,7 +104,7 @@ The main stale interpretation risk is not a totally wrong document. It is emphas
 
 Specifically:
 
-- historical hosted proof success can be read too optimistically if replacement-database revalidation status is not mentioned nearby
+- historical hosted proof success can be read too optimistically if future replacement-database revalidation status is not mentioned nearby
 - some older docs still describe ideal or previously healthy deployment conditions that should be read alongside recovery and limitations docs
 - the large docs index is useful, but it benefits from routing docs like [documentation-map.md](documentation-map.md) and this report
 

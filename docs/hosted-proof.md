@@ -128,8 +128,11 @@ Current live evidence:
 
 - run 1: `6 passed (6.3m)`
 - run 2: `6 passed (4.3m)`
+- replacement database run: `6 passed (4.1m)` on August 3, 2026 using proof tenant `HOSTED-PROOF-2`
 
 Those runs followed the official proof order above.
+
+Current replacement-database evidence is recorded in [release-evidence-2026-08-03.md](release-evidence-2026-08-03.md).
 
 ## Operational Noise Classification
 

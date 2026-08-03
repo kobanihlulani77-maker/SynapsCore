@@ -66,9 +66,10 @@ The current supported scope is not theoretical. It is proven.
 
 Hosted proof evidence:
 
-- full hosted proof passed twice consecutively on Render
+- full hosted proof passed on Render, including replacement-database revalidation
 - run 1: `6 passed (6.3m)`
 - run 2: `6 passed (4.3m)`
+- replacement DB run: `6 passed (4.1m)` on August 3, 2026 using proof tenant `HOSTED-PROOF-2`
 
 What those runs proved live:
 
@@ -88,11 +89,11 @@ The most important current truth is:
 
 - historical hosted proof evidence exists
 - the frontend deployment is reachable
-- the replacement Render database and backend are reachable again when live readiness, auth, and websocket checks pass
-- hosted proof should still run only after `scripts\check-live-connections.ps1` reports `PROOF_ALLOWED=True`
-- a clean replacement database requires hosted proof preparation to bootstrap the proof tenant through supported APIs
+- the replacement Render database and backend are reachable
+- hosted proof revalidation passed against the replacement database
+- future hosted proof reruns should still run only after `scripts\check-live-connections.ps1` reports `PROOF_ALLOWED=True`
 
-That means historical proof success should be read together with the current recovery and runtime posture, and every replacement database must be revalidated before claiming refreshed hosted proof.
+That means historical proof success is now refreshed by a current replacement-database proof run. Every future replacement database must still be revalidated before claiming refreshed hosted proof.
 
 ## Current Supported Scope
 
