@@ -36,6 +36,30 @@ export default function OrdersPage({ context }) {
   const loadedWarehouses = new Set(orderCards.map((order) => order.warehouseCode).filter(Boolean)).size
   const newestOrder = orderCards[0]
   const mostPressedOrder = delayedOrders[0] || linkedOrders[0] || newestOrder
+  const attentionOrders = [
+    ...delayedOrders,
+    ...orderCards.filter((order) => !order.relatedFulfillment && !delayedOrders.some((candidate) => candidate.id === order.id)),
+    ...highValueOrders.filter((order) => !delayedOrders.some((candidate) => candidate.id === order.id)),
+  ].filter((order, index, list) => list.findIndex((candidate) => candidate.id === order.id) === index)
+  const orderPosture = delayedOrders.length
+    ? 'Attention required'
+    : orderCards.length && linkedOrders.length === orderCards.length
+      ? 'Processing normally'
+      : orderCards.length
+        ? 'Awaiting linkage'
+        : 'Quiet'
+  const orderPostureTone = delayedOrders.length
+    ? 'status-failure'
+    : orderCards.length && linkedOrders.length === orderCards.length
+      ? 'status-success'
+      : 'status-partial'
+  const orderPostureCopy = delayedOrders.length
+    ? `${delayedOrders.length} order lane${delayedOrders.length === 1 ? '' : 's'} have delayed fulfillment evidence. Inspect those before normal order review.`
+    : orderCards.length && linkedOrders.length === orderCards.length
+      ? 'Visible orders are linked into fulfillment. Continue watching warehouse concentration and delivery posture.'
+      : orderCards.length
+        ? 'Recent orders are visible, but some are still waiting for downstream fulfillment linkage.'
+        : 'No recent order pressure is visible in the current workspace window.'
 
   return (
     <section className="content-grid orders-center-grid">
@@ -48,20 +72,26 @@ export default function OrdersPage({ context }) {
           <span className="panel-badge order-badge">{orderCards.length}</span>
         </div>
 
-        <div className="ops-command-hero">
-          <div className="ops-command-copy">
-            <strong>Live order operations</strong>
-            <p>
-              Keep warehouse flow, fulfillment linkage, and order value moving through one command surface.
-              The highest-pressure lanes should be obvious before teams need to drill into downstream details.
-            </p>
+        <div className="workflow-decision-hero daily-ops-hero">
+          <div className="workflow-decision-copy">
+            <p className="panel-kicker">Order posture</p>
+            <div className="runtime-decision-title">
+              <span className={`runtime-decision-badge ${orderPostureTone}`}>{orderPosture}</span>
+              <h2>{attentionOrders.length ? `${attentionOrders.length} order${attentionOrders.length === 1 ? '' : 's'} need review` : 'Order stream is calm.'}</h2>
+            </div>
+            <p>{orderPostureCopy}</p>
             <div className="ops-pill-row">
-              <span className="workspace-meta-pill">Warehouse-scoped</span>
-              <span className="workspace-meta-pill">Fulfillment-aware</span>
-              <span className="workspace-meta-pill">Recent live flow</span>
+              <span className="workspace-meta-pill">Recent {orderCards.length}</span>
+              <span className="workspace-meta-pill">Delayed {delayedOrders.length}</span>
+              <span className="workspace-meta-pill">Linked {linkedOrders.length}</span>
             </div>
           </div>
-          <div className="ops-command-actions">
+          <div className="workflow-action-console">
+            <div className="workflow-action-card">
+              <span>Inspect next</span>
+              <strong>{mostPressedOrder?.externalOrderId || 'No order selected'}</strong>
+              <p>{mostPressedOrder ? 'Focus the order with delay, fulfillment linkage, or newest activity before reviewing secondary flow posture.' : 'No order action is available until order data arrives.'}</p>
+            </div>
             <button className="secondary-button" onClick={() => newestOrder && setSelectedOrderId(newestOrder.id)} disabled={!newestOrder} type="button">
               Inspect newest order
             </button>
@@ -78,14 +108,14 @@ export default function OrdersPage({ context }) {
           <MetricCard label="Warehouses under flow" value={warehouseOptions.length} accent="teal" note="Warehouse lanes currently participating in order movement." />
         </div>
 
-        <div className="experience-grid experience-grid-split">
+        <div className="experience-grid daily-ops-workbench">
           <article className="stack-card section-card">
             <div className="stack-title-row">
-              <strong>Recent order queue</strong>
-              <span className="scenario-type-tag">{orderCards.length ? 'Live' : 'Quiet'}</span>
+              <strong>{attentionOrders.length ? 'Attention queue' : 'Recent order queue'}</strong>
+              <span className={`status-tag ${orderPostureTone}`}>{attentionOrders.length || orderCards.length}</span>
             </div>
             <div className="signal-list">
-              {orderCards.length ? orderCards.map((order) => (
+              {(attentionOrders.length ? attentionOrders : orderCards).length ? (attentionOrders.length ? attentionOrders : orderCards).map((order) => (
                 <button
                   key={order.id}
                   className={`signal-list-item selectable-card system-select-card ${selectedOrder?.id === order.id ? 'is-selected' : ''}`}
@@ -94,18 +124,17 @@ export default function OrdersPage({ context }) {
                 >
                   <div className="stack-title-row">
                     <strong>{order.externalOrderId}</strong>
-                    <span className="order-total">{currency.format(order.totalAmount)}</span>
+                    <span className={`status-tag ${order.relatedFulfillment?.fulfillmentStatus === 'DELAYED' ? 'status-failure' : order.relatedFulfillment ? 'status-success' : 'status-partial'}`}>
+                      {order.relatedFulfillment ? formatCodeLabel(order.relatedFulfillment.fulfillmentStatus) : 'Awaiting link'}
+                    </span>
                   </div>
-                  <p>{order.warehouseName} | {order.itemCount} units</p>
-                  <p className="muted-text">{formatTimestamp(order.createdAt)}</p>
+                  <p>{order.warehouseName} | {order.itemCount} units | {currency.format(order.totalAmount)}</p>
                   {order.relatedFulfillment ? (
                     <p className="muted-text">
-                      Fulfillment {formatCodeLabel(order.relatedFulfillment.fulfillmentStatus)}
-                      {' | '}
-                      Dispatch due {formatRelativeHours(order.relatedFulfillment.hoursUntilDispatchDue)}
+                      Dispatch due {formatRelativeHours(order.relatedFulfillment.hoursUntilDispatchDue)} | Created {formatTimestamp(order.createdAt)}
                     </p>
                   ) : (
-                    <p className="muted-text">Awaiting fulfillment lane linkage.</p>
+                    <p className="muted-text">Awaiting fulfillment lane linkage | Created {formatTimestamp(order.createdAt)}</p>
                   )}
                 </button>
               )) : (
@@ -116,10 +145,12 @@ export default function OrdersPage({ context }) {
             </div>
           </article>
 
-          <article className="stack-card section-card" id="orders-focus">
+          <article className="stack-card section-card workflow-selected-panel" id="orders-focus">
             <div className="stack-title-row">
               <strong>Selected order lane</strong>
-              <span className="scenario-type-tag">{selectedOrder ? selectedOrder.warehouseCode : 'Waiting'}</span>
+              <span className={`status-tag ${selectedOrder?.relatedFulfillment?.fulfillmentStatus === 'DELAYED' ? 'status-failure' : selectedOrder?.relatedFulfillment ? 'status-success' : 'status-partial'}`}>
+                {selectedOrder?.relatedFulfillment ? formatCodeLabel(selectedOrder.relatedFulfillment.fulfillmentStatus) : selectedOrder ? 'Awaiting link' : 'Waiting'}
+              </span>
             </div>
             {selectedOrder ? (
               <div className="signal-list">
@@ -139,6 +170,13 @@ export default function OrdersPage({ context }) {
                     ? `Dispatch due ${formatRelativeHours(selectedOrder.relatedFulfillment.hoursUntilDispatchDue)} | Delivery due ${formatRelativeHours(selectedOrder.relatedFulfillment.hoursUntilDeliveryDue)}`
                     : 'This order is visible in the workspace and still waiting for downstream fulfillment linkage.'}
                 </p>
+                <div className="workflow-action-band">
+                  <div>
+                    <strong>{selectedOrder.relatedFulfillment?.fulfillmentStatus === 'DELAYED' ? 'Inspect delayed fulfillment evidence' : 'Inspect order context'}</strong>
+                    <p>SynapseCore does not edit or cancel orders here. Use this lane to understand status, timing, warehouse context, and whether related recovery evidence is needed.</p>
+                  </div>
+                  <button className="ghost-button" onClick={() => setSelectedOrderId(selectedOrder.id)} type="button">Keep Selected</button>
+                </div>
               </div>
             ) : (
               <EmptyState>

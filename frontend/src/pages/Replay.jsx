@@ -265,7 +265,7 @@ export default function ReplayPage({ context }) {
 
           <article className="stack-card section-card workflow-selected-panel">
             <div className="stack-title-row">
-              <strong>Selected failed event</strong>
+              <strong>Recovery detail</strong>
               <span className={`status-tag ${replayDecision.tone}`}>{replayDecision.label}</span>
             </div>
             {selectedRecord ? (

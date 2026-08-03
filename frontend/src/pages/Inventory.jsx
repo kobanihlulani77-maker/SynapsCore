@@ -29,6 +29,30 @@ export default function InventoryPage({ context }) {
   const gridRows = snapshot.inventory.slice(0, 6)
   const mostPressedItem = highRiskInventory[0] || lowStockInventory[0] || fastMovingInventory[0]
   const warehouseCoverage = new Set(snapshot.inventory.map((item) => item.warehouseCode).filter(Boolean)).size
+  const outOfStockInventory = snapshot.inventory.filter((item) => Number(item.quantityAvailable) <= 0)
+  const inventoryPosture = outOfStockInventory.length
+    ? 'Unavailable'
+    : highRiskInventory.length
+      ? 'Attention required'
+      : lowStockInventory.length
+        ? 'Watch'
+        : snapshot.inventory.length
+          ? 'Normal'
+          : 'Insufficient coverage'
+  const inventoryPostureTone = outOfStockInventory.length || highRiskInventory.length
+    ? 'status-failure'
+    : lowStockInventory.length || !snapshot.inventory.length
+      ? 'status-partial'
+      : 'status-success'
+  const inventoryPostureCopy = outOfStockInventory.length
+    ? `${outOfStockInventory.length} inventory lane${outOfStockInventory.length === 1 ? '' : 's'} show no available quantity. Confirm the affected product and location before promising downstream work.`
+    : highRiskInventory.length
+      ? `${highRiskInventory.length} high-risk lane${highRiskInventory.length === 1 ? '' : 's'} need inventory review before order pressure deepens.`
+      : lowStockInventory.length
+        ? 'Low-stock lanes are visible. Review thresholds, stockout windows, and affected warehouses.'
+        : snapshot.inventory.length
+          ? 'Inventory lanes look stable inside the current workspace view.'
+          : 'Inventory coverage is not available yet. Add stock data before treating the workspace as operationally covered.'
 
   return (
     <section className="content-grid inventory-intelligence-grid">
@@ -41,20 +65,26 @@ export default function InventoryPage({ context }) {
           <span className="panel-badge inventory-badge">{snapshot.inventory.length}</span>
         </div>
 
-        <div className="ops-command-hero">
-          <div className="ops-command-copy">
-            <strong>Inventory health command view</strong>
-            <p>
-              Bring low-stock exposure, fast movers, and warehouse-specific pressure into one decision surface so operators
-              can act before availability risk turns into missed fulfillment.
-            </p>
+        <div className="workflow-decision-hero daily-ops-hero">
+          <div className="workflow-decision-copy">
+            <p className="panel-kicker">Inventory risk posture</p>
+            <div className="runtime-decision-title">
+              <span className={`runtime-decision-badge ${inventoryPostureTone}`}>{inventoryPosture}</span>
+              <h2>{mostPressedItem ? `${mostPressedItem.productName} needs review` : 'Inventory coverage is waiting.'}</h2>
+            </div>
+            <p>{inventoryPostureCopy}</p>
             <div className="ops-pill-row">
-              <span className="workspace-meta-pill">Availability-first</span>
-              <span className="workspace-meta-pill">Velocity-aware</span>
-              <span className="workspace-meta-pill">Warehouse-scoped</span>
+              <span className="workspace-meta-pill">Low stock {lowStockInventory.length}</span>
+              <span className="workspace-meta-pill">High risk {highRiskInventory.length}</span>
+              <span className="workspace-meta-pill">Sites {warehouseCoverage || warehouseOptions.length}</span>
             </div>
           </div>
-          <div className="ops-command-actions">
+          <div className="workflow-action-console">
+            <div className="workflow-action-card">
+              <span>Inspect next</span>
+              <strong>{mostPressedItem?.productSku || 'No risk selected'}</strong>
+              <p>{mostPressedItem ? 'Review the selected product, warehouse, available quantity, threshold, and stockout window before taking action in the source system.' : 'Inventory rows will become actionable once stock data is available.'}</p>
+            </div>
             <button className="secondary-button" onClick={() => mostPressedItem && setSelectedInventoryId(mostPressedItem.id)} disabled={!mostPressedItem} type="button">
               Focus highest risk
             </button>
@@ -71,14 +101,14 @@ export default function InventoryPage({ context }) {
           <MetricCard label="Warehouse coverage" value={warehouseCoverage || warehouseOptions.length} accent="blue" note="Warehouse lanes currently represented in the live stock picture." />
         </div>
 
-        <div className="inventory-spotlight-grid" id="inventory-spotlight">
-          <article className="stack-card section-card">
+        <div className="inventory-spotlight-grid daily-priority-grid" id="inventory-spotlight">
+          <article className="stack-card section-card workflow-selected-panel">
             <div className="stack-title-row">
-              <strong>Low-stock focus</strong>
-              <span className="status-tag status-failure">{lowStockInventory.length}</span>
+              <strong>Highest-risk inventory</strong>
+              <span className={`status-tag ${inventoryPostureTone}`}>{lowStockInventory.length || highRiskInventory.length}</span>
             </div>
             <div className="signal-list">
-              {lowStockInventory.slice(0, 5).length ? lowStockInventory.slice(0, 5).map((item) => (
+              {(highRiskInventory.length ? highRiskInventory : lowStockInventory).slice(0, 5).length ? (highRiskInventory.length ? highRiskInventory : lowStockInventory).slice(0, 5).map((item) => (
                 <button
                   key={item.id}
                   className={`signal-list-item selectable-card system-select-card ${selectedInventoryItem?.id === item.id ? 'is-selected' : ''}`}
@@ -93,7 +123,7 @@ export default function InventoryPage({ context }) {
                   <p className="muted-text">{item.quantityAvailable} available | Threshold {item.reorderThreshold}</p>
                   <p className="muted-text">Stockout {formatRelativeHours(item.hoursToStockout)}</p>
                 </button>
-              )) : <EmptyState>No low-stock items right now. The live inventory posture is currently stable.</EmptyState>}
+              )) : <EmptyState>No low-stock or high-risk items right now. The live inventory posture is currently stable.</EmptyState>}
             </div>
           </article>
 
@@ -122,8 +152,8 @@ export default function InventoryPage({ context }) {
           </article>
         </div>
 
-        <div className="experience-grid experience-grid-split">
-          <article className="stack-card section-card" id="inventory-focus">
+        <div className="experience-grid daily-ops-workbench">
+          <article className="stack-card section-card workflow-selected-panel" id="inventory-focus">
             <div className="stack-title-row">
               <strong>Selected inventory lane</strong>
               <span className={`status-tag ${selectedInventoryItem ? `risk-${selectedInventoryItem.riskLevel}` : 'status-partial'}`}>
@@ -143,8 +173,15 @@ export default function InventoryPage({ context }) {
                   <div><span>Stockout</span><strong>{formatRelativeHours(selectedInventoryItem.hoursToStockout)}</strong></div>
                 </div>
                 <p className="muted-text">
-                  This lane shows the product, warehouse, available quantity, and forecasted risk window without requiring a separate inventory export.
+                  This lane shows the product, warehouse, available quantity, and forecasted risk window. Inventory adjustment remains in the company's source stock-control system during pilot use.
                 </p>
+                <div className="workflow-action-band">
+                  <div>
+                    <strong>{selectedInventoryItem.lowStock ? 'Review replenishment or source-system correction' : 'Monitor inventory posture'}</strong>
+                    <p>Use SynapseCore to identify risk and related operating pressure; do not treat this page as direct stock-adjustment authority.</p>
+                  </div>
+                  <button className="ghost-button" onClick={() => setSelectedInventoryId(selectedInventoryItem.id)} type="button">Keep Selected</button>
+                </div>
               </div>
             ) : (
               <EmptyState>

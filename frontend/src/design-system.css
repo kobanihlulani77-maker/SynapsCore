@@ -2167,6 +2167,65 @@ tbody tr:hover {
   padding-top: 4px;
 }
 
+.daily-ops-hero {
+  grid-template-columns: minmax(320px, 0.9fr) minmax(400px, 1.1fr);
+}
+
+.daily-ops-workbench {
+  display: grid;
+  grid-template-columns: minmax(320px, 0.82fr) minmax(430px, 1.18fr);
+  gap: 18px;
+}
+
+.daily-priority-grid {
+  grid-template-columns: minmax(420px, 1.12fr) minmax(300px, 0.88fr);
+}
+
+.daily-ops-workbench .signal-list-item.selectable-card,
+.daily-priority-grid .signal-list-item.selectable-card {
+  padding: 14px 16px;
+}
+
+.catalog-admin-hero {
+  grid-template-columns: minmax(340px, 0.95fr) minmax(380px, 1.05fr);
+}
+
+.catalog-workflow-grid {
+  display: grid;
+  grid-template-columns: minmax(320px, 1fr) minmax(320px, 1fr) minmax(260px, 0.78fr);
+  gap: 16px;
+  margin-bottom: 18px;
+}
+
+.catalog-review-workbench {
+  grid-template-columns: minmax(420px, 1.12fr) minmax(320px, 0.88fr);
+}
+
+.catalog-field-group,
+.catalog-import-steps {
+  display: grid;
+  gap: 12px;
+}
+
+.catalog-field-group {
+  padding: 14px;
+  border-radius: var(--radius-md);
+  border: 1px solid rgba(121, 156, 194, 0.14);
+  background: rgba(5, 14, 23, 0.38);
+}
+
+.catalog-field-group p {
+  margin: 4px 0 0;
+}
+
+.catalog-import-steps {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.catalog-import-steps .workspace-meta-pill {
+  justify-content: center;
+}
+
 .ops-command-actions {
   gap: 12px;
   align-content: start;
@@ -2292,7 +2351,7 @@ tbody tr:hover {
 
 .data-grid-table th,
 .data-grid-table td {
-  padding: 14px 16px;
+  padding: 12px 14px;
   text-align: left;
   vertical-align: top;
 }
@@ -2313,6 +2372,7 @@ tbody tr:hover {
 
 .data-grid-table tbody td {
   color: var(--color-text-secondary);
+  line-height: 1.45;
 }
 
 .data-grid-sort {
@@ -2455,7 +2515,11 @@ tbody tr:hover {
   .dashboard-activity-grid,
   .replay-workbench-grid,
   .scenario-history-workbench,
-  .scenario-planner-workflow {
+  .scenario-planner-workflow,
+  .daily-ops-workbench,
+  .daily-priority-grid,
+  .catalog-workflow-grid,
+  .catalog-review-workbench {
     grid-template-columns: 1fr;
   }
 
@@ -2511,6 +2575,7 @@ tbody tr:hover {
   .command-hero-metrics,
   .workflow-evidence-grid,
   .workflow-action-band,
+  .catalog-import-steps,
   .workspace-topbar-identity,
   .dashboard-health-strip,
   .dashboard-signal-grid,
