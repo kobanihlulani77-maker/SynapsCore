@@ -28,9 +28,20 @@ This index links the main product, architecture, runbook, proof, and operator do
 ## Product Vision
 
 - [future-product-vision.md](future-product-vision.md)
+- [product-evolution-framework.md](product-evolution-framework.md)
+- [product-decision-principles.md](product-decision-principles.md)
 - [final-product-vision.md](final-product-vision.md)
 - [product-purpose.md](product-purpose.md)
 - [why-synapsecore-exists.md](why-synapsecore-exists.md)
+
+## Product Evolution
+
+- [product-evolution-framework.md](product-evolution-framework.md)
+- [improvement-lifecycle.md](improvement-lifecycle.md)
+- [product-decision-principles.md](product-decision-principles.md)
+- [release-evolution-model.md](release-evolution-model.md)
+- [platform-maturity-model.md](platform-maturity-model.md)
+- `scripts\evolution-check.ps1`
 
 ## Enterprise Product Knowledge Base
 
@@ -281,6 +292,8 @@ This index links the main product, architecture, runbook, proof, and operator do
 ## Product Roadmap
 
 - [master-product-roadmap.md](master-product-roadmap.md)
+- [release-evolution-model.md](release-evolution-model.md)
+- [platform-maturity-model.md](platform-maturity-model.md)
 - [final-product-vision.md](final-product-vision.md)
 - [platform-potential.md](platform-potential.md)
 
@@ -299,6 +312,7 @@ This index links the main product, architecture, runbook, proof, and operator do
 ## Engineering Excellence / Operational Readiness
 
 - [engineering-review.md](engineering-review.md)
+- [improvement-lifecycle.md](improvement-lifecycle.md)
 - [maintainability-guide.md](maintainability-guide.md)
 - [support-playbook.md](support-playbook.md)
 - [operations-handbook.md](operations-handbook.md)
@@ -362,6 +376,7 @@ This index links the main product, architecture, runbook, proof, and operator do
 - `scripts\explain-proof-system.ps1`
 - `scripts\project-map.ps1`
 - `scripts\repo-health.ps1`
+- `scripts\evolution-check.ps1`
 - `scripts\engineering-readiness.ps1`
 - `scripts\env-sanity-check.ps1`
 - `scripts\docs-link-check.ps1`

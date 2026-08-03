@@ -136,6 +136,26 @@ powershell -ExecutionPolicy Bypass -File scripts\engineering-readiness.ps1
 
 This command is informational. It does not deploy, tag, edit the database, or run hosted proof.
 
+## Product Evolution
+
+Future SynapseCore work should be driven by operational evidence, not feature brainstorming.
+
+Start here for the product-evolution discipline:
+
+- [docs/product-evolution-framework.md](docs/product-evolution-framework.md)
+- [docs/improvement-lifecycle.md](docs/improvement-lifecycle.md)
+- [docs/product-decision-principles.md](docs/product-decision-principles.md)
+- [docs/release-evolution-model.md](docs/release-evolution-model.md)
+- [docs/platform-maturity-model.md](docs/platform-maturity-model.md)
+
+Evolution readiness check:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File scripts\evolution-check.ps1
+```
+
+This command is informational. It does not deploy, edit runtime behavior, or run hosted proof.
+
 ## Current Supported Scope
 
 SynapseCore is fully real for its current supported scope.
@@ -326,6 +346,7 @@ Safe repo and docs checks:
 powershell -ExecutionPolicy Bypass -File scripts\repo-health.ps1
 powershell -ExecutionPolicy Bypass -File scripts\project-map.ps1
 powershell -ExecutionPolicy Bypass -File scripts\explain-infrastructure.ps1
+powershell -ExecutionPolicy Bypass -File scripts\evolution-check.ps1
 powershell -ExecutionPolicy Bypass -File scripts\env-sanity-check.ps1
 powershell -ExecutionPolicy Bypass -File scripts\docs-link-check.ps1
 powershell -ExecutionPolicy Bypass -File scripts\script-help.ps1

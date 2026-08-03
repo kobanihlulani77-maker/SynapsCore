@@ -347,6 +347,47 @@ Recommended command:
 powershell -ExecutionPolicy Bypass -File scripts\engineering-readiness.ps1
 ```
 
+## `scripts\evolution-check.ps1`
+
+Purpose:
+
+- summarizes whether the repository has the product evolution foundation needed for evidence-driven future work
+
+What it checks:
+
+- current release marker
+- hosted proof evidence presence
+- product evolution docs
+- product knowledge and engineering foundation docs
+- pilot release candidate documentation
+- tracked risky artifact or env files
+- uncommitted production changes
+- outstanding improvement source docs
+
+Outputs:
+
+- `EVOLUTION_READY=True`
+- `EVOLUTION_READY=False`
+- blockers and warnings
+
+Safe to run anytime:
+
+- yes
+
+Changes anything:
+
+- no
+
+Requires backend or DB:
+
+- no
+
+Recommended command:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File scripts\evolution-check.ps1
+```
+
 ## `scripts\prepare-hosted-proof.ps1`
 
 Purpose:
@@ -466,6 +507,7 @@ Requires backend or DB:
 For repo hygiene:
 
 - `scripts\repo-health.ps1`
+- `scripts\evolution-check.ps1`
 - `scripts\engineering-readiness.ps1`
 - `scripts\docs-link-check.ps1`
 

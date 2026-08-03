@@ -212,6 +212,11 @@ Use these when:
 
 Core docs:
 
+- [product-evolution-framework.md](product-evolution-framework.md)
+- [improvement-lifecycle.md](improvement-lifecycle.md)
+- [product-decision-principles.md](product-decision-principles.md)
+- [release-evolution-model.md](release-evolution-model.md)
+- [platform-maturity-model.md](platform-maturity-model.md)
 - [final-product-vision.md](final-product-vision.md)
 - [product-purpose.md](product-purpose.md)
 - [master-product-roadmap.md](master-product-roadmap.md)
@@ -223,6 +228,25 @@ Use these when:
 - aligning product direction
 - deciding what is current vs future
 - understanding what still needs hardening
+- deciding whether evidence justifies a future change
+
+## If You Need Product Evolution Guidance
+
+Read first:
+
+- [product-evolution-framework.md](product-evolution-framework.md)
+- [improvement-lifecycle.md](improvement-lifecycle.md)
+- [product-decision-principles.md](product-decision-principles.md)
+- [release-evolution-model.md](release-evolution-model.md)
+- [platform-maturity-model.md](platform-maturity-model.md)
+
+Use these when:
+
+- turning pilot feedback into product work
+- deciding whether an idea should become a feature
+- planning releases after the Pilot Release Candidate
+- protecting evidence-first product discipline
+- assessing platform maturity over time
 
 ## If You Need Deep Reference Docs
 
