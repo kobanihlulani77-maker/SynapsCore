@@ -99,6 +99,7 @@ Use these when:
 
 Read first:
 
+- [official-pilot-program.md](official-pilot-program.md)
 - [support-playbook.md](support-playbook.md)
 - [operations-handbook.md](operations-handbook.md)
 - [change-management.md](change-management.md)
@@ -139,6 +140,7 @@ Read first:
 - [executive-product-guide.md](executive-product-guide.md)
 - [company-explainer.md](company-explainer.md)
 - [product-knowledge-base.md](product-knowledge-base.md)
+- [official-pilot-program.md](official-pilot-program.md)
 - [buyer-due-diligence-guide.md](buyer-due-diligence-guide.md)
 - [pilot-adoption-roadmap.md](pilot-adoption-roadmap.md)
 - [pilot-acceptance-criteria.md](pilot-acceptance-criteria.md)
@@ -281,6 +283,7 @@ Read first:
 
 Read first:
 
+- [official-pilot-program.md](official-pilot-program.md)
 - [pilot-program-guide.md](pilot-program-guide.md)
 - [pilot-adoption-roadmap.md](pilot-adoption-roadmap.md)
 - [pilot-acceptance-criteria.md](pilot-acceptance-criteria.md)
@@ -291,6 +294,8 @@ Use these when:
 - deciding whether a pilot is actually accepted
 - separating local success from hosted readiness
 - defining expansion criteria before adding more sites, connectors, or operators
+
+Use [official-pilot-program.md](official-pilot-program.md) as the authoritative pilot operating document. Older pilot docs remain supporting references for onboarding, rollback, acceptance, and readiness details.
 
 ## Overlap Guidance
 

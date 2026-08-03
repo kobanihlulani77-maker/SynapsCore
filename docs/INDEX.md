@@ -182,6 +182,7 @@ This index links the main product, architecture, runbook, proof, and operator do
 
 ## Pilot Rollout
 
+- [official-pilot-program.md](official-pilot-program.md) - canonical pilot operating model
 - [pilot-release-candidate.md](pilot-release-candidate.md)
 - [pilot-company-onboarding-checklist.md](pilot-company-onboarding-checklist.md)
 - [pilot-operator-checklist.md](pilot-operator-checklist.md)
@@ -193,6 +194,10 @@ This index links the main product, architecture, runbook, proof, and operator do
 - [pilot-adoption-roadmap.md](pilot-adoption-roadmap.md)
 - [pilot-acceptance-criteria.md](pilot-acceptance-criteria.md)
 - [pilot-faq.md](pilot-faq.md)
+- [templates/pilot-evidence-template.md](templates/pilot-evidence-template.md)
+- [templates/pilot-weekly-review-template.md](templates/pilot-weekly-review-template.md)
+- [templates/pilot-final-report-template.md](templates/pilot-final-report-template.md)
+- [templates/pilot-incident-log-template.md](templates/pilot-incident-log-template.md)
 
 ## Pilot Release Candidate
 
@@ -346,6 +351,7 @@ This index links the main product, architecture, runbook, proof, and operator do
 
 ## Onboarding And Pilot
 
+- [official-pilot-program.md](official-pilot-program.md)
 - [onboarding-playbook.md](onboarding-playbook.md)
 - [product-knowledge-base.md](product-knowledge-base.md)
 - [pilot-onboarding-pack.md](pilot-onboarding-pack.md)

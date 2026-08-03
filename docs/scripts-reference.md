@@ -502,12 +502,50 @@ Requires backend or DB:
 
 - no
 
+## `scripts\product-knowledge-check.ps1`
+
+Purpose:
+
+- verifies that the canonical product-knowledge, industry, role-guide, and official pilot-program documents are present and linked from the main navigation
+
+What it checks:
+
+- product knowledge base
+- operational concepts
+- SynapseCore dictionary
+- business process library
+- executive, operator, warehouse, IT, and solution architect guides
+- industry guides
+- official pilot program
+- pilot evidence templates
+- README, docs index, and documentation map links
+
+Outputs:
+
+- `PRODUCT_KNOWLEDGE_READY`
+- `READY_WITH_WARNINGS`
+- `NEEDS_ATTENTION`
+- blockers and warnings
+
+Safe to run anytime:
+
+- yes
+
+Changes anything:
+
+- no
+
+Requires backend or DB:
+
+- no
+
 ## Which Scripts To Run First
 
 For repo hygiene:
 
 - `scripts\repo-health.ps1`
 - `scripts\evolution-check.ps1`
+- `scripts\product-knowledge-check.ps1`
 - `scripts\engineering-readiness.ps1`
 - `scripts\docs-link-check.ps1`
 

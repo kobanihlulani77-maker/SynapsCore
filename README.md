@@ -103,12 +103,15 @@ The current controlled pilot release candidate proposal is:
 
 Pilot RC entry points:
 
+- [Official pilot program](docs/official-pilot-program.md)
 - [Pilot release candidate](docs/pilot-release-candidate.md)
 - [Pilot company onboarding checklist](docs/pilot-company-onboarding-checklist.md)
 - [Pilot operator checklist](docs/pilot-operator-checklist.md)
 - [Pilot success metrics](docs/pilot-success-metrics.md)
 - [Pilot rollback and escalation](docs/pilot-rollback-and-escalation.md)
 - [Release evidence - August 3, 2026](docs/release-evidence-2026-08-03.md)
+
+The official pilot program is the canonical operating model for selecting, preparing, running, pausing, expanding, and completing SynapseCore pilots. The other pilot documents are supporting references.
 
 The pilot RC is for controlled company evaluation within the current supported scope. It is not an unrestricted enterprise production rollout claim.
 
