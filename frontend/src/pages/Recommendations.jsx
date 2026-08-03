@@ -21,12 +21,20 @@ export default function RecommendationsPage({ context }) {
 
   const recommendationCandidates = [...recommendationNow, ...recommendationSoon, ...recommendationWatch]
   const columns = [
-    { title: 'Urgent now', items: recommendationNow, tone: 'priority-high', description: 'Immediate operational action lanes.' },
-    { title: 'Important soon', items: recommendationSoon, tone: 'priority-medium', description: 'Items that should be scheduled before they become urgent.' },
-    { title: 'Watch', items: recommendationWatch, tone: 'priority-low', description: 'Signals worth watching before teams commit work.' },
+    { title: 'Urgent now', items: recommendationNow, tone: 'priority-high', description: 'Immediate operator decisions that should shape the next response.' },
+    { title: 'Important soon', items: recommendationSoon, tone: 'priority-medium', description: 'Work to schedule before it becomes active operational risk.' },
+    { title: 'Watch', items: recommendationWatch, tone: 'priority-low', description: 'Signals worth monitoring before teams commit new work.' },
   ]
   const selectedRecommendation = recommendationCandidates.find((recommendation) => recommendation.id === selectedRecommendationId) || recommendationCandidates[0]
   const warehouseCoverage = new Set(snapshot.recommendations.map((item) => item.warehouseCode).filter(Boolean)).size
+  const evidenceBackedCount = snapshot.recommendations.filter((recommendation) => Boolean(recommendation.policyExplanation)).length
+  const nextDecisionLabel = recommendationNow.length
+    ? 'Decide now'
+    : recommendationSoon.length
+      ? 'Schedule'
+      : recommendationWatch.length
+        ? 'Monitor'
+        : 'Clear'
 
   return (
     <section className="content-grid">
@@ -39,23 +47,35 @@ export default function RecommendationsPage({ context }) {
           <span className="panel-badge recommendation-badge">{snapshot.recommendations.length}</span>
         </div>
 
-        <div className="ops-command-hero">
-          <div className="ops-command-copy">
+        <div className="workflow-decision-hero recommendation-decision-hero">
+          <div className="workflow-decision-copy">
             <strong>Decision intelligence surface</strong>
             <p>
-              Recommendations should turn live platform intelligence into clear next actions, not just another list of observations.
-              Priority, impact, and timing need to feel readable at a glance.
+              Recommendations turn live platform intelligence into clear human decisions. The page should show what is
+              suggested, why it matters, and what action the operator still owns.
             </p>
             <div className="ops-pill-row">
-              <span className="workspace-meta-pill">Priority ranked</span>
-              <span className="workspace-meta-pill">Action oriented</span>
-              <span className="workspace-meta-pill">Warehouse aware</span>
+              <span className="workspace-meta-pill">{nextDecisionLabel}</span>
+              <span className="workspace-meta-pill">{evidenceBackedCount} evidence backed</span>
+              <span className="workspace-meta-pill">Human approved action</span>
             </div>
           </div>
-          <div className="ops-command-actions">
-            <button className="secondary-button" onClick={() => recommendationNow[0] && setSelectedRecommendationId(recommendationNow[0].id)} disabled={!recommendationNow[0]} type="button">
-              Focus urgent recommendation
-            </button>
+          <div className="workflow-action-console">
+            <div className="workflow-action-card">
+              <span>Primary recommendation</span>
+              <strong>{selectedRecommendation ? selectedRecommendation.title : 'No action waiting'}</strong>
+              <p>{selectedRecommendation ? selectedRecommendation.description : 'The recommendation queue stays quiet until the workspace has useful guidance.'}</p>
+            </div>
+            <div className="workflow-action-card">
+              <span>Operator responsibility</span>
+              <strong>Review before action</strong>
+              <p>Guidance supports the decision; it does not hide the human approval, scheduling, or execution choice.</p>
+            </div>
+            <div className="ops-command-actions">
+              <button className="secondary-button" onClick={() => recommendationNow[0] && setSelectedRecommendationId(recommendationNow[0].id)} disabled={!recommendationNow[0]} type="button">
+                Focus urgent recommendation
+              </button>
+            </div>
           </div>
         </div>
 
@@ -78,7 +98,7 @@ export default function RecommendationsPage({ context }) {
                 {column.items.length ? column.items.map((recommendation) => (
                   <button
                     key={recommendation.id}
-                    className={`stack-card selectable-card ${selectedRecommendation?.id === recommendation.id ? 'is-selected' : ''}`}
+                    className={`stack-card selectable-card recommendation-decision-card ${selectedRecommendation?.id === recommendation.id ? 'is-selected' : ''}`}
                     onClick={() => setSelectedRecommendationId(recommendation.id)}
                     type="button"
                   >
@@ -88,6 +108,7 @@ export default function RecommendationsPage({ context }) {
                     </div>
                     <p>{recommendation.description}</p>
                     <p className="muted-text">{recommendation.warehouseCode || 'Tenant-wide'} | {formatTimestamp(recommendation.createdAt)}</p>
+                    {recommendation.policyExplanation ? <p className="muted-text recommendation-evidence-line">{recommendation.policyExplanation}</p> : null}
                   </button>
                 )) : <EmptyState>No items in this action lane.</EmptyState>}
               </div>
@@ -96,7 +117,7 @@ export default function RecommendationsPage({ context }) {
         </div>
 
         <div className="experience-grid experience-grid-split">
-          <article className="stack-card section-card" id="recommendations-focus">
+          <article className="stack-card section-card workflow-selected-panel recommendation-focus-panel" id="recommendations-focus">
             <div className="stack-title-row">
               <strong>Selected recommendation</strong>
               <span className="scenario-type-tag">{selectedRecommendation ? selectedRecommendation.priority : 'Clear'}</span>
@@ -108,6 +129,13 @@ export default function RecommendationsPage({ context }) {
                   <p>{selectedRecommendation.description}</p>
                   <p className="muted-text">Created {formatTimestamp(selectedRecommendation.createdAt)}</p>
                   <p className="muted-text">{selectedRecommendation.warehouseCode || 'Tenant-wide lane'} | Priority {selectedRecommendation.priority}</p>
+                  {selectedRecommendation.policyExplanation ? <p className="muted-text">Evidence: {selectedRecommendation.policyExplanation}</p> : null}
+                </div>
+                <div className="utility-metric-grid">
+                  <div><span>Decision</span><strong>{selectedRecommendation.priority === 'HIGH' ? 'Act' : selectedRecommendation.priority === 'MEDIUM' ? 'Plan' : 'Watch'}</strong></div>
+                  <div><span>Evidence</span><strong>{selectedRecommendation.policyExplanation ? 'Present' : 'Basic'}</strong></div>
+                  <div><span>Owner</span><strong>Operator</strong></div>
+                  <div><span>Automation</span><strong>Guidance</strong></div>
                 </div>
               </div>
             ) : (
@@ -127,6 +155,7 @@ export default function RecommendationsPage({ context }) {
               <div><span>Important soon</span><strong>{recommendationSoon.length}</strong></div>
               <div><span>Watch</span><strong>{recommendationWatch.length}</strong></div>
               <div><span>Action lanes</span><strong>{warehouseCoverage || 'All'}</strong></div>
+              <div><span>Evidence</span><strong>{evidenceBackedCount}</strong></div>
             </div>
             <p className="muted-text">The best items should feel immediately executable. This page exists to help teams act faster, not just review more data.</p>
           </article>

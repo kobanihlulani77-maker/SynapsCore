@@ -27,7 +27,22 @@ export default function AlertsPage({ context }) {
   const criticalAlertCount = activeAlerts.filter((alert) => alert.severity === 'CRITICAL').length
   const highAlertCount = activeAlerts.filter((alert) => alert.severity === 'HIGH').length
   const warehouseHitCount = new Set(activeAlerts.map((alert) => alert.warehouseCode).filter(Boolean)).size
+  const sortedAlerts = [...activeAlerts].sort((left, right) => {
+    const severityDelta = (severityPriority[right.severity] || 0) - (severityPriority[left.severity] || 0)
+    if (severityDelta) {
+      return severityDelta
+    }
+    return new Date(right.createdAt || 0).getTime() - new Date(left.createdAt || 0).getTime()
+  })
   const mostSevereAlert = [...activeAlerts].sort((left, right) => (severityPriority[right.severity] || 0) - (severityPriority[left.severity] || 0))[0]
+  const responsePosture = criticalAlertCount
+    ? 'Critical response'
+    : highAlertCount
+      ? 'Elevated response'
+      : activeAlerts.length
+        ? 'Monitor'
+        : 'Clear'
+  const actionableAlertCount = activeAlerts.filter((alert) => Boolean(alert.recommendedAction)).length
 
   return (
     <section className="content-grid alerts-center-grid">
@@ -40,23 +55,35 @@ export default function AlertsPage({ context }) {
           <span className="panel-badge alert-badge">{activeAlerts.length}</span>
         </div>
 
-        <div className="ops-command-hero">
-          <div className="ops-command-copy">
+        <div className="workflow-decision-hero attention-ops-hero">
+          <div className="workflow-decision-copy">
             <strong>Operational warning center</strong>
             <p>
               Severity, warehouse impact, and recommended action should all be visible together so operators can respond
               calmly and quickly instead of translating raw incidents into next steps.
             </p>
             <div className="ops-pill-row">
-              <span className="workspace-meta-pill">Severity led</span>
-              <span className="workspace-meta-pill">Warehouse scoped</span>
-              <span className="workspace-meta-pill">Action guided</span>
+              <span className="workspace-meta-pill">{responsePosture}</span>
+              <span className="workspace-meta-pill">Assign during triage</span>
+              <span className="workspace-meta-pill">{actionableAlertCount} action guided</span>
             </div>
           </div>
-          <div className="ops-command-actions">
-            <button className="secondary-button" onClick={() => mostSevereAlert && setSelectedAlertId(mostSevereAlert.id)} disabled={!mostSevereAlert} type="button">
-              Focus highest severity
-            </button>
+          <div className="workflow-action-console">
+            <div className="workflow-action-card">
+              <span>First decision</span>
+              <strong>{mostSevereAlert ? `${mostSevereAlert.severity} alert first` : 'No active warning'}</strong>
+              <p>{mostSevereAlert ? mostSevereAlert.title : 'The alert lane stays quiet until operational risk forms.'}</p>
+            </div>
+            <div className="workflow-action-card">
+              <span>Ownership</span>
+              <strong>Operator triage required</strong>
+              <p>SynapseCore exposes the issue and suggested response; the team still assigns the human owner.</p>
+            </div>
+            <div className="ops-command-actions">
+              <button className="secondary-button" onClick={() => mostSevereAlert && setSelectedAlertId(mostSevereAlert.id)} disabled={!mostSevereAlert} type="button">
+                Focus highest severity
+              </button>
+            </div>
           </div>
         </div>
 
@@ -70,14 +97,15 @@ export default function AlertsPage({ context }) {
         <div className="experience-grid experience-grid-split">
           <article className="stack-card section-card">
             <div className="stack-title-row">
-              <strong>Active alert queue</strong>
-              <span className="scenario-type-tag">{activeAlerts.length ? 'Live' : 'Quiet'}</span>
+              <strong>Response queue</strong>
+              <span className="scenario-type-tag">{activeAlerts.length ? responsePosture : 'Quiet'}</span>
             </div>
+            <p className="muted-text">Sorted by severity so the riskiest operational lane is never visually buried.</p>
             <div className="signal-list">
-              {activeAlerts.length ? activeAlerts.map((alert) => (
+              {sortedAlerts.length ? sortedAlerts.map((alert) => (
                 <button
                   key={alert.id}
-                  className={`signal-list-item selectable-card system-select-card ${selectedAlert?.id === alert.id ? 'is-selected' : ''}`}
+                  className={`signal-list-item selectable-card system-select-card attention-queue-card ${selectedAlert?.id === alert.id ? 'is-selected' : ''}`}
                   onClick={() => setSelectedAlertId(alert.id)}
                   type="button"
                 >
@@ -90,6 +118,10 @@ export default function AlertsPage({ context }) {
                   </div>
                   <p>{alert.description}</p>
                   <p className="muted-text">{alert.impactSummary}</p>
+                  <div className="attention-card-meta">
+                    <span>Owner: assign during triage</span>
+                    <span>Status: {alert.status || 'ACTIVE'}</span>
+                  </div>
                   <p className="action-line">Recommended action: {alert.recommendedAction}</p>
                 </button>
               )) : (
@@ -100,7 +132,7 @@ export default function AlertsPage({ context }) {
             </div>
           </article>
 
-          <article className="stack-card section-card" id="alerts-response">
+          <article className="stack-card section-card workflow-selected-panel attention-detail-panel" id="alerts-response">
             <div className="stack-title-row">
               <strong>Selected alert</strong>
               <span className="scenario-type-tag">{selectedAlert ? selectedAlert.severity : 'Clear'}</span>
@@ -115,10 +147,13 @@ export default function AlertsPage({ context }) {
                 <div className="utility-metric-grid">
                   <div><span>Severity</span><strong>{selectedAlert.severity}</strong></div>
                   <div><span>Warehouse</span><strong>{selectedAlert.warehouseCode || 'Tenant-wide'}</strong></div>
-                  <div><span>Status</span><strong>Active</strong></div>
+                  <div><span>Status</span><strong>{selectedAlert.status || 'Active'}</strong></div>
                   <div><span>Created</span><strong>{formatTimestamp(selectedAlert.createdAt)}</strong></div>
+                  <div><span>Owner</span><strong>Assign</strong></div>
+                  <div><span>Next step</span><strong>{selectedAlert.recommendedAction ? 'Action' : 'Review'}</strong></div>
                 </div>
                 <p className="action-line">Action: {selectedAlert.recommendedAction}</p>
+                {selectedAlert.policyExplanation ? <p className="muted-text">Policy context: {selectedAlert.policyExplanation}</p> : null}
               </div>
             ) : (
               <EmptyState>
@@ -138,7 +173,7 @@ export default function AlertsPage({ context }) {
               <div><span>Critical</span><strong>{criticalAlertCount}</strong></div>
               <div><span>High</span><strong>{highAlertCount}</strong></div>
               <div><span>Warehouses hit</span><strong>{warehouseHitCount}</strong></div>
-              <div><span>Actionable</span><strong>{activeAlerts.filter((alert) => Boolean(alert.recommendedAction)).length}</strong></div>
+              <div><span>Actionable</span><strong>{actionableAlertCount}</strong></div>
             </div>
             <p className="muted-text">Use severity, affected warehouse scope, and actionability together to decide what the team needs to resolve first.</p>
           </article>

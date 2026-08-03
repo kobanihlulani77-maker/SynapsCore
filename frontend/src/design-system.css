@@ -2283,6 +2283,55 @@ tbody tr:hover {
   gap: 10px;
 }
 
+.attention-ops-hero,
+.recommendation-decision-hero,
+.connector-trust-hero {
+  background:
+    radial-gradient(circle at top right, rgba(80, 216, 171, 0.09), transparent 28%),
+    linear-gradient(180deg, rgba(14, 27, 43, 0.97), rgba(9, 18, 30, 0.99));
+}
+
+.attention-queue-card,
+.recommendation-decision-card {
+  display: grid;
+  gap: 10px;
+}
+
+.attention-card-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.attention-card-meta span {
+  min-height: 26px;
+  padding: 5px 9px;
+  border-radius: 999px;
+  border: 1px solid rgba(121, 156, 194, 0.14);
+  background: rgba(255, 255, 255, 0.035);
+  color: var(--color-text-muted);
+  font-size: 0.74rem;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+}
+
+.attention-detail-panel,
+.recommendation-focus-panel,
+.connector-detail-panel {
+  border-color: rgba(80, 216, 171, 0.24);
+  background:
+    radial-gradient(circle at top right, rgba(80, 216, 171, 0.08), transparent 30%),
+    rgba(8, 18, 30, 0.9);
+}
+
+.recommendation-evidence-line {
+  padding-top: 2px;
+}
+
+.connector-card-meta {
+  padding: 0 2px 2px;
+}
+
 .compact-action-button {
   min-height: 36px;
   padding: 0 12px;

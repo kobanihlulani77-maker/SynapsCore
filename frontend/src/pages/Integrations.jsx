@@ -23,15 +23,21 @@ export default function IntegrationsPage({ context }) {
   }
 
   const connectorPortfolio = snapshot.integrationConnectors
-  const connectorSpotlights = connectorPortfolio.slice(0, 6)
   const recentImportRuns = snapshot.integrationImportRuns.slice(0, 4)
-  const selectedConnector = connectorPortfolio.find((connector) => connector.id === selectedIntegrationConnectorId) || connectorSpotlights[0]
   const unownedConnectors = connectorPortfolio.filter((connector) => !connector.supportOwnerActorName).length
   const realtimeConnectors = connectorPortfolio.filter((connector) => connector.syncMode === 'REALTIME_PUSH').length
   const connectedSystemCount = new Set(connectorPortfolio.map((connector) => connector.sourceSystem)).size
   const fallbackEnabledCount = connectorPortfolio.filter((connector) => connector.allowDefaultWarehouseFallback).length
   const disabledConnectorCount = connectorPortfolio.filter((connector) => connector.healthStatus === 'OFFLINE').length
   const degradedConnectorCount = connectorPortfolio.filter((connector) => connector.healthStatus === 'DEGRADED').length
+  const connectorAttentionCount = disabledConnectorCount + degradedConnectorCount + unownedConnectors
+  const connectorTrustPosture = disabledConnectorCount
+    ? 'Recovery required'
+    : degradedConnectorCount || pendingReplayCount
+      ? 'Limited trust'
+      : connectorPortfolio.length
+        ? 'Trusted lanes'
+        : 'Not connected'
   const supportedModeLabel = (connector) => (connector?.supportedSyncModes || [])
     .map((mode) => formatCodeLabel(mode))
     .join(' | ')
@@ -66,6 +72,24 @@ export default function IntegrationsPage({ context }) {
     return 'Live'
   }
 
+  const getConnectorAttentionScore = (connector) => {
+    if (!connector) {
+      return 0
+    }
+    return [
+      connector.healthStatus === 'OFFLINE' ? 100 : 0,
+      connector.healthStatus === 'DEGRADED' ? 70 : 0,
+      connector.pendingReplayCount ? 50 : 0,
+      connector.recentInboundFailureCount ? 35 : 0,
+      !connector.supportOwnerActorName ? 20 : 0,
+    ].reduce((total, score) => total + score, 0)
+  }
+
+  const connectorSpotlights = [...connectorPortfolio]
+    .sort((left, right) => getConnectorAttentionScore(right) - getConnectorAttentionScore(left))
+    .slice(0, 6)
+  const selectedConnector = connectorPortfolio.find((connector) => connector.id === selectedIntegrationConnectorId) || connectorSpotlights[0]
+
   const formatReplayAge = (ageSeconds) => {
     if (ageSeconds == null) {
       return null
@@ -93,26 +117,38 @@ export default function IntegrationsPage({ context }) {
           <span className="panel-badge integration-badge">{connectorPortfolio.length}</span>
         </div>
 
-        <div className="ops-command-hero">
-          <div className="ops-command-copy">
+        <div className="workflow-decision-hero connector-trust-hero">
+          <div className="workflow-decision-copy">
             <strong>Connector operations surface</strong>
             <p>
               This is where companies should understand what external systems are connected, which lanes are healthy,
-              and where support ownership or replay pressure is starting to build.
+              and where support ownership, validation policy, or replay pressure is starting to affect operational trust.
             </p>
             <div className="ops-pill-row">
-              <span className="workspace-meta-pill">Source visible</span>
-              <span className="workspace-meta-pill">Health aware</span>
-              <span className="workspace-meta-pill">Recovery linked</span>
+              <span className="workspace-meta-pill">{connectorTrustPosture}</span>
+              <span className="workspace-meta-pill">{pendingReplayCount} replay waiting</span>
+              <span className="workspace-meta-pill">{unownedConnectors} ownership gaps</span>
             </div>
           </div>
-          <div className="ops-command-actions">
-            <button className="secondary-button" onClick={() => selectedConnector && setSelectedIntegrationConnectorId(selectedConnector.id)} disabled={!selectedConnector} type="button">
-              Inspect connector
-            </button>
-            <button className="ghost-button" onClick={() => navigateToPage('replay')} type="button">
-              Open replay queue
-            </button>
+          <div className="workflow-action-console">
+            <div className="workflow-action-card">
+              <span>Trust posture</span>
+              <strong>{connectorTrustPosture}</strong>
+              <p>{connectorAttentionCount ? `${connectorAttentionCount} connector signals need ownership, remediation, or recovery review.` : 'Connector lanes are not currently reporting operational pressure.'}</p>
+            </div>
+            <div className="workflow-action-card">
+              <span>Recovery route</span>
+              <strong>{pendingReplayCount ? 'Replay queue active' : 'Replay queue clear'}</strong>
+              <p>Failed inbound records should move through replay instead of being repaired with hidden database edits.</p>
+            </div>
+            <div className="ops-command-actions">
+              <button className="secondary-button" onClick={() => selectedConnector && setSelectedIntegrationConnectorId(selectedConnector.id)} disabled={!selectedConnector} type="button">
+                Inspect connector
+              </button>
+              <button className="ghost-button" onClick={() => navigateToPage('replay')} type="button">
+                Open replay queue
+              </button>
+            </div>
           </div>
         </div>
 
@@ -120,15 +156,16 @@ export default function IntegrationsPage({ context }) {
           <MetricCard label="Enabled connectors" value={enabledConnectorCount} accent="teal" note="Connector lanes currently allowed to feed live operational state." />
           <MetricCard label="Connected systems" value={connectedSystemCount} accent="blue" note="Distinct external operating systems represented in the workspace." />
           <MetricCard label="Replay queued" value={pendingReplayCount} accent="amber" note="Inbound records still waiting on recovery or connector remediation." />
-          <MetricCard label="Attention needed" value={disabledConnectorCount + degradedConnectorCount + unownedConnectors} accent="rose" note="Connectors that need ownership, remediation, or active support." />
+          <MetricCard label="Attention needed" value={connectorAttentionCount} accent="rose" note="Connectors that need ownership, remediation, or active support." />
         </div>
 
         <div className="experience-grid experience-grid-three">
           <article className="stack-card section-card">
             <div className="stack-title-row">
-              <strong>Connector portfolio</strong>
+              <strong>Connector trust queue</strong>
               <span className="scenario-type-tag">{connectorSpotlights.length ? 'Live' : 'Pending'}</span>
             </div>
+            <p className="muted-text">Attention-heavy connectors rise first so failures, replay pressure, and ownership gaps are not buried below healthy lanes.</p>
             <div className="signal-list">
               {connectorSpotlights.length ? connectorSpotlights.map((connector) => (
                 <button
@@ -148,12 +185,17 @@ export default function IntegrationsPage({ context }) {
                       </span>
                     )}
                   />
+                  <div className="attention-card-meta connector-card-meta">
+                    <span>Owner: {connector.supportOwnerDisplayName || 'Unassigned'}</span>
+                    <span>Replay: {connector.pendingReplayCount || 0}</span>
+                    <span>Failures: {connector.recentInboundFailureCount || 0}</span>
+                  </div>
                 </button>
               )) : <EmptyState>Connectors will appear here once the workspace is integrated with external systems.</EmptyState>}
             </div>
           </article>
 
-          <article className="stack-card section-card">
+          <article className="stack-card section-card workflow-selected-panel connector-detail-panel">
             <div className="stack-title-row">
               <strong>Selected connector detail</strong>
               <span className="scenario-type-tag">{selectedConnector ? formatCodeLabel(selectedConnector.validationPolicy) : 'Waiting'}</span>
@@ -172,6 +214,8 @@ export default function IntegrationsPage({ context }) {
                   <div><span>Sync mode</span><strong>{formatCodeLabel(selectedConnector.syncMode)}</strong></div>
                   <div><span>Failures</span><strong>{selectedConnector.recentInboundFailureCount || 0}</strong></div>
                   <div><span>Replay waiting</span><strong>{selectedConnector.pendingReplayCount || 0}</strong></div>
+                  <div><span>Owner</span><strong>{selectedConnector.supportOwnerDisplayName ? 'Assigned' : 'Missing'}</strong></div>
+                  <div><span>Fallback</span><strong>{selectedConnector.allowDefaultWarehouseFallback ? 'On' : 'Off'}</strong></div>
                 </div>
                 <p className="muted-text">
                   Validation {formatCodeLabel(selectedConnector.validationPolicy)}
