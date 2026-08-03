@@ -181,7 +181,7 @@ Before claiming larger enterprise scale, SynapseCore still needs stronger proof 
 
 ### Near-term
 
-- restore and stabilize hosted backend/DB proof path
+- complete hosted proof preparation and browser proof against the replacement Render database
 - continue operational hardening around availability and readiness
 - keep frontend and runtime trust surfaces consistent
 - improve local full-stack bring-up ergonomics

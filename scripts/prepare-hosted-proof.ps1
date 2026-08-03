@@ -28,6 +28,66 @@ function Get-FirstValue {
     return $null
 }
 
+function Read-HostedProofState {
+    if ([string]::IsNullOrWhiteSpace($script:HostedProofStatePath) -or -not (Test-Path -LiteralPath $script:HostedProofStatePath)) {
+        return [pscustomobject]@{}
+    }
+
+    try {
+        return Get-Content -LiteralPath $script:HostedProofStatePath -Raw | ConvertFrom-Json -ErrorAction Stop
+    } catch {
+        return [pscustomobject]@{}
+    }
+}
+
+function Get-HostedProofStateValue {
+    param([string[]]$Names)
+
+    foreach ($name in $Names) {
+        if ($null -eq $script:ExistingHostedProofState) {
+            continue
+        }
+        $property = $script:ExistingHostedProofState.PSObject.Properties[$name]
+        if ($null -ne $property -and -not [string]::IsNullOrWhiteSpace([string]$property.Value)) {
+            return ([string]$property.Value).Trim()
+        }
+    }
+
+    return $null
+}
+
+function Write-HostedProofState {
+    param([hashtable]$Values)
+
+    $state = [ordered]@{}
+    if ($null -ne $script:ExistingHostedProofState) {
+        foreach ($property in $script:ExistingHostedProofState.PSObject.Properties) {
+            $state[$property.Name] = $property.Value
+        }
+    }
+
+    foreach ($key in $Values.Keys) {
+        $state[$key] = $Values[$key]
+    }
+
+    $state["preparedAt"] = (Get-Date).ToUniversalTime().ToString("o")
+
+    $stateDirectory = Split-Path -Parent $script:HostedProofStatePath
+    New-Item -ItemType Directory -Path $stateDirectory -Force | Out-Null
+    $state | ConvertTo-Json -Depth 8 | Set-Content -LiteralPath $script:HostedProofStatePath -Encoding UTF8
+    $script:ExistingHostedProofState = Read-HostedProofState
+}
+
+function New-ProofPassword {
+    param([string]$Purpose)
+
+    $safePurpose = ($Purpose.ToLowerInvariant() -replace '[^a-z0-9]+', '-').Trim('-')
+    if ([string]::IsNullOrWhiteSpace($safePurpose)) {
+        $safePurpose = "proof"
+    }
+    return "Proof-$safePurpose-$([Guid]::NewGuid().ToString("N").Substring(0, 24))-A1"
+}
+
 function Require-Value {
     param(
         [string]$Name,
@@ -663,22 +723,25 @@ function Ensure-ProofCatalogAndInventory {
         } | Out-Null
 }
 
+$script:HostedProofStatePath = Join-Path (Join-Path (Split-Path -Parent $PSScriptRoot) "frontend") "test-results\hosted-proof-state.json"
+$script:ExistingHostedProofState = Read-HostedProofState
+
 $script:ApiBaseUrlValue = (Require-Value `
     -Name "PLAYWRIGHT_API_BASE_URL" `
-    -Value (Get-FirstValue -Values @($ApiBaseUrl, $env:PLAYWRIGHT_API_BASE_URL, $env:PLAYWRIGHT_BACKEND_URL, "https://synapscore-3.onrender.com"))).TrimEnd("/")
-$FrontendBaseUrlValue = Get-FirstValue -Values @($FrontendBaseUrl, $env:PLAYWRIGHT_BASE_URL, $env:PLAYWRIGHT_FRONTEND_URL)
+    -Value (Get-FirstValue -Values @($ApiBaseUrl, $env:PLAYWRIGHT_API_BASE_URL, $env:PLAYWRIGHT_BACKEND_URL, (Get-HostedProofStateValue -Names @("PLAYWRIGHT_API_BASE_URL", "PLAYWRIGHT_BACKEND_URL")), "https://synapscore-3.onrender.com"))).TrimEnd("/")
+$FrontendBaseUrlValue = Get-FirstValue -Values @($FrontendBaseUrl, $env:PLAYWRIGHT_BASE_URL, $env:PLAYWRIGHT_FRONTEND_URL, (Get-HostedProofStateValue -Names @("PLAYWRIGHT_BASE_URL", "PLAYWRIGHT_FRONTEND_URL")), "https://synapscore-frontend-3.onrender.com")
 if (-not [string]::IsNullOrWhiteSpace($FrontendBaseUrlValue)) {
     $FrontendBaseUrlValue = $FrontendBaseUrlValue.TrimEnd("/")
 }
-$script:TenantCodeValue = Require-TenantCode -Name "PLAYWRIGHT_TENANT_CODE" -Value (Get-FirstValue -Values @($TenantCode, $env:PLAYWRIGHT_TENANT_CODE))
-$TenantNameValue = Get-FirstValue -Values @($TenantName, $env:PLAYWRIGHT_TENANT_NAME, "$script:TenantCodeValue Hosted Verification")
-$TenantAdminUsernameValue = Require-Username -Name "PLAYWRIGHT_TENANT_ADMIN_USERNAME" -Value (Get-FirstValue -Values @($TenantAdminUsername, $env:PLAYWRIGHT_TENANT_ADMIN_USERNAME, $env:PLAYWRIGHT_OPERATIONS_LEAD_USERNAME))
-$TenantAdminPasswordValue = Require-Password -Name "PLAYWRIGHT_TENANT_ADMIN_PASSWORD" -Value (Get-FirstValue -Values @($TenantAdminPassword, $env:PLAYWRIGHT_TENANT_ADMIN_PASSWORD, $env:PLAYWRIGHT_OPERATIONS_LEAD_PASSWORD))
-$PlannerUsernameValue = Require-Username -Name "PLAYWRIGHT_PLANNER_USERNAME" -Value (Get-FirstValue -Values @($PlannerUsername, $env:PLAYWRIGHT_PLANNER_USERNAME, $env:PLAYWRIGHT_OPERATIONS_PLANNER_USERNAME))
-$PlannerPasswordValue = Require-Password -Name "PLAYWRIGHT_PLANNER_PASSWORD" -Value (Get-FirstValue -Values @($PlannerPassword, $env:PLAYWRIGHT_PLANNER_PASSWORD, $env:PLAYWRIGHT_OPERATIONS_PLANNER_PASSWORD))
-$IntegrationAdminUsernameValue = Require-Username -Name "PLAYWRIGHT_INTEGRATION_ADMIN_USERNAME" -Value (Get-FirstValue -Values @($IntegrationAdminUsername, $env:PLAYWRIGHT_INTEGRATION_ADMIN_USERNAME, $env:PLAYWRIGHT_INTEGRATION_LEAD_USERNAME))
-$IntegrationAdminPasswordValue = Require-Password -Name "PLAYWRIGHT_INTEGRATION_ADMIN_PASSWORD" -Value (Get-FirstValue -Values @($IntegrationAdminPassword, $env:PLAYWRIGHT_INTEGRATION_ADMIN_PASSWORD, $env:PLAYWRIGHT_INTEGRATION_LEAD_PASSWORD))
-$ProofProductSkuValue = Normalize-ProofSku -Name "PLAYWRIGHT_PROOF_PRODUCT_SKU" -Value (Get-FirstValue -Values @($ProofProductSku, $env:PLAYWRIGHT_PROOF_PRODUCT_SKU, (Get-DefaultProofProductSku -TenantCode $script:TenantCodeValue)))
+$script:TenantCodeValue = Require-TenantCode -Name "PLAYWRIGHT_TENANT_CODE" -Value (Get-FirstValue -Values @($TenantCode, $env:PLAYWRIGHT_TENANT_CODE, (Get-HostedProofStateValue -Names @("PLAYWRIGHT_TENANT_CODE")), "HOSTED-PROOF"))
+$TenantNameValue = Get-FirstValue -Values @($TenantName, $env:PLAYWRIGHT_TENANT_NAME, (Get-HostedProofStateValue -Names @("PLAYWRIGHT_TENANT_NAME")), "$script:TenantCodeValue Hosted Verification")
+$TenantAdminUsernameValue = Require-Username -Name "PLAYWRIGHT_TENANT_ADMIN_USERNAME" -Value (Get-FirstValue -Values @($TenantAdminUsername, $env:PLAYWRIGHT_TENANT_ADMIN_USERNAME, $env:PLAYWRIGHT_OPERATIONS_LEAD_USERNAME, (Get-HostedProofStateValue -Names @("PLAYWRIGHT_TENANT_ADMIN_USERNAME", "PLAYWRIGHT_OPERATIONS_LEAD_USERNAME")), "hosted.proof.admin"))
+$TenantAdminPasswordValue = Require-Password -Name "PLAYWRIGHT_TENANT_ADMIN_PASSWORD" -Value (Get-FirstValue -Values @($TenantAdminPassword, $env:PLAYWRIGHT_TENANT_ADMIN_PASSWORD, $env:PLAYWRIGHT_OPERATIONS_LEAD_PASSWORD, (Get-HostedProofStateValue -Names @("PLAYWRIGHT_TENANT_ADMIN_PASSWORD", "PLAYWRIGHT_OPERATIONS_LEAD_PASSWORD")), (New-ProofPassword -Purpose "admin")))
+$PlannerUsernameValue = Require-Username -Name "PLAYWRIGHT_PLANNER_USERNAME" -Value (Get-FirstValue -Values @($PlannerUsername, $env:PLAYWRIGHT_PLANNER_USERNAME, $env:PLAYWRIGHT_OPERATIONS_PLANNER_USERNAME, (Get-HostedProofStateValue -Names @("PLAYWRIGHT_PLANNER_USERNAME", "PLAYWRIGHT_OPERATIONS_PLANNER_USERNAME")), "hosted.proof.planner"))
+$PlannerPasswordValue = Require-Password -Name "PLAYWRIGHT_PLANNER_PASSWORD" -Value (Get-FirstValue -Values @($PlannerPassword, $env:PLAYWRIGHT_PLANNER_PASSWORD, $env:PLAYWRIGHT_OPERATIONS_PLANNER_PASSWORD, (Get-HostedProofStateValue -Names @("PLAYWRIGHT_PLANNER_PASSWORD", "PLAYWRIGHT_OPERATIONS_PLANNER_PASSWORD")), (New-ProofPassword -Purpose "planner")))
+$IntegrationAdminUsernameValue = Require-Username -Name "PLAYWRIGHT_INTEGRATION_ADMIN_USERNAME" -Value (Get-FirstValue -Values @($IntegrationAdminUsername, $env:PLAYWRIGHT_INTEGRATION_ADMIN_USERNAME, $env:PLAYWRIGHT_INTEGRATION_LEAD_USERNAME, (Get-HostedProofStateValue -Names @("PLAYWRIGHT_INTEGRATION_ADMIN_USERNAME", "PLAYWRIGHT_INTEGRATION_LEAD_USERNAME")), "hosted.proof.integration"))
+$IntegrationAdminPasswordValue = Require-Password -Name "PLAYWRIGHT_INTEGRATION_ADMIN_PASSWORD" -Value (Get-FirstValue -Values @($IntegrationAdminPassword, $env:PLAYWRIGHT_INTEGRATION_ADMIN_PASSWORD, $env:PLAYWRIGHT_INTEGRATION_LEAD_PASSWORD, (Get-HostedProofStateValue -Names @("PLAYWRIGHT_INTEGRATION_ADMIN_PASSWORD", "PLAYWRIGHT_INTEGRATION_LEAD_PASSWORD")), (New-ProofPassword -Purpose "integration")))
+$ProofProductSkuValue = Normalize-ProofSku -Name "PLAYWRIGHT_PROOF_PRODUCT_SKU" -Value (Get-FirstValue -Values @($ProofProductSku, $env:PLAYWRIGHT_PROOF_PRODUCT_SKU, (Get-HostedProofStateValue -Names @("PLAYWRIGHT_PROOF_PRODUCT_SKU")), (Get-DefaultProofProductSku -TenantCode $script:TenantCodeValue)))
 $PlatformAdminTokenValue = Get-FirstValue -Values @($PlatformAdminToken, $env:SYNAPSECORE_PLATFORM_ADMIN_TOKEN)
 $BootstrapInitialTokenValue = Get-FirstValue -Values @($BootstrapInitialToken, $env:SYNAPSECORE_BOOTSTRAP_INITIAL_TOKEN)
 
@@ -691,6 +754,20 @@ if ($distinctUsernames.Count -ne 3) {
     throw "Hosted proof requires three distinct sign-in accounts: tenant admin, planner/operator, and integration admin."
 }
 
+Write-HostedProofState -Values @{
+    PLAYWRIGHT_BASE_URL = $FrontendBaseUrlValue
+    PLAYWRIGHT_API_BASE_URL = $script:ApiBaseUrlValue
+    PLAYWRIGHT_TENANT_CODE = $script:TenantCodeValue
+    PLAYWRIGHT_TENANT_NAME = $TenantNameValue
+    PLAYWRIGHT_TENANT_ADMIN_USERNAME = $TenantAdminUsernameValue
+    PLAYWRIGHT_TENANT_ADMIN_PASSWORD = $TenantAdminPasswordValue
+    PLAYWRIGHT_PLANNER_USERNAME = $PlannerUsernameValue
+    PLAYWRIGHT_PLANNER_PASSWORD = $PlannerPasswordValue
+    PLAYWRIGHT_INTEGRATION_ADMIN_USERNAME = $IntegrationAdminUsernameValue
+    PLAYWRIGHT_INTEGRATION_ADMIN_PASSWORD = $IntegrationAdminPasswordValue
+    PLAYWRIGHT_PROOF_PRODUCT_SKU = $ProofProductSkuValue
+}
+
 Write-Host "========================================"
 Write-Host "SYNAPSECORE HOSTED PROOF PREP"
 Write-Host "========================================"
@@ -700,6 +777,7 @@ if (-not [string]::IsNullOrWhiteSpace($FrontendBaseUrlValue)) {
 }
 Write-Host "Tenant      : $script:TenantCodeValue"
 Write-Host "Mode        : real tenant/admin APIs, no seed or DB edits"
+Write-Host "Proof state : $script:HostedProofStatePath"
 Write-Host ""
 
 $readinessUrl = "$script:ApiBaseUrlValue/actuator/health/readiness"
@@ -757,7 +835,7 @@ if ($null -eq $tenant) {
     $tenantHeaders = @{}
     if ($tenants.Count -eq 0) {
         if ([string]::IsNullOrWhiteSpace($BootstrapInitialTokenValue)) {
-            throw "No tenants exist yet. Set SYNAPSECORE_BOOTSTRAP_INITIAL_TOKEN so the first tenant can be created safely."
+            throw "No tenants exist yet. Proof tenant/operator values have been generated and written to $script:HostedProofStatePath. Set SYNAPSECORE_BOOTSTRAP_INITIAL_TOKEN to the private Render backend bootstrap secret, then rerun this script so the first tenant can be created safely through /api/access/tenants."
         }
         $tenantHeaders["X-Synapse-Bootstrap-Token"] = $BootstrapInitialTokenValue
     } else {
@@ -849,7 +927,8 @@ Write-Host "PLAYWRIGHT_PROOF_PRODUCT_SKU=$ProofProductSkuValue"
 Write-Host "PLAYWRIGHT_TENANT_ADMIN_USERNAME=$TenantAdminUsernameValue"
 Write-Host "PLAYWRIGHT_PLANNER_USERNAME=$PlannerUsernameValue"
 Write-Host "PLAYWRIGHT_INTEGRATION_ADMIN_USERNAME=$IntegrationAdminUsernameValue"
-Write-Host "Keep the password env vars set to the secret values supplied to this script."
+Write-Host "Secret proof passwords are stored in the ignored proof state file for this machine."
+Write-Host "Playwright reads that state file automatically; do not commit or print it."
 Write-Host ""
 Write-Host "Official hosted proof order:"
 Write-Host "1. readiness warm-up (performed by this script and Playwright global setup)"

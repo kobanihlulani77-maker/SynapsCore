@@ -1,4 +1,5 @@
 import path from 'node:path'
+import fs from 'node:fs'
 
 const authRateLimitWindowSeconds = Number.parseInt(
   process.env.PLAYWRIGHT_AUTH_RATE_LIMIT_WINDOW_SECONDS
@@ -14,3 +15,11 @@ export const authRateLimitWindowMs = Number.isFinite(authRateLimitWindowSeconds)
 export const authRateLimitCooldownBufferMs = 5_000
 
 export const hostedProofStatePath = path.resolve(process.cwd(), 'test-results', 'hosted-proof-state.json')
+
+export function readHostedProofStateSync() {
+  try {
+    return JSON.parse(fs.readFileSync(hostedProofStatePath, 'utf8'))
+  } catch {
+    return {}
+  }
+}

@@ -43,26 +43,29 @@ Production tenant creation is intentionally strict:
 
 Hosted browser proof must use real tenant accounts created or reset through production APIs.
 
-Required env values:
+The current proof preparation lane is authoritative for proof tenant and operator values. It resolves values in this order:
+
+1. script parameters
+2. shell environment overrides
+3. ignored proof state at `frontend\test-results\hosted-proof-state.json`
+4. generated safe defaults
+
+For a new empty production database, the only value the script cannot safely invent is the private backend bootstrap token.
+
+Empty database bootstrap:
 
 ```powershell
-$env:PLAYWRIGHT_BASE_URL="<frontend-url>"
-$env:PLAYWRIGHT_API_BASE_URL="<backend-url>"
-$env:PLAYWRIGHT_TENANT_CODE="<proof-tenant>"
-$env:PLAYWRIGHT_PROOF_PRODUCT_SKU="<tenant-specific-proof-sku>"
-$env:PLAYWRIGHT_TENANT_ADMIN_USERNAME="<tenant-admin-user>"
-$env:PLAYWRIGHT_TENANT_ADMIN_PASSWORD="<tenant-admin-password>"
-$env:PLAYWRIGHT_PLANNER_USERNAME="<planner-user>"
-$env:PLAYWRIGHT_PLANNER_PASSWORD="<planner-password>"
-$env:PLAYWRIGHT_INTEGRATION_ADMIN_USERNAME="<integration-admin-user>"
-$env:PLAYWRIGHT_INTEGRATION_ADMIN_PASSWORD="<integration-admin-password>"
+$env:SYNAPSECORE_BOOTSTRAP_INITIAL_TOKEN="<private Render backend bootstrap secret>"
+powershell -ExecutionPolicy Bypass -File scripts\prepare-hosted-proof.ps1
 ```
 
-Preparation command:
+Preparation command after proof state exists or the bootstrap token is already loaded:
 
 ```powershell
 powershell -ExecutionPolicy Bypass -File scripts\prepare-hosted-proof.ps1
 ```
+
+Do not commit or print `frontend\test-results\hosted-proof-state.json`; it contains generated proof passwords for the local proof runner.
 
 Browser proof:
 

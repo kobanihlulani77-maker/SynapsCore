@@ -204,7 +204,8 @@ Hosted proof should be blocked when:
 
 Proof should also be paused when:
 
-- proof credentials are not correctly loaded
+- generated proof state is missing or invalid
+- the private bootstrap token is missing while the target database has zero tenants
 - local changes are not verified enough to justify a live rerun
 
 ## When Proof Should NOT Run

@@ -5,17 +5,24 @@ import {
   authRateLimitCooldownBufferMs,
   authRateLimitWindowMs,
   hostedProofStatePath,
+  readHostedProofStateSync,
 } from './prod-proof-state.mjs'
+
+const hostedProofState = readHostedProofStateSync()
 
 const frontendUrl = (
   process.env.PLAYWRIGHT_BASE_URL
   || process.env.PLAYWRIGHT_FRONTEND_URL
+  || hostedProofState.PLAYWRIGHT_BASE_URL
+  || hostedProofState.PLAYWRIGHT_FRONTEND_URL
   || 'https://synapscore-frontend-3.onrender.com'
 ).replace(/\/+$/, '')
 
 const backendUrl = (
   process.env.PLAYWRIGHT_API_BASE_URL
   || process.env.PLAYWRIGHT_BACKEND_URL
+  || hostedProofState.PLAYWRIGHT_API_BASE_URL
+  || hostedProofState.PLAYWRIGHT_BACKEND_URL
   || 'https://synapscore-3.onrender.com'
 ).replace(/\/+$/, '')
 
@@ -27,6 +34,10 @@ const optionalEnv = (...names) => {
     const value = process.env[name]
     if (value && value.trim()) {
       return value.trim()
+    }
+    const stateValue = hostedProofState[name]
+    if (stateValue && String(stateValue).trim()) {
+      return String(stateValue).trim()
     }
   }
   return ''

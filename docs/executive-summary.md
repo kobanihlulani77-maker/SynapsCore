@@ -57,10 +57,12 @@ The frontend has been fully productized into a premium command-center experience
 Current live truth in this project phase:
 
 - frontend deployment is live and responding
-- backend/database availability is currently affecting hosted proof readiness
-- hosted proof is paused until backend readiness, auth session, and websocket info return cleanly
+- backend deployment is live and responding after replacement PostgreSQL provisioning
+- live readiness, auth session, and websocket info are responding cleanly
+- the replacement database is clean and empty, so hosted proof preparation must bootstrap a tenant through supported APIs
+- hosted proof rerun is pending the private backend bootstrap token required only for first-tenant creation on the empty replacement database
 
-That means the system is being treated honestly: proof only runs when the backend is actually available.
+That means the system is being treated honestly: live readiness is back, but current hosted proof is not considered refreshed until preparation and browser proof pass against the replacement database.
 
 ## Why The Architecture Matters
 

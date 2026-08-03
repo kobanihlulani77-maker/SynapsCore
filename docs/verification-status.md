@@ -1,6 +1,6 @@
 # Verification Status
 
-Last updated: **May 6, 2026**
+Last updated: **August 3, 2026**
 
 This file is the strict product-truth record for SynapseCore. It does not treat localhost proof as the same thing as live hosted proof.
 
@@ -15,14 +15,14 @@ That claim is grounded in:
 - hosted tenant preparation proof
 - two consecutive full hosted browser-proof passes on Render
 
-Hosted Render evidence:
+Historical hosted Render evidence:
 
 - run 1: `6 passed (6.3m)`
 - run 2: `6 passed (4.3m)`
 
 ## Live Hosted Proof Coverage
 
-Both live passes covered:
+The historical live passes covered:
 
 1. auth flow and the full authenticated page system
 2. product catalog onboarding through tenant-scoped API and browser
@@ -50,6 +50,30 @@ Both live passes covered:
 | Deployment safety | `FULLY REAL` | Production startup uses Flyway plus JPA validate, root `/` is safe, and runtime build identity is exposed through backend runtime metadata. |
 | Hosted authenticated proof | `FULLY PROVEN` | The full six-test hosted proof pack passed twice consecutively on Render. |
 
+## Current Replacement-Database Revalidation
+
+Current live infrastructure status after the Render trial database was deleted and replaced:
+
+- frontend endpoint responds
+- backend health responds
+- backend liveness responds
+- backend readiness responds
+- unauthenticated auth/session responds
+- `/ws/info` responds
+- `scripts\check-live-connections.ps1` reports `PROOF_ALLOWED=True`
+
+Current proof-preparation status:
+
+- the replacement PostgreSQL database is clean and empty
+- `/api/access/tenants` currently returns an empty tenant list
+- `scripts\prepare-hosted-proof.ps1` now generates and persists proof tenant/operator values into ignored local proof state
+- first-tenant creation on the empty replacement database still requires the private backend bootstrap token, supplied through `SYNAPSECORE_BOOTSTRAP_INITIAL_TOKEN`
+- current hosted browser proof has not yet been rerun against the replacement database
+
+Required next step:
+
+- load only the private backend bootstrap token, run `scripts\prepare-hosted-proof.ps1`, then run `cd frontend` and `npm.cmd run test:e2e:prod`
+
 ## Final Platform Truths
 
 - connector breadth is intentionally limited to webhook, CSV, and scheduled pull order ingestion
@@ -57,6 +81,7 @@ Both live passes covered:
 - replay recovery is deterministic for disabled-connector manual recovery flows
 - rate limiting is active and browser-visible
 - Render free-tier cold starts are a real hosting characteristic, but the hosted proof path now accounts for them through readiness warm-up and authenticated proof staging
+- replacement databases must be treated as new proof targets, even when the code and backend contracts did not change
 
 ## Operational Noise Classification
 
@@ -67,7 +92,7 @@ They should not be treated as product failure by themselves.
 ## Final Verdict
 
 - `FRONTEND_BACKEND_CONNECTION = FULLY PROVEN`
-- `HOSTED_PROOF = FULLY PROVEN`
+- `HOSTED_PROOF = HISTORICALLY FULLY PROVEN; REVALIDATION PENDING ON REPLACEMENT DB`
 - `REPLAY_RECOVERY = FULLY PROVEN`
 - `REALTIME = FULLY PROVEN`
 - `WHOLE_PROJECT = FULLY REAL`

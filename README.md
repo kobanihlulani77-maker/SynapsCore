@@ -88,9 +88,11 @@ The most important current truth is:
 
 - historical hosted proof evidence exists
 - the frontend deployment is reachable
-- hosted proof is currently paused whenever live backend, DB, readiness, auth, or websocket trust are unavailable
+- the replacement Render database and backend are reachable again when live readiness, auth, and websocket checks pass
+- hosted proof should still run only after `scripts\check-live-connections.ps1` reports `PROOF_ALLOWED=True`
+- a clean replacement database requires hosted proof preparation to bootstrap the proof tenant through supported APIs
 
-That means historical proof success should be read together with the current recovery and runtime posture, not as a permanent guarantee that the live backend is healthy right now.
+That means historical proof success should be read together with the current recovery and runtime posture, and every replacement database must be revalidated before claiming refreshed hosted proof.
 
 ## Current Supported Scope
 

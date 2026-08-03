@@ -6,10 +6,15 @@ import {
   authRateLimitCooldownBufferMs,
   authRateLimitWindowMs,
   hostedProofStatePath,
+  readHostedProofStateSync,
 } from './prod-proof-state.mjs'
+
+const hostedProofState = readHostedProofStateSync()
 
 const backendUrl = process.env.PLAYWRIGHT_API_BASE_URL
   || process.env.PLAYWRIGHT_BACKEND_URL
+  || hostedProofState.PLAYWRIGHT_API_BASE_URL
+  || hostedProofState.PLAYWRIGHT_BACKEND_URL
   || 'https://synapscore-3.onrender.com'
 const requiredEnv = (...names) => {
   for (const name of names) {
@@ -17,8 +22,12 @@ const requiredEnv = (...names) => {
     if (value && value.trim()) {
       return value.trim()
     }
+    const stateValue = hostedProofState[name]
+    if (stateValue && String(stateValue).trim()) {
+      return String(stateValue).trim()
+    }
   }
-  throw new Error(`Missing required environment variable. Set one of: ${names.join(', ')} for live production proof.`)
+  throw new Error(`Missing required hosted proof value. Run scripts/prepare-hosted-proof.ps1 first, or set one of: ${names.join(', ')} for live production proof.`)
 }
 
 const proofTenantCode = requiredEnv('PLAYWRIGHT_TENANT_CODE').toUpperCase()
@@ -30,7 +39,7 @@ const deriveDefaultProofProductSku = (tenantCode) => {
     : `SKU-${normalizedTenant.slice(0, Math.min(normalizedTenant.length, 50))}-PRF`
 }
 const defaultProofProductSku = deriveDefaultProofProductSku(proofTenantCode)
-const proofProductSku = (process.env.PLAYWRIGHT_PROOF_PRODUCT_SKU || defaultProofProductSku).trim().toUpperCase()
+const proofProductSku = (process.env.PLAYWRIGHT_PROOF_PRODUCT_SKU || hostedProofState.PLAYWRIGHT_PROOF_PRODUCT_SKU || defaultProofProductSku).trim().toUpperCase()
 const configuredAuthRateLimitMaxAttempts = Number.parseInt(
   process.env.PLAYWRIGHT_AUTH_RATE_LIMIT_MAX_ATTEMPTS
     || process.env.SYNAPSECORE_RATE_LIMIT_AUTH_LOGIN_MAX_ATTEMPTS

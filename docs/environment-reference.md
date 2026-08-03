@@ -271,6 +271,34 @@ Important:
 - these are sensitive values
 - they should not be committed as real tokens
 
+### Hosted Proof Preparation Values
+
+Authoritative generated values:
+
+- `PLAYWRIGHT_BASE_URL`
+- `PLAYWRIGHT_API_BASE_URL`
+- `PLAYWRIGHT_TENANT_CODE`
+- `PLAYWRIGHT_TENANT_NAME`
+- `PLAYWRIGHT_PROOF_PRODUCT_SKU`
+- `PLAYWRIGHT_TENANT_ADMIN_USERNAME`
+- `PLAYWRIGHT_TENANT_ADMIN_PASSWORD`
+- `PLAYWRIGHT_PLANNER_USERNAME`
+- `PLAYWRIGHT_PLANNER_PASSWORD`
+- `PLAYWRIGHT_INTEGRATION_ADMIN_USERNAME`
+- `PLAYWRIGHT_INTEGRATION_ADMIN_PASSWORD`
+
+Source:
+
+- generated or reused by `scripts\prepare-hosted-proof.ps1`
+- persisted locally in ignored state at `frontend\test-results\hosted-proof-state.json`
+- read automatically by the Playwright hosted proof when shell env vars are absent
+
+Not generated:
+
+- `SYNAPSECORE_BOOTSTRAP_INITIAL_TOKEN`
+
+That token is a private backend/Render secret. It is required only when the target production database has zero tenants and the first tenant must be created through the supported bootstrap API.
+
 ## Profile Notes
 
 ### `dev`

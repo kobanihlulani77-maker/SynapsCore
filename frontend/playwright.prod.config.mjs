@@ -1,6 +1,16 @@
 import fs from 'node:fs'
 import { defineConfig } from '@playwright/test'
 
+function readHostedProofState() {
+  try {
+    return JSON.parse(fs.readFileSync('test-results/hosted-proof-state.json', 'utf8'))
+  } catch {
+    return {}
+  }
+}
+
+const hostedProofState = readHostedProofState()
+
 const browserExecutablePath = [
   process.env.PLAYWRIGHT_BROWSER_PATH,
   'C:\\Program Files\\Microsoft\\Edge\\Application\\msedge.exe',
@@ -25,6 +35,8 @@ export default defineConfig({
   use: {
     baseURL: process.env.PLAYWRIGHT_BASE_URL
       || process.env.PLAYWRIGHT_FRONTEND_URL
+      || hostedProofState.PLAYWRIGHT_BASE_URL
+      || hostedProofState.PLAYWRIGHT_FRONTEND_URL
       || 'https://synapscore-frontend-3.onrender.com',
     headless: process.env.PLAYWRIGHT_HEADED !== 'true',
     viewport: { width: 1440, height: 960 },

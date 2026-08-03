@@ -309,10 +309,13 @@ Requires backend or DB:
 Purpose:
 
 - prepares the hosted proof environment before Playwright runs
+- generates proof tenant/operator values when absent
+- writes ignored proof state to `frontend\test-results\hosted-proof-state.json`
 
 Use when:
 
 - live readiness/auth/ws posture is healthy
+- a new replacement database needs the proof tenant recreated through supported APIs
 
 Safe to run anytime:
 
@@ -325,6 +328,11 @@ Changes anything:
 Requires backend or DB:
 
 - yes, because hosted proof depends on them
+
+Notes:
+
+- `SYNAPSECORE_BOOTSTRAP_INITIAL_TOKEN` is required only when the target production database is empty and the first tenant must be created.
+- Playwright reads generated proof values from the ignored proof state file, so proof users/passwords do not need to be invented manually.
 
 ## `scripts\verify-deployment.ps1`
 
