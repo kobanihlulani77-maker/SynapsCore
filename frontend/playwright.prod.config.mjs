@@ -3,7 +3,7 @@ import { defineConfig } from '@playwright/test'
 
 function readHostedProofState() {
   try {
-    return JSON.parse(fs.readFileSync('.hosted-proof/hosted-proof-state.json', 'utf8'))
+    return JSON.parse(fs.readFileSync('.hosted-proof/hosted-proof-state.json', 'utf8').replace(/^\uFEFF/, ''))
   } catch {
     return {}
   }

@@ -1412,25 +1412,33 @@ async function waitForAlertPageAlertVisible(page, alertRecord, testInfo) {
       await refreshWorkspace(page)
     }
 
-    const alertButton = page.getByRole('button', {
+    const alertButton = page.locator('#alerts-feed').getByRole('button', {
       name: new RegExp(escapeRegExp(alertRecord.title), 'i'),
     }).first()
     if (await alertButton.isVisible().catch(() => false)) {
-      await activateSelectableButton(alertButton).catch(() => {})
+      await alertButton.scrollIntoViewIfNeeded().catch(() => {})
+      await alertButton.click({ timeout: 1_500 }).catch(async () => {
+        await page.evaluate((title) => {
+          const normalizeText = (value) => value?.replace?.(/\s+/g, ' ')?.trim?.() || ''
+          const alertButtons = [...(globalThis.document?.querySelectorAll?.('#alerts-feed button') || [])]
+          const exactAlertButton = alertButtons.find((button) => normalizeText(button.textContent).includes(title))
+          exactAlertButton?.click?.()
+        }, alertRecord.title).catch(() => {})
+      })
     }
 
     lastState = await page.evaluate(({ title, recommendedAction }) => {
       const normalizeText = (value) => value?.replace?.(/\s+/g, ' ')?.trim?.() || ''
-      const alertButtons = [...(globalThis.document?.querySelectorAll?.('button') || [])]
+      const alertButtons = [...(globalThis.document?.querySelectorAll?.('#alerts-feed button') || [])]
       const exactAlertButton = alertButtons.find((button) => normalizeText(button.textContent).includes(title)) || null
-      const selectedAlert = globalThis.document?.querySelector?.('#alerts-focus') || null
+      const selectedAlert = globalThis.document?.querySelector?.('#alerts-response') || null
       const selectedText = normalizeText(selectedAlert?.textContent)
       return {
         pageUrl: globalThis.location?.href || '',
         alertButtonFound: Boolean(exactAlertButton),
         alertButtonText: normalizeText(exactAlertButton?.textContent),
         selectedText,
-        selectedMatches: selectedText.includes(title) && selectedText.includes(`Action: ${recommendedAction}`),
+        selectedMatches: selectedText.includes(title) && selectedText.includes(recommendedAction),
       }
     }, {
       title: alertRecord.title,
@@ -2903,7 +2911,7 @@ test('alerts, recommendations, orders, inventory, integrations, users, profile, 
     await page.getByRole('button', { name: 'Manage Policies' }).click()
 
     await expect(page.getByRole('heading', { level: 1, name: 'Tenant and workspace settings' })).toBeVisible()
-    await expect(page.getByLabel('Tenant Name').first()).toHaveValue(workspace.tenantName)
+    await expect(page.getByLabel('Company workspace name').first()).toHaveValue(workspace.tenantName)
     if (workspace.connectors?.length) {
       await expect(page.getByText(workspace.connectors[0].displayName).first()).toBeVisible()
     }

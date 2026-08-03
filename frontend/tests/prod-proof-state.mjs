@@ -18,7 +18,7 @@ export const hostedProofStatePath = path.resolve(process.cwd(), '.hosted-proof',
 
 export function readHostedProofStateSync() {
   try {
-    return JSON.parse(fs.readFileSync(hostedProofStatePath, 'utf8'))
+    return JSON.parse(fs.readFileSync(hostedProofStatePath, 'utf8').replace(/^\uFEFF/, ''))
   } catch {
     return {}
   }

@@ -74,7 +74,9 @@ function Write-HostedProofState {
 
     $stateDirectory = Split-Path -Parent $script:HostedProofStatePath
     New-Item -ItemType Directory -Path $stateDirectory -Force | Out-Null
-    $state | ConvertTo-Json -Depth 8 | Set-Content -LiteralPath $script:HostedProofStatePath -Encoding UTF8
+    $json = $state | ConvertTo-Json -Depth 8
+    $utf8NoBom = New-Object System.Text.UTF8Encoding($false)
+    [System.IO.File]::WriteAllText($script:HostedProofStatePath, $json, $utf8NoBom)
     $script:ExistingHostedProofState = Read-HostedProofState
 }
 
