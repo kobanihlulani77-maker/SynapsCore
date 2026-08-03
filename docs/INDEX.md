@@ -145,12 +145,27 @@ This index links the main product, architecture, runbook, proof, and operator do
 
 ## Pilot Rollout
 
+- [pilot-release-candidate.md](pilot-release-candidate.md)
+- [pilot-company-onboarding-checklist.md](pilot-company-onboarding-checklist.md)
+- [pilot-operator-checklist.md](pilot-operator-checklist.md)
+- [pilot-success-metrics.md](pilot-success-metrics.md)
+- [pilot-rollback-and-escalation.md](pilot-rollback-and-escalation.md)
 - [pilot-program-guide.md](pilot-program-guide.md)
 - [pilot-onboarding-pack.md](pilot-onboarding-pack.md)
 - [pilot-operations-runbook.md](pilot-operations-runbook.md)
 - [pilot-adoption-roadmap.md](pilot-adoption-roadmap.md)
 - [pilot-acceptance-criteria.md](pilot-acceptance-criteria.md)
 - [pilot-faq.md](pilot-faq.md)
+
+## Pilot Release Candidate
+
+- [pilot-release-candidate.md](pilot-release-candidate.md)
+- [release-evidence-2026-08-03.md](release-evidence-2026-08-03.md)
+- [pilot-company-onboarding-checklist.md](pilot-company-onboarding-checklist.md)
+- [pilot-operator-checklist.md](pilot-operator-checklist.md)
+- [pilot-success-metrics.md](pilot-success-metrics.md)
+- [pilot-rollback-and-escalation.md](pilot-rollback-and-escalation.md)
+- [release-process.md](release-process.md)
 
 ## Executive Overview
 

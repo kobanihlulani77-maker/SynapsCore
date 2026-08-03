@@ -95,6 +95,23 @@ The most important current truth is:
 
 That means historical proof success is now refreshed by a current replacement-database proof run. Every future replacement database must still be revalidated before claiming refreshed hosted proof.
 
+## Pilot Release Candidate
+
+The current controlled pilot release candidate proposal is:
+
+- `v0.9.0-pilot-rc1`
+
+Pilot RC entry points:
+
+- [Pilot release candidate](docs/pilot-release-candidate.md)
+- [Pilot company onboarding checklist](docs/pilot-company-onboarding-checklist.md)
+- [Pilot operator checklist](docs/pilot-operator-checklist.md)
+- [Pilot success metrics](docs/pilot-success-metrics.md)
+- [Pilot rollback and escalation](docs/pilot-rollback-and-escalation.md)
+- [Release evidence - August 3, 2026](docs/release-evidence-2026-08-03.md)
+
+The pilot RC is for controlled company evaluation within the current supported scope. It is not an unrestricted enterprise production rollout claim.
+
 ## Current Supported Scope
 
 SynapseCore is fully real for its current supported scope.
