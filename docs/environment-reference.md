@@ -290,7 +290,7 @@ Authoritative generated values:
 Source:
 
 - generated or reused by `scripts\prepare-hosted-proof.ps1`
-- persisted locally in ignored state at `frontend\test-results\hosted-proof-state.json`
+- persisted locally in ignored state at `frontend\.hosted-proof\hosted-proof-state.json`
 - read automatically by the Playwright hosted proof when shell env vars are absent
 
 Not generated:

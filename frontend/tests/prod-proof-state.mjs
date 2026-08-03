@@ -14,7 +14,7 @@ export const authRateLimitWindowMs = Number.isFinite(authRateLimitWindowSeconds)
 
 export const authRateLimitCooldownBufferMs = 5_000
 
-export const hostedProofStatePath = path.resolve(process.cwd(), 'test-results', 'hosted-proof-state.json')
+export const hostedProofStatePath = path.resolve(process.cwd(), '.hosted-proof', 'hosted-proof-state.json')
 
 export function readHostedProofStateSync() {
   try {

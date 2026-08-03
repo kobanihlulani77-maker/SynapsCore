@@ -47,7 +47,7 @@ The current proof preparation lane is authoritative for proof tenant and operato
 
 1. script parameters
 2. shell environment overrides
-3. ignored proof state at `frontend\test-results\hosted-proof-state.json`
+3. ignored proof state at `frontend\.hosted-proof\hosted-proof-state.json`
 4. generated safe defaults
 
 For a new empty production database, the only value the script cannot safely invent is the private backend bootstrap token.
@@ -65,7 +65,7 @@ Preparation command after proof state exists or the bootstrap token is already l
 powershell -ExecutionPolicy Bypass -File scripts\prepare-hosted-proof.ps1
 ```
 
-Do not commit or print `frontend\test-results\hosted-proof-state.json`; it contains generated proof passwords for the local proof runner.
+Do not commit or print `frontend\.hosted-proof\hosted-proof-state.json`; it contains generated proof passwords for the local proof runner.
 
 Browser proof:
 

@@ -310,7 +310,7 @@ Purpose:
 
 - prepares the hosted proof environment before Playwright runs
 - generates proof tenant/operator values when absent
-- writes ignored proof state to `frontend\test-results\hosted-proof-state.json`
+- writes ignored proof state to `frontend\.hosted-proof\hosted-proof-state.json`
 
 Use when:
 

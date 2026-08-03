@@ -403,7 +403,7 @@ The authoritative flow is:
 
 - run `scripts\prepare-hosted-proof.ps1`
 - let it generate or reuse the proof tenant, proof users, proof passwords, and proof SKU
-- let it write ignored local proof state to `frontend\test-results\hosted-proof-state.json`
+- let it write ignored local proof state to `frontend\.hosted-proof\hosted-proof-state.json`
 - let Playwright read that state file automatically
 
 For an empty production database, the only value that must come from outside the repo is:

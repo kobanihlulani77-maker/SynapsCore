@@ -723,7 +723,7 @@ function Ensure-ProofCatalogAndInventory {
         } | Out-Null
 }
 
-$script:HostedProofStatePath = Join-Path (Join-Path (Split-Path -Parent $PSScriptRoot) "frontend") "test-results\hosted-proof-state.json"
+$script:HostedProofStatePath = Join-Path (Join-Path (Split-Path -Parent $PSScriptRoot) "frontend") ".hosted-proof\hosted-proof-state.json"
 $script:ExistingHostedProofState = Read-HostedProofState
 
 $script:ApiBaseUrlValue = (Require-Value `
@@ -744,6 +744,9 @@ $IntegrationAdminPasswordValue = Require-Password -Name "PLAYWRIGHT_INTEGRATION_
 $ProofProductSkuValue = Normalize-ProofSku -Name "PLAYWRIGHT_PROOF_PRODUCT_SKU" -Value (Get-FirstValue -Values @($ProofProductSku, $env:PLAYWRIGHT_PROOF_PRODUCT_SKU, (Get-HostedProofStateValue -Names @("PLAYWRIGHT_PROOF_PRODUCT_SKU")), (Get-DefaultProofProductSku -TenantCode $script:TenantCodeValue)))
 $PlatformAdminTokenValue = Get-FirstValue -Values @($PlatformAdminToken, $env:SYNAPSECORE_PLATFORM_ADMIN_TOKEN)
 $BootstrapInitialTokenValue = Get-FirstValue -Values @($BootstrapInitialToken, $env:SYNAPSECORE_BOOTSTRAP_INITIAL_TOKEN)
+if ($BootstrapInitialTokenValue -match '^<.*>$') {
+    throw "SYNAPSECORE_BOOTSTRAP_INITIAL_TOKEN is still a placeholder. Copy the real private Render backend value into this shell before running hosted proof preparation."
+}
 
 if ($script:TenantCodeValue -ieq "SYNAPSE-DEMO") {
     throw "SYNAPSE-DEMO is blocked for hosted proof. Use a real verification tenant created through /api/access/tenants."
