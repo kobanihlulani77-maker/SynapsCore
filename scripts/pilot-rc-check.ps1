@@ -30,12 +30,12 @@ function Invoke-Step {
     try {
         & $Script
         Write-Host "PASS"
-        return $true
+        return
     }
     catch {
         Write-Host "FAIL: $($_.Exception.Message)"
         $blockers.Add("$Name failed: $($_.Exception.Message)")
-        return $false
+        return
     }
 }
 
