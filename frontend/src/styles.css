@@ -2462,39 +2462,6 @@ tbody tr:hover {
   background: rgba(91, 226, 255, 0.04);
 }
 
-.primary-button,
-.secondary-button,
-.ghost-button,
-.approve-button,
-.reject-button {
-  border-radius: 16px;
-}
-
-.primary-button {
-  background: linear-gradient(135deg, #4bc8ff, #42f0c4);
-  color: #05111b;
-  border-color: transparent;
-}
-
-.secondary-button {
-  background: rgba(75, 200, 255, 0.12);
-  color: #c8fbff;
-  border-color: rgba(75, 200, 255, 0.18);
-}
-
-.ghost-button,
-.reject-button {
-  background: rgba(255, 255, 255, 0.025);
-  color: #eaf2fb;
-  border-color: rgba(126, 168, 216, 0.12);
-}
-
-.approve-button {
-  background: rgba(74, 213, 153, 0.12);
-  color: #aef6d5;
-  border-color: rgba(74, 213, 153, 0.18);
-}
-
 .field span,
 .summary-label,
 .status-label,

@@ -43,7 +43,7 @@ export default function DataGrid({ columns = [], rows = [], className = '', empt
                   aria-label={column.sortable ? `Sort by ${column.label}` : column.label}
                 >
                   <span>{column.label}</span>
-                  {sortState.key === column.key ? <span aria-hidden="true">{sortState.direction === 'asc' ? '↑' : '↓'}</span> : null}
+                  {sortState.key === column.key ? <span aria-hidden="true">{sortState.direction === 'asc' ? 'ASC' : 'DESC'}</span> : null}
                 </button>
               </th>
             ))}

@@ -198,7 +198,7 @@ export default function SignInPage({ context }) {
           {signInBusy ? (
             <div className="signin-feedback-card tone-info">
               <strong>Opening your operations workspace</strong>
-              <p>We’re validating the company workspace, operator identity, and live session before the command center opens.</p>
+              <p>We're validating the company workspace, operator identity, and live session before the command center opens.</p>
             </div>
           ) : null}
           {authError ? (

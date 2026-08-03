@@ -30,27 +30,44 @@ export default function Topbar({
 
   return (
     <header className="workspace-topbar">
-      <div>
+      <div className="workspace-topbar-primary">
         <p className="eyebrow">{effectivePageMeta.group ? effectivePageMeta.group.toUpperCase() : 'WORKSPACE'}</p>
         <h1>{effectivePageMeta.title}</h1>
         <p className="workspace-topbar-copy">{effectivePageMeta.description}</p>
+        <div className="workspace-topbar-statusline" aria-label="Workspace runtime status">
+          <span className="workspace-status-pill">{liveClockLabel}</span>
+          <span className={`workspace-status-pill status-${connectionState}`}>{connectionState === 'live' ? 'Live system' : formatCodeLabel(connectionState)}</span>
+          <button className="workspace-status-pill workspace-status-button" onClick={() => navigateToPage('runtime')} type="button">
+            Runtime {runtimeLabel}
+          </button>
+          <button className="workspace-status-pill workspace-status-button" onClick={() => navigateToPage('alerts')} type="button">
+            Notifications {globalNotificationCount}
+          </button>
+        </div>
       </div>
       <div className="workspace-topbar-actions">
-        <div className="workspace-topbar-identity">
-          <div className="workspace-identity-card">
+        <div className="workspace-topbar-utility">
+          <div className="workspace-compact-identity">
             <span>Workspace</span>
             <strong>{workspaceLabel}</strong>
-            <p>{signedInSession?.tenantCode || 'No workspace code'} | {primaryRole}</p>
+            <small>{signedInSession?.tenantCode || 'No workspace code'} | {primaryRole}</small>
           </div>
-          <div className="workspace-identity-card">
+          <div className="workspace-compact-identity">
             <span>Operator</span>
             <strong>{signedInSession?.displayName || 'Unknown operator'}</strong>
-            <p>{signedInSession?.actorName || 'No actor binding'} | {signedInSession?.username || 'No username'}</p>
+            <small>{signedInSession?.actorName || 'No actor binding'} | {signedInSession?.username || 'No username'}</small>
           </div>
-          <div className="workspace-identity-card">
-            <span>System posture</span>
-            <strong>{connectionState === 'live' ? 'Live system' : formatCodeLabel(connectionState)}</strong>
-            <p>{runtimeLabel} | Updated {liveClockLabel}</p>
+          <div className="workspace-topbar-controls">
+            {topbarQuickActions.map((action) => (
+              <button key={action.label} className="ghost-button topbar-quick-action" onClick={() => navigateToPage(action.target)} type="button">{action.label}</button>
+            ))}
+            <button className="secondary-button topbar-refresh-button" onClick={async () => { await Promise.all([pageState.onRefresh(), systemRuntimeState.onRefresh()]) }} disabled={pageState.loading || actionState.loading || systemRuntimeState.loading} type="button">
+              {pageState.loading || systemRuntimeState.loading ? 'Refreshing...' : 'Refresh'}
+            </button>
+            <button className="ghost-button topbar-account-button" onClick={() => navigateToPage('profile')} type="button">{signedInSession?.displayName || 'Profile'}</button>
+            <button className="ghost-button quiet-button" onClick={signOutOperator} disabled={authSessionState.loading} type="button">
+              {authSessionState.action === 'signout' ? 'Signing Out...' : 'Sign Out'}
+            </button>
           </div>
         </div>
         <div className="workspace-topbar-search">
@@ -119,28 +136,6 @@ export default function Topbar({
               </button>
             ))
             : effectivePageMeta.focus.map((focusItem) => <span key={focusItem} className="hero-jump-link">{focusItem}</span>)}
-        </div>
-        <div className="workspace-status-strip">
-          <span className="workspace-status-pill">{liveClockLabel}</span>
-          <span className={`workspace-status-pill status-${connectionState}`}>{connectionState === 'live' ? 'Live system' : formatCodeLabel(connectionState)}</span>
-          <button className="workspace-status-pill workspace-status-button" onClick={() => navigateToPage('runtime')} type="button">
-            Runtime {runtimeLabel}
-          </button>
-          <button className="workspace-status-pill workspace-status-button" onClick={() => navigateToPage('alerts')} type="button">
-            Notifications {globalNotificationCount}
-          </button>
-        </div>
-        <div className="workspace-topbar-controls">
-          {topbarQuickActions.map((action) => (
-            <button key={action.label} className="ghost-button" onClick={() => navigateToPage(action.target)} type="button">{action.label}</button>
-          ))}
-          <button className="ghost-button" onClick={async () => { await Promise.all([pageState.onRefresh(), systemRuntimeState.onRefresh()]) }} disabled={pageState.loading || actionState.loading || systemRuntimeState.loading} type="button">
-            {pageState.loading || systemRuntimeState.loading ? 'Refreshing...' : 'Refresh'}
-          </button>
-          <button className="ghost-button" onClick={() => navigateToPage('profile')} type="button">{signedInSession?.displayName || 'Profile'}</button>
-          <button className="ghost-button" onClick={signOutOperator} disabled={authSessionState.loading} type="button">
-            {authSessionState.action === 'signout' ? 'Signing Out...' : 'Sign Out'}
-          </button>
         </div>
       </div>
     </header>

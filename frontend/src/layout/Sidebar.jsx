@@ -9,7 +9,7 @@ export default function Sidebar({
   formatCodeLabel,
 }) {
   const roleSummary = signedInSession?.roles?.length
-    ? signedInSession.roles.map((role) => formatCodeLabel(role)).join(' • ')
+    ? signedInSession.roles.map((role) => formatCodeLabel(role)).join(' / ')
     : 'Workspace operator'
   const scopeSummary = signedInSession?.warehouseScopes?.length
     ? signedInSession.warehouseScopes.join(', ')
