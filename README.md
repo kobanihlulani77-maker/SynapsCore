@@ -286,7 +286,7 @@ These commands are informational only. They do not modify runtime behavior or de
 
 ## Honest Bottom Line
 
-SynapseCore should now be read as a real SaaS operations platform with live hosted proof, not as a code repo looking for a story.
+SynapseCore should now be read as a real SaaS operations system with live hosted proof, not as a code repo looking for a story.
 
 The platform is fully real for its current supported scope.
 
