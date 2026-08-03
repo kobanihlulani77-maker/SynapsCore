@@ -25,6 +25,67 @@ export default function RuntimePage({ context }) {
   const selectedRuntimeIncident = systemIncidents.find((incident) => incident.incidentKey === selectedRuntimeIncidentKey) || systemIncidents[0]
   const connectorDiagnostics = runtime?.connectorDiagnostics || []
   const highSeverityIncidents = systemIncidents.filter((incident) => ['CRITICAL', 'HIGH'].includes(incident.severity)).length
+  const degradedConnectorDiagnostics = connectorDiagnostics.filter((connector) => connector.healthStatus && !['HEALTHY', 'UP'].includes(connector.healthStatus)).length
+  const readinessIsHealthy = ['UP', 'CORRECT', 'ACCEPTING_TRAFFIC'].includes(runtime?.readinessState)
+  const runtimeIsHealthy = Boolean(runtime && ['UP', 'CORRECT', 'ACCEPTING_TRAFFIC'].includes(runtime.overallStatus) && readinessIsHealthy)
+  const queuePressure = Boolean(runtime && (runtime.backbone.pendingDispatchCount > 0 || runtime.backbone.failedDispatchCount > 0))
+  const runtimeDecision = !runtime
+    ? {
+      label: 'WATCH',
+      tone: 'status-partial',
+      title: 'Runtime evidence is incomplete.',
+      body: 'Do not treat the platform as fully safe until readiness, queue, and realtime evidence load.',
+      action: 'Wait for runtime evidence, then refresh if the state does not resolve.',
+    }
+    : !runtimeIsHealthy || highSeverityIncidents
+      ? {
+        label: 'STOP',
+        tone: 'status-failure',
+        title: 'Review the affected dependency before continuing.',
+        body: 'One or more runtime trust signals can affect supported operational flow.',
+        action: 'Pause sensitive integration events and inspect incidents, readiness, and release posture.',
+      }
+      : queuePressure || degradedConnectorDiagnostics || systemIncidents.length
+        ? {
+          label: 'WATCH',
+          tone: 'status-partial',
+          title: 'Normal work may continue with observation.',
+          body: 'The platform is responding, but queue, connector, or incident evidence deserves operator awareness.',
+          action: 'Review the highlighted dependency and keep replay/recovery visible.',
+        }
+        : {
+          label: 'SAFE',
+          tone: 'status-success',
+          title: 'Normal operation can continue.',
+          body: 'Runtime evidence supports the current workspace operating inside the supported pilot scope.',
+          action: 'Continue normal operation and keep audit/release evidence available.',
+        }
+  const runtimeDecisionFactors = [
+    {
+      label: 'Backend readiness',
+      value: runtime ? formatCodeLabel(runtime.readinessState) : 'Loading',
+      impact: runtime ? (readinessIsHealthy ? 'Accepting supported traffic.' : 'Traffic acceptance needs review.') : 'Evidence pending.',
+      tone: runtime && readinessIsHealthy ? 'status-success' : 'status-partial',
+    },
+    {
+      label: 'Database/runtime state',
+      value: runtime ? runtime.overallStatus : 'Loading',
+      impact: runtimeIsHealthy ? 'Core runtime evidence is healthy.' : 'Runtime trust is not fully confirmed.',
+      tone: runtimeIsHealthy ? 'status-success' : 'status-partial',
+    },
+    {
+      label: 'Realtime delivery',
+      value: runtime ? formatCodeLabel(runtime.backbone.realtimeBrokerMode || 'unknown') : 'Loading',
+      impact: runtime ? 'Dashboard changes can be evaluated against the configured websocket lane.' : 'Realtime evidence pending.',
+      tone: runtime ? 'status-success' : 'status-partial',
+    },
+    {
+      label: 'Operator blockers',
+      value: `${highSeverityIncidents} high severity`,
+      impact: highSeverityIncidents ? 'Escalate before continuing sensitive operational work.' : 'No high-severity runtime incident is active.',
+      tone: highSeverityIncidents ? 'status-failure' : 'status-success',
+    },
+  ]
   const runtimeSignalCards = runtime
     ? [
       { label: 'Readiness', value: formatCodeLabel(runtime.readinessState), note: 'Current service acceptance posture.' },
@@ -47,26 +108,39 @@ export default function RuntimePage({ context }) {
           <span className={`panel-badge ${runtime ? getRuntimeStatusClassName(runtime.overallStatus) : 'audit-badge'}`}>{runtime ? runtime.overallStatus : 'Loading'}</span>
         </div>
 
-        <div className="ops-command-hero">
-          <div className="ops-command-copy">
-            <strong>Live platform trust center</strong>
-            <p>
-              Runtime should help non-developer operators understand whether the platform is live, degraded, noisy, or truly in need of intervention,
-              while still keeping technical depth available for support and release review.
-            </p>
+        <div className="runtime-decision-hero" id="runtime-health">
+          <div className="runtime-decision-copy">
+            <p className="panel-kicker">Operator interpretation</p>
+            <div className="runtime-decision-title">
+              <span className={`runtime-decision-badge ${runtimeDecision.tone}`}>{runtimeDecision.label}</span>
+              <h2>{runtimeDecision.title}</h2>
+            </div>
+            <p>{runtimeDecision.body}</p>
+            <strong>{runtimeDecision.action}</strong>
             <div className="ops-pill-row">
-              <span className="workspace-meta-pill">Live posture</span>
-              <span className="workspace-meta-pill">Incident aware</span>
-              <span className="workspace-meta-pill">Queue visible</span>
+              <span className="workspace-meta-pill">Overall {runtime ? runtime.overallStatus : 'Loading'}</span>
+              <span className="workspace-meta-pill">Readiness {runtime ? formatCodeLabel(runtime.readinessState) : 'Loading'}</span>
+              <span className="workspace-meta-pill">Broker {runtime ? formatCodeLabel(runtime.backbone.realtimeBrokerMode || 'unknown') : 'Loading'}</span>
             </div>
           </div>
-          <div className="ops-command-actions">
-            <button className="secondary-button" onClick={() => navigateToPage('audit')} type="button">
-              Open audit
-            </button>
-            <button className="ghost-button" onClick={() => navigateToPage('releases')} type="button">
-              Open releases
-            </button>
+          <div className="runtime-decision-factors" aria-label="Runtime decision factors">
+            {runtimeDecisionFactors.map((factor) => (
+              <div className="runtime-factor-card" key={factor.label}>
+                <div className="stack-title-row">
+                  <span>{factor.label}</span>
+                  <span className={`status-tag ${factor.tone}`}>{factor.value}</span>
+                </div>
+                <p>{factor.impact}</p>
+              </div>
+            ))}
+            <div className="ops-command-actions">
+              <button className="secondary-button" onClick={() => navigateToPage('audit')} type="button">
+                Open audit
+              </button>
+              <button className="ghost-button" onClick={() => navigateToPage('releases')} type="button">
+                Open releases
+              </button>
+            </div>
           </div>
         </div>
 
@@ -78,9 +152,9 @@ export default function RuntimePage({ context }) {
         </div>
 
         <div className="experience-grid experience-grid-three">
-          <article className="stack-card section-card" id="runtime-health">
+          <article className="stack-card section-card">
             <div className="stack-title-row">
-              <strong>Health board</strong>
+              <strong>Detailed health board</strong>
               <span className={`status-tag ${runtime ? getRuntimeStatusClassName(runtime.overallStatus) : 'status-partial'}`}>{runtime ? runtime.overallStatus : 'Loading'}</span>
             </div>
             <div className="signal-list">

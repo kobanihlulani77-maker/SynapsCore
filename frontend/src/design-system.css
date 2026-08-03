@@ -1713,8 +1713,8 @@ tbody tr:hover {
 }
 
 .dashboard-command-header {
-  margin-bottom: 24px;
-  padding: 24px 26px;
+  margin-bottom: 16px;
+  padding: 22px 24px;
   border-radius: var(--radius-xl);
   border: 1px solid rgba(121, 156, 194, 0.14);
   background:
@@ -1726,35 +1726,102 @@ tbody tr:hover {
   justify-content: space-between;
 }
 
+.dashboard-operational-answer {
+  display: grid;
+  grid-template-columns: minmax(320px, 0.9fr) minmax(420px, 1.1fr);
+  gap: 18px;
+}
+
 .dashboard-command-identity,
-.dashboard-command-health,
 .dashboard-health-card,
 .dashboard-lane-card,
-.dashboard-guidance-card {
+.dashboard-guidance-card,
+.dashboard-attention-panel,
+.dashboard-attention-item,
+.dashboard-attention-clear {
   display: grid;
   gap: 10px;
 }
 
 .dashboard-command-identity {
-  max-width: 72ch;
+  max-width: 66ch;
   align-content: start;
 }
 
 .dashboard-command-identity h2 {
   margin: 0;
-  font-size: clamp(1.9rem, 2.3vw, 2.55rem);
+  font-size: clamp(2.15rem, 3vw, 3.35rem);
+  line-height: 0.95;
+  letter-spacing: -0.05em;
 }
 
-.dashboard-command-health {
+.dashboard-state-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.dashboard-state-copy {
+  max-width: 58ch;
+  font-size: 1rem;
+  color: var(--color-text);
+}
+
+.dashboard-health-strip {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 12px;
-  min-width: min(100%, 520px);
+  margin-bottom: 18px;
+}
+
+.dashboard-attention-panel {
+  align-content: start;
+  padding: 16px;
+  border-radius: var(--radius-lg);
+  border: 1px solid rgba(121, 156, 194, 0.14);
+  background: rgba(5, 14, 23, 0.54);
+}
+
+.dashboard-attention-list {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.dashboard-attention-item,
+.dashboard-attention-clear {
+  min-height: 160px;
+  padding: 14px;
+  border-radius: var(--radius-md);
+  border: 1px solid rgba(121, 156, 194, 0.14);
+  background: linear-gradient(180deg, rgba(19, 31, 49, 0.86), rgba(11, 20, 33, 0.94));
+  text-align: left;
+}
+
+.dashboard-attention-item {
+  cursor: pointer;
+  transition:
+    transform var(--motion-base) var(--ease-standard),
+    border-color var(--motion-base) var(--ease-standard),
+    background var(--motion-base) var(--ease-standard);
+}
+
+.dashboard-attention-item:hover {
+  transform: translateY(-1px);
+  border-color: rgba(99, 216, 255, 0.24);
+}
+
+.dashboard-attention-item p,
+.dashboard-attention-clear p {
+  margin: 0;
+  color: var(--color-text-muted);
+  line-height: 1.45;
 }
 
 .dashboard-health-card,
 .dashboard-lane-card {
-  padding: 18px 20px;
+  padding: 16px 18px;
   border-radius: var(--radius-md);
   border: 1px solid rgba(121, 156, 194, 0.14);
   background: linear-gradient(180deg, rgba(19, 31, 49, 0.9), rgba(12, 22, 35, 0.94));
@@ -1768,11 +1835,12 @@ tbody tr:hover {
 }
 
 .dashboard-signal-grid {
-  margin-bottom: 24px;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  margin-bottom: 20px;
 }
 
 .dashboard-signal-card {
-  min-height: 176px;
+  min-height: 132px;
 }
 
 .dashboard-operations-grid {
@@ -1849,27 +1917,97 @@ tbody tr:hover {
   box-shadow: var(--shadow-ambient);
 }
 
+.runtime-decision-hero {
+  display: grid;
+  grid-template-columns: minmax(320px, 0.88fr) minmax(420px, 1.12fr);
+  gap: 18px;
+  align-items: start;
+  margin-bottom: 18px;
+  padding: 22px 24px;
+  border-radius: var(--radius-lg);
+  border: 1px solid rgba(121, 156, 194, 0.14);
+  background:
+    radial-gradient(circle at top right, rgba(80, 216, 171, 0.1), transparent 30%),
+    linear-gradient(180deg, rgba(14, 27, 43, 0.96), rgba(9, 18, 30, 0.98));
+  box-shadow: var(--shadow-ambient);
+}
+
 .ops-command-copy,
 .ops-command-actions,
 .ops-pill-row,
 .recommendation-column,
 .approval-status-grid,
-.experience-grid-three {
+.experience-grid-three,
+.runtime-decision-copy,
+.runtime-decision-factors,
+.runtime-factor-card {
   display: grid;
 }
 
-.ops-command-copy {
+.ops-command-copy,
+.runtime-decision-copy {
   gap: 12px;
 }
 
-.ops-command-copy strong {
+.ops-command-copy strong,
+.runtime-decision-copy > strong {
   font-size: 1.06rem;
 }
 
 .ops-command-copy p,
+.runtime-decision-copy p,
 .recommendation-column > p {
   margin: 0;
   line-height: 1.6;
+}
+
+.runtime-decision-title {
+  display: grid;
+  gap: 10px;
+}
+
+.runtime-decision-title h2 {
+  margin: 0;
+  font-size: clamp(1.65rem, 2.2vw, 2.45rem);
+  line-height: 1.05;
+  letter-spacing: -0.04em;
+}
+
+.runtime-decision-badge {
+  display: inline-flex;
+  width: fit-content;
+  min-height: 32px;
+  align-items: center;
+  padding: 0 12px;
+  border-radius: 999px;
+  border: 1px solid rgba(121, 156, 194, 0.16);
+  font-size: 0.76rem;
+  font-weight: 800;
+  letter-spacing: 0.14em;
+}
+
+.runtime-decision-factors {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.runtime-factor-card {
+  min-height: 108px;
+  padding: 14px;
+  border-radius: var(--radius-md);
+  border: 1px solid rgba(121, 156, 194, 0.14);
+  background: rgba(5, 14, 23, 0.48);
+}
+
+.runtime-factor-card p {
+  margin: 0;
+  color: var(--color-text-muted);
+  line-height: 1.45;
+}
+
+.runtime-decision-factors .ops-command-actions {
+  grid-column: 1 / -1;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
 }
 
 .ops-command-actions {
@@ -2122,6 +2260,8 @@ tbody tr:hover {
 
   .workspace-topbar,
   .dashboard-command-header,
+  .dashboard-operational-answer,
+  .runtime-decision-hero,
   .ops-command-hero {
     grid-template-columns: 1fr;
   }
@@ -2140,10 +2280,13 @@ tbody tr:hover {
   }
 
   .workspace-topbar-identity,
-  .dashboard-command-health,
+  .dashboard-health-strip,
+  .dashboard-signal-grid,
+  .dashboard-attention-list,
   .dashboard-lane-grid,
   .dashboard-response-grid,
   .experience-grid-three,
+  .runtime-decision-factors,
   .inventory-spotlight-grid,
   .recommendation-board,
   .approval-status-grid {
@@ -2204,10 +2347,13 @@ tbody tr:hover {
   .utility-metric-grid,
   .command-hero-metrics,
   .workspace-topbar-identity,
-  .dashboard-command-health,
+  .dashboard-health-strip,
+  .dashboard-signal-grid,
+  .dashboard-attention-list,
   .dashboard-lane-grid,
   .dashboard-response-grid,
   .experience-grid-three,
+  .runtime-decision-factors,
   .inventory-spotlight-grid,
   .recommendation-board,
   .approval-status-grid {
@@ -2241,6 +2387,19 @@ tbody tr:hover {
 
   .workspace-topbar h1 {
     max-width: none;
+  }
+
+  .dashboard-command-identity h2 {
+    font-size: clamp(1.9rem, 12vw, 2.5rem);
+  }
+
+  .dashboard-attention-item,
+  .dashboard-attention-clear {
+    min-height: auto;
+  }
+
+  .runtime-decision-factors .ops-command-actions {
+    grid-template-columns: 1fr;
   }
 
   .data-grid-table {

@@ -133,6 +133,133 @@ export default function DashboardPage({ context }) {
     },
   ]
   const completedKickoffCount = kickoffTasks.filter((task) => task.complete).length
+  const readinessIsHealthy = ['UP', 'CORRECT', 'ACCEPTING_TRAFFIC'].includes(runtime?.readinessState)
+  const runtimeIsHealthy = Boolean(runtime && ['UP', 'CORRECT', 'ACCEPTING_TRAFFIC'].includes(runtime.overallStatus) && readinessIsHealthy)
+  const runtimeIsBlocked = Boolean(runtime && !runtimeIsHealthy && runtime.overallStatus !== 'UNKNOWN')
+  const connectionIsLive = connectionState === 'live'
+  const overdueApprovalCount = pendingApprovalScenarios.filter((scenario) => scenario.overdue).length
+  const seriousAlertCount = activeAlerts.filter((alert) => ['CRITICAL', 'HIGH'].includes(alert.severity)).length
+  const highSeverityIncidentCount = systemIncidents.filter((incident) => ['CRITICAL', 'HIGH'].includes(incident.severity)).length
+  const dashboardAttentionItems = [
+    !runtime ? {
+      id: 'runtime-loading',
+      tag: 'Runtime evidence',
+      title: 'Runtime trust is still loading',
+      note: 'Wait for runtime evidence before treating this workspace as fully safe.',
+      target: 'runtime',
+      actionLabel: 'Open Runtime',
+      tone: 'status-partial',
+    } : null,
+    runtimeIsBlocked || highSeverityIncidentCount ? {
+      id: 'runtime-blocked',
+      tag: 'Runtime trust',
+      title: highSeverityIncidentCount ? `${highSeverityIncidentCount} high-severity incident${highSeverityIncidentCount === 1 ? '' : 's'}` : `${runtimeStatusLabel} runtime posture`,
+      note: 'Review the affected dependency before continuing sensitive operational work.',
+      target: 'runtime',
+      actionLabel: 'Open Runtime',
+      tone: 'status-failure',
+    } : null,
+    !connectionIsLive ? {
+      id: 'realtime-degraded',
+      tag: 'Realtime',
+      title: `${formatCodeLabel(connectionState)} realtime state`,
+      note: 'Operators may need to refresh before trusting live dashboard changes.',
+      target: 'runtime',
+      actionLabel: 'Open Runtime',
+      tone: 'status-partial',
+    } : null,
+    pendingReplayCount ? {
+      id: 'replay-backlog',
+      tag: 'Recovery',
+      title: `${pendingReplayCount} failed inbound item${pendingReplayCount === 1 ? '' : 's'}`,
+      note: 'Replay queue needs review before failed external work can re-enter live flow.',
+      target: 'replay',
+      actionLabel: 'Review Replay',
+      tone: 'status-failure',
+    } : null,
+    overdueApprovalCount ? {
+      id: 'approval-overdue',
+      tag: 'Approvals',
+      title: `${overdueApprovalCount} overdue approval${overdueApprovalCount === 1 ? '' : 's'}`,
+      note: 'Governed changes are blocked until an approver resolves the queue.',
+      target: 'approvals',
+      actionLabel: 'Review Approvals',
+      tone: 'status-failure',
+    } : pendingApprovalScenarios.length ? {
+      id: 'approval-pending',
+      tag: 'Approvals',
+      title: `${pendingApprovalScenarios.length} scenario${pendingApprovalScenarios.length === 1 ? '' : 's'} awaiting decision`,
+      note: 'Review approval posture before the team expects execution to move.',
+      target: 'approvals',
+      actionLabel: 'Review Approvals',
+      tone: 'status-partial',
+    } : null,
+    degradedConnectorCount ? {
+      id: 'connector-degraded',
+      tag: 'Integrations',
+      title: `${degradedConnectorCount} connector${degradedConnectorCount === 1 ? '' : 's'} degraded`,
+      note: 'Inspect connector telemetry before relying on inbound operational events.',
+      target: 'integrations',
+      actionLabel: 'Inspect Connectors',
+      tone: 'status-partial',
+    } : null,
+    seriousAlertCount || resolvedActiveAlertCount ? {
+      id: 'alert-pressure',
+      tag: 'Alerts',
+      title: `${resolvedActiveAlertCount} active alert${resolvedActiveAlertCount === 1 ? '' : 's'}`,
+      note: seriousAlertCount ? `${seriousAlertCount} serious alert${seriousAlertCount === 1 ? '' : 's'} need ownership.` : 'Warnings are waiting for operator ownership.',
+      target: 'alerts',
+      actionLabel: 'Open Alerts',
+      tone: seriousAlertCount ? 'status-failure' : 'status-partial',
+    } : null,
+    resolvedLowStockCount ? {
+      id: 'inventory-risk',
+      tag: 'Inventory',
+      title: `${resolvedLowStockCount} low-stock item${resolvedLowStockCount === 1 ? '' : 's'}`,
+      note: 'Inventory risk may affect order and fulfillment commitments.',
+      target: 'inventory',
+      actionLabel: 'Review Inventory',
+      tone: 'status-partial',
+    } : null,
+    showWorkspaceKickoff ? {
+      id: 'workspace-kickoff',
+      tag: 'Setup',
+      title: `${kickoffTasks.length - completedKickoffCount} setup lane${kickoffTasks.length - completedKickoffCount === 1 ? '' : 's'} remaining`,
+      note: 'Finish the first catalog, inventory, access, integration, and scenario setup before live pressure is expected.',
+      target: kickoffTasks.find((task) => !task.complete)?.target || 'catalog',
+      actionLabel: 'Continue Setup',
+      tone: 'status-partial',
+    } : null,
+    !resolvedActiveAlertCount && resolvedRecommendationCount ? {
+      id: 'recommendation-queue',
+      tag: 'Recommendations',
+      title: `${resolvedRecommendationCount} recommendation${resolvedRecommendationCount === 1 ? '' : 's'} ready`,
+      note: 'Action guidance is available even though the alert lane is calm.',
+      target: 'recommendations',
+      actionLabel: 'Open Recommendations',
+      tone: 'status-partial',
+    } : null,
+  ].filter(Boolean)
+  const primaryAttentionItem = dashboardAttentionItems[0]
+  const operationalState = runtimeIsBlocked || highSeverityIncidentCount
+    ? 'Blocked'
+    : (!runtime || !connectionIsLive || degradedConnectorCount || systemIncidents.length)
+      ? 'Degraded'
+      : (showWorkspaceKickoff || pendingReplayCount || pendingApprovalScenarios.length || resolvedActiveAlertCount || resolvedLowStockCount || resolvedRecommendationCount)
+        ? 'Attention required'
+        : 'Healthy'
+  const operationalTone = operationalState === 'Healthy'
+    ? 'status-success'
+    : operationalState === 'Blocked'
+      ? 'status-failure'
+      : 'status-partial'
+  const operationalSummary = operationalState === 'Healthy'
+    ? 'Normal supported operation can continue. SynapseCore is monitoring for the next meaningful change.'
+    : operationalState === 'Blocked'
+      ? 'A trust or governance blocker needs review before sensitive operational work continues.'
+      : operationalState === 'Degraded'
+        ? 'The workspace is usable, but runtime, realtime, connector, or incident evidence needs attention.'
+        : 'The workspace has actionable operational work waiting for an operator.'
 
   const guidanceActions = showWorkspaceKickoff
     ? kickoffTasks.filter((task) => !task.complete).map((task) => ({
@@ -162,18 +289,6 @@ export default function DashboardPage({ context }) {
       value: pendingReplayCount,
       accent: 'rose',
       note: pendingReplayCount ? 'Failed inbound work is waiting for operator recovery' : 'Recovery queue is clear',
-    },
-    {
-      label: 'Alerts',
-      value: resolvedActiveAlertCount,
-      accent: 'rose',
-      note: resolvedActiveAlertCount ? 'Warnings are waiting for ownership' : 'No active alert pressure',
-    },
-    {
-      label: 'Recommendations',
-      value: resolvedRecommendationCount,
-      accent: 'teal',
-      note: resolvedRecommendationCount ? 'Action guidance is ready for the operating team' : 'No immediate action guidance is queued',
     },
     {
       label: 'Runtime & Incidents',
@@ -271,36 +386,65 @@ export default function DashboardPage({ context }) {
 
   return (
     <>
-      <section className="dashboard-command-header">
+      <section className="dashboard-command-header dashboard-operational-answer" id="dashboard-act-now">
         <article className="dashboard-command-identity">
           <p className="panel-kicker">Company command center</p>
-          <h2>{signedInSession?.tenantName || 'Operational workspace'}</h2>
-          <p>{pageStatus}</p>
+          <div className="dashboard-state-row">
+            <h2>{operationalState}</h2>
+            <span className={`status-tag ${operationalTone}`}>{primaryAttentionItem?.tag || 'Operational state'}</span>
+          </div>
+          <p className="dashboard-state-copy">{operationalSummary}</p>
           <div className="dashboard-command-meta">
+            <span className="workspace-meta-pill">{signedInSession?.tenantName || 'Operational workspace'}</span>
             <span className="workspace-meta-pill">Workspace {signedInSession?.tenantCode || 'Unknown'}</span>
             <span className={`workspace-meta-pill ${connectionState === 'live' ? 'status-live' : 'status-missing'}`}>{connectionState === 'live' ? 'Realtime live' : formatCodeLabel(connectionState)}</span>
-            <span className="workspace-meta-pill">Operator {signedInSession?.displayName || 'Unknown'}</span>
           </div>
         </article>
-        <article className="dashboard-command-health">
-          <div className="dashboard-health-card">
-            <span>Live system</span>
-            <strong>{connectionState === 'live' ? 'Connected' : formatCodeLabel(connectionState)}</strong>
-            <p>{snapshot.generatedAt ? `Snapshot ${formatTimestamp(snapshot.generatedAt)}` : `Monitoring ${liveClockLabel}`}</p>
+        <article className="dashboard-attention-panel" aria-labelledby="dashboard-attention-title">
+          <div className="stack-title-row">
+            <strong id="dashboard-attention-title">What needs attention now</strong>
+            <span className="scenario-type-tag">{dashboardAttentionItems.length || 'Clear'}</span>
           </div>
-          <div className="dashboard-health-card">
-            <span>Runtime trust</span>
-            <strong>{runtimeStatusLabel}</strong>
-            <p>{runtime?.build?.version ? `Build ${runtime.build.version} | ${readinessLabel}` : `${readinessLabel} | Runtime metadata pending`}</p>
+          <div className="dashboard-attention-list">
+            {dashboardAttentionItems.length ? dashboardAttentionItems.slice(0, 3).map((item) => (
+              <button key={item.id} className="dashboard-attention-item" onClick={() => navigateToPage(item.target)} type="button">
+                <span className={`status-tag ${item.tone}`}>{item.tag}</span>
+                <strong>{item.title}</strong>
+                <p>{item.note}</p>
+                <span className="workspace-kickoff-link">{item.actionLabel}</span>
+              </button>
+            )) : (
+              <div className="dashboard-attention-clear">
+                <strong>No immediate blockers</strong>
+                <p>Review live activity or audit history when you need supporting evidence.</p>
+              </div>
+            )}
           </div>
-          <div className="dashboard-health-card">
-            <span>Primary actions</span>
-            <div className="dashboard-health-actions">
-              <button className="secondary-button" onClick={() => navigateToPage('alerts')} type="button">Open Alerts</button>
-              <button className="ghost-button" onClick={() => navigateToPage('runtime')} type="button">Open Runtime</button>
-            </div>
+          <div className="dashboard-health-actions">
+            <button className="secondary-button" onClick={() => navigateToPage(primaryAttentionItem?.target || 'audit')} type="button">
+              {primaryAttentionItem?.actionLabel || 'Open Audit'}
+            </button>
+            <button className="ghost-button" onClick={() => navigateToPage('runtime')} type="button">Open Runtime</button>
           </div>
         </article>
+      </section>
+
+      <section className="dashboard-health-strip" id="dashboard-live-state" aria-label="Live workspace state">
+        <div className="dashboard-health-card">
+          <span>Live system</span>
+          <strong>{connectionState === 'live' ? 'Connected' : formatCodeLabel(connectionState)}</strong>
+          <p>{snapshot.generatedAt ? `Snapshot ${formatTimestamp(snapshot.generatedAt)}` : `Monitoring ${liveClockLabel}`}</p>
+        </div>
+        <div className="dashboard-health-card">
+          <span>Runtime trust</span>
+          <strong>{runtimeStatusLabel}</strong>
+          <p>{runtime?.build?.version ? `Build ${runtime.build.version} | ${readinessLabel}` : `${readinessLabel} | Runtime metadata pending`}</p>
+        </div>
+        <div className="dashboard-health-card">
+          <span>Operator</span>
+          <strong>{signedInSession?.displayName || 'Unknown'}</strong>
+          <p>{pageStatus}</p>
+        </div>
       </section>
 
       {showWorkspaceKickoff ? (
