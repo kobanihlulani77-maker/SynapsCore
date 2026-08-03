@@ -27,9 +27,9 @@ export default function SignInPage({ context }) {
   })
 
   const featureCards = [
-    { title: 'Live visibility', body: 'Orders, inventory, locations, fulfillment, incidents, and connectors pulled into one operational picture.' },
-    { title: 'Prediction and guidance', body: 'Detect risk early, estimate near-term impact, and surface what the team should do next.' },
-    { title: 'Control and trust', body: 'Run scenarios, route approvals, recover failed inbound work, and keep runtime confidence visible.' },
+    { title: 'Workspace first', body: 'Start with the company workspace code so SynapseCore opens the correct tenant boundary.' },
+    { title: 'Operator identity', body: 'Username and password confirm the person signing in and the operational permissions they carry.' },
+    { title: 'Live command entry', body: 'After validation, alerts, replay, approvals, runtime, orders, and inventory open under that session.' },
   ]
   const signInBusy = authSessionState.loading && authSessionState.action === 'signin'
   const workspaceCodeMissing = (attemptedSubmit || visitedFields.tenantCode) && !authSessionState.tenantCode.trim()
@@ -68,6 +68,10 @@ export default function SignInPage({ context }) {
           <p className="eyebrow">Secure company entry</p>
           <h1>{effectivePageMeta.title}</h1>
           <p>{effectivePageMeta.description}</p>
+          <div className="public-positioning-card signin-positioning-card">
+            <strong>Daily operator path</strong>
+            <p>Use the workspace code from your company admin. SynapseCore checks tenant context and operator credentials before protected actions unlock.</p>
+          </div>
           <div className="enterprise-status-row">
             <span className="enterprise-status-pill">{tenantDirectoryState.loading ? 'Checking workspace directory' : `${tenantDirectoryState.items.length} workspaces visible`}</span>
             <span className={`enterprise-status-pill ${wsUrl ? 'status-live' : 'status-missing'}`}>{wsUrl ? 'Realtime path ready' : 'Realtime not configured'}</span>
@@ -84,6 +88,7 @@ export default function SignInPage({ context }) {
         <article className="public-signin-card">
           <p className="panel-kicker">Company sign in</p>
           <h2>Enter the operational platform</h2>
+          <p className="muted-text">Sign in with workspace code, username, and password. If access fails, the company workspace admin manages resets and role changes.</p>
           {tenantDirectoryState.loading && !tenantDirectoryState.items.length ? <LoadingState label="Loading available workspaces..." /> : null}
           <form className="signin-form-shell" onSubmit={submitWithValidation}>
             <div className="signin-form-grid">

@@ -8,6 +8,12 @@ const setupSteps = [
   { key: 'next', label: 'Guided next steps' },
 ]
 
+const setupBoundaries = [
+  'This frontend prepares a workspace setup brief.',
+  'Live tenant creation uses supported backend provisioning paths.',
+  'SynapseCore supports operations beside existing ERP, WMS, ecommerce, and source systems.',
+]
+
 const industryOptions = [
   'Logistics provider',
   'Warehouse operation',
@@ -181,6 +187,10 @@ export default function CreateWorkspacePage({ context }) {
           <p className="eyebrow">Company workspace setup</p>
           <h1>{effectivePageMeta.title}</h1>
           <p>{effectivePageMeta.description}</p>
+          <div className="workspace-wizard-note workspace-entry-boundary">
+            <strong>Controlled pilot setup</strong>
+            <p>Prepare company context, first administrator, and rollout lane before operators sign in. Provisioning is confirmed only by supported backend flows.</p>
+          </div>
           <div className="workspace-wizard-steps">
             {setupSteps.map((step, index) => {
               const state = index < currentStepIndex ? 'complete' : index === currentStepIndex ? 'active' : 'upcoming'
@@ -374,6 +384,18 @@ export default function CreateWorkspacePage({ context }) {
                     <div key={lane.title} className="workspace-next-card">
                       <strong>{lane.title}</strong>
                       <p>{lane.body}</p>
+                    </div>
+                  ))}
+                </div>
+              </article>
+
+              <article className="workspace-review-card workspace-setup-boundaries">
+                <p className="panel-kicker">Boundaries</p>
+                <h3>What this setup does and does not do</h3>
+                <div className="public-list-grid">
+                  {setupBoundaries.map((boundary) => (
+                    <div key={boundary} className="public-list-item">
+                      <strong>{boundary}</strong>
                     </div>
                   ))}
                 </div>

@@ -66,6 +66,17 @@ const capabilityCards = [
   },
 ]
 
+const boundaryCards = [
+  {
+    title: 'Works beside source systems',
+    body: 'SynapseCore improves visibility, coordination, recovery, and governed action without replacing ERP, WMS, ecommerce, or source-of-record systems during a pilot.',
+  },
+  {
+    title: 'Best first step',
+    body: 'Start with one controlled operational lane, prove the workflow, then expand based on real operator evidence.',
+  },
+]
+
 const proofCards = [
   {
     title: 'Hosted proof flow exists',
@@ -74,7 +85,7 @@ const proofCards = [
   },
   {
     title: 'Core lanes are being proven',
-    body: 'Catalog, inventory, orders, realtime, replay, scenario approval, and runtime visibility are under active proof work.',
+    body: 'Catalog, inventory, orders, realtime, replay, scenario approval, and runtime visibility are covered by the hosted proof discipline.',
     tone: 'success',
   },
   {
@@ -144,7 +155,7 @@ export default function PublicExperience({ context }) {
     : effectivePageMeta.title
 
   const heroDescription = isLanding
-    ? 'SynapseCore connects orders, inventory, integrations, replay recovery, approvals, alerts, and live operational signals into one tenant-based control platform.'
+    ? 'SynapseCore helps operational teams see live work, coordinate decisions, recover failed inbound flow, and keep runtime trust visible across one tenant-scoped command center.'
     : effectivePageMeta.description
 
   const heroEyebrow = isContact
@@ -195,6 +206,10 @@ export default function PublicExperience({ context }) {
           <p className="eyebrow">{heroEyebrow}</p>
           <h1>{heroTitle}</h1>
           <p>{heroDescription}</p>
+          <div className="public-positioning-card">
+            <strong>Built for controlled operational pilots.</strong>
+            <p>Not an ERP or WMS replacement. SynapseCore sits above existing systems to improve visibility, recovery, approvals, and operational confidence.</p>
+          </div>
           <div className="public-hero-metrics">
             {heroMetrics.map((metric) => (
               <div key={metric.label} className="public-hero-metric-card">
@@ -221,7 +236,7 @@ export default function PublicExperience({ context }) {
               <p className="panel-kicker">Live command surface</p>
               <h2>One operating picture for control, recovery, and trust.</h2>
             </div>
-            <span className="enterprise-status-pill status-live">Live system intelligence</span>
+            <span className="enterprise-status-pill status-live">Pilot-ready command surface</span>
           </div>
           <div className="public-command-signals">
             {commandSignals.map((signal) => (
@@ -242,6 +257,21 @@ export default function PublicExperience({ context }) {
             ))}
           </div>
         </article>
+      </section>
+
+      <section className="public-section-shell public-boundary-strip" aria-labelledby="pilot-boundaries">
+        <div className="public-section-heading">
+          <p className="panel-kicker">Pilot boundaries</p>
+          <h2 id="pilot-boundaries">Clear value without pretending to replace the systems companies already rely on.</h2>
+        </div>
+        <div className="public-card-grid public-card-grid-two">
+          {boundaryCards.map((card) => (
+            <article key={card.title} className="public-proof-card tone-info">
+              <strong>{card.title}</strong>
+              <p>{card.body}</p>
+            </article>
+          ))}
+        </div>
       </section>
 
       <section className="public-section-shell" aria-labelledby="who-it-is-for">

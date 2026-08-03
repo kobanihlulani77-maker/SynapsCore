@@ -1161,6 +1161,7 @@ tbody tr:hover {
   display: grid;
   gap: 22px;
   align-content: center;
+  min-width: 0;
 }
 
 .public-hero-copy > p {
@@ -1189,6 +1190,7 @@ tbody tr:hover {
 .public-onboarding-card,
 .public-list-item,
 .public-command-lane,
+.public-positioning-card,
 .public-final-cta-card {
   position: relative;
   padding: 18px 20px;
@@ -1210,6 +1212,20 @@ tbody tr:hover {
   text-transform: uppercase;
 }
 
+.public-positioning-card {
+  display: grid;
+  gap: 6px;
+  max-width: 68ch;
+  border-color: rgba(80, 216, 171, 0.2);
+  background:
+    radial-gradient(circle at top right, rgba(80, 216, 171, 0.08), transparent 34%),
+    linear-gradient(180deg, rgba(15, 30, 45, 0.92), rgba(8, 18, 30, 0.94));
+}
+
+.public-positioning-card p {
+  margin: 0;
+}
+
 .public-hero-metric-card strong,
 .public-command-signal strong,
 .public-domain-card strong,
@@ -1220,6 +1236,25 @@ tbody tr:hover {
 .public-list-item strong,
 .public-final-cta-card h2 {
   display: block;
+}
+
+.public-hero,
+.public-signin-shell,
+.public-section-shell,
+.public-section-shell-split,
+.public-section-card,
+.public-signin-card,
+.public-signin-story,
+.public-command-visual,
+.public-command-header > div,
+.public-card-grid,
+.public-feature-grid,
+.public-list-grid,
+.workspace-wizard-shell,
+.workspace-wizard-sidebar,
+.workspace-wizard-panel,
+.workspace-review-card {
+  min-width: 0;
 }
 
 .public-hero-metric-card strong,
@@ -1302,6 +1337,10 @@ tbody tr:hover {
 
 .public-card-grid-wide {
   grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
+.public-card-grid-two {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
 }
 
 .public-feature-grid {
@@ -2678,6 +2717,10 @@ tbody tr:hover {
     padding-right: 16px;
   }
 
+  .public-topbar {
+    min-width: 0;
+  }
+
   .workspace-utility-rail,
   .signin-trust-grid,
   .utility-metric-grid,
@@ -2724,6 +2767,23 @@ tbody tr:hover {
     grid-template-columns: 1fr;
   }
 
+  .public-topbar .brand-lockup,
+  .public-nav > *,
+  .history-action-row > *,
+  .workspace-wizard-actions > * {
+    min-width: 0;
+  }
+
+  .public-topbar .brand-lockup {
+    width: 100%;
+  }
+
+  .public-topbar .brand-lockup small,
+  .public-nav button,
+  .history-action-row button {
+    white-space: normal;
+  }
+
   .workspace-topbar h1 {
     max-width: none;
   }
@@ -2766,6 +2826,8 @@ tbody tr:hover {
 
   .public-card-grid,
   .public-card-grid-wide,
+  .public-card-grid-two,
+  .public-section-shell-split,
   .public-command-grid,
   .public-hero-metrics,
   .public-feature-grid,
