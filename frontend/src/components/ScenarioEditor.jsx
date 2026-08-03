@@ -12,7 +12,11 @@ export default function ScenarioEditor({
   return (
     <article className="scenario-editor-card">
       <div className="planner-line-header">
-        <div><p className="panel-kicker">Scenario editor</p><h2>{title}</h2></div>
+        <div>
+          <p className="panel-kicker">Inputs and assumptions</p>
+          <h2>{title}</h2>
+          <p className="muted-text planner-note">Set the warehouse, product mix, quantity, and unit price before previewing operational impact.</p>
+        </div>
         <button className="ghost-button" onClick={() => addScenarioLine(setter, form.warehouseCode)} disabled={!context.productOptions.length} type="button">Add Line</button>
       </div>
       <div className="planner-controls">

@@ -120,6 +120,68 @@ export default function ReplayPage({ context }) {
     : replayBlockedByEligibility
       ? `This replay record is gated until ${formatTimestamp(selectedRecord?.nextEligibleAt)}.`
       : ''
+  const signedInCanReplay = Boolean(
+    signedInSession
+      && signedInRoles.some((role) => role === 'INTEGRATION_OPERATOR' || role === 'INTEGRATION_ADMIN')
+      && (!selectedRecord || hasWarehouseScope(signedInWarehouseScopes, selectedRecord.warehouseCode))
+  )
+  const selectedReplayActionDisabled = Boolean(
+    selectedRecord && (
+      integrationReplayState.loadingId === selectedRecord.id
+      || !signedInSession
+      || !signedInRoles.some((role) => role === 'INTEGRATION_OPERATOR' || role === 'INTEGRATION_ADMIN')
+      || !hasWarehouseScope(signedInWarehouseScopes, selectedRecord.warehouseCode)
+      || replayBlockedByEligibility
+      || replayBlockedByConnector
+    )
+  )
+  const replayDecision = !selectedRecord
+    ? {
+      label: 'Queue clear',
+      tone: 'status-success',
+      title: 'No failed inbound item is selected.',
+      body: 'Recovery is currently clear. New connector failures will appear in the queue when they need operator review.',
+      next: 'Monitor connector health and audit history.',
+    }
+    : selectedRecord.status === 'REPLAYED'
+      ? {
+        label: 'Recovered',
+        tone: 'status-success',
+        title: `${selectedRecord.externalOrderId} has already been replayed.`,
+        body: 'This failed inbound item has already moved through recovery. Use the history and connector evidence for traceability.',
+        next: 'No replay action is required right now.',
+      }
+      : selectedRecord.status === 'REPLAY_FAILED'
+        ? {
+          label: 'Failed again',
+          tone: 'status-failure',
+          title: `${selectedRecord.externalOrderId} still needs recovery.`,
+          body: selectedRecord.lastReplayMessage || selectedRecord.failureMessage || 'The previous replay attempt did not complete successfully.',
+          next: 'Review connector posture and failure detail before trying again.',
+        }
+        : replayBlockedMessage
+          ? {
+            label: 'Blocked',
+            tone: 'status-failure',
+            title: 'Replay is not safe yet.',
+            body: replayBlockedMessage,
+            next: replayBlockedByConnector ? 'Re-enable or inspect the connector before replay.' : 'Wait until the eligibility time passes.',
+          }
+          : signedInCanReplay
+            ? {
+              label: 'Eligible',
+              tone: 'status-success',
+              title: `${selectedRecord.externalOrderId} can enter live recovery.`,
+              body: 'The selected record is pending, connector prerequisites are clear, and this operator has the required replay scope.',
+              next: 'Replay Into Live Flow will send this failed inbound item back through the supported live flow.',
+            }
+            : {
+              label: 'Manual review',
+              tone: 'status-partial',
+              title: 'Replay needs an authorized operator.',
+              body: 'The selected record is visible, but this session does not currently satisfy the required integration role or warehouse scope.',
+              next: 'Use an authorized integration operator or review the workspace access assignment.',
+            }
   const failedCount = queuedRecords.filter((record) => record.status === 'REPLAY_FAILED').length
   const recoveredCount = queuedRecords.filter((record) => record.status === 'REPLAYED').length
   const eligiblePendingCount = queuedRecords.filter((record) => record.status === 'PENDING' && !record.nextEligibleAt).length
@@ -135,20 +197,27 @@ export default function ReplayPage({ context }) {
           <span className="panel-badge integration-badge">{pendingReplayCount}</span>
         </div>
 
-        <div className="ops-command-hero">
-          <div className="ops-command-copy">
-            <strong>Failed inbound recovery surface</strong>
-            <p>
-              Recovery keeps failed source activity visible, actionable, and auditable. Operators should be able to see
-              the failed source, replay eligibility, connector posture, and safe next action without guessing.
-            </p>
+        <div className="workflow-decision-hero replay-decision-hero">
+          <div className="workflow-decision-copy">
+            <p className="panel-kicker">Recovery decision</p>
+            <div className="runtime-decision-title">
+              <span className={`runtime-decision-badge ${replayDecision.tone}`}>{replayDecision.label}</span>
+              <h2>{replayDecision.title}</h2>
+            </div>
+            <p>{replayDecision.body}</p>
+            <strong>{replayDecision.next}</strong>
             <div className="ops-pill-row">
-              <span className="workspace-meta-pill">Connector aware</span>
-              <span className="workspace-meta-pill">Audit visible</span>
-              <span className="workspace-meta-pill">Manual recovery safe</span>
+              <span className="workspace-meta-pill">Record {selectedRecord?.externalOrderId || 'None'}</span>
+              <span className="workspace-meta-pill">Source {selectedRecord?.sourceSystem || 'Waiting'}</span>
+              <span className="workspace-meta-pill">Workspace {signedInSession?.tenantCode || 'Tenant scoped'}</span>
             </div>
           </div>
-          <div className="ops-command-actions">
+          <div className="workflow-action-console">
+            <div className="workflow-action-card">
+              <span>Safe action</span>
+              <strong>{selectedRecord ? 'Manual replay review' : 'No action required'}</strong>
+              <p>{selectedRecord ? 'Confirm the failed record, connector state, eligibility, and operator scope before replay.' : 'The recovery queue is clear.'}</p>
+            </div>
             <button className="secondary-button" onClick={() => selectedRecord && setSelectedReplayRecordId(selectedRecord.id)} disabled={!selectedRecord} type="button">
               Review next replay item
             </button>
@@ -168,7 +237,7 @@ export default function ReplayPage({ context }) {
         {integrationReplayState.error ? <p className="error-text">{integrationReplayState.error}</p> : null}
         {integrationReplayState.success ? <p className="success-text">{integrationReplayState.success}</p> : null}
 
-        <div className="experience-grid experience-grid-split">
+        <div className="experience-grid replay-workbench-grid">
           <article className="stack-card section-card">
             <div className="stack-title-row">
               <strong>Failed inbound queue</strong>
@@ -186,53 +255,62 @@ export default function ReplayPage({ context }) {
                     <strong>{record.externalOrderId}</strong>
                     <span className={`status-tag ${getReplayStatusClassName(record.status)}`}>{formatCodeLabel(record.status)}</span>
                   </div>
-                  <p>{record.sourceSystem} | {record.warehouseCode || 'Unknown lane'}</p>
-                  <p className="muted-text">{record.failureMessage}</p>
+                  <p>{record.failureMessage}</p>
+                  <p className="muted-text">{record.sourceSystem} | {record.warehouseCode || 'Unknown lane'}</p>
                   <p className="muted-text">Attempts {record.replayAttemptCount} | Queued {formatTimestamp(record.createdAt)}</p>
                 </button>
               )) : <EmptyState>No failed inbound items are waiting. Recovery is currently clear.</EmptyState>}
             </div>
           </article>
 
-          <article className="stack-card section-card">
+          <article className="stack-card section-card workflow-selected-panel">
             <div className="stack-title-row">
-              <strong>Recovery detail</strong>
-              <span className="scenario-type-tag">{selectedRecord ? formatCodeLabel(selectedRecord.connectorType) : 'Clear'}</span>
+              <strong>Selected failed event</strong>
+              <span className={`status-tag ${replayDecision.tone}`}>{replayDecision.label}</span>
             </div>
             {selectedRecord ? (
               <div className="signal-list">
-                <div className="signal-list-item">
-                  <strong>{selectedRecord.externalOrderId}</strong>
-                  <p>{selectedRecord.failureMessage}</p>
-                  <p className="muted-text">
-                    Source {selectedRecord.sourceSystem} | Warehouse {selectedRecord.warehouseCode || 'Unknown'} | Attempts {selectedRecord.replayAttemptCount}
-                  </p>
-                  <p className="muted-text">
-                    {selectedRecord.lastAttemptedAt ? `Last attempted ${formatTimestamp(selectedRecord.lastAttemptedAt)} | ` : ''}
-                    Queued {formatTimestamp(selectedRecord.createdAt)}
-                  </p>
-                  {selectedRecord.lastReplayMessage ? <p className="muted-text">Last replay note: {selectedRecord.lastReplayMessage}</p> : null}
+                <div className="workflow-evidence-grid">
+                  <div className="signal-list-item">
+                    <span>Failed record</span>
+                    <strong>{selectedRecord.externalOrderId}</strong>
+                    <p>{selectedRecord.failureMessage}</p>
+                  </div>
+                  <div className="signal-list-item">
+                    <span>Connector and lane</span>
+                    <strong>{selectedRecord.sourceSystem}</strong>
+                    <p>{formatCodeLabel(selectedRecord.connectorType)} | Warehouse {selectedRecord.warehouseCode || 'Unknown'}</p>
+                  </div>
+                  <div className="signal-list-item">
+                    <span>Replay history</span>
+                    <strong>{selectedRecord.replayAttemptCount} attempt{selectedRecord.replayAttemptCount === 1 ? '' : 's'}</strong>
+                    <p>{selectedRecord.lastAttemptedAt ? `Last attempted ${formatTimestamp(selectedRecord.lastAttemptedAt)}` : `Queued ${formatTimestamp(selectedRecord.createdAt)}`}</p>
+                  </div>
+                  <div className="signal-list-item">
+                    <span>Eligibility</span>
+                    <strong>{replayDecision.label}</strong>
+                    <p>{replayBlockedMessage || (signedInCanReplay ? 'Operator scope and connector prerequisites are clear.' : 'Authorization or scope needs review.')}</p>
+                  </div>
                 </div>
-                <div className="history-action-row">
+                <div className="workflow-action-band">
+                  <div>
+                    <strong>{selectedReplayActionDisabled ? 'Replay blocked or waiting' : 'Ready for controlled replay'}</strong>
+                    <p>{selectedReplayActionDisabled ? replayDecision.next : 'This action re-enters the selected failed inbound item through the supported live recovery flow.'}</p>
+                  </div>
                   <button
                     className="secondary-button"
                     onClick={() => replayFailedIntegration(selectedRecord.id)}
-                    disabled={
-                      integrationReplayState.loadingId === selectedRecord.id
-                      || !signedInSession
-                      || !signedInRoles.some((role) => role === 'INTEGRATION_OPERATOR' || role === 'INTEGRATION_ADMIN')
-                      || !hasWarehouseScope(signedInWarehouseScopes, selectedRecord.warehouseCode)
-                      || replayBlockedByEligibility
-                      || replayBlockedByConnector
-                    }
+                    disabled={selectedReplayActionDisabled}
                     type="button"
                   >
                     {integrationReplayState.loadingId === selectedRecord.id ? 'Replaying...' : 'Replay Into Live Flow'}
                   </button>
+                </div>
+                <div className="history-action-row">
                   <button className="ghost-button" onClick={() => navigateToPage('integrations')} type="button">View Connector Health</button>
                 </div>
                 {replayBlockedMessage ? <p className="muted-text">{replayBlockedMessage}</p> : null}
-                <p className="muted-text">Recovery keeps failed inbound activity visible, actionable, and auditable instead of hidden inside scripts or operator guesswork.</p>
+                {selectedRecord.lastReplayMessage ? <p className="muted-text">Last replay note: {selectedRecord.lastReplayMessage}</p> : null}
               </div>
             ) : <EmptyState>Select a replay record to inspect failure reason, eligibility, connector posture, and safe recovery options.</EmptyState>}
           </article>

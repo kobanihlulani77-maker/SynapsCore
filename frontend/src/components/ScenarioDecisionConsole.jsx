@@ -50,6 +50,17 @@ export default function ScenarioDecisionConsole({ scenario, title, emptyMessage,
   const canRejectScenario = scenario.type === 'SAVED_PLAN' && scenario.approvalStatus !== 'REJECTED'
   const canExecuteScenario = Boolean(scenario.executable)
   const canAcknowledgeEscalation = Boolean(scenario.slaEscalated && !scenario.slaAcknowledged)
+  const actionStateSummary = canApproveScenario
+    ? `${approvalActionLabel} needs ${formatCodeLabel(approvalRole)} authority${approvalNoteRequired ? ' and a decision note' : ''}.`
+    : canExecuteScenario
+      ? 'Execute Scenario moves an approved plan into the supported live execution path.'
+      : canRejectScenario
+        ? `Reject Plan needs ${formatCodeLabel(rejectionRole)} authority and a decision note.`
+        : canLoadScenario
+          ? 'Load Into Planner opens this scenario for revision or comparison.'
+          : canAcknowledgeEscalation
+            ? 'Acknowledge Escalation records ownership of the overdue escalation.'
+            : 'No live action is required for this scenario right now.'
   const approvalDisabled = scenarioApprovalState.loadingId === scenario.id
     || !signedInSession
     || (approvalNoteRequired && !scenarioReviewNote.trim())
@@ -68,9 +79,42 @@ export default function ScenarioDecisionConsole({ scenario, title, emptyMessage,
     || scenarioActorRole !== 'ESCALATION_OWNER'
     || !signedInRoles.includes('ESCALATION_OWNER')
     || !hasWarehouseScope(signedInWarehouseScopes, scenario.warehouseCode)
+  const approvalBlocker = !canApproveScenario
+    ? ''
+    : !signedInSession
+      ? 'Sign in before approving.'
+      : scenarioActorRole !== approvalRole || !signedInRoles.includes(approvalRole)
+        ? `Switch to an operator with ${formatCodeLabel(approvalRole)} authority.`
+        : !hasWarehouseScope(signedInWarehouseScopes, scenario.warehouseCode)
+          ? 'This operator does not have the required warehouse scope.'
+          : approvalNoteRequired && !scenarioReviewNote.trim()
+            ? 'Add a decision note before approval.'
+            : 'Approval action is available.'
+  const rejectionBlocker = !canRejectScenario
+    ? ''
+    : !signedInSession
+      ? 'Sign in before rejecting.'
+      : scenarioActorRole !== rejectionRole || !signedInRoles.includes(rejectionRole)
+        ? `Switch to an operator with ${formatCodeLabel(rejectionRole)} authority.`
+        : !hasWarehouseScope(signedInWarehouseScopes, scenario.warehouseCode)
+          ? 'This operator does not have the required warehouse scope.'
+          : !scenarioReviewNote.trim()
+            ? 'Add a decision note before rejection.'
+            : 'Rejection action is available.'
+  const escalationBlocker = !canAcknowledgeEscalation
+    ? ''
+    : !signedInSession
+      ? 'Sign in before acknowledging escalation.'
+      : scenarioActorRole !== 'ESCALATION_OWNER' || !signedInRoles.includes('ESCALATION_OWNER')
+        ? 'Switch to an escalation owner before acknowledging.'
+        : !hasWarehouseScope(signedInWarehouseScopes, scenario.warehouseCode)
+          ? 'This operator does not have the required warehouse scope.'
+          : !scenarioReviewNote.trim()
+            ? 'Add a decision note before acknowledging.'
+            : 'Escalation acknowledgement is available.'
 
   return (
-    <article className="stack-card section-card">
+    <article className="stack-card section-card scenario-decision-console">
       <div className="stack-title-row">
         <strong>{title}</strong>
         <span className="scenario-type-tag">{formatCodeLabel(scenario.approvalStatus || scenario.type)}</span>
@@ -94,6 +138,17 @@ export default function ScenarioDecisionConsole({ scenario, title, emptyMessage,
             {scenario.approvalDueAt ? ` | Due ${formatTimestamp(scenario.approvalDueAt)}` : ''}
           </p>
         </div>
+      </div>
+      <div className="workflow-action-card scenario-action-meaning">
+        <span>Governance consequence</span>
+        <strong>{actionStateSummary}</strong>
+        <p>
+          {scenario.approvalStatus === 'PENDING_APPROVAL'
+            ? 'Approval moves the plan forward under its policy; rejection prevents this saved plan version from proceeding.'
+            : scenario.executable
+              ? 'Execution is separate from approval and should be used only when the operator is ready to apply the approved plan.'
+              : 'This surface keeps the decision evidence visible even when no action is currently available.'}
+        </p>
       </div>
       <div className="session-control-row">
         <label className="field planner-name-field">
@@ -123,7 +178,7 @@ export default function ScenarioDecisionConsole({ scenario, title, emptyMessage,
       {scenarioExecutionState.success ? <p className="success-text">{scenarioExecutionState.success}</p> : null}
       {scenarioEscalationAckState.error ? <p className="error-text">{scenarioEscalationAckState.error}</p> : null}
       {scenarioEscalationAckState.success ? <p className="success-text">{scenarioEscalationAckState.success}</p> : null}
-      <div className="history-action-row">
+      <div className="history-action-row scenario-action-row" aria-label="Scenario action controls">
         {canLoadScenario ? (
           <button className="ghost-button" onClick={() => loadScenarioIntoPlanner(scenario.id)} disabled={scenarioLoadState.loadingId === scenario.id} type="button">
             {scenarioLoadState.loadingId === scenario.id ? 'Loading...' : 'Load Into Planner'}
@@ -149,6 +204,11 @@ export default function ScenarioDecisionConsole({ scenario, title, emptyMessage,
             {scenarioEscalationAckState.loadingId === scenario.id ? 'Acknowledging...' : 'Acknowledge Escalation'}
           </button>
         ) : null}
+      </div>
+      <div className="workflow-blocker-list" aria-label="Scenario action availability">
+        {approvalBlocker ? <p className={approvalDisabled ? 'muted-text' : 'success-text'}>{approvalBlocker}</p> : null}
+        {rejectionBlocker ? <p className={rejectionDisabled ? 'muted-text' : 'success-text'}>{rejectionBlocker}</p> : null}
+        {escalationBlocker ? <p className={escalationDisabled ? 'muted-text' : 'success-text'}>{escalationBlocker}</p> : null}
       </div>
       {!canLoadScenario && !canApproveScenario && !canRejectScenario && !canExecuteScenario && !canAcknowledgeEscalation ? (
         <p className="muted-text">This scenario is visible for traceability and comparison, but it does not need another live action right now.</p>

@@ -2010,6 +2010,163 @@ tbody tr:hover {
   grid-template-columns: repeat(2, minmax(0, 1fr));
 }
 
+.workflow-decision-hero {
+  display: grid;
+  grid-template-columns: minmax(320px, 0.92fr) minmax(420px, 1.08fr);
+  gap: 18px;
+  align-items: start;
+  margin-bottom: 18px;
+  padding: 20px 22px;
+  border-radius: var(--radius-lg);
+  border: 1px solid rgba(121, 156, 194, 0.14);
+  background: linear-gradient(180deg, rgba(14, 27, 43, 0.96), rgba(9, 18, 30, 0.98));
+  box-shadow: var(--shadow-ambient);
+}
+
+.workflow-decision-copy,
+.workflow-action-console,
+.workflow-action-card,
+.workflow-selected-panel,
+.scenario-filter-rail,
+.scenario-identity-panel,
+.scenario-decision-console,
+.workflow-blocker-list {
+  display: grid;
+  gap: 12px;
+}
+
+.workflow-decision-copy p,
+.workflow-action-card p,
+.workflow-action-band p,
+.workflow-blocker-list p {
+  margin: 0;
+}
+
+.workflow-action-console {
+  align-content: start;
+}
+
+.workflow-action-card {
+  padding: 14px;
+  border-radius: var(--radius-md);
+  border: 1px solid rgba(121, 156, 194, 0.14);
+  background: rgba(5, 14, 23, 0.5);
+}
+
+.workflow-action-card span,
+.workflow-evidence-grid span {
+  color: var(--color-text-muted);
+  font-size: 0.78rem;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.workflow-action-card p,
+.workflow-action-band p {
+  color: var(--color-text-muted);
+  line-height: 1.5;
+}
+
+.workflow-action-band {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(220px, max-content);
+  gap: 16px;
+  align-items: center;
+  padding: 16px;
+  border-radius: var(--radius-md);
+  border: 1px solid rgba(80, 216, 171, 0.18);
+  background: rgba(80, 216, 171, 0.06);
+}
+
+.workflow-action-band .secondary-button {
+  min-height: 48px;
+  padding-inline: 18px;
+}
+
+.workflow-evidence-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.replay-workbench-grid,
+.scenario-history-workbench {
+  display: grid;
+  grid-template-columns: minmax(300px, 0.78fr) minmax(420px, 1.22fr);
+  gap: 18px;
+}
+
+.workflow-selected-panel {
+  border-color: rgba(99, 216, 255, 0.2);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.03), 0 18px 40px rgba(1, 10, 20, 0.22);
+}
+
+.approval-priority-grid,
+.approval-history-grid {
+  display: grid;
+  gap: 16px;
+  margin-bottom: 16px;
+}
+
+.approval-priority-grid {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.approval-history-grid {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  opacity: 0.92;
+}
+
+.approval-priority-card {
+  min-height: 260px;
+}
+
+.scenario-planner-workflow {
+  display: grid;
+  grid-template-columns: minmax(280px, 0.62fr) minmax(420px, 1.38fr);
+  align-items: start;
+}
+
+.scenario-filter-rail,
+.scenario-identity-panel {
+  padding: 16px;
+  border-radius: var(--radius-md);
+  border: 1px solid rgba(121, 156, 194, 0.14);
+  background: rgba(5, 14, 23, 0.42);
+}
+
+.scenario-filter-rail .history-quick-actions {
+  margin-top: 0;
+}
+
+.scenario-planner-actions .secondary-button {
+  min-height: 48px;
+}
+
+.scenario-planner-actions .compare-button,
+.scenario-planner-actions .ghost-button {
+  min-height: 42px;
+}
+
+.scenario-editor-card {
+  background: linear-gradient(180deg, rgba(17, 32, 50, 0.92), rgba(10, 19, 32, 0.96));
+  border-color: rgba(121, 156, 194, 0.14);
+}
+
+.planner-line-card {
+  background: rgba(5, 14, 23, 0.5);
+  border-color: rgba(121, 156, 194, 0.14);
+}
+
+.scenario-action-meaning {
+  border-color: rgba(255, 189, 99, 0.18);
+}
+
+.scenario-action-row {
+  padding-top: 4px;
+}
+
 .ops-command-actions {
   gap: 12px;
   align-content: start;
@@ -2262,6 +2419,7 @@ tbody tr:hover {
   .dashboard-command-header,
   .dashboard-operational-answer,
   .runtime-decision-hero,
+  .workflow-decision-hero,
   .ops-command-hero {
     grid-template-columns: 1fr;
   }
@@ -2294,13 +2452,18 @@ tbody tr:hover {
   }
 
   .dashboard-operations-grid,
-  .dashboard-activity-grid {
+  .dashboard-activity-grid,
+  .replay-workbench-grid,
+  .scenario-history-workbench,
+  .scenario-planner-workflow {
     grid-template-columns: 1fr;
   }
 
   .public-hero,
   .public-signin-shell,
   .experience-grid-three,
+  .approval-priority-grid,
+  .approval-history-grid,
   .experience-grid-split {
     grid-template-columns: 1fr;
   }
@@ -2346,6 +2509,8 @@ tbody tr:hover {
   .signin-trust-grid,
   .utility-metric-grid,
   .command-hero-metrics,
+  .workflow-evidence-grid,
+  .workflow-action-band,
   .workspace-topbar-identity,
   .dashboard-health-strip,
   .dashboard-signal-grid,
@@ -2400,6 +2565,17 @@ tbody tr:hover {
 
   .runtime-decision-factors .ops-command-actions {
     grid-template-columns: 1fr;
+  }
+
+  .workflow-decision-hero,
+  .runtime-decision-hero,
+  .scenario-filter-rail,
+  .scenario-identity-panel {
+    padding: 16px;
+  }
+
+  .workflow-action-band .secondary-button {
+    width: 100%;
   }
 
   .data-grid-table {

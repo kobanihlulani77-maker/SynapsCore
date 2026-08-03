@@ -35,20 +35,26 @@ export default function ScenarioHistoryPage({ context }) {
           <span className="panel-badge scenario-badge">{scenarioHistoryItems.length}</span>
         </div>
 
-        <div className="ops-command-hero">
-          <div className="ops-command-copy">
-            <strong>Scenario memory and execution surface</strong>
-            <p>
-              Scenario history should help teams compare revisions, understand why a plan exists, and move confidently from
-              saved analysis into approval and execution without losing context.
-            </p>
+        <div className="workflow-decision-hero scenario-history-hero">
+          <div className="workflow-decision-copy">
+            <p className="panel-kicker">Execution memory</p>
+            <div className="runtime-decision-title">
+              <span className={`runtime-decision-badge ${executableCount ? 'status-partial' : 'status-success'}`}>{executableCount ? 'ACTION READY' : 'TRACEABLE'}</span>
+              <h2>{selectedHistoryScenario ? selectedHistoryScenario.title : 'Select a scenario to inspect evidence.'}</h2>
+            </div>
+            <p>{selectedHistoryScenario ? selectedHistoryScenario.summary : 'Saved plans, revisions, approvals, and execution readiness remain traceable here.'}</p>
             <div className="ops-pill-row">
-              <span className="workspace-meta-pill">Traceable</span>
-              <span className="workspace-meta-pill">Approval aware</span>
-              <span className="workspace-meta-pill">Execution ready</span>
+              <span className="workspace-meta-pill">Saved {savedPlans}</span>
+              <span className="workspace-meta-pill">Revisions {revisions}</span>
+              <span className="workspace-meta-pill">Executable {executableCount}</span>
             </div>
           </div>
-          <div className="ops-command-actions">
+          <div className="workflow-action-console">
+            <div className="workflow-action-card">
+              <span>Current scenario state</span>
+              <strong>{selectedHistoryScenario ? formatCodeLabel(selectedHistoryScenario.approvalStatus || selectedHistoryScenario.type) : 'Waiting'}</strong>
+              <p>{selectedHistoryScenario?.executable ? 'This plan is approved and eligible for execution from the action console.' : 'History remains evidence-first unless a scenario exposes an available action.'}</p>
+            </div>
             <button className="secondary-button" onClick={() => executableScenarios[0] && setSelectedScenarioId(executableScenarios[0].id)} disabled={!executableScenarios[0]} type="button">
               Focus executable plan
             </button>
@@ -62,7 +68,7 @@ export default function ScenarioHistoryPage({ context }) {
           <MetricCard label="Executable" value={executableCount} accent="orange" note="Plans currently eligible to move into live execution." />
         </div>
 
-        <div className="approval-board">
+        <div className="approval-board scenario-history-board">
           {scenarioHistoryItems.slice(0, 6).map((scenario) => (
             <button
               key={scenario.id}
@@ -84,8 +90,8 @@ export default function ScenarioHistoryPage({ context }) {
           {!scenarioHistoryItems.length ? <EmptyState>Scenario history will fill up after planners start previewing and saving alternative operating paths.</EmptyState> : null}
         </div>
 
-        <div className="experience-grid experience-grid-split">
-          <article className="stack-card section-card">
+        <div className="experience-grid scenario-history-workbench">
+          <article className="stack-card section-card workflow-selected-panel">
             <div className="stack-title-row">
               <strong>Selected scenario memory</strong>
               <span className="scenario-type-tag">{selectedHistoryScenario ? formatCodeLabel(selectedHistoryScenario.type) : 'Waiting'}</span>

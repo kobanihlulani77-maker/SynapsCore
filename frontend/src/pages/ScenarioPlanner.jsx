@@ -56,6 +56,32 @@ export default function ScenarioPlannerPage({ context }) {
   if (!isAuthenticated || !isScenariosPage) {
     return null
   }
+  const plannerLifecycleLabel = comparisonState.result
+    ? 'Compared'
+    : scenarioState.result
+      ? 'Previewed'
+      : scenarioRevisionSource
+        ? 'Revision'
+        : 'Draft'
+  const plannerNextStep = !primaryContext.inputValid
+    ? 'Complete Scenario A inputs before preview or save.'
+    : scenarioState.result
+      ? 'Review preview evidence, compare alternatives if needed, then save for governance.'
+      : 'Preview Scenario A before the plan moves toward approval.'
+  const saveBlockedReason = !primaryContext.inputValid
+    ? 'Scenario A inputs are incomplete.'
+    : !scenarioPlanName.trim()
+      ? 'Plan name is required before saving.'
+      : !scenarioRequestedBy || !scenarioReviewOwner
+        ? 'Requester and review owner must be selected.'
+        : !signedInSession
+          ? 'Sign in before saving a governed plan.'
+          : !hasWarehouseScope(signedInWarehouseScopes, scenarioForm.warehouseCode)
+            ? 'This operator does not have scope for the selected warehouse.'
+            : 'Ready to save for approval routing.'
+  const compareBlockedReason = !primaryContext.inputValid || !alternativeContext.inputValid
+    ? 'Both Scenario A and Scenario B need valid inputs before comparison.'
+    : 'Ready to compare Scenario A against Scenario B.'
 
   return (
     <section className="content-grid planner-grid" id="planner">
@@ -64,15 +90,44 @@ export default function ScenarioPlannerPage({ context }) {
           <div><p className="panel-kicker">Scenario planning</p><h2>Compare proposed order plans</h2></div>
           <span className="panel-badge planner-badge">{comparisonState.result ? 'Comparison ready' : scenarioState.result ? 'Preview ready' : 'Planner'}</span>
         </div>
-        <div className="planner-action-bar">
-          <div>
-            <p className="muted-text">Preview a single plan or compare two proposed order mixes before they touch live inventory.</p>
+        <div className="workflow-decision-hero scenario-planner-hero">
+          <div className="workflow-decision-copy">
+            <p className="panel-kicker">Planning sequence</p>
+            <div className="runtime-decision-title">
+              <span className="runtime-decision-badge status-partial">{plannerLifecycleLabel}</span>
+              <h2>{scenarioPlanName.trim() || 'Define the scenario before governance.'}</h2>
+            </div>
+            <p>{plannerNextStep}</p>
             {scenarioRevisionSource ? (
               <div className="revision-banner">
                 <span>Revision mode: saving will create revision {scenarioRevisionSource.revisionNumber} of {scenarioRevisionSource.title}.</span>
                 <button className="ghost-button" onClick={() => setScenarioRevisionSource(null)} type="button">Exit Revision Mode</button>
               </div>
             ) : null}
+            <div className="ops-pill-row">
+              <span className="workspace-meta-pill">Step 1 Identity</span>
+              <span className="workspace-meta-pill">Step 2 Inputs</span>
+              <span className="workspace-meta-pill">Step 3 Preview</span>
+              <span className="workspace-meta-pill">Step 4 Compare / Save</span>
+            </div>
+          </div>
+          <div className="workflow-action-console scenario-planner-actions">
+            <div className="workflow-action-card">
+              <span>Next governance step</span>
+              <strong>{saveBlockedReason}</strong>
+              <p>{compareBlockedReason}</p>
+            </div>
+            <button className="secondary-button" onClick={analyzeScenario} disabled={scenarioState.loading || !primaryContext.inputValid}>{scenarioState.loading ? 'Analyzing...' : 'Preview Scenario A'}</button>
+            <button className="compare-button" onClick={compareScenarios} disabled={comparisonState.loading || !primaryContext.inputValid || !alternativeContext.inputValid}>{comparisonState.loading ? 'Comparing...' : 'Compare A vs B'}</button>
+            <button className="ghost-button" onClick={saveScenarioPlan} disabled={scenarioSaveState.loading || !primaryContext.inputValid || !scenarioPlanName.trim() || !scenarioRequestedBy || !scenarioReviewOwner || !signedInSession || !hasWarehouseScope(signedInWarehouseScopes, scenarioForm.warehouseCode)}>{scenarioSaveState.loading ? 'Saving...' : 'Save Scenario A'}</button>
+          </div>
+        </div>
+        <div className="planner-action-bar scenario-planner-workflow">
+          <div className="scenario-filter-rail">
+            <div className="stack-title-row">
+              <strong>Review queues</strong>
+              <span className="scenario-type-tag">Secondary</span>
+            </div>
             <div className="history-quick-actions">
               <button
                 className="ghost-button"
@@ -137,7 +192,11 @@ export default function ScenarioPlannerPage({ context }) {
               </button>
             </div>
           </div>
-          <div className="planner-actions">
+          <div className="planner-actions scenario-identity-panel">
+            <div className="stack-title-row">
+              <strong>Scenario identity and governance</strong>
+              <span className="scenario-type-tag">{plannerLifecycleLabel}</span>
+            </div>
             <label className="field planner-name-field">
               <span>Plan Name</span>
               <input
@@ -186,9 +245,6 @@ export default function ScenarioPlannerPage({ context }) {
             </label>
             <p className="muted-text planner-note">Review and approval actions use the signed-in operator session. Warehouse-scoped operators only appear for the selected warehouse, and review actions are blocked outside their assigned lanes.</p>
             {operatorDirectoryState.error ? <p className="error-text">{operatorDirectoryState.error}</p> : null}
-            <button className="ghost-button" onClick={saveScenarioPlan} disabled={scenarioSaveState.loading || !primaryContext.inputValid || !scenarioPlanName.trim() || !scenarioRequestedBy || !scenarioReviewOwner || !signedInSession || !hasWarehouseScope(signedInWarehouseScopes, scenarioForm.warehouseCode)}>{scenarioSaveState.loading ? 'Saving...' : 'Save Scenario A'}</button>
-            <button className="secondary-button" onClick={analyzeScenario} disabled={scenarioState.loading || !primaryContext.inputValid}>{scenarioState.loading ? 'Analyzing...' : 'Preview Scenario A'}</button>
-            <button className="compare-button" onClick={compareScenarios} disabled={comparisonState.loading || !primaryContext.inputValid || !alternativeContext.inputValid}>{comparisonState.loading ? 'Comparing...' : 'Compare A vs B'}</button>
           </div>
         </div>
         <div className="planner-compare-grid">

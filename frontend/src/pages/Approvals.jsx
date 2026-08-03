@@ -19,6 +19,25 @@ export default function ApprovalsPage({ context }) {
   } = context
 
   if (!isAuthenticated || !isApprovalsPage) return null
+  const currentDecisionCount = pendingApprovalScenarios.length + overdueScenarios.length
+  const highestPriorityPending = [
+    ...overdueScenarios,
+    ...pendingApprovalScenarios.filter((scenario) => !overdueScenarios.some((overdue) => overdue.id === scenario.id)),
+  ][0]
+  const selectedDecisionState = selectedApprovalScenario
+    ? formatCodeLabel(selectedApprovalScenario.approvalStage || selectedApprovalScenario.approvalStatus || 'pending_approval')
+    : 'Waiting'
+  const selectedDecisionConsequence = !selectedApprovalScenario
+    ? 'Select a pending or overdue decision to see the consequence before acting.'
+    : selectedApprovalScenario.approvalPolicy === 'ESCALATED' && selectedApprovalScenario.approvalStage === 'PENDING_REVIEW'
+      ? 'Approval records owner review and may still require final approval before execution.'
+      : selectedApprovalScenario.approvalPolicy === 'ESCALATED'
+        ? 'Approval may clear the final governance step and make the scenario eligible for execution.'
+        : selectedApprovalScenario.executable
+          ? 'This plan is already approved for execution; use the scenario action console when ready.'
+          : selectedApprovalScenario.approvalStatus === 'PENDING_APPROVAL'
+            ? 'Approval can move this saved plan toward execution eligibility. Rejection prevents this version from proceeding.'
+            : 'This item is visible for decision history and traceability.'
 
   return (
     <section className="content-grid approvals-center-grid">
@@ -31,20 +50,28 @@ export default function ApprovalsPage({ context }) {
           <span className="panel-badge scenario-badge">{pendingApprovalScenarios.length}</span>
         </div>
 
-        <div className="ops-command-hero">
-          <div className="ops-command-copy">
-            <strong>Approval board and decision execution</strong>
-            <p>
-              Teams should be able to see pending decisions, overdue risk, and action-ready approvals in one place, then
-              move confidently through review without losing operational context.
-            </p>
+        <div className="workflow-decision-hero approvals-decision-hero">
+          <div className="workflow-decision-copy">
+            <p className="panel-kicker">Decision queue</p>
+            <div className="runtime-decision-title">
+              <span className={`runtime-decision-badge ${overdueScenarios.length ? 'status-failure' : currentDecisionCount ? 'status-partial' : 'status-success'}`}>
+                {overdueScenarios.length ? 'OVERDUE' : currentDecisionCount ? 'PENDING' : 'CLEAR'}
+              </span>
+              <h2>{currentDecisionCount ? `${currentDecisionCount} decision${currentDecisionCount === 1 ? '' : 's'} need review` : 'No decisions are blocking control.'}</h2>
+            </div>
+            <p>{highestPriorityPending ? highestPriorityPending.summary : 'Approved and rejected plans remain available below as secondary evidence.'}</p>
             <div className="ops-pill-row">
-              <span className="workspace-meta-pill">Stage aware</span>
-              <span className="workspace-meta-pill">SLA visible</span>
-              <span className="workspace-meta-pill">Execution linked</span>
+              <span className="workspace-meta-pill">Pending {pendingApprovalScenarios.length}</span>
+              <span className="workspace-meta-pill">Overdue {overdueScenarios.length}</span>
+              <span className="workspace-meta-pill">Selected {selectedDecisionState}</span>
             </div>
           </div>
-          <div className="ops-command-actions">
+          <div className="workflow-action-console">
+            <div className="workflow-action-card">
+              <span>Decision consequence</span>
+              <strong>{selectedApprovalScenario?.title || 'Select a request'}</strong>
+              <p>{selectedDecisionConsequence}</p>
+            </div>
             <button className="secondary-button" onClick={() => overdueScenarios[0] && setSelectedScenarioId(overdueScenarios[0].id)} disabled={!overdueScenarios[0]} type="button">
               Focus overdue decision
             </button>
@@ -58,8 +85,8 @@ export default function ApprovalsPage({ context }) {
           <MetricCard label="Overdue" value={overdueScenarios.length} accent="orange" note="Plans that have already breached expected approval timing." />
         </div>
 
-        <div className="approval-status-grid">
-          <article className="stack-card">
+        <div className="approval-priority-grid">
+          <article className="stack-card approval-priority-card">
             <div className="stack-title-row"><strong>Pending</strong><span className="status-tag status-partial">{pendingApprovalScenarios.length}</span></div>
             <div className="stack-list compact-stack-list">
               {pendingApprovalScenarios.slice(0, 4).map((scenario) => (
@@ -71,31 +98,7 @@ export default function ApprovalsPage({ context }) {
               {!pendingApprovalScenarios.length ? <div className="empty-state">No pending approvals right now.</div> : null}
             </div>
           </article>
-          <article className="stack-card">
-            <div className="stack-title-row"><strong>Approved</strong><span className="status-tag status-success">{approvedScenarios.length}</span></div>
-            <div className="stack-list compact-stack-list">
-              {approvedScenarios.slice(0, 4).map((scenario) => (
-                <button key={scenario.id} className={`stack-card stack-card-compact selectable-card ${selectedApprovalScenario?.id === scenario.id ? 'is-selected' : ''}`} onClick={() => setSelectedScenarioId(scenario.id)} type="button">
-                  <strong>{scenario.title}</strong>
-                  <p className="muted-text">{scenario.approvedBy || 'Approved'} | {formatTimestamp(scenario.createdAt)}</p>
-                </button>
-              ))}
-              {!approvedScenarios.length ? <div className="empty-state">Approved plans will appear here.</div> : null}
-            </div>
-          </article>
-          <article className="stack-card">
-            <div className="stack-title-row"><strong>Rejected</strong><span className="status-tag status-failure">{rejectedScenarios.length}</span></div>
-            <div className="stack-list compact-stack-list">
-              {rejectedScenarios.slice(0, 4).map((scenario) => (
-                <button key={scenario.id} className={`stack-card stack-card-compact selectable-card ${selectedApprovalScenario?.id === scenario.id ? 'is-selected' : ''}`} onClick={() => setSelectedScenarioId(scenario.id)} type="button">
-                  <strong>{scenario.title}</strong>
-                  <p className="muted-text">{scenario.rejectedBy || 'Rejected'} | {scenario.rejectionReason || 'Reason recorded in plan history'}</p>
-                </button>
-              ))}
-              {!rejectedScenarios.length ? <div className="empty-state">Rejected plans will appear here.</div> : null}
-            </div>
-          </article>
-          <article className="stack-card">
+          <article className="stack-card approval-priority-card">
             <div className="stack-title-row"><strong>Overdue</strong><span className="status-tag status-failure">{overdueScenarios.length}</span></div>
             <div className="stack-list compact-stack-list">
               {overdueScenarios.slice(0, 4).map((scenario) => (
@@ -105,6 +108,33 @@ export default function ApprovalsPage({ context }) {
                 </button>
               ))}
               {!overdueScenarios.length ? <div className="empty-state">No overdue approval items.</div> : null}
+            </div>
+          </article>
+        </div>
+
+        <div className="approval-history-grid">
+          <article className="stack-card">
+            <div className="stack-title-row"><strong>Approved history</strong><span className="status-tag status-success">{approvedScenarios.length}</span></div>
+            <div className="stack-list compact-stack-list">
+              {approvedScenarios.slice(0, 3).map((scenario) => (
+                <button key={scenario.id} className={`stack-card stack-card-compact selectable-card ${selectedApprovalScenario?.id === scenario.id ? 'is-selected' : ''}`} onClick={() => setSelectedScenarioId(scenario.id)} type="button">
+                  <strong>{scenario.title}</strong>
+                  <p className="muted-text">{scenario.approvedBy || 'Approved'} | {formatTimestamp(scenario.createdAt)}</p>
+                </button>
+              ))}
+              {!approvedScenarios.length ? <div className="empty-state">Approved plans will appear here.</div> : null}
+            </div>
+          </article>
+          <article className="stack-card">
+            <div className="stack-title-row"><strong>Rejected history</strong><span className="status-tag status-failure">{rejectedScenarios.length}</span></div>
+            <div className="stack-list compact-stack-list">
+              {rejectedScenarios.slice(0, 3).map((scenario) => (
+                <button key={scenario.id} className={`stack-card stack-card-compact selectable-card ${selectedApprovalScenario?.id === scenario.id ? 'is-selected' : ''}`} onClick={() => setSelectedScenarioId(scenario.id)} type="button">
+                  <strong>{scenario.title}</strong>
+                  <p className="muted-text">{scenario.rejectedBy || 'Rejected'} | {scenario.rejectionReason || 'Reason recorded in plan history'}</p>
+                </button>
+              ))}
+              {!rejectedScenarios.length ? <div className="empty-state">Rejected plans will appear here.</div> : null}
             </div>
           </article>
         </div>
