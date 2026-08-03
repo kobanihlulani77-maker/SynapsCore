@@ -5,6 +5,7 @@ import {
   authRateLimitCooldownBufferMs,
   authRateLimitWindowMs,
   hostedProofStatePath,
+  readHostedProofState,
   readHostedProofStateSync,
 } from './prod-proof-state.mjs'
 
@@ -60,12 +61,7 @@ function delay(ms) {
 }
 
 async function readProofState() {
-  try {
-    const raw = await fs.readFile(hostedProofStatePath, 'utf8')
-    return JSON.parse(raw)
-  } catch {
-    return {}
-  }
+  return readHostedProofState()
 }
 
 async function waitForRecordedAuthCooldown() {

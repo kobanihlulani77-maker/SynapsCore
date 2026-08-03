@@ -1,12 +1,10 @@
-import fs from 'node:fs/promises'
 import { randomUUID } from 'node:crypto'
-import path from 'node:path'
 import { expect, request as playwrightRequest, test } from '@playwright/test'
 import {
   authRateLimitCooldownBufferMs,
   authRateLimitWindowMs,
-  hostedProofStatePath,
   readHostedProofStateSync,
+  writeHostedProofState,
 } from './prod-proof-state.mjs'
 
 const hostedProofState = readHostedProofStateSync()
@@ -407,22 +405,6 @@ async function resolvePasswordField(signInCard) {
 async function expectSignInErrorAndRecovery(signInCard, message) {
   await expect(signInCard.getByText(message)).toBeVisible({ timeout: 15_000 })
   await waitForSignInReady(signInCard)
-}
-
-async function writeHostedProofState(nextState) {
-  await fs.mkdir(path.dirname(hostedProofStatePath), { recursive: true })
-  let currentState = {}
-  try {
-    currentState = JSON.parse(await fs.readFile(hostedProofStatePath, 'utf8'))
-  } catch {
-    currentState = {}
-  }
-
-  await fs.writeFile(
-    hostedProofStatePath,
-    JSON.stringify({ ...currentState, ...nextState }, null, 2),
-    'utf8',
-  )
 }
 
 async function navigateWithinApp(page, route) {
