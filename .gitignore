@@ -17,6 +17,7 @@ frontend/dist/
 frontend/playwright-report/
 frontend/test-results/
 frontend/.hosted-proof/
+frontend/.visual-audit/
 
 # Env
 *.env

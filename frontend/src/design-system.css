@@ -1244,7 +1244,6 @@ tbody tr:hover {
   background:
     radial-gradient(circle at top right, rgba(80, 216, 171, 0.08), transparent 34%),
     linear-gradient(180deg, rgba(15, 30, 45, 0.92), rgba(8, 18, 30, 0.94));
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.03);
 }
 
 .public-positioning-card p {
@@ -1334,7 +1333,7 @@ tbody tr:hover {
   background:
     radial-gradient(circle at top right, rgba(99, 216, 255, 0.16), transparent 28%),
     linear-gradient(180deg, rgba(14, 25, 40, 0.96), rgba(8, 17, 29, 0.98));
-  box-shadow: 0 24px 56px rgba(1, 7, 15, 0.34);
+  box-shadow: var(--shadow-raised);
   overflow: hidden;
 }
 
@@ -1434,7 +1433,6 @@ tbody tr:hover {
   display: grid;
   gap: 12px;
   min-height: 188px;
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.03);
 }
 
 .public-onboarding-card {
@@ -1498,26 +1496,6 @@ tbody tr:hover {
 .enterprise-signin-story .public-feature-card {
   min-height: auto;
   padding: 14px 16px;
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.03);
-}
-
-.enterprise-signin-form {
-  box-shadow: 0 28px 68px rgba(1, 7, 15, 0.4);
-}
-
-.signin-readiness-note {
-  display: grid;
-  gap: 6px;
-  margin: 14px 0;
-  padding: 12px 14px;
-  border-radius: var(--radius-sm);
-  border: 1px solid rgba(99, 216, 255, 0.16);
-  background: rgba(99, 216, 255, 0.055);
-}
-
-.signin-readiness-note p {
-  margin: 0;
-  font-size: 0.92rem;
 }
 
 .field-control {
