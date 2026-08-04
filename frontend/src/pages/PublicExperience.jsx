@@ -259,14 +259,14 @@ export default function PublicExperience({ context }) {
         </article>
       </section>
 
-      <section className="public-section-shell public-boundary-strip" aria-labelledby="pilot-boundaries">
+      <section className="public-section-shell public-boundary-strip public-compact-section" aria-labelledby="pilot-boundaries">
         <div className="public-section-heading">
           <p className="panel-kicker">Pilot boundaries</p>
           <h2 id="pilot-boundaries">Clear value without pretending to replace the systems companies already rely on.</h2>
         </div>
-        <div className="public-card-grid public-card-grid-two">
+        <div className="public-boundary-list">
           {boundaryCards.map((card) => (
-            <article key={card.title} className="public-proof-card tone-info">
+            <article key={card.title} className="public-boundary-item">
               <strong>{card.title}</strong>
               <p>{card.body}</p>
             </article>
@@ -280,9 +280,9 @@ export default function PublicExperience({ context }) {
           <h2 id="who-it-is-for">Built for operational teams that cannot afford blind spots.</h2>
           <p>SynapseCore is designed for real operating environments where multiple systems, sites, and teams have to stay aligned under pressure.</p>
         </div>
-        <div className="public-card-grid public-card-grid-wide">
+        <div className="public-audience-list">
           {audienceCards.map((card) => (
-            <article key={card.title} className="public-domain-card">
+            <article key={card.title} className="public-audience-row">
               <strong>{card.title}</strong>
               <p>{card.body}</p>
             </article>
@@ -290,25 +290,25 @@ export default function PublicExperience({ context }) {
         </div>
       </section>
 
-      <section className="public-section-shell public-section-shell-split" aria-labelledby="operational-pain">
-        <article className="public-section-card">
+      <section className="public-section-shell public-section-shell-split public-operational-flow" aria-labelledby="operational-pain">
+        <article className="public-flow-column">
           <p className="panel-kicker">Operational pain</p>
           <h2 id="operational-pain">Most operations teams are still working through fragmented pressure.</h2>
-          <div className="public-list-grid">
+          <div className="public-pressure-list">
             {painCards.map((pain) => (
-              <div key={pain} className="public-list-item public-list-item-warning">
+              <div key={pain} className="public-pressure-row">
                 <strong>{pain}</strong>
               </div>
             ))}
           </div>
         </article>
 
-        <article className="public-section-card">
+        <article className="public-flow-column public-flow-column-primary">
           <p className="panel-kicker">How SynapseCore helps</p>
           <h2>Bring live signals, recovery, and governance into one product surface.</h2>
-          <div className="public-feature-grid">
-            {capabilityCards.map((card) => (
-              <article key={card.title} className="public-capability-card">
+          <div className="public-capability-list">
+            {capabilityCards.map((card, index) => (
+              <article key={card.title} className={index === 0 ? 'public-capability-row public-capability-row-lead' : 'public-capability-row'}>
                 <strong>{card.title}</strong>
                 <p>{card.body}</p>
               </article>
@@ -323,9 +323,9 @@ export default function PublicExperience({ context }) {
           <h2 id="proof-and-trust">Grounded in real proof work, not inflated claims.</h2>
           <p>SynapseCore is being proved through live product flows and hardening work. The trust story is earned through system behavior, recoverability, and tenant-safe operations.</p>
         </div>
-        <div className="public-card-grid">
+        <div className="public-proof-ledger">
           {proofCards.map((card) => (
-            <article key={card.title} className={`public-proof-card tone-${card.tone}`}>
+            <article key={card.title} className={`public-proof-row tone-${card.tone}`}>
               <strong>{card.title}</strong>
               <p>{card.body}</p>
             </article>
@@ -339,10 +339,10 @@ export default function PublicExperience({ context }) {
           <h2 id="workspace-onboarding-title">A company workspace gives each team its own operating environment.</h2>
           <p>SynapseCore uses workspace codes to separate companies cleanly. Existing operators sign in to the right environment, and first-time admins stand up the workspace for rollout.</p>
         </div>
-        <div className="public-card-grid public-card-grid-wide">
-          {workspaceSteps.map((step) => (
-            <article key={step.title} className="public-onboarding-card">
-              <span className="public-step-marker">Step</span>
+        <div className="public-workspace-path">
+          {workspaceSteps.map((step, index) => (
+            <article key={step.title} className="public-workspace-step">
+              <span className="public-step-marker">{String(index + 1).padStart(2, '0')}</span>
               <strong>{step.title}</strong>
               <p>{step.body}</p>
             </article>

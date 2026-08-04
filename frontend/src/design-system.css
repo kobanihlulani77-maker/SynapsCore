@@ -1196,7 +1196,17 @@ tbody tr:hover {
 .public-command-grid,
 .public-card-grid,
 .public-feature-grid,
-.public-list-grid {
+.public-list-grid,
+.public-boundary-list,
+.public-audience-list,
+.public-pressure-list,
+.public-capability-list,
+.public-proof-ledger,
+.public-workspace-path,
+.signin-support-list,
+.signin-trust-ledger,
+.workspace-next-list,
+.workspace-boundary-list {
   display: grid;
   gap: 16px;
 }
@@ -1274,6 +1284,28 @@ tbody tr:hover {
 .public-card-grid,
 .public-feature-grid,
 .public-list-grid,
+.public-boundary-list,
+.public-audience-list,
+.public-pressure-list,
+.public-capability-list,
+.public-proof-ledger,
+.public-workspace-path,
+.signin-support-list,
+.signin-trust-ledger,
+.workspace-next-list,
+.workspace-boundary-list,
+.public-boundary-item,
+.public-audience-row,
+.public-pressure-row,
+.public-capability-row,
+.public-proof-row,
+.public-workspace-step,
+.signin-support-row,
+.signin-trust-row,
+.workspace-next-row,
+.workspace-boundary-row,
+.workspace-step-row,
+.workspace-guidance-block,
 .workspace-wizard-shell,
 .workspace-wizard-sidebar,
 .workspace-wizard-panel,
@@ -1293,6 +1325,10 @@ tbody tr:hover {
   margin-top: 34px;
   margin-right: auto;
   margin-left: auto;
+}
+
+.public-compact-section {
+  gap: 16px;
 }
 
 .public-section-shell-split {
@@ -1319,7 +1355,17 @@ tbody tr:hover {
 .public-capability-card p,
 .public-proof-card p,
 .public-onboarding-card p,
-.public-command-lane li {
+.public-command-lane li,
+.public-boundary-item p,
+.public-audience-row p,
+.public-capability-row p,
+.public-proof-row p,
+.public-workspace-step p,
+.signin-support-row p,
+.signin-trust-row p,
+.workspace-next-row p,
+.workspace-boundary-row p,
+.workspace-guidance-block p {
   margin: 0;
 }
 
@@ -1372,6 +1418,121 @@ tbody tr:hover {
 
 .public-feature-grid {
   grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.public-boundary-list {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 1px;
+  overflow: hidden;
+  border-radius: var(--radius-lg);
+  border: 1px solid rgba(121, 156, 194, 0.14);
+}
+
+.public-boundary-item {
+  display: grid;
+  gap: 8px;
+  padding: 20px 22px;
+  background: rgba(12, 22, 35, 0.74);
+}
+
+.public-audience-list {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px 18px;
+}
+
+.public-audience-row {
+  display: grid;
+  grid-template-columns: minmax(130px, 0.36fr) minmax(0, 1fr);
+  gap: 14px;
+  align-items: start;
+  padding: 14px 0;
+  border-bottom: 1px solid rgba(121, 156, 194, 0.12);
+}
+
+.public-operational-flow {
+  gap: 28px;
+  padding-top: 8px;
+  border-top: 1px solid rgba(121, 156, 194, 0.12);
+}
+
+.public-flow-column {
+  display: grid;
+  gap: 16px;
+  align-content: start;
+  min-width: 0;
+}
+
+.public-flow-column-primary {
+  padding: 22px;
+  border-radius: var(--radius-lg);
+  border: 1px solid rgba(99, 216, 255, 0.14);
+  background: rgba(12, 22, 35, 0.64);
+}
+
+.public-pressure-list {
+  gap: 0;
+}
+
+.public-pressure-row {
+  padding: 14px 0;
+  border-bottom: 1px solid rgba(255, 189, 99, 0.14);
+}
+
+.public-pressure-row strong {
+  color: #f6d59e;
+}
+
+.public-capability-list {
+  gap: 12px;
+}
+
+.public-capability-row {
+  display: grid;
+  grid-template-columns: minmax(140px, 0.38fr) minmax(0, 1fr);
+  gap: 14px;
+  padding: 14px 0;
+  border-top: 1px solid rgba(121, 156, 194, 0.12);
+}
+
+.public-capability-row-lead {
+  grid-template-columns: 1fr;
+  padding: 0 0 16px;
+  border-top: 0;
+  border-bottom: 1px solid rgba(99, 216, 255, 0.14);
+}
+
+.public-proof-ledger {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 1px;
+  overflow: hidden;
+  border-radius: var(--radius-lg);
+  border: 1px solid rgba(121, 156, 194, 0.14);
+}
+
+.public-proof-row {
+  display: grid;
+  gap: 8px;
+  padding: 18px 20px;
+  background: rgba(12, 22, 35, 0.7);
+}
+
+.public-workspace-path {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 0;
+  border-top: 1px solid rgba(121, 156, 194, 0.14);
+  border-bottom: 1px solid rgba(121, 156, 194, 0.14);
+}
+
+.public-workspace-step {
+  display: grid;
+  gap: 10px;
+  align-content: start;
+  padding: 18px 20px;
+  border-right: 1px solid rgba(121, 156, 194, 0.12);
+}
+
+.public-workspace-step:last-child {
+  border-right: 0;
 }
 
 .public-command-lane ul {
@@ -1498,6 +1659,18 @@ tbody tr:hover {
   padding: 14px 16px;
 }
 
+.signin-support-list {
+  gap: 0;
+  border-top: 1px solid rgba(121, 156, 194, 0.12);
+}
+
+.signin-support-row {
+  display: grid;
+  gap: 6px;
+  padding: 14px 0;
+  border-bottom: 1px solid rgba(121, 156, 194, 0.1);
+}
+
 .field-control {
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto;
@@ -1550,7 +1723,9 @@ tbody tr:hover {
 .workspace-review-card,
 .workspace-next-card,
 .workspace-step-card,
+.workspace-step-row,
 .workspace-wizard-note,
+.workspace-guidance-block,
 .workspace-kickoff-card {
   border-radius: var(--radius-md);
   border: 1px solid rgba(121, 156, 194, 0.14);
@@ -1566,8 +1741,10 @@ tbody tr:hover {
 }
 
 .signin-status-card span,
+.signin-trust-row span,
 .workspace-review-grid span,
 .workspace-step-card span,
+.workspace-step-row span,
 .workspace-kickoff-link,
 .workspace-kickoff-progress span {
   display: block;
@@ -1597,6 +1774,30 @@ tbody tr:hover {
 .signin-feedback-card.tone-danger {
   border-color: rgba(255, 127, 127, 0.22);
   background: linear-gradient(180deg, rgba(54, 17, 24, 0.54), rgba(21, 11, 16, 0.82));
+}
+
+.signin-trust-ledger {
+  gap: 1px;
+  margin-top: 18px;
+  overflow: hidden;
+  border-radius: var(--radius-md);
+  border: 1px solid rgba(121, 156, 194, 0.14);
+}
+
+.signin-trust-row {
+  display: grid;
+  gap: 6px;
+  padding: 15px 18px;
+  background: rgba(12, 22, 35, 0.72);
+}
+
+.signin-trust-row strong,
+.signin-support-row strong,
+.workspace-next-row strong,
+.workspace-boundary-row strong,
+.workspace-guidance-block strong,
+.workspace-step-row strong {
+  display: block;
 }
 
 .workspace-wizard-shell {
@@ -1646,11 +1847,12 @@ tbody tr:hover {
 
 .workspace-wizard-steps {
   display: grid;
-  gap: 12px;
+  gap: 8px;
 }
 
-.workspace-step-card {
-  padding: 16px 18px;
+.workspace-step-card,
+.workspace-step-row {
+  padding: 14px 16px;
   text-align: left;
   transition:
     transform var(--motion-base) var(--ease-standard),
@@ -1659,7 +1861,8 @@ tbody tr:hover {
     box-shadow var(--motion-base) var(--ease-standard);
 }
 
-.workspace-step-card:hover {
+.workspace-step-card:hover,
+.workspace-step-row:hover {
   transform: translateY(-1px);
   border-color: rgba(99, 216, 255, 0.22);
 }
@@ -1732,6 +1935,27 @@ tbody tr:hover {
   padding: 18px 20px;
   display: grid;
   gap: 8px;
+}
+
+.workspace-guidance-block {
+  display: grid;
+  gap: 8px;
+  padding: 16px 18px;
+  background: rgba(12, 22, 35, 0.68);
+}
+
+.workspace-next-list,
+.workspace-boundary-list {
+  gap: 0;
+  border-top: 1px solid rgba(121, 156, 194, 0.12);
+}
+
+.workspace-next-row,
+.workspace-boundary-row {
+  display: grid;
+  gap: 6px;
+  padding: 14px 0;
+  border-bottom: 1px solid rgba(121, 156, 194, 0.1);
 }
 
 .workspace-kickoff-panel {
@@ -2736,6 +2960,10 @@ tbody tr:hover {
   .public-command-grid,
   .public-hero-metrics,
   .public-feature-grid,
+  .public-boundary-list,
+  .public-audience-list,
+  .public-proof-ledger,
+  .public-workspace-path,
   .workspace-wizard-grid,
   .workspace-review-grid,
   .workspace-next-grid {
@@ -2774,6 +3002,10 @@ tbody tr:hover {
   .public-onboarding-card,
   .public-domain-card {
     min-height: auto;
+  }
+
+  .public-flow-column-primary {
+    padding: 20px;
   }
 
   .enterprise-signin-form {
@@ -2931,11 +3163,38 @@ tbody tr:hover {
   .public-hero-metrics,
   .public-feature-grid,
   .public-command-signals,
+  .public-boundary-list,
+  .public-audience-list,
+  .public-proof-ledger,
+  .public-workspace-path,
   .signin-status-grid,
   .workspace-wizard-grid,
   .workspace-review-grid,
   .workspace-next-grid {
     grid-template-columns: 1fr;
+  }
+
+  .public-audience-row,
+  .public-capability-row {
+    grid-template-columns: 1fr;
+  }
+
+  .public-boundary-list,
+  .public-proof-ledger {
+    border-radius: var(--radius-md);
+  }
+
+  .public-workspace-path {
+    gap: 0;
+  }
+
+  .public-workspace-step {
+    border-right: 0;
+    border-bottom: 1px solid rgba(121, 156, 194, 0.12);
+  }
+
+  .public-workspace-step:last-child {
+    border-bottom: 0;
   }
 
   .public-command-header {

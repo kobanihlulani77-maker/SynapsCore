@@ -76,9 +76,9 @@ export default function SignInPage({ context }) {
             <span className="enterprise-status-pill">{tenantDirectoryState.loading ? 'Checking workspace directory' : `${tenantDirectoryState.items.length} workspaces visible`}</span>
             <span className={`enterprise-status-pill ${wsUrl ? 'status-live' : 'status-missing'}`}>{wsUrl ? 'Realtime path ready' : 'Realtime not configured'}</span>
           </div>
-          <div className="public-feature-stack">
+          <div className="signin-support-list">
             {featureCards.map((feature) => (
-              <article key={feature.title} className="public-feature-card">
+              <article key={feature.title} className="signin-support-row">
                 <strong>{feature.title}</strong>
                 <p>{feature.body}</p>
               </article>
@@ -183,18 +183,18 @@ export default function SignInPage({ context }) {
               <button className="ghost-button" onClick={() => navigateToPage('product')} type="button">Product Overview</button>
             </div>
           </form>
-          <div className="signin-trust-grid">
-            <article className="signin-trust-card">
+          <div className="signin-trust-ledger">
+            <article className="signin-trust-row">
               <span>Workspace scope</span>
               <strong>{selectedTenantOption?.name || authSessionState.tenantCode.trim() || 'Workspace required'}</strong>
               <p>Operators sign into a specific company workspace, not a generic application account.</p>
             </article>
-            <article className="signin-trust-card">
+            <article className="signin-trust-row">
               <span>Session model</span>
               <strong>Secure browser session</strong>
               <p>Protected actions, approvals, replay, and realtime access all follow the signed-in operator identity.</p>
             </article>
-            <article className="signin-trust-card">
+            <article className="signin-trust-row">
               <span>Realtime posture</span>
               <strong>{wsUrl ? 'Live transport configured' : 'Realtime path missing'}</strong>
               <p>SynapseCore opens the command workspace with live operational updates when the session is valid.</p>

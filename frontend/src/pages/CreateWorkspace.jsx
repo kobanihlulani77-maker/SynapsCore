@@ -187,7 +187,7 @@ export default function CreateWorkspacePage({ context }) {
           <p className="eyebrow">Company workspace setup</p>
           <h1>{effectivePageMeta.title}</h1>
           <p>{effectivePageMeta.description}</p>
-          <div className="workspace-wizard-note workspace-entry-boundary">
+          <div className="workspace-guidance-block workspace-entry-boundary">
             <strong>Controlled pilot setup</strong>
             <p>Prepare company context, first administrator, and rollout lane before operators sign in. Provisioning is confirmed only by supported backend flows.</p>
           </div>
@@ -197,7 +197,7 @@ export default function CreateWorkspacePage({ context }) {
               return (
                 <button
                   key={step.key}
-                  className={`workspace-step-card workspace-step-${state}`}
+                  className={`workspace-step-row workspace-step-${state}`}
                   onClick={() => setCurrentStepIndex(index)}
                   type="button"
                 >
@@ -207,7 +207,7 @@ export default function CreateWorkspacePage({ context }) {
               )
             })}
           </div>
-          <div className="workspace-wizard-note">
+          <div className="workspace-guidance-block">
             <strong>How this works</strong>
             <p>Existing operators sign into a company workspace with workspace code, username, and password. The first admin sets up the company environment and guides catalog, users, inventory, and integrations afterward.</p>
           </div>
@@ -379,9 +379,9 @@ export default function CreateWorkspacePage({ context }) {
 
               <article className="workspace-review-card">
                 <p className="panel-kicker">What happens next</p>
-                <div className="workspace-next-grid">
+                <div className="workspace-next-list">
                   {onboardingLanes.map((lane) => (
-                    <div key={lane.title} className="workspace-next-card">
+                    <div key={lane.title} className="workspace-next-row">
                       <strong>{lane.title}</strong>
                       <p>{lane.body}</p>
                     </div>
@@ -392,9 +392,9 @@ export default function CreateWorkspacePage({ context }) {
               <article className="workspace-review-card workspace-setup-boundaries">
                 <p className="panel-kicker">Boundaries</p>
                 <h3>What this setup does and does not do</h3>
-                <div className="public-list-grid">
+                <div className="workspace-boundary-list">
                   {setupBoundaries.map((boundary) => (
-                    <div key={boundary} className="public-list-item">
+                    <div key={boundary} className="workspace-boundary-row">
                       <strong>{boundary}</strong>
                     </div>
                   ))}
