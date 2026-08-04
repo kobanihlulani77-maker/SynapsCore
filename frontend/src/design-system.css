@@ -1101,11 +1101,26 @@ tbody tr:hover {
 .public-topbar {
   width: min(100%, 1360px);
   padding: 12px 0 16px;
+  border: 1px solid var(--public-border-quiet);
+  background: rgba(7, 15, 25, 0.88);
+  box-shadow: none;
+  backdrop-filter: blur(10px) saturate(115%);
 }
 
 .public-shell {
   min-width: 320px;
   overflow-wrap: anywhere;
+  --public-surface-working: rgba(12, 22, 35, 0.94);
+  --public-surface-supporting: rgba(12, 22, 35, 0.68);
+  --public-surface-quiet: rgba(255, 255, 255, 0.025);
+  --public-border-quiet: rgba(132, 156, 184, 0.12);
+  --public-border-selected: rgba(101, 186, 205, 0.24);
+  --public-shadow-working: 0 18px 42px rgba(1, 7, 15, 0.3);
+  --public-shadow-elevated: 0 22px 52px rgba(1, 7, 15, 0.36);
+  --public-accent-action: #59cfe1;
+  --public-accent-action-strong: #73deca;
+  --public-text-secondary: #9eb0c3;
+  --public-text-muted: #8297ad;
 }
 
 .public-nav {
@@ -1118,9 +1133,86 @@ tbody tr:hover {
   white-space: nowrap;
 }
 
+.public-shell .muted-text,
+.public-shell .field-hint {
+  color: var(--public-text-secondary);
+}
+
+.public-shell .eyebrow,
+.public-shell .panel-kicker,
+.public-shell .public-hero-metric-card span,
+.public-shell .public-command-signal span,
+.public-shell .public-step-marker,
+.public-shell .signin-status-card span,
+.public-shell .signin-trust-row span,
+.public-shell .workspace-step-row span,
+.public-shell .workspace-review-grid span {
+  color: var(--public-text-muted);
+}
+
+.public-shell .primary-button {
+  border: 1px solid rgba(96, 199, 217, 0.2);
+  background: var(--public-accent-action);
+  color: #041016;
+  box-shadow: none;
+}
+
+.public-shell .secondary-button {
+  border: 1px solid var(--public-border-quiet);
+  background: rgba(255, 255, 255, 0.045);
+  color: #e2edf7;
+  box-shadow: none;
+}
+
+.public-shell .ghost-button {
+  border: 1px solid var(--public-border-quiet);
+  background: rgba(255, 255, 255, 0.018);
+  color: #d7e3ef;
+}
+
+.public-shell .primary-button:hover,
+.public-shell .secondary-button:hover,
+.public-shell .ghost-button:hover,
+.public-shell .field-inline-button:hover,
+.public-shell .workspace-step-row:hover {
+  box-shadow: 0 12px 24px rgba(1, 7, 15, 0.24);
+}
+
+.public-shell .primary-button:hover {
+  background: var(--public-accent-action-strong);
+}
+
+.public-shell .page-step-active,
+.public-shell .public-nav .page-step-active {
+  border-color: var(--public-border-selected);
+  background: rgba(89, 207, 225, 0.08);
+  color: #f2fbff;
+}
+
 .public-signin-card,
 .public-signin-story {
   min-height: 100%;
+}
+
+.public-shell .public-signin-card {
+  border-color: var(--public-border-quiet);
+  background: var(--public-surface-working);
+  box-shadow: var(--public-shadow-working);
+  backdrop-filter: blur(10px) saturate(112%);
+}
+
+.public-shell .public-signin-story {
+  border-color: transparent;
+  background: transparent;
+  box-shadow: none;
+  backdrop-filter: none;
+}
+
+.public-shell .public-signin-card::after,
+.public-shell .public-signin-story::after,
+.public-shell .public-signin-card::before,
+.public-shell .public-section-card::before {
+  display: none;
 }
 
 .enterprise-status-pill,
@@ -1149,15 +1241,33 @@ tbody tr:hover {
   font-weight: 600;
 }
 
+.public-shell .enterprise-status-pill {
+  border-color: var(--public-border-quiet);
+  background: rgba(255, 255, 255, 0.025);
+  color: #d4e1ed;
+}
+
 .workspace-status-pill.status-live,
 .enterprise-status-pill.status-live {
   color: #c7f6dd;
+}
+
+.public-shell .enterprise-status-pill.status-live {
+  border-color: var(--public-border-quiet);
+  background: rgba(255, 255, 255, 0.025);
+  color: #d4e1ed;
 }
 
 .workspace-status-pill.status-missing,
 .enterprise-status-pill.status-missing {
   color: #ffd0d7;
   border-color: rgba(255, 127, 127, 0.18);
+}
+
+.public-shell .enterprise-status-pill.status-missing {
+  color: #ffcbd2;
+  border-color: rgba(255, 127, 127, 0.18);
+  background: rgba(255, 127, 127, 0.07);
 }
 
 .public-signin-shell,
@@ -1250,10 +1360,30 @@ tbody tr:hover {
   display: grid;
   gap: 6px;
   max-width: 68ch;
-  border-color: rgba(80, 216, 171, 0.2);
-  background:
-    radial-gradient(circle at top right, rgba(80, 216, 171, 0.08), transparent 34%),
-    linear-gradient(180deg, rgba(15, 30, 45, 0.92), rgba(8, 18, 30, 0.94));
+  border-color: rgba(116, 154, 182, 0.14);
+  background: var(--public-surface-supporting);
+  box-shadow: none;
+}
+
+.public-shell .public-hero-metric-card,
+.public-shell .public-command-signal,
+.public-shell .public-command-lane {
+  border-color: var(--public-border-quiet);
+  background: var(--public-surface-supporting);
+  box-shadow: none;
+}
+
+.public-shell .public-command-signal.tone-warning {
+  border-color: rgba(207, 157, 92, 0.18);
+  background: rgba(49, 38, 20, 0.34);
+}
+
+.public-shell .public-command-signal.tone-success {
+  border-color: rgba(89, 169, 136, 0.18);
+}
+
+.public-shell .public-command-signal.tone-info {
+  border-color: rgba(96, 172, 195, 0.16);
 }
 
 .public-positioning-card p {
@@ -1375,20 +1505,16 @@ tbody tr:hover {
   gap: 18px;
   padding: 22px;
   border-radius: var(--radius-xl);
-  border: 1px solid rgba(121, 156, 194, 0.14);
+  border: 1px solid var(--public-border-quiet);
   background:
-    radial-gradient(circle at top right, rgba(99, 216, 255, 0.16), transparent 28%),
-    linear-gradient(180deg, rgba(14, 25, 40, 0.96), rgba(8, 17, 29, 0.98));
-  box-shadow: var(--shadow-raised);
+    radial-gradient(circle at top right, rgba(89, 207, 225, 0.06), transparent 30%),
+    linear-gradient(180deg, rgba(13, 24, 38, 0.96), rgba(8, 17, 28, 0.98));
+  box-shadow: var(--public-shadow-elevated);
   overflow: hidden;
 }
 
 .public-command-visual::after {
-  content: "";
-  position: absolute;
-  inset: 0;
-  pointer-events: none;
-  background: linear-gradient(180deg, rgba(255, 255, 255, 0.04), transparent 22%);
+  display: none;
 }
 
 .public-command-header {
@@ -1425,14 +1551,14 @@ tbody tr:hover {
   gap: 1px;
   overflow: hidden;
   border-radius: var(--radius-lg);
-  border: 1px solid rgba(121, 156, 194, 0.14);
+  border: 1px solid var(--public-border-quiet);
 }
 
 .public-boundary-item {
   display: grid;
   gap: 8px;
   padding: 20px 22px;
-  background: rgba(12, 22, 35, 0.74);
+  background: var(--public-surface-supporting);
 }
 
 .public-audience-list {
@@ -1446,13 +1572,13 @@ tbody tr:hover {
   gap: 14px;
   align-items: start;
   padding: 14px 0;
-  border-bottom: 1px solid rgba(121, 156, 194, 0.12);
+  border-bottom: 1px solid rgba(132, 156, 184, 0.1);
 }
 
 .public-operational-flow {
   gap: 28px;
   padding-top: 8px;
-  border-top: 1px solid rgba(121, 156, 194, 0.12);
+  border-top: 1px solid rgba(132, 156, 184, 0.1);
 }
 
 .public-flow-column {
@@ -1465,8 +1591,8 @@ tbody tr:hover {
 .public-flow-column-primary {
   padding: 22px;
   border-radius: var(--radius-lg);
-  border: 1px solid rgba(99, 216, 255, 0.14);
-  background: rgba(12, 22, 35, 0.64);
+  border: 1px solid var(--public-border-quiet);
+  background: var(--public-surface-supporting);
 }
 
 .public-pressure-list {
@@ -1475,11 +1601,11 @@ tbody tr:hover {
 
 .public-pressure-row {
   padding: 14px 0;
-  border-bottom: 1px solid rgba(255, 189, 99, 0.14);
+  border-bottom: 1px solid rgba(207, 157, 92, 0.12);
 }
 
 .public-pressure-row strong {
-  color: #f6d59e;
+  color: #e6c48c;
 }
 
 .public-capability-list {
@@ -1491,14 +1617,14 @@ tbody tr:hover {
   grid-template-columns: minmax(140px, 0.38fr) minmax(0, 1fr);
   gap: 14px;
   padding: 14px 0;
-  border-top: 1px solid rgba(121, 156, 194, 0.12);
+  border-top: 1px solid rgba(132, 156, 184, 0.1);
 }
 
 .public-capability-row-lead {
   grid-template-columns: 1fr;
   padding: 0 0 16px;
   border-top: 0;
-  border-bottom: 1px solid rgba(99, 216, 255, 0.14);
+  border-bottom: 1px solid rgba(132, 156, 184, 0.12);
 }
 
 .public-proof-ledger {
@@ -1506,21 +1632,21 @@ tbody tr:hover {
   gap: 1px;
   overflow: hidden;
   border-radius: var(--radius-lg);
-  border: 1px solid rgba(121, 156, 194, 0.14);
+  border: 1px solid var(--public-border-quiet);
 }
 
 .public-proof-row {
   display: grid;
   gap: 8px;
   padding: 18px 20px;
-  background: rgba(12, 22, 35, 0.7);
+  background: var(--public-surface-supporting);
 }
 
 .public-workspace-path {
   grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 0;
-  border-top: 1px solid rgba(121, 156, 194, 0.14);
-  border-bottom: 1px solid rgba(121, 156, 194, 0.14);
+  border-top: 1px solid var(--public-border-quiet);
+  border-bottom: 1px solid var(--public-border-quiet);
 }
 
 .public-workspace-step {
@@ -1528,7 +1654,7 @@ tbody tr:hover {
   gap: 10px;
   align-content: start;
   padding: 18px 20px;
-  border-right: 1px solid rgba(121, 156, 194, 0.12);
+  border-right: 1px solid rgba(132, 156, 184, 0.1);
 }
 
 .public-workspace-step:last-child {
@@ -1557,28 +1683,28 @@ tbody tr:hover {
   width: 7px;
   height: 7px;
   border-radius: 999px;
-  background: var(--color-accent-primary);
-  box-shadow: 0 0 0 5px rgba(99, 216, 255, 0.08);
+  background: var(--public-accent-action);
+  box-shadow: none;
 }
 
 .public-command-signal.tone-warning,
 .public-list-item-warning {
-  border-color: rgba(255, 189, 99, 0.18);
-  background: linear-gradient(180deg, rgba(54, 38, 17, 0.42), rgba(18, 18, 22, 0.92));
+  border-color: rgba(207, 157, 92, 0.18);
+  background: rgba(49, 38, 20, 0.34);
 }
 
 .public-command-signal.tone-success,
 .public-proof-card.tone-success {
-  border-color: rgba(80, 216, 171, 0.2);
+  border-color: rgba(89, 169, 136, 0.2);
 }
 
 .public-command-signal.tone-info,
 .public-proof-card.tone-info {
-  border-color: rgba(99, 216, 255, 0.2);
+  border-color: rgba(96, 172, 195, 0.18);
 }
 
 .public-proof-card.tone-warning {
-  border-color: rgba(255, 189, 99, 0.2);
+  border-color: rgba(207, 157, 92, 0.18);
 }
 
 .public-list-item {
@@ -1607,9 +1733,9 @@ tbody tr:hover {
   min-height: 28px;
   padding: 0 12px;
   border-radius: 999px;
-  border: 1px solid rgba(99, 216, 255, 0.14);
-  background: rgba(99, 216, 255, 0.08);
-  color: #c6f7ff;
+  border: 1px solid var(--public-border-quiet);
+  background: rgba(255, 255, 255, 0.025);
+  color: var(--public-text-muted);
   letter-spacing: 0.12em;
 }
 
@@ -1624,10 +1750,9 @@ tbody tr:hover {
   justify-content: space-between;
   padding: 24px 26px;
   border-radius: var(--radius-lg);
-  background:
-    radial-gradient(circle at top right, rgba(80, 216, 171, 0.1), transparent 24%),
-    radial-gradient(circle at left, rgba(99, 216, 255, 0.12), transparent 24%),
-    linear-gradient(180deg, rgba(17, 29, 46, 0.96), rgba(11, 20, 32, 0.98));
+  border-color: var(--public-border-quiet);
+  background: var(--public-surface-working);
+  box-shadow: var(--public-shadow-working);
 }
 
 .public-final-cta-card > div:first-child {
@@ -1698,6 +1823,17 @@ tbody tr:hover {
   background: rgba(99, 216, 255, 0.12);
 }
 
+.public-shell .field-inline-button {
+  border-color: var(--public-border-quiet);
+  background: rgba(255, 255, 255, 0.035);
+  color: #dce8f4;
+}
+
+.public-shell .field-inline-button:hover {
+  border-color: var(--public-border-selected);
+  background: rgba(89, 207, 225, 0.07);
+}
+
 .field-inline-button:focus-visible {
   outline: none;
   box-shadow: var(--shadow-focus);
@@ -1728,9 +1864,9 @@ tbody tr:hover {
 .workspace-guidance-block,
 .workspace-kickoff-card {
   border-radius: var(--radius-md);
-  border: 1px solid rgba(121, 156, 194, 0.14);
-  background: linear-gradient(180deg, rgba(19, 31, 49, 0.9), rgba(12, 22, 35, 0.94));
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.03), var(--shadow-ambient);
+  border: 1px solid var(--public-border-quiet);
+  background: var(--public-surface-supporting);
+  box-shadow: none;
 }
 
 .signin-status-card,
@@ -1738,6 +1874,12 @@ tbody tr:hover {
 .workspace-review-card,
 .workspace-kickoff-card {
   padding: 18px 20px;
+}
+
+.workspace-kickoff-card {
+  border: 1px solid rgba(121, 156, 194, 0.14);
+  background: linear-gradient(180deg, rgba(19, 31, 49, 0.9), rgba(12, 22, 35, 0.94));
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.03), var(--shadow-ambient);
 }
 
 .signin-status-card span,
@@ -1763,17 +1905,17 @@ tbody tr:hover {
 }
 
 .signin-feedback-card.tone-info {
-  border-color: rgba(99, 216, 255, 0.2);
+  border-color: rgba(96, 172, 195, 0.18);
 }
 
 .signin-feedback-card.tone-warning {
-  border-color: rgba(255, 189, 99, 0.2);
-  background: linear-gradient(180deg, rgba(54, 38, 17, 0.42), rgba(18, 18, 22, 0.92));
+  border-color: rgba(207, 157, 92, 0.2);
+  background: rgba(49, 38, 20, 0.36);
 }
 
 .signin-feedback-card.tone-danger {
   border-color: rgba(255, 127, 127, 0.22);
-  background: linear-gradient(180deg, rgba(54, 17, 24, 0.54), rgba(21, 11, 16, 0.82));
+  background: rgba(58, 18, 25, 0.52);
 }
 
 .signin-trust-ledger {
@@ -1781,14 +1923,14 @@ tbody tr:hover {
   margin-top: 18px;
   overflow: hidden;
   border-radius: var(--radius-md);
-  border: 1px solid rgba(121, 156, 194, 0.14);
+  border: 1px solid var(--public-border-quiet);
 }
 
 .signin-trust-row {
   display: grid;
   gap: 6px;
   padding: 15px 18px;
-  background: rgba(12, 22, 35, 0.72);
+  background: var(--public-surface-supporting);
 }
 
 .signin-trust-row strong,
@@ -1810,10 +1952,16 @@ tbody tr:hover {
 .workspace-wizard-sidebar,
 .workspace-wizard-panel {
   border-radius: var(--radius-xl);
-  border: 1px solid rgba(121, 156, 194, 0.14);
-  background: var(--color-surface-glass);
-  box-shadow: var(--shadow-raised);
-  backdrop-filter: blur(18px) saturate(140%);
+  border: 1px solid var(--public-border-quiet);
+  background: var(--public-surface-working);
+  box-shadow: var(--public-shadow-working);
+  backdrop-filter: blur(10px) saturate(112%);
+}
+
+.workspace-wizard-sidebar {
+  background: rgba(12, 22, 35, 0.52);
+  box-shadow: none;
+  backdrop-filter: none;
 }
 
 .workspace-wizard-sidebar,
@@ -1868,14 +2016,12 @@ tbody tr:hover {
 }
 
 .workspace-step-active {
-  border-color: rgba(99, 216, 255, 0.24);
-  background:
-    radial-gradient(circle at top right, rgba(99, 216, 255, 0.12), transparent 34%),
-    linear-gradient(180deg, rgba(19, 37, 58, 0.98), rgba(11, 21, 34, 0.98));
+  border-color: var(--public-border-selected);
+  background: rgba(89, 207, 225, 0.08);
 }
 
 .workspace-step-complete {
-  border-color: rgba(80, 216, 171, 0.18);
+  border-color: rgba(89, 169, 136, 0.18);
 }
 
 .workspace-step-card strong,
@@ -1941,13 +2087,13 @@ tbody tr:hover {
   display: grid;
   gap: 8px;
   padding: 16px 18px;
-  background: rgba(12, 22, 35, 0.68);
+  background: var(--public-surface-supporting);
 }
 
 .workspace-next-list,
 .workspace-boundary-list {
   gap: 0;
-  border-top: 1px solid rgba(121, 156, 194, 0.12);
+  border-top: 1px solid rgba(132, 156, 184, 0.1);
 }
 
 .workspace-next-row,
@@ -1955,7 +2101,7 @@ tbody tr:hover {
   display: grid;
   gap: 6px;
   padding: 14px 0;
-  border-bottom: 1px solid rgba(121, 156, 194, 0.1);
+  border-bottom: 1px solid rgba(132, 156, 184, 0.1);
 }
 
 .workspace-kickoff-panel {
