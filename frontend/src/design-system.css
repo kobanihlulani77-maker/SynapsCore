@@ -2975,6 +2975,315 @@ tbody tr:hover {
   color: var(--color-text-secondary);
 }
 
+/* Authenticated application surface model: quiet by default, semantic only when state requires it. */
+.workspace-shell {
+  --app-background: #07101c;
+  --app-surface-working: rgba(12, 22, 35, 0.96);
+  --app-surface-supporting: rgba(11, 20, 32, 0.84);
+  --app-surface-data: rgba(7, 15, 25, 0.88);
+  --app-surface-elevated: rgba(14, 25, 39, 0.98);
+  --app-border-quiet: rgba(132, 156, 184, 0.13);
+  --app-border-strong: rgba(132, 156, 184, 0.22);
+  --app-border-selected: rgba(111, 183, 202, 0.34);
+  --app-accent: #69cfe0;
+  --app-accent-muted: rgba(105, 207, 224, 0.12);
+  --app-success: #9ed8ba;
+  --app-success-muted: rgba(119, 204, 157, 0.13);
+  --app-warning: #e5c184;
+  --app-warning-muted: rgba(229, 193, 132, 0.13);
+  --app-danger: #f1a5ae;
+  --app-danger-muted: rgba(241, 165, 174, 0.13);
+  --app-info: #abc5d7;
+  --app-info-muted: rgba(171, 197, 215, 0.1);
+  --app-unavailable: #aab7c5;
+  --app-shadow-working: 0 16px 34px rgba(1, 7, 15, 0.24);
+  --app-shadow-elevated: 0 22px 46px rgba(1, 7, 15, 0.34);
+  background:
+    radial-gradient(circle at 0 0, rgba(105, 207, 224, 0.035), transparent 18%),
+    var(--app-background);
+}
+
+.workspace-shell .workspace-sidebar {
+  background: #07101c;
+  border-color: var(--app-border-quiet);
+}
+
+.workspace-shell .workspace-topbar,
+.workspace-shell .command-hero,
+.workspace-shell .page-intro-panel,
+.workspace-shell .panel,
+.workspace-shell .summary-card,
+.workspace-shell .metric-card,
+.workspace-shell .stack-card,
+.workspace-shell .empty-state,
+.workspace-shell .workspace-switcher,
+.workspace-shell .workspace-sidebar-footer,
+.workspace-shell .utility-card,
+.workspace-shell .command-hero-panel,
+.workspace-shell .signal-list-item,
+.workspace-shell .workspace-search-result,
+.workspace-shell .utility-action,
+.workspace-shell .warehouse-health-card,
+.workspace-shell .recommendation-column,
+.workspace-shell .scenario-editor-card,
+.workspace-shell .comparison-card,
+.workspace-shell .comparison-banner,
+.workspace-shell .planner-line-card,
+.workspace-shell .scenario-stat,
+.workspace-shell .workspace-identity-card,
+.workspace-shell .workspace-compact-identity,
+.workspace-shell .runtime-factor-card,
+.workspace-shell .workflow-action-card,
+.workspace-shell .scenario-filter-rail,
+.workspace-shell .scenario-identity-panel,
+.workspace-shell .catalog-field-group,
+.workspace-shell .admin-form-section,
+.workspace-shell .admin-review-card {
+  border-color: var(--app-border-quiet);
+  background: var(--app-surface-supporting);
+  box-shadow: none;
+  backdrop-filter: none;
+}
+
+.workspace-shell .workspace-topbar,
+.workspace-shell .command-hero,
+.workspace-shell .page-intro-panel,
+.workspace-shell .ops-command-hero,
+.workspace-shell .runtime-decision-hero,
+.workspace-shell .workflow-decision-hero,
+.workspace-shell .daily-ops-hero,
+.workspace-shell .catalog-admin-hero,
+.workspace-shell .attention-ops-hero,
+.workspace-shell .recommendation-decision-hero,
+.workspace-shell .connector-trust-hero,
+.workspace-shell .admin-trust-hero,
+.workspace-shell .platform-admin-hero,
+.workspace-shell .release-trust-hero,
+.workspace-shell .config-trust-hero {
+  border-color: var(--app-border-strong);
+  background: var(--app-surface-working);
+  box-shadow: var(--app-shadow-working);
+}
+
+.workspace-shell .data-grid {
+  max-width: 100%;
+  border-color: var(--app-border-quiet);
+  background: var(--app-surface-data);
+  box-shadow: none;
+}
+
+.workspace-shell .data-grid-table thead th {
+  background: rgba(132, 156, 184, 0.055);
+}
+
+.workspace-shell .panel::after,
+.workspace-shell .summary-card::after,
+.workspace-shell .stack-card::after,
+.workspace-shell .empty-state::after,
+.workspace-shell .utility-card::after,
+.workspace-shell .command-hero-panel::after {
+  display: none;
+}
+
+.workspace-shell .summary-card::before,
+.workspace-shell .stack-card::before,
+.workspace-shell .panel::before,
+.workspace-shell .utility-card::before {
+  background: rgba(132, 156, 184, 0.12);
+}
+
+.workspace-shell .selectable-card:hover,
+.workspace-shell .stack-card.selectable-card:hover,
+.workspace-shell .signal-list-item.selectable-card:hover,
+.workspace-shell .workspace-search-result:hover,
+.workspace-shell .utility-action:hover,
+.workspace-shell .dashboard-lane-card:hover,
+.workspace-shell .dashboard-guidance-card:hover {
+  border-color: var(--app-border-selected);
+  background: var(--app-surface-elevated);
+  box-shadow: none;
+}
+
+.workspace-shell .workspace-nav-link:hover,
+.workspace-shell .workspace-nav-link-active,
+.workspace-shell .selectable-card.is-selected,
+.workspace-shell .page-step-active,
+.workspace-shell .workflow-selected-panel,
+.workspace-shell .attention-detail-panel,
+.workspace-shell .recommendation-focus-panel,
+.workspace-shell .connector-detail-panel,
+.workspace-shell .admin-focus-panel {
+  border-color: var(--app-border-selected);
+  background: var(--app-accent-muted);
+  box-shadow: none;
+}
+
+.workspace-shell .workspace-nav-link-active,
+.workspace-shell .workflow-selected-panel,
+.workspace-shell .attention-detail-panel,
+.workspace-shell .recommendation-focus-panel,
+.workspace-shell .connector-detail-panel,
+.workspace-shell .admin-focus-panel {
+  box-shadow: inset 3px 0 0 var(--app-accent);
+}
+
+.workspace-shell .primary-button {
+  border-color: rgba(105, 207, 224, 0.22);
+  background: #69cfe0;
+  color: #041018;
+  box-shadow: none;
+}
+
+.workspace-shell .secondary-button,
+.workspace-shell .ghost-button,
+.workspace-shell .compare-button,
+.workspace-shell .hero-jump-link {
+  border-color: var(--app-border-quiet);
+  background: rgba(132, 156, 184, 0.08);
+  color: #e1edf7;
+  box-shadow: none;
+}
+
+.workspace-shell .approve-button {
+  border-color: rgba(119, 204, 157, 0.28);
+  background: var(--app-success-muted);
+  color: var(--app-success);
+  box-shadow: none;
+}
+
+.workspace-shell .reject-button {
+  border-color: rgba(229, 193, 132, 0.28);
+  background: var(--app-warning-muted);
+  color: var(--app-warning);
+  box-shadow: none;
+}
+
+.workspace-shell .danger-button {
+  border-color: rgba(241, 165, 174, 0.32);
+  background: var(--app-danger-muted);
+  color: var(--app-danger);
+  box-shadow: none;
+}
+
+.workspace-shell .primary-button:hover,
+.workspace-shell .secondary-button:hover,
+.workspace-shell .ghost-button:hover,
+.workspace-shell .approve-button:hover,
+.workspace-shell .reject-button:hover,
+.workspace-shell .compare-button:hover,
+.workspace-shell .danger-button:hover,
+.workspace-shell .hero-jump-link:hover {
+  border-color: var(--app-border-selected);
+  box-shadow: none;
+}
+
+.workspace-shell .workspace-status-pill,
+.workspace-shell .workspace-meta-pill,
+.workspace-shell .utility-state,
+.workspace-shell .status-pill,
+.workspace-shell .panel-badge,
+.workspace-shell .severity-tag,
+.workspace-shell .priority-tag,
+.workspace-shell .risk-chip,
+.workspace-shell .event-type-tag,
+.workspace-shell .status-tag,
+.workspace-shell .policy-tag,
+.workspace-shell .stage-tag,
+.workspace-shell .scenario-type-tag,
+.workspace-shell .attention-card-meta span,
+.workspace-shell .dashboard-lane-metrics span {
+  border-color: var(--app-border-quiet);
+  background: rgba(132, 156, 184, 0.075);
+  color: #d4e2ee;
+  box-shadow: none;
+}
+
+.workspace-shell .status-live,
+.workspace-shell .status-success,
+.workspace-shell .utility-live,
+.workspace-shell .utility-good,
+.workspace-shell .stage-approved,
+.workspace-shell .risk-stable,
+.workspace-shell .alert-card-success {
+  border-color: rgba(119, 204, 157, 0.24);
+  background: var(--app-success-muted);
+  color: var(--app-success);
+}
+
+.workspace-shell .status-partial,
+.workspace-shell .severity-medium,
+.workspace-shell .priority-medium,
+.workspace-shell .stage-pending-final-approval,
+.workspace-shell .stage-pending-review,
+.workspace-shell .scenario-action-meaning,
+.workspace-shell .admin-risk-panel {
+  border-color: rgba(229, 193, 132, 0.25);
+  background: var(--app-warning-muted);
+  color: var(--app-warning);
+}
+
+.workspace-shell .status-failure,
+.workspace-shell .severity-critical,
+.workspace-shell .severity-high,
+.workspace-shell .priority-critical,
+.workspace-shell .priority-high,
+.workspace-shell .stage-rejected,
+.workspace-shell .status-missing,
+.workspace-shell .alert-card-failure {
+  border-color: rgba(241, 165, 174, 0.28);
+  background: var(--app-danger-muted);
+  color: var(--app-danger);
+}
+
+.workspace-shell .policy-standard,
+.workspace-shell .stage-not-required,
+.workspace-shell .alert-card-partial {
+  border-color: var(--app-border-quiet);
+  background: var(--app-info-muted);
+  color: var(--app-info);
+}
+
+.workspace-shell .loading-state,
+.workspace-shell .empty-state {
+  background: var(--app-surface-data);
+  border-color: var(--app-border-quiet);
+}
+
+.workspace-shell .loading-skeleton {
+  background: rgba(132, 156, 184, 0.18);
+  animation: none;
+}
+
+@media (max-width: 720px) {
+  .workspace-shell,
+  .workspace-frame,
+  .workspace-topbar,
+  .workspace-topbar-primary,
+  .workspace-topbar-actions,
+  .workspace-topbar-utility,
+  .workspace-topbar-statusline,
+  .workspace-topbar-controls,
+  .workspace-status-strip,
+  .workspace-command-bar,
+  .dashboard-command-header,
+  .dashboard-command-grid,
+  .catalog-review-workbench,
+  .catalog-workflow-grid {
+    min-width: 0;
+    max-width: 100%;
+  }
+
+  .workspace-shell .workspace-status-pill,
+  .workspace-shell .workspace-meta-pill,
+  .workspace-shell .panel-badge,
+  .workspace-shell .runtime-decision-badge,
+  .workspace-shell .data-grid-sort span {
+    min-width: 0;
+    overflow-wrap: anywhere;
+    white-space: normal;
+  }
+}
+
 @keyframes ds-shimmer {
   0% {
     background-position: 200% 0;
@@ -3377,6 +3686,60 @@ tbody tr:hover {
   .workspace-notice-card {
     flex-direction: column;
     align-items: stretch;
+  }
+}
+
+@media (max-width: 430px) {
+  .workspace-shell,
+  .workspace-frame,
+  .workspace-sidebar,
+  .workspace-sidebar-header,
+  .workspace-switcher,
+  .workspace-switcher-meta,
+  .workspace-brand,
+  .workspace-brand span,
+  .workspace-nav,
+  .workspace-nav-group,
+  .workspace-nav-links,
+  .workspace-sidebar-footer,
+  .workspace-sidebar-status,
+  .workspace-sidebar-quick-actions,
+  .workspace-topbar,
+  .workspace-topbar-primary,
+  .workspace-topbar-actions,
+  .workspace-topbar-utility,
+  .workspace-topbar-statusline,
+  .workspace-topbar-controls,
+  .workspace-body,
+  .workspace-content,
+  .content-grid,
+  .catalog-workflow-grid,
+  .catalog-review-workbench {
+    min-width: 0;
+    max-width: 100%;
+  }
+
+  .workspace-shell .workspace-meta-pill,
+  .workspace-shell .workspace-status-pill,
+  .workspace-shell .panel-badge,
+  .workspace-shell .runtime-decision-badge,
+  .workspace-shell .scenario-type-tag,
+  .workspace-shell .status-tag {
+    width: auto;
+    max-width: 100%;
+    min-width: 0;
+    overflow-wrap: anywhere;
+    white-space: normal;
+  }
+
+  .workspace-shell .data-grid {
+    width: 100%;
+    max-width: 100%;
+    overflow-x: auto;
+  }
+
+  .workspace-shell .data-grid-table {
+    min-width: 480px;
   }
 }
 
