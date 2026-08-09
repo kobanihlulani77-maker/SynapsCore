@@ -38,42 +38,6 @@
   color: var(--color-text-secondary);
 }
 
-.tone-success {
-  background: rgba(80, 216, 171, 0.08);
-}
-
-.tone-warning {
-  background: rgba(255, 189, 99, 0.09);
-}
-
-.tone-danger {
-  background: rgba(255, 127, 127, 0.08);
-}
-
-.tone-neutral {
-  background: rgba(127, 216, 255, 0.06);
-}
-
-.live-dot {
-  width: 12px;
-  height: 12px;
-  border-radius: 999px;
-  display: inline-block;
-}
-
-.status-connecting,
-.status-reconnecting {
-  background: var(--color-accent-warning);
-}
-
-.status-degraded {
-  background: var(--color-accent-danger);
-}
-
-.status-signed-out {
-  background: var(--color-accent-unavailable);
-}
-
 .control-row {
   display: flex;
   flex-wrap: wrap;
@@ -118,16 +82,6 @@
   grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
 }
 
-.summary-card {
-  padding: 16px;
-}
-
-.summary-value {
-  display: block;
-  margin-top: 16px;
-  overflow-wrap: anywhere;
-}
-
 .content-grid {
   grid-template-columns: repeat(2, minmax(0, 1fr));
 }
@@ -136,36 +90,8 @@
   grid-template-columns: minmax(0, 1.45fr) minmax(300px, 0.8fr);
 }
 
-.panel {
-  border-radius: var(--radius-lg);
-  padding: 20px;
-}
-
 .panel-wide {
   min-width: 0;
-}
-
-.panel-header,
-.stack-title-row {
-  display: flex;
-  justify-content: space-between;
-  gap: 16px;
-}
-
-.panel-badge,
-.severity-tag,
-.priority-tag,
-.risk-chip {
-  border-radius: 999px;
-  font-size: 0.76rem;
-  font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: 0.06em;
-}
-
-.panel-badge {
-  align-self: flex-start;
-  padding: 6px 10px;
 }
 
 .alert-badge { background: rgba(239, 68, 68, 0.14); color: #ffd1d1; }
@@ -186,56 +112,9 @@
   margin-top: 14px;
 }
 
-.stack-card p,
-.empty-state {
-  margin: 8px 0 0;
-}
-
-.severity-tag,
-.priority-tag,
-.risk-chip {
-  padding: 6px 9px;
-}
-
-.event-type-tag,
-.status-tag {
-  border-radius: 999px;
-  padding: 6px 9px;
-  font-size: 0.75rem;
-  font-weight: 700;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
-}
-
-.policy-tag {
-  border-radius: 999px;
-  padding: 6px 9px;
-  font-size: 0.75rem;
-  font-weight: 700;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
-}
-
-.stage-tag {
-  border-radius: 999px;
-  padding: 6px 9px;
-  font-size: 0.75rem;
-  font-weight: 700;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
-}
-
 .policy-escalated {
   background: rgba(239, 68, 68, 0.14);
   color: #ffd1d1;
-}
-
-.scenario-type-tag {
-  padding: 6px 9px;
-  font-size: 0.75rem;
-  font-weight: 700;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
 }
 
 .stack-tag-row {
@@ -253,7 +132,7 @@
 .trace-line {
   margin-top: 10px;
   color: var(--color-text-muted);
-  font-family: "Cascadia Code", "Consolas", monospace;
+  font-family: var(--font-mono);
   font-size: 0.84rem;
 }
 
