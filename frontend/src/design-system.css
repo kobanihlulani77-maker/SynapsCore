@@ -26,7 +26,8 @@
   --color-text-link: #38bdf8;
 
   --color-border-subtle: #242b35;
-  --color-border-strong: #303946;
+  --color-border-normal: #303946;
+  --color-border-strong: var(--color-border-normal);
   --color-border-selected: #0ea5c6;
   --color-border-focus: #38bdf8;
   --color-border-danger: #ef4444;
@@ -227,6 +228,41 @@ h4,
 .public-signin-story,
 .utility-card {
   position: relative;
+}
+
+/* Shared operational component geometry. Route-specific composition stays in styles.css. */
+.panel {
+  padding: 20px;
+  border: 1px solid var(--color-border-subtle);
+  border-radius: var(--radius-md);
+}
+
+.summary-card,
+.stack-card {
+  border: 1px solid var(--color-border-subtle);
+  border-radius: var(--radius-md);
+}
+
+.summary-card {
+  padding: 16px;
+}
+
+.summary-value {
+  display: block;
+  margin-top: 12px;
+  overflow-wrap: anywhere;
+}
+
+.panel-header,
+.stack-title-row {
+  display: flex;
+  justify-content: space-between;
+  gap: 14px;
+}
+
+.stack-card p,
+.empty-state {
+  margin: 8px 0 0;
 }
 
 .panel::after,
@@ -852,13 +888,7 @@ h4,
 .utility-card::before,
 .public-section-card::before,
 .public-signin-card::before {
-  content: "";
-  position: absolute;
-  inset: 0 auto auto 0;
-  width: 100%;
-  height: 1px;
-  background: var(--color-border-subtle);
-  pointer-events: none;
+  display: none;
 }
 
 .metric-card {
@@ -968,9 +998,9 @@ h4,
 .compare-button,
 .danger-button {
   transition:
-    border-color var(--motion-base) var(--ease-standard),
-    background var(--motion-base) var(--ease-standard),
-    color var(--motion-base) var(--ease-standard),
+    border-color var(--motion-fast) var(--ease-standard),
+    background-color var(--motion-fast) var(--ease-standard),
+    color var(--motion-fast) var(--ease-standard),
     opacity var(--motion-fast) linear;
 }
 
@@ -982,17 +1012,22 @@ h4,
 .compare-button,
 .danger-button {
   min-height: 40px;
-  padding: 0 15px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 0 14px;
   border-radius: var(--radius-sm);
   font-weight: 700;
-  letter-spacing: 0.01em;
+  line-height: 1.2;
+  letter-spacing: 0;
   box-shadow: none;
 }
 
 .primary-button {
   background: var(--color-accent-primary);
-  color: #04101a;
-  border: 1px solid transparent;
+  color: var(--color-text-inverse);
+  border: 1px solid var(--color-accent-primary);
 }
 
 .secondary-button {
@@ -1005,65 +1040,84 @@ h4,
   background: transparent;
   color: var(--color-text-secondary);
   border: 1px solid var(--color-border-subtle);
-  box-shadow: none;
 }
 
 .approve-button {
-  background: rgba(16, 185, 129, 0.12);
-  color: #bff6dd;
+  background: rgba(16, 185, 129, 0.1);
+  color: var(--color-accent-success);
   border: 1px solid rgba(16, 185, 129, 0.28);
 }
 
 .reject-button {
-  background: rgba(245, 158, 11, 0.12);
-  color: #f8d79a;
+  background: rgba(245, 158, 11, 0.1);
+  color: var(--color-accent-warning);
   border: 1px solid rgba(245, 158, 11, 0.28);
 }
 
 .danger-button {
-  background: rgba(239, 68, 68, 0.14);
-  color: #ffd1d1;
+  background: rgba(239, 68, 68, 0.11);
+  color: var(--color-accent-danger);
   border: 1px solid rgba(239, 68, 68, 0.3);
 }
 
 .compare-button {
-  background: rgba(59, 130, 246, 0.12);
-  color: #cfe2ff;
+  background: rgba(59, 130, 246, 0.1);
+  color: #9ec5ff;
   border: 1px solid rgba(59, 130, 246, 0.24);
 }
 
 .quiet-button {
   color: var(--color-text-muted);
-  border-color: rgba(121, 156, 194, 0.1);
-  background: rgba(255, 255, 255, 0.018);
+  border-color: var(--color-border-subtle);
+  background: transparent;
 }
 
-.primary-button:hover,
-.secondary-button:hover,
+.primary-button:hover {
+  border-color: var(--color-accent-primary-strong);
+  background: var(--color-accent-primary-strong);
+  color: var(--color-text-inverse);
+}
+
+.secondary-button:hover {
+  border-color: var(--color-border-normal);
+  background: var(--color-surface-hover);
+}
+
 .ghost-button:hover,
-.approve-button:hover,
-.reject-button:hover,
-.compare-button:hover,
-.danger-button:hover,
-.hero-jump-link:hover,
-.workspace-nav-link:hover,
+.hero-jump-link:hover {
+  border-color: var(--color-border-normal);
+  background: rgba(255, 255, 255, 0.035);
+  color: var(--color-text-primary);
+}
+
+.approve-button:hover {
+  border-color: rgba(16, 185, 129, 0.42);
+  background: rgba(16, 185, 129, 0.16);
+}
+
+.reject-button:hover {
+  border-color: rgba(245, 158, 11, 0.42);
+  background: rgba(245, 158, 11, 0.16);
+}
+
+.danger-button:hover {
+  border-color: rgba(239, 68, 68, 0.46);
+  background: rgba(239, 68, 68, 0.17);
+}
+
+.compare-button:hover {
+  border-color: rgba(59, 130, 246, 0.38);
+  background: rgba(59, 130, 246, 0.15);
+}
+
 .workspace-search-result:hover,
 .utility-action:hover,
 .selectable-card:hover,
 .stack-card.selectable-card:hover,
 .signal-list-item.selectable-card:hover {
-  border-color: var(--color-border-selected);
+  border-color: var(--color-border-normal);
   background: var(--color-surface-hover);
   box-shadow: none;
-}
-
-.ghost-button:hover,
-.secondary-button:hover,
-.selectable-card:hover,
-.signal-list-item.selectable-card:hover,
-.stack-card.selectable-card:hover {
-  border-color: rgba(99, 216, 255, 0.22);
-  background: var(--color-surface-hover);
 }
 
 .workspace-nav-link:hover {
@@ -1128,8 +1182,9 @@ h4,
 .field select:focus-visible,
 .field textarea:focus-visible,
 .checkbox-input:focus-visible {
-  outline: none;
-  box-shadow: var(--shadow-focus);
+  outline: 2px solid var(--color-border-focus);
+  outline-offset: 2px;
+  box-shadow: none;
 }
 
 .field {
@@ -1155,13 +1210,13 @@ h4,
 .field input:hover,
 .field select:hover,
 .field textarea:hover {
-  border-color: rgba(99, 216, 255, 0.18);
+  border-color: var(--color-border-normal);
 }
 
 .field input:focus,
 .field select:focus,
 .field textarea:focus {
-  border-color: rgba(99, 216, 255, 0.32);
+  border-color: var(--color-border-focus);
 }
 
 .field-hint {
@@ -1222,32 +1277,30 @@ h4,
 .status-tag,
 .policy-tag,
 .stage-tag,
-.scenario-type-tag {
-  border-radius: 999px;
-  border: 1px solid transparent;
-  box-shadow: none;
-}
-
-.scenario-type-tag {
-  background: rgba(99, 216, 255, 0.08);
-  color: #b6f2ff;
-  border-color: rgba(99, 216, 255, 0.16);
+.scenario-type-tag,
+.policy-standard,
+.stage-pending-review {
+  background: rgba(59, 130, 246, 0.1);
+  color: #9ec5ff;
+  border-color: rgba(59, 130, 246, 0.22);
 }
 
 .status-success,
-.event-type-tag {
-  background: rgba(80, 216, 171, 0.12);
-  color: #bff9de;
-  border-color: rgba(80, 216, 171, 0.18);
+.event-type-tag,
+.stage-approved,
+.risk-stable {
+  background: rgba(16, 185, 129, 0.1);
+  color: #72dfb8;
+  border-color: rgba(16, 185, 129, 0.24);
 }
 
 .status-partial,
 .severity-medium,
 .priority-medium,
 .stage-pending-final-approval {
-  background: rgba(255, 189, 99, 0.14);
-  color: #ffe3b7;
-  border-color: rgba(255, 189, 99, 0.18);
+  background: rgba(245, 158, 11, 0.1);
+  color: #f7be54;
+  border-color: rgba(245, 158, 11, 0.24);
 }
 
 .status-failure,
@@ -1256,29 +1309,15 @@ h4,
 .priority-critical,
 .priority-high,
 .stage-rejected {
-  background: rgba(255, 127, 127, 0.14);
-  color: #ffd3d7;
-  border-color: rgba(255, 127, 127, 0.18);
-}
-
-.policy-standard,
-.stage-pending-review {
-  background: rgba(99, 216, 255, 0.12);
-  color: #c6f7ff;
-  border-color: rgba(99, 216, 255, 0.18);
-}
-
-.stage-approved,
-.risk-stable {
-  background: rgba(80, 216, 171, 0.12);
-  color: #bff9de;
-  border-color: rgba(80, 216, 171, 0.18);
+  background: rgba(239, 68, 68, 0.1);
+  color: #f98080;
+  border-color: rgba(239, 68, 68, 0.26);
 }
 
 .stage-not-required {
-  background: rgba(153, 171, 192, 0.12);
-  color: #d8e2ee;
-  border-color: rgba(153, 171, 192, 0.18);
+  background: rgba(100, 116, 139, 0.1);
+  color: var(--color-text-secondary);
+  border-color: var(--color-border-subtle);
 }
 
 .status-live,
@@ -1303,7 +1342,7 @@ h4,
 
 .loading-skeleton {
   height: 12px;
-  border-radius: 999px;
+  border-radius: var(--radius-xs);
   background: rgba(104, 115, 131, 0.26);
 }
 
@@ -1316,8 +1355,58 @@ h4,
 }
 
 .empty-state {
-  border: 1px dashed rgba(121, 156, 194, 0.2);
+  border: 1px solid var(--color-border-subtle);
   background: var(--color-surface-data);
+}
+
+/* Shared semantic tone and connection-state primitives. */
+.tone-success,
+.tone-warning,
+.tone-danger,
+.tone-neutral {
+  background: var(--color-surface-supporting);
+}
+
+.tone-success {
+  border-color: rgba(16, 185, 129, 0.26);
+  box-shadow: inset 3px 0 0 var(--color-accent-success);
+}
+
+.tone-warning {
+  border-color: rgba(245, 158, 11, 0.26);
+  box-shadow: inset 3px 0 0 var(--color-accent-warning);
+}
+
+.tone-danger {
+  border-color: rgba(239, 68, 68, 0.28);
+  box-shadow: inset 3px 0 0 var(--color-accent-danger);
+}
+
+.tone-neutral {
+  border-color: var(--color-border-subtle);
+  box-shadow: inset 3px 0 0 var(--color-accent-info);
+}
+
+.live-dot {
+  width: 9px;
+  height: 9px;
+  display: inline-block;
+  flex: 0 0 auto;
+  border-radius: 999px;
+  background: var(--color-accent-success);
+}
+
+.status-connecting,
+.status-reconnecting {
+  background: var(--color-accent-warning);
+}
+
+.status-degraded {
+  background: var(--color-accent-danger);
+}
+
+.status-signed-out {
+  background: var(--color-accent-unavailable);
 }
 
 .workspace-notices {
@@ -1411,8 +1500,9 @@ tbody tr:hover {
 }
 
 .brand-button:focus-visible {
-  outline: none;
-  box-shadow: var(--shadow-focus);
+  outline: 2px solid var(--color-border-focus);
+  outline-offset: 3px;
+  box-shadow: none;
 }
 
 .brand-lockup {
@@ -2172,8 +2262,9 @@ tbody tr:hover {
 }
 
 .field-inline-button:focus-visible {
-  outline: none;
-  box-shadow: var(--shadow-focus);
+  outline: 2px solid var(--color-border-focus);
+  outline-offset: 2px;
+  box-shadow: none;
 }
 
 .field-validation-warning {
@@ -3282,9 +3373,10 @@ tbody tr:hover {
 }
 
 .data-grid-sort:focus-visible {
-  outline: none;
-  box-shadow: var(--shadow-focus);
-  border-radius: 10px;
+  outline: 2px solid var(--color-border-focus);
+  outline-offset: 2px;
+  box-shadow: none;
+  border-radius: var(--radius-xs);
 }
 
 .table-empty-row td {
@@ -3391,7 +3483,7 @@ tbody tr:hover {
 .workspace-shell .summary-card::before,
 .workspace-shell .stack-card::before,
 .workspace-shell .panel::before {
-  background: var(--app-border-quiet);
+  display: none;
 }
 
 .workspace-shell .selectable-card:hover,
@@ -3399,7 +3491,7 @@ tbody tr:hover {
 .workspace-shell .signal-list-item.selectable-card:hover,
 .workspace-shell .dashboard-lane-card:hover,
 .workspace-shell .dashboard-guidance-card:hover {
-  border-color: var(--app-border-selected);
+  border-color: var(--app-border-strong);
   background: var(--app-surface-elevated);
   box-shadow: none;
 }
@@ -3462,16 +3554,37 @@ tbody tr:hover {
   box-shadow: none;
 }
 
-.workspace-shell .primary-button:hover,
+.workspace-shell .primary-button:hover {
+  border-color: var(--color-accent-primary-strong);
+  background: var(--color-accent-primary-strong);
+}
+
 .workspace-shell .secondary-button:hover,
 .workspace-shell .ghost-button:hover,
-.workspace-shell .approve-button:hover,
-.workspace-shell .reject-button:hover,
-.workspace-shell .compare-button:hover,
-.workspace-shell .danger-button:hover,
 .workspace-shell .hero-jump-link:hover {
-  border-color: var(--app-border-selected);
-  box-shadow: none;
+  border-color: var(--app-border-strong);
+  background: var(--app-surface-elevated);
+  color: var(--color-text-primary);
+}
+
+.workspace-shell .approve-button:hover {
+  border-color: rgba(16, 185, 129, 0.42);
+  background: rgba(16, 185, 129, 0.16);
+}
+
+.workspace-shell .reject-button:hover {
+  border-color: rgba(245, 158, 11, 0.42);
+  background: rgba(245, 158, 11, 0.16);
+}
+
+.workspace-shell .compare-button:hover {
+  border-color: rgba(59, 130, 246, 0.38);
+  background: rgba(59, 130, 246, 0.15);
+}
+
+.workspace-shell .danger-button:hover {
+  border-color: rgba(239, 68, 68, 0.46);
+  background: rgba(239, 68, 68, 0.17);
 }
 
 .workspace-shell .utility-state,
