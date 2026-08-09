@@ -68,6 +68,8 @@ html {
 }
 
 body {
+  margin: 0;
+  min-width: 320px;
   font-family: var(--font-sans);
   color: var(--color-text-primary);
   background:
@@ -82,6 +84,7 @@ body {
 }
 
 * {
+  box-sizing: border-box;
   scrollbar-width: thin;
   scrollbar-color: rgba(112, 150, 190, 0.44) rgba(6, 12, 19, 0.42);
 }
@@ -100,6 +103,10 @@ body {
   border-radius: 999px;
   border: 2px solid transparent;
   background-clip: padding-box;
+}
+
+button {
+  font: inherit;
 }
 
 h1,
@@ -236,16 +243,26 @@ h4,
 }
 
 .workspace-shell {
+  display: grid;
+  grid-template-columns: 290px minmax(0, 1fr);
+  min-height: 100vh;
+  position: relative;
+  isolation: isolate;
   background:
     radial-gradient(circle at top left, rgba(99, 216, 255, 0.06), transparent 16%),
     linear-gradient(180deg, rgba(4, 10, 18, 0.98), rgba(7, 13, 22, 0.98));
 }
 
 .workspace-sidebar {
+  position: sticky;
+  top: 0;
+  min-height: 100vh;
   display: grid;
   gap: 18px;
   align-content: start;
   padding: 24px 20px;
+  border-right: 1px solid rgba(121, 156, 194, 0.12);
+  z-index: 1;
 }
 
 .workspace-sidebar-header,
@@ -463,6 +480,80 @@ h4,
   padding: 0 12px;
 }
 
+.workspace-topbar-search {
+  position: relative;
+  width: 100%;
+}
+
+.workspace-search-field {
+  width: 100%;
+  min-width: 0;
+}
+
+.workspace-search-results {
+  position: absolute;
+  top: calc(100% + 8px);
+  left: 0;
+  right: 0;
+  z-index: 5;
+  display: grid;
+  gap: 8px;
+  max-height: min(60vh, 560px);
+  overflow-y: auto;
+  padding: 12px;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--color-border-subtle);
+  background: rgba(14, 26, 41, 0.98);
+  box-shadow: var(--shadow-raised);
+}
+
+.workspace-search-results-header,
+.workspace-search-group-title {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.workspace-search-shortcuts,
+.workspace-command-bar,
+.workspace-status-strip,
+.workspace-topbar-controls {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.workspace-search-shortcuts,
+.workspace-command-bar,
+.workspace-status-strip,
+.workspace-topbar-controls {
+  justify-content: flex-end;
+}
+
+.workspace-search-group {
+  display: grid;
+  gap: 8px;
+}
+
+.workspace-search-clear {
+  min-height: 32px;
+  padding: 0 12px;
+}
+
+.workspace-shortcut-chip {
+  display: inline-flex;
+  align-items: center;
+  min-height: 28px;
+  padding: 0 10px;
+  border-radius: 999px;
+  border: 1px solid rgba(121, 156, 194, 0.12);
+  background: rgba(255, 255, 255, 0.025);
+  color: var(--color-text-muted);
+  font-size: 0.75rem;
+  letter-spacing: 0.04em;
+}
+
 .topbar-refresh-button {
   order: -1;
 }
@@ -475,13 +566,162 @@ h4,
 }
 
 .command-hero {
+  display: grid;
+  grid-template-columns: minmax(0, 1.5fr) minmax(280px, 0.85fr);
+  gap: 20px;
   border-radius: var(--radius-xl);
   padding: var(--space-major);
+  position: relative;
+  overflow: hidden;
+}
+
+.command-hero-copy .hero-copy {
+  color: var(--color-text-secondary);
+}
+
+.command-hero-aside {
+  display: flex;
+}
+
+.command-hero-panel {
+  width: 100%;
+  display: grid;
+  gap: 14px;
+  padding: 22px;
+  border-radius: var(--radius-lg);
+}
+
+.command-hero-panel h3 {
+  margin: 0;
+  font-size: 1.4rem;
 }
 
 .page-intro-panel {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 18px;
+  position: relative;
+  overflow: hidden;
   border-radius: var(--radius-lg);
   padding: 22px 24px;
+}
+
+.workspace-body {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 320px;
+  gap: 22px;
+  align-items: start;
+}
+
+.workspace-content {
+  min-width: 0;
+  display: grid;
+}
+
+.workspace-utility-rail {
+  position: sticky;
+  top: 24px;
+  display: grid;
+  gap: 16px;
+}
+
+.page-intro-tags,
+.utility-card-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.page-intro-tags {
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+
+.utility-card {
+  display: grid;
+  gap: 14px;
+  padding: 18px;
+  border-radius: var(--radius-md);
+}
+
+.utility-action {
+  width: 100%;
+  padding: 14px;
+  text-align: left;
+  cursor: pointer;
+}
+
+.utility-action span,
+.utility-timeline-item span {
+  display: block;
+}
+
+.utility-action strong,
+.utility-timeline-item strong,
+.command-hero-metrics strong,
+.utility-metric-grid strong {
+  display: block;
+  margin-top: 6px;
+}
+
+.utility-action p,
+.utility-timeline-item p {
+  margin: 6px 0 0;
+}
+
+.utility-timeline {
+  display: grid;
+  gap: 12px;
+}
+
+.utility-timeline-item {
+  padding-left: 16px;
+  border-left: 1px solid rgba(99, 216, 255, 0.14);
+}
+
+.command-hero-metrics div,
+.utility-metric-grid div {
+  padding: 14px;
+  border-radius: var(--radius-sm);
+  border: 1px solid rgba(121, 156, 194, 0.08);
+  background: rgba(255, 255, 255, 0.03);
+}
+
+.command-hero-metrics span,
+.utility-metric-grid span {
+  display: block;
+  font-size: 0.72rem;
+  text-transform: uppercase;
+  letter-spacing: 0.14em;
+  color: var(--color-text-muted);
+}
+
+#dashboard-act-now,
+#dashboard-live-state,
+#alerts-feed,
+#alerts-response,
+#recommendations-lanes,
+#recommendations-focus,
+#orders-stream,
+#orders-focus,
+#inventory-spotlight,
+#inventory-focus,
+#runtime-health,
+#runtime-incident-lane,
+#audit-events,
+#audit-logs,
+#settings-profile,
+#settings-security,
+#settings-connectors,
+#platform-portfolio,
+#platform-focus,
+#releases-builds,
+#releases-checklist,
+#workspace-trust-rail,
+#workspace-page-focus {
+  scroll-margin-top: 112px;
 }
 
 .summary-grid,
@@ -987,24 +1227,6 @@ h4,
 .empty-state {
   border: 1px dashed rgba(121, 156, 194, 0.2);
   background: linear-gradient(180deg, rgba(13, 22, 35, 0.62), rgba(9, 17, 28, 0.84));
-}
-
-.empty-state::before {
-  content: "Ready";
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: fit-content;
-  min-height: 28px;
-  padding: 0 12px;
-  border-radius: 999px;
-  background: rgba(99, 216, 255, 0.08);
-  border: 1px solid rgba(99, 216, 255, 0.14);
-  color: #c8f8ff;
-  font-size: 0.76rem;
-  font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: 0.12em;
 }
 
 .workspace-notices {
@@ -2224,7 +2446,7 @@ tbody tr:hover {
 .dashboard-state-copy {
   max-width: 58ch;
   font-size: 1rem;
-  color: var(--color-text);
+  color: var(--color-text-secondary);
 }
 
 .dashboard-health-strip {
