@@ -750,7 +750,7 @@ h4,
 
 .summary-card {
   background: linear-gradient(180deg, rgba(17, 32, 50, 0.94), rgba(10, 19, 32, 0.96));
-  overflow: hidden;
+  overflow: visible;
 }
 
 .summary-card::before,
@@ -774,12 +774,11 @@ h4,
 }
 
 .metric-card-note {
-  display: -webkit-box;
+  display: block;
   margin: 10px 0 0;
-  overflow: hidden;
+  overflow: visible;
   line-height: 1.45;
-  -webkit-box-orient: vertical;
-  -webkit-line-clamp: 2;
+  -webkit-line-clamp: unset;
 }
 
 .panel-header-actions {
@@ -1101,13 +1100,12 @@ h4,
 }
 
 .workspace-topbar-copy {
-  display: -webkit-box;
+  display: block;
   max-width: 58ch;
-  overflow: hidden;
+  overflow: visible;
   font-size: 0.95rem;
   line-height: 1.45;
-  -webkit-box-orient: vertical;
-  -webkit-line-clamp: 2;
+  -webkit-line-clamp: unset;
 }
 
 .panel-header h2,
@@ -2882,6 +2880,11 @@ tbody tr:hover {
   grid-template-columns: minmax(420px, 1.12fr) minmax(320px, 0.88fr);
 }
 
+.catalog-review-workbench > .section-card {
+  min-width: 0;
+  max-width: 100%;
+}
+
 .catalog-field-group,
 .catalog-import-steps {
   display: grid;
@@ -3126,6 +3129,9 @@ tbody tr:hover {
 }
 
 .data-grid {
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
   overflow: auto;
   border-radius: var(--radius-md);
   border: 1px solid rgba(121, 156, 194, 0.14);
@@ -3935,10 +3941,18 @@ tbody tr:hover {
   .workspace-body,
   .workspace-content,
   .content-grid,
+  .dashboard-response-panel,
+  .dashboard-response-grid,
+  .dashboard-response-panel .section-card,
+  .dashboard-response-panel .stack-title-row,
   .catalog-workflow-grid,
   .catalog-review-workbench {
     min-width: 0;
     max-width: 100%;
+  }
+
+  .dashboard-response-panel .stack-title-row {
+    flex-wrap: wrap;
   }
 
   .workspace-shell .workspace-meta-pill,

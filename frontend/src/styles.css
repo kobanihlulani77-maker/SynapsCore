@@ -125,6 +125,7 @@
 .summary-value {
   display: block;
   margin-top: 16px;
+  overflow-wrap: anywhere;
 }
 
 .content-grid {
@@ -523,6 +524,10 @@
   }
 
   .summary-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .compact-summary-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
@@ -961,6 +966,12 @@
 
   .workspace-nav-link {
     padding: 11px 12px;
+  }
+}
+
+@media (max-width: 430px) {
+  .compact-summary-grid {
+    grid-template-columns: 1fr;
   }
 }
 
