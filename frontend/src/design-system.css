@@ -4984,3 +4984,1162 @@ tbody tr:hover,
     transition-duration: 0.01ms;
   }
 }
+
+/* ======================================================================
+   SYNAPSCORE STRUCTURAL ARCHITECTURE — CSS SPECIALIST REBUILD
+   ----------------------------------------------------------------------
+   Purpose:
+   - keep the accepted operational visual language
+   - completely recalibrate how the application sits in space
+   - establish one predictable shell, one density rhythm, and deliberate
+     master/detail composition across laptop, tablet, and mobile
+   - make pages inherit structure instead of fighting per-route CSS
+   ====================================================================== */
+
+:root {
+  --layout-sidebar: 260px;
+  --layout-content-max: 1680px;
+  --layout-page-x: 28px;
+  --layout-page-y: 20px;
+  --layout-topbar-min: 58px;
+  --layout-rail: 272px;
+  --layout-gap-1: 6px;
+  --layout-gap-2: 10px;
+  --layout-gap-3: 14px;
+  --layout-gap-4: 18px;
+  --layout-gap-5: 24px;
+  --layout-panel-pad: 16px;
+  --layout-panel-pad-lg: 18px;
+}
+
+/* --- Application viewport ------------------------------------------- */
+
+body {
+  overflow: hidden;
+}
+
+.workspace-shell {
+  width: 100%;
+  height: 100vh;
+  min-height: 100vh;
+  display: grid;
+  grid-template-columns: var(--layout-sidebar) minmax(0, 1fr);
+  background: var(--color-bg-canvas);
+  overflow: hidden;
+}
+
+/* Sidebar is a true navigation rail, not a stack of cards. */
+.workspace-sidebar {
+  position: relative;
+  top: auto;
+  width: var(--layout-sidebar);
+  height: 100vh;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  padding: 20px 14px 16px;
+  background: var(--color-bg-rail);
+  border-right: 1px solid var(--color-border-subtle);
+  z-index: 20;
+}
+
+.workspace-sidebar-header {
+  flex: 0 0 auto;
+  display: grid;
+  gap: 14px;
+}
+
+.workspace-brand,
+.brand-lockup {
+  min-width: 0;
+}
+
+.brand-lockup {
+  gap: 10px;
+}
+
+.brand-mark {
+  flex: 0 0 auto;
+}
+
+.workspace-switcher {
+  display: grid;
+  gap: 5px;
+  padding: 10px 10px;
+  border: 1px solid var(--color-border-subtle);
+  border-radius: var(--radius-md);
+  background: rgba(255, 255, 255, 0.018);
+}
+
+.workspace-switcher-meta {
+  gap: 4px;
+}
+
+.workspace-meta-pill {
+  min-height: 22px;
+  padding: 2px 6px;
+  border-radius: var(--radius-sm);
+  font-size: 0.68rem;
+}
+
+/* Navigation rhythm is compact and intentionally left aligned. */
+.workspace-nav {
+  flex: 1 1 auto;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.workspace-nav-group {
+  display: grid;
+  gap: 5px;
+}
+
+.workspace-nav-group-header {
+  min-height: 22px;
+  padding: 0 8px;
+}
+
+.workspace-nav-group-header span,
+.workspace-nav-group > p {
+  font-size: 0.66rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.workspace-nav-links {
+  display: grid;
+  gap: 2px;
+}
+
+.workspace-nav-link {
+  width: 100%;
+  min-height: 38px;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 9px;
+  border: 1px solid transparent;
+  border-radius: var(--radius-sm);
+  background: transparent;
+}
+
+.workspace-nav-link-copy {
+  min-width: 0;
+  display: block;
+}
+
+.workspace-nav-link-copy strong,
+.workspace-nav-link-copy span {
+  display: block;
+  overflow: hidden;
+  color: inherit;
+  font-size: 0.82rem;
+  line-height: 1.25;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.workspace-nav-link-copy small {
+  display: none;
+}
+
+.workspace-nav-link > strong {
+  min-width: 22px;
+  min-height: 20px;
+  padding: 1px 5px;
+  border: 0;
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.045);
+  color: var(--color-text-muted);
+  font-size: 0.66rem;
+  line-height: 18px;
+}
+
+.workspace-nav-link-active {
+  border-color: transparent;
+  background: var(--color-surface-elevated);
+  color: var(--color-text-primary);
+  box-shadow: inset 2px 0 0 var(--color-accent-primary);
+}
+
+.workspace-nav-link-active > strong {
+  color: var(--color-accent-primary);
+  background: rgba(0, 180, 216, 0.08);
+}
+
+.workspace-sidebar-footer {
+  flex: 0 0 auto;
+  display: grid;
+  gap: 10px;
+  margin-top: auto;
+  padding-top: 14px;
+  border-top: 1px solid var(--color-border-subtle);
+}
+
+.workspace-sidebar-status {
+  gap: 8px;
+}
+
+.workspace-sidebar-quick-actions {
+  gap: 6px;
+}
+
+/* --- Main scroll surface -------------------------------------------- */
+
+.workspace-frame {
+  width: 100%;
+  height: 100vh;
+  min-width: 0;
+  max-width: none;
+  overflow-y: auto;
+  overflow-x: hidden;
+  overscroll-behavior: contain;
+  margin: 0;
+  padding: 0 var(--layout-page-x) 36px;
+  background: var(--color-bg-canvas);
+  scrollbar-gutter: stable;
+}
+
+/* Topbar becomes a compact control strip, not a large dashboard card. */
+.workspace-topbar {
+  position: sticky;
+  top: 0;
+  z-index: 18;
+  width: 100%;
+  min-height: var(--layout-topbar-min);
+  margin: 0 0 var(--layout-gap-4);
+  padding: 14px 0 12px;
+  display: grid;
+  grid-template-columns: minmax(220px, 0.7fr) minmax(0, 1.3fr);
+  gap: 16px;
+  align-items: center;
+  border: 0;
+  border-bottom: 1px solid var(--color-border-subtle);
+  border-radius: 0;
+  background: rgba(10, 13, 17, 0.97);
+  box-shadow: none;
+}
+
+.workspace-topbar-primary {
+  min-width: 0;
+  display: grid;
+  gap: 3px;
+  align-content: center;
+}
+
+.workspace-topbar h1 {
+  max-width: none;
+  margin: 0;
+  font-size: clamp(1.08rem, 1.2vw, 1.34rem);
+  line-height: 1.2;
+}
+
+.workspace-topbar-copy {
+  max-width: 68ch;
+  margin: 0;
+  font-size: 0.78rem;
+  line-height: 1.35;
+}
+
+.workspace-topbar-actions {
+  min-width: 0;
+  display: grid;
+  grid-template-columns: minmax(220px, 1fr) auto;
+  gap: 10px;
+  align-items: center;
+}
+
+.workspace-topbar-search {
+  min-width: 0;
+  width: 100%;
+}
+
+.workspace-topbar-utility {
+  min-width: 0;
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  align-items: center;
+  gap: 8px;
+}
+
+.workspace-topbar-statusline,
+.workspace-status-strip,
+.workspace-command-bar,
+.workspace-topbar-controls,
+.workspace-search-shortcuts {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 6px;
+  margin: 0;
+}
+
+.workspace-topbar-controls .ghost-button,
+.workspace-topbar-controls .secondary-button,
+.workspace-command-bar .ghost-button,
+.workspace-command-bar .secondary-button {
+  min-height: 32px;
+  padding-inline: 9px;
+  font-size: 0.74rem;
+}
+
+.workspace-identity-card,
+.workspace-compact-identity {
+  min-width: 0;
+  min-height: 28px;
+  padding: 0 0 0 10px;
+  border: 0;
+  border-left: 1px solid var(--color-border-subtle);
+  border-radius: 0;
+  background: transparent;
+}
+
+.workspace-identity-card span,
+.workspace-compact-identity span {
+  margin-bottom: 1px;
+  font-size: 0.62rem;
+}
+
+.workspace-identity-card strong,
+.workspace-compact-identity strong {
+  font-size: 0.74rem;
+}
+
+.workspace-compact-identity small {
+  margin-top: 0;
+  font-size: 0.66rem;
+}
+
+/* --- Page canvas ----------------------------------------------------- */
+
+.workspace-body {
+  width: min(100%, var(--layout-content-max));
+  margin: 0 auto;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: var(--layout-gap-4);
+  align-items: start;
+}
+
+.workspace-content {
+  min-width: 0;
+  width: 100%;
+  display: grid;
+  align-content: start;
+  gap: var(--layout-gap-4);
+}
+
+.workspace-content > * {
+  min-width: 0;
+}
+
+/* At normal laptop widths the utility rail becomes supporting content
+   below the work area instead of stealing a permanent right column. */
+.workspace-utility-rail {
+  position: static;
+  width: 100%;
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: var(--layout-gap-3);
+  align-items: stretch;
+  margin-top: 2px;
+}
+
+.workspace-utility-rail .utility-card {
+  min-width: 0;
+  height: 100%;
+  padding: 14px;
+}
+
+.utility-card-header,
+.page-intro-tags {
+  gap: 8px;
+}
+
+.utility-action {
+  padding: 9px 0;
+  border: 0;
+  border-bottom: 1px solid var(--color-border-subtle);
+  border-radius: 0;
+  background: transparent;
+}
+
+.utility-action:last-child {
+  border-bottom: 0;
+}
+
+/* Only very wide monitors keep a persistent support rail. */
+@media (min-width: 1540px) {
+  .workspace-body {
+    grid-template-columns: minmax(0, 1fr) var(--layout-rail);
+    gap: 22px;
+  }
+
+  .workspace-utility-rail {
+    position: sticky;
+    top: calc(var(--layout-topbar-min) + 24px);
+    grid-template-columns: 1fr;
+    margin-top: 0;
+  }
+}
+
+/* --- Shared layout rhythm ------------------------------------------- */
+
+.summary-grid,
+.compact-summary-grid,
+.content-grid,
+.experience-grid,
+.stack-list,
+.signal-list,
+.command-hero-metrics,
+.utility-metric-grid,
+.approval-board,
+.recommendation-board,
+.inventory-spotlight-grid,
+.dashboard-health-strip,
+.dashboard-signal-grid,
+.dashboard-lane-grid,
+.dashboard-response-grid,
+.dashboard-attention-list {
+  gap: var(--layout-gap-3);
+}
+
+.summary-grid {
+  grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
+  margin-top: 0;
+}
+
+.compact-summary-grid {
+  grid-template-columns: repeat(4, minmax(150px, 1fr));
+}
+
+.content-grid {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  margin-top: 0;
+}
+
+.panel,
+.summary-card,
+.metric-card,
+.stack-card,
+.utility-card,
+.signal-list-item,
+.empty-state,
+.loading-state,
+.section-card {
+  min-width: 0;
+}
+
+.panel,
+.section-card {
+  padding: var(--layout-panel-pad-lg);
+}
+
+.summary-card,
+.metric-card,
+.stack-card,
+.utility-card,
+.signal-list-item,
+.empty-state,
+.loading-state {
+  padding: var(--layout-panel-pad);
+}
+
+.panel-header,
+.stack-title-row {
+  min-width: 0;
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.panel-header > :first-child,
+.stack-title-row > :first-child {
+  min-width: 0;
+}
+
+.panel-header-actions,
+.history-action-row,
+.control-row,
+.demo-action-row,
+.preset-chip-row,
+.filter-chip-row {
+  gap: 8px;
+}
+
+/* Heroes become compact operational headers. */
+.command-hero,
+.page-intro-panel,
+.dashboard-command-header,
+.ops-command-hero,
+.runtime-decision-hero,
+.workflow-decision-hero,
+.daily-ops-hero,
+.catalog-admin-hero,
+.attention-ops-hero,
+.recommendation-decision-hero,
+.connector-trust-hero,
+.admin-trust-hero,
+.platform-admin-hero,
+.release-trust-hero,
+.config-trust-hero {
+  min-width: 0;
+  min-height: 0;
+  margin: 0;
+  padding: 16px 18px;
+  gap: 16px;
+  border-radius: var(--radius-md);
+}
+
+.command-hero,
+.ops-command-hero,
+.runtime-decision-hero,
+.workflow-decision-hero,
+.daily-ops-hero,
+.catalog-admin-hero {
+  grid-template-columns: minmax(0, 1.25fr) minmax(260px, 0.75fr);
+  align-items: start;
+}
+
+.page-intro-panel {
+  align-items: flex-start;
+}
+
+.command-hero-copy,
+.ops-command-copy,
+.runtime-decision-copy,
+.workflow-decision-copy,
+.dashboard-command-identity {
+  max-width: 72ch;
+}
+
+.command-hero-aside,
+.ops-command-actions,
+.runtime-decision-factors,
+.workflow-action-console {
+  min-width: 0;
+}
+
+/* Metrics should scan horizontally and remain modest in height. */
+.metric-card,
+.dashboard-signal-card {
+  min-height: 96px;
+}
+
+.summary-value {
+  margin-top: 8px;
+}
+
+.command-hero-metrics,
+.utility-metric-grid {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.command-hero-metrics div,
+.utility-metric-grid div,
+.warehouse-stat-grid div {
+  min-width: 0;
+}
+
+/* Lists are dense operational records, not floating feature cards. */
+.stack-list,
+.signal-list,
+.compact-stack-list {
+  display: grid;
+  gap: 6px;
+}
+
+.stack-card,
+.signal-list-item.selectable-card,
+.attention-queue-card,
+.recommendation-decision-card {
+  min-height: 0;
+}
+
+.signal-list-item.selectable-card,
+.daily-ops-workbench .signal-list-item.selectable-card,
+.daily-priority-grid .signal-list-item.selectable-card {
+  padding: 11px 12px;
+}
+
+/* --- Workbench composition ------------------------------------------ */
+
+.dashboard-operational-answer {
+  grid-template-columns: minmax(300px, 0.86fr) minmax(0, 1.14fr);
+  gap: var(--layout-gap-3);
+}
+
+.dashboard-command-header {
+  align-items: start;
+}
+
+.dashboard-health-strip {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.dashboard-signal-grid {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  margin: 0;
+}
+
+.dashboard-attention-list {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.dashboard-attention-item,
+.dashboard-attention-clear {
+  min-height: 104px;
+}
+
+.dashboard-operations-grid {
+  grid-template-columns: minmax(0, 1.45fr) minmax(280px, 0.55fr);
+}
+
+.dashboard-activity-grid {
+  grid-template-columns: minmax(0, 1.35fr) repeat(2, minmax(220px, 0.65fr));
+}
+
+.replay-workbench-grid,
+.scenario-history-workbench {
+  grid-template-columns: minmax(280px, 0.72fr) minmax(0, 1.28fr);
+  gap: var(--layout-gap-3);
+  align-items: start;
+}
+
+.workflow-evidence-grid {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.workflow-action-band {
+  grid-template-columns: minmax(0, 1fr) auto;
+}
+
+.approval-priority-grid,
+.approval-history-grid {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--layout-gap-3);
+}
+
+.approval-priority-card {
+  min-height: 0;
+}
+
+.scenario-planner-workflow {
+  grid-template-columns: minmax(240px, 0.52fr) minmax(0, 1.48fr);
+  gap: var(--layout-gap-3);
+}
+
+.scenario-filter-rail {
+  position: sticky;
+  top: calc(var(--layout-topbar-min) + 24px);
+}
+
+.daily-ops-workbench {
+  grid-template-columns: minmax(300px, 0.78fr) minmax(0, 1.22fr);
+  gap: var(--layout-gap-3);
+}
+
+.daily-priority-grid {
+  grid-template-columns: minmax(0, 1.28fr) minmax(280px, 0.72fr);
+  gap: var(--layout-gap-3);
+}
+
+.catalog-workflow-grid {
+  grid-template-columns: repeat(2, minmax(0, 1fr)) minmax(240px, 0.7fr);
+  gap: var(--layout-gap-3);
+}
+
+.catalog-review-workbench {
+  grid-template-columns: minmax(0, 1.25fr) minmax(300px, 0.75fr);
+  gap: var(--layout-gap-3);
+}
+
+.inventory-spotlight-grid,
+.recommendation-board {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.approval-status-grid {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
+/* --- Forms / filters ------------------------------------------------ */
+
+.session-control-row {
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 10px;
+}
+
+.history-filter-bar {
+  gap: 10px;
+  margin-bottom: 14px;
+}
+
+.history-filter-grid {
+  grid-template-columns: repeat(3, minmax(160px, 1fr));
+  gap: 10px;
+}
+
+.planner-controls {
+  grid-template-columns: minmax(220px, 0.8fr) minmax(0, 1.2fr);
+  gap: 12px;
+}
+
+.planner-line-grid {
+  grid-template-columns: minmax(0, 1.4fr) minmax(110px, 0.45fr) minmax(130px, 0.55fr);
+  gap: 10px;
+}
+
+.planner-lines,
+.planner-compare-grid,
+.comparison-grid {
+  gap: 12px;
+}
+
+/* --- Data surfaces -------------------------------------------------- */
+
+.data-grid {
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+}
+
+.data-grid-table th,
+.data-grid-table td {
+  padding: 9px 10px;
+}
+
+.data-grid-table tbody tr {
+  min-height: 36px;
+}
+
+.table-shell {
+  width: 100%;
+  min-width: 0;
+  overflow-x: auto;
+}
+
+/* --- Public shell: same system, more breathing room ----------------- */
+
+.public-shell {
+  width: 100%;
+  min-width: 320px;
+  padding: 0 28px 44px;
+}
+
+.public-topbar {
+  width: min(100%, 1220px);
+  min-height: 64px;
+  margin: 0 auto;
+  padding: 14px 0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 18px;
+  border: 0;
+  border-bottom: 1px solid var(--public-border-quiet);
+  border-radius: 0;
+  background: transparent;
+}
+
+.public-nav {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.public-section-shell,
+.public-story-grid,
+.public-cta-banner {
+  width: min(100%, 1220px);
+  max-width: 1220px;
+  margin-right: auto;
+  margin-left: auto;
+}
+
+.public-hero,
+.enterprise-public-hero {
+  width: min(100%, 1220px);
+  margin: 0 auto;
+  grid-template-columns: minmax(0, 1.2fr) minmax(320px, 0.8fr);
+  gap: 28px;
+  padding: 44px 0 18px;
+  align-items: start;
+}
+
+.public-section-shell {
+  gap: 18px;
+  margin-top: 46px;
+}
+
+.public-section-shell-split {
+  grid-template-columns: minmax(0, 0.8fr) minmax(0, 1.2fr);
+  gap: 30px;
+}
+
+.public-card-grid,
+.public-command-grid {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.public-card-grid-wide {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
+.public-card-grid-two,
+.public-feature-grid,
+.public-boundary-list,
+.public-audience-list {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.enterprise-signin-shell {
+  width: min(100%, 1060px);
+  margin: 32px auto 0;
+  grid-template-columns: minmax(0, 0.72fr) minmax(420px, 1.28fr);
+  gap: 32px;
+  align-items: start;
+}
+
+.workspace-wizard-shell {
+  width: min(100%, 1120px);
+  margin: 26px auto 0;
+  grid-template-columns: minmax(240px, 0.62fr) minmax(0, 1.38fr);
+  gap: 18px;
+}
+
+/* --- Responsive architecture --------------------------------------- */
+
+@media (max-width: 1280px) {
+  :root {
+    --layout-page-x: 22px;
+  }
+
+  .workspace-utility-rail {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .dashboard-activity-grid {
+    grid-template-columns: minmax(0, 1fr) minmax(240px, 0.72fr);
+  }
+
+  .dashboard-activity-grid > :last-child {
+    grid-column: 1 / -1;
+  }
+
+  .catalog-workflow-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .catalog-workflow-grid > :last-child {
+    grid-column: 1 / -1;
+  }
+}
+
+@media (max-width: 1024px) {
+  body {
+    overflow: auto;
+  }
+
+  .workspace-shell {
+    height: auto;
+    min-height: 100vh;
+    grid-template-columns: 1fr;
+    overflow: visible;
+  }
+
+  .workspace-sidebar {
+    width: 100%;
+    height: auto;
+    min-height: 0;
+    overflow: visible;
+    display: grid;
+    grid-template-columns: minmax(210px, 0.7fr) minmax(0, 1.3fr);
+    gap: 14px 22px;
+    padding: 14px 18px;
+    border-right: 0;
+    border-bottom: 1px solid var(--color-border-subtle);
+  }
+
+  .workspace-sidebar-header {
+    grid-column: 1;
+  }
+
+  .workspace-nav {
+    grid-column: 2;
+    grid-row: 1 / span 2;
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 10px 12px;
+  }
+
+  .workspace-sidebar-footer {
+    grid-column: 1;
+    margin-top: 0;
+  }
+
+  .workspace-frame {
+    height: auto;
+    min-height: 0;
+    overflow: visible;
+  }
+
+  .workspace-topbar {
+    position: relative;
+    top: auto;
+    grid-template-columns: 1fr;
+    padding-top: 14px;
+  }
+
+  .workspace-topbar-actions {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .workspace-topbar-utility,
+  .workspace-topbar-statusline,
+  .workspace-status-strip,
+  .workspace-command-bar,
+  .workspace-topbar-controls {
+    justify-content: flex-start;
+  }
+
+  .workspace-identity-card,
+  .workspace-compact-identity {
+    padding: 0;
+    border-left: 0;
+  }
+
+  .command-hero,
+  .ops-command-hero,
+  .runtime-decision-hero,
+  .workflow-decision-hero,
+  .daily-ops-hero,
+  .catalog-admin-hero,
+  .dashboard-operational-answer,
+  .dashboard-operations-grid,
+  .dashboard-activity-grid,
+  .replay-workbench-grid,
+  .scenario-history-workbench,
+  .scenario-planner-workflow,
+  .daily-ops-workbench,
+  .daily-priority-grid,
+  .catalog-review-workbench {
+    grid-template-columns: 1fr;
+  }
+
+  .scenario-filter-rail {
+    position: static;
+  }
+
+  .dashboard-activity-grid > :last-child {
+    grid-column: auto;
+  }
+
+  .dashboard-signal-grid,
+  .approval-status-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .public-hero,
+  .enterprise-public-hero,
+  .public-section-shell-split,
+  .enterprise-signin-shell,
+  .workspace-wizard-shell {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 720px) {
+  :root {
+    --layout-page-x: 14px;
+    --layout-gap-3: 12px;
+    --layout-gap-4: 14px;
+  }
+
+  .workspace-sidebar {
+    grid-template-columns: 1fr;
+    gap: 10px;
+    padding: 12px;
+  }
+
+  .workspace-sidebar-header,
+  .workspace-nav,
+  .workspace-sidebar-footer {
+    grid-column: 1;
+    grid-row: auto;
+  }
+
+  .workspace-nav {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 6px;
+  }
+
+  .workspace-nav-group {
+    gap: 3px;
+  }
+
+  .workspace-nav-group-header {
+    padding-inline: 5px;
+  }
+
+  .workspace-nav-link {
+    min-height: 36px;
+    padding: 7px 8px;
+  }
+
+  .workspace-sidebar-footer {
+    padding-top: 10px;
+  }
+
+  .workspace-topbar {
+    gap: 10px;
+    margin-bottom: 12px;
+    padding-bottom: 10px;
+  }
+
+  .workspace-topbar-actions,
+  .workspace-topbar-utility {
+    display: grid;
+    grid-template-columns: 1fr;
+  }
+
+  .workspace-topbar-controls,
+  .workspace-command-bar,
+  .workspace-status-strip,
+  .workspace-topbar-statusline {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 6px;
+  }
+
+  .workspace-topbar-controls > *,
+  .workspace-command-bar > * {
+    width: 100%;
+  }
+
+  .workspace-utility-rail,
+  .summary-grid,
+  .compact-summary-grid,
+  .content-grid,
+  .dashboard-health-strip,
+  .dashboard-signal-grid,
+  .dashboard-attention-list,
+  .dashboard-lane-grid,
+  .dashboard-response-grid,
+  .runtime-decision-factors,
+  .workflow-evidence-grid,
+  .approval-priority-grid,
+  .approval-history-grid,
+  .inventory-spotlight-grid,
+  .recommendation-board,
+  .approval-status-grid,
+  .history-filter-grid,
+  .planner-controls,
+  .planner-line-grid,
+  .catalog-workflow-grid,
+  .public-card-grid,
+  .public-card-grid-wide,
+  .public-card-grid-two,
+  .public-feature-grid,
+  .public-boundary-list,
+  .public-audience-list,
+  .public-proof-ledger,
+  .public-workspace-path,
+  .workspace-wizard-grid,
+  .workspace-review-grid,
+  .workspace-next-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .catalog-workflow-grid > :last-child {
+    grid-column: auto;
+  }
+
+  .workflow-action-band {
+    grid-template-columns: 1fr;
+  }
+
+  .panel,
+  .section-card,
+  .command-hero,
+  .page-intro-panel,
+  .dashboard-command-header,
+  .ops-command-hero,
+  .runtime-decision-hero,
+  .workflow-decision-hero,
+  .daily-ops-hero,
+  .catalog-admin-hero {
+    padding: 14px;
+  }
+
+  .public-shell {
+    padding-inline: 14px;
+  }
+
+  .public-topbar {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .public-nav {
+    width: 100%;
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .public-nav .primary-button {
+    grid-column: 1 / -1;
+  }
+
+  .public-hero,
+  .enterprise-public-hero {
+    padding-top: 24px;
+  }
+
+  .public-section-shell {
+    margin-top: 34px;
+  }
+}
+
+@media (max-width: 430px) {
+  .workspace-nav {
+    grid-template-columns: 1fr;
+  }
+
+  .workspace-topbar-controls,
+  .workspace-command-bar,
+  .workspace-status-strip,
+  .workspace-topbar-statusline {
+    grid-template-columns: 1fr;
+  }
+
+  .public-nav {
+    grid-template-columns: 1fr;
+  }
+
+  .public-nav .primary-button {
+    grid-column: auto;
+  }
+
+  .data-grid-table {
+    min-width: 520px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .workspace-search-results,
+  .live-dot {
+    animation: none;
+  }
+}
