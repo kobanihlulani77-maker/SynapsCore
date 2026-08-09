@@ -1,9 +1,8 @@
 /*
- * Legacy bridge stylesheet.
- * design-system.css owns the active tokens, reusable surface patterns, shared
- * form controls, badges, and command-center visual system.
- * Keep only page-specific layout helpers and older route-specific hooks here
- * until they can be consolidated route-by-route without proof risk.
+ * SynapseCore route-composition layer.
+ * design-system.css owns the visual theme, tokens, shell, shared components,
+ * controls, data surfaces, semantic state and shared responsive behavior.
+ * This file owns page/workflow geometry only and uses design-system tokens.
  */
 .hero-highlight-grid {
   display: grid;
@@ -23,7 +22,7 @@
   display: inline-block;
   margin-bottom: 10px;
   text-transform: uppercase;
-  letter-spacing: 0.08em;
+  letter-spacing: 0.04em;
   font-size: 0.76rem;
   color: var(--color-text-muted);
 }
@@ -94,17 +93,17 @@
   min-width: 0;
 }
 
-.alert-badge { background: rgba(239, 68, 68, 0.14); color: #ffd1d1; }
-.recommendation-badge { background: rgba(16, 185, 129, 0.12); color: #bff6dd; }
-.inventory-badge { background: rgba(59, 130, 246, 0.12); color: #cfe2ff; }
-.order-badge { background: rgba(245, 158, 11, 0.12); color: #f8d79a; }
-.fulfillment-badge { background: rgba(0, 168, 199, 0.12); color: #bdefff; }
-.event-badge { background: rgba(59, 130, 246, 0.12); color: #cfe2ff; }
-.audit-badge { background: rgba(100, 116, 139, 0.14); color: #d4e2ee; }
-.integration-badge { background: rgba(0, 168, 199, 0.12); color: #bdefff; }
-.notification-badge { background: rgba(239, 68, 68, 0.14); color: #ffd1d1; }
-.planner-badge { background: rgba(59, 130, 246, 0.12); color: #cfe2ff; }
-.scenario-badge { background: rgba(0, 168, 199, 0.12); color: #bdefff; }
+.alert-badge { background: var(--color-danger-muted); color: var(--color-danger-text); }
+.recommendation-badge { background: var(--color-success-muted); color: var(--color-success-text); }
+.inventory-badge { background: var(--color-info-muted); color: var(--color-info-text); }
+.order-badge { background: var(--color-warning-muted); color: var(--color-warning-text); }
+.fulfillment-badge { background: rgba(34, 175, 198, 0.10); color: var(--color-accent-text); }
+.event-badge { background: var(--color-info-muted); color: var(--color-info-text); }
+.audit-badge { background: var(--color-neutral-muted); color: var(--color-neutral-text); }
+.integration-badge { background: rgba(34, 175, 198, 0.10); color: var(--color-accent-text); }
+.notification-badge { background: var(--color-danger-muted); color: var(--color-danger-text); }
+.planner-badge { background: var(--color-info-muted); color: var(--color-info-text); }
+.scenario-badge { background: rgba(34, 175, 198, 0.10); color: var(--color-accent-text); }
 
 .stack-list {
   display: grid;
@@ -113,8 +112,8 @@
 }
 
 .policy-escalated {
-  background: rgba(239, 68, 68, 0.14);
-  color: #ffd1d1;
+  background: var(--color-danger-muted);
+  color: var(--color-danger-text);
 }
 
 .stack-tag-row {
@@ -181,7 +180,7 @@
 }
 
 .overdue-text {
-  color: #ffd1d1;
+  color: var(--color-danger-text);
 }
 
 .planner-grid {
@@ -243,9 +242,10 @@
   gap: 12px;
   flex-wrap: wrap;
   padding: 12px 14px;
-  border-radius: 16px;
-  background: rgba(31, 106, 165, 0.08);
-  color: #18466d;
+  border: 1px solid var(--color-border-subtle);
+  border-radius: var(--radius-md);
+  background: var(--color-surface-data);
+  color: var(--color-text-secondary);
 }
 
 .history-quick-actions {
@@ -324,8 +324,8 @@
 }
 
 .compare-score-badge {
-  background: rgba(59, 130, 246, 0.12);
-  color: #cfe2ff;
+  background: var(--color-info-muted);
+  color: var(--color-info-text);
 }
 
 .scenario-grid {
@@ -410,8 +410,7 @@
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
-  .hero-panel,
-  .panel {
+  .hero-panel {
     padding: 18px;
     border-radius: var(--radius-lg);
   }
@@ -482,7 +481,7 @@
   display: block;
   font-size: 0.76rem;
   text-transform: uppercase;
-  letter-spacing: 0.075em;
+  letter-spacing: 0.04em;
   color: var(--color-text-muted);
 }
 
@@ -627,29 +626,6 @@
   cursor: pointer;
 }
 
-@media (prefers-reduced-motion: reduce) {
-  .workspace-content > *,
-  .workspace-utility-rail .utility-card,
-  .status-live {
-    animation: none;
-  }
-
-  .utility-card,
-  .utility-action,
-  .selectable-card,
-  .workspace-nav-link,
-  .hero-jump-link,
-  .workspace-search-result,
-  .primary-button,
-  .secondary-button,
-  .ghost-button,
-  .approve-button,
-  .reject-button,
-  .compare-button {
-    transition: none;
-  }
-}
-
 .compact-summary-grid {
   grid-template-columns: repeat(4, minmax(0, 1fr));
 }
@@ -676,8 +652,9 @@
 
 .warehouse-stat-grid div {
   padding: 12px;
-  border-radius: 16px;
-  background: rgba(255, 255, 255, 0.03);
+  border-radius: var(--radius-md);
+  border: 1px solid var(--color-border-subtle);
+  background: var(--color-surface-data);
 }
 
 .warehouse-stat-grid span {
@@ -685,7 +662,7 @@
   color: var(--color-text-muted);
   font-size: 0.76rem;
   text-transform: uppercase;
-  letter-spacing: 0.075em;
+  letter-spacing: 0.04em;
 }
 
 .tenant-list-stack {
@@ -697,7 +674,7 @@
 }
 
 .summary-value {
-  color: #f6fbff;
+  color: var(--color-text-primary);
 }
 
 .history-action-row,
