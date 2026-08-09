@@ -162,7 +162,7 @@ export default function DashboardPage({ context }) {
     !connectionIsLive ? {
       id: 'realtime-degraded',
       tag: 'Realtime',
-      title: `${formatCodeLabel(connectionState)} realtime state`,
+      title: `${formatCodeLabel(connectionState)} live connection`,
       note: 'Operators may need to refresh before trusting live dashboard changes.',
       target: 'runtime',
       actionLabel: 'Open Runtime',
