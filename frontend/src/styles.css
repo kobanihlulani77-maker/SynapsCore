@@ -555,27 +555,6 @@
   }
 }
 
-.brand-button {
-  border: 0;
-  background: transparent;
-  color: inherit;
-  cursor: pointer;
-  padding: 0;
-}
-
-.brand-lockup {
-  display: inline-flex;
-  align-items: center;
-  gap: 14px;
-  text-align: left;
-}
-
-.brand-lockup small {
-  display: block;
-  margin-top: 2px;
-  color: var(--color-text-muted);
-}
-
 .command-hero {
   margin-bottom: 0;
 }
@@ -853,15 +832,6 @@
 }
 
 @media (max-width: 1320px) {
-  .workspace-body {
-    grid-template-columns: 1fr;
-  }
-
-  .workspace-utility-rail {
-    position: static;
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
-
   .public-hero,
   .public-signin-shell,
   .signin-trust-grid,
@@ -882,33 +852,6 @@
 }
 
 @media (max-width: 1080px) {
-  .workspace-shell {
-    grid-template-columns: 1fr;
-  }
-
-  .workspace-sidebar {
-    position: static;
-    min-height: auto;
-    border-right: 0;
-    border-bottom: 1px solid rgba(126, 168, 216, 0.12);
-  }
-
-  .workspace-topbar {
-    flex-direction: column;
-    position: static;
-    padding: 0;
-    border: 0;
-    background: transparent;
-    box-shadow: none;
-  }
-
-  .workspace-topbar-actions,
-  .workspace-command-bar,
-  .workspace-topbar-controls {
-    width: 100%;
-    justify-content: flex-start;
-  }
-
   .command-hero,
   .public-hero,
   .public-hero-metric-grid,
@@ -918,18 +861,8 @@
 }
 
 @media (max-width: 720px) {
-  .public-shell,
-  .workspace-frame {
+  .public-shell {
     padding: 16px 14px 24px;
-  }
-
-  .workspace-topbar {
-    gap: 16px;
-    margin-bottom: 18px;
-  }
-
-  .workspace-utility-rail {
-    grid-template-columns: 1fr;
   }
 
   .page-intro-panel,
@@ -939,9 +872,6 @@
     align-items: flex-start;
   }
 
-  .workspace-nav-link {
-    padding: 11px 12px;
-  }
 }
 
 @media (max-width: 430px) {
