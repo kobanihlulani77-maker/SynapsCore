@@ -45,11 +45,11 @@
   --space-lg: 24px;
   --space-xl: 32px;
   --space-2xl: 40px;
-  --space-section: 22px;
-  --space-major: 30px;
+  --space-section: 20px;
+  --space-major: 26px;
   --workspace-max-width: 1520px;
-  --workspace-pad-inline: 28px;
-  --workspace-pad-block: 24px;
+  --workspace-pad-inline: 26px;
+  --workspace-pad-block: 22px;
 
   --motion-fast: 120ms;
   --motion-base: 180ms;
@@ -244,7 +244,7 @@ h4,
 
 .workspace-shell {
   display: grid;
-  grid-template-columns: 290px minmax(0, 1fr);
+  grid-template-columns: 276px minmax(0, 1fr);
   min-height: 100vh;
   position: relative;
   isolation: isolate;
@@ -258,9 +258,9 @@ h4,
   top: 0;
   min-height: 100vh;
   display: grid;
-  gap: 18px;
+  gap: 16px;
   align-content: start;
-  padding: 24px 20px;
+  padding: 22px 18px;
   border-right: 1px solid rgba(121, 156, 194, 0.12);
   z-index: 1;
 }
@@ -290,25 +290,25 @@ h4,
   display: inline-flex;
   align-items: center;
   width: fit-content;
-  min-height: 32px;
-  padding: 0 12px;
+  min-height: 30px;
+  padding: 0 11px;
   border-radius: 999px;
   border: 1px solid rgba(121, 156, 194, 0.14);
   background: rgba(255, 255, 255, 0.035);
   color: #d5e7f6;
-  font-size: 0.78rem;
+  font-size: 0.79rem;
   font-weight: 700;
-  letter-spacing: 0.05em;
+  letter-spacing: 0.035em;
 }
 
 .workspace-nav {
   display: grid;
-  gap: 18px;
+  gap: 14px;
 }
 
 .workspace-nav-group {
   display: grid;
-  gap: 10px;
+  gap: 8px;
 }
 
 .workspace-nav-group-header {
@@ -321,16 +321,16 @@ h4,
   color: var(--color-text-muted);
   font-size: 0.78rem;
   font-weight: 700;
-  letter-spacing: 0.08em;
+  letter-spacing: 0.055em;
 }
 
 .workspace-nav-link {
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto;
-  gap: 12px;
+  gap: 10px;
   align-items: start;
   text-align: left;
-  padding: 14px 16px;
+  padding: 12px 14px;
 }
 
 .workspace-nav-link-copy {
@@ -340,14 +340,14 @@ h4,
 
 .workspace-nav-link-copy small {
   color: var(--color-text-muted);
-  font-size: 0.8rem;
-  line-height: 1.4;
+  font-size: 0.79rem;
+  line-height: 1.36;
 }
 
 .workspace-nav-link strong {
-  min-width: 34px;
-  min-height: 30px;
-  padding: 0 8px;
+  min-width: 32px;
+  min-height: 28px;
+  padding: 0 7px;
   border-radius: 999px;
   background: rgba(99, 216, 255, 0.08);
   display: inline-flex;
@@ -390,7 +390,7 @@ h4,
 .workspace-topbar {
   top: 10px;
   margin-bottom: var(--space-section);
-  padding: 16px 18px;
+  padding: 14px 16px;
   display: grid;
   grid-template-columns: minmax(280px, 0.82fr) minmax(420px, 1.18fr);
   gap: 18px;
@@ -432,9 +432,9 @@ h4,
   display: block;
   margin-bottom: 5px;
   color: var(--color-text-muted);
-  font-size: 0.68rem;
+  font-size: 0.72rem;
   font-weight: 700;
-  letter-spacing: 0.08em;
+  letter-spacing: 0.055em;
   text-transform: uppercase;
 }
 
@@ -476,8 +476,8 @@ h4,
 
 .workspace-topbar-controls .ghost-button,
 .workspace-topbar-controls .secondary-button {
-  min-height: 38px;
-  padding: 0 12px;
+  min-height: 36px;
+  padding: 0 11px;
 }
 
 .workspace-topbar-search {
@@ -568,7 +568,7 @@ h4,
 .command-hero {
   display: grid;
   grid-template-columns: minmax(0, 1.5fr) minmax(280px, 0.85fr);
-  gap: 20px;
+  gap: 18px;
   border-radius: var(--radius-xl);
   padding: var(--space-major);
   position: relative;
@@ -586,25 +586,25 @@ h4,
 .command-hero-panel {
   width: 100%;
   display: grid;
-  gap: 14px;
-  padding: 22px;
+  gap: 12px;
+  padding: 18px;
   border-radius: var(--radius-lg);
 }
 
 .command-hero-panel h3 {
   margin: 0;
-  font-size: 1.4rem;
+  font-size: 1.24rem;
 }
 
 .page-intro-panel {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 18px;
+  gap: 16px;
   position: relative;
   overflow: hidden;
   border-radius: var(--radius-lg);
-  padding: 22px 24px;
+  padding: 18px 20px;
 }
 
 .workspace-body {
@@ -641,14 +641,14 @@ h4,
 
 .utility-card {
   display: grid;
-  gap: 14px;
-  padding: 18px;
+  gap: 12px;
+  padding: 16px;
   border-radius: var(--radius-md);
 }
 
 .utility-action {
   width: 100%;
-  padding: 14px;
+  padding: 12px;
   text-align: left;
   cursor: pointer;
 }
@@ -683,7 +683,7 @@ h4,
 
 .command-hero-metrics div,
 .utility-metric-grid div {
-  padding: 14px;
+  padding: 12px;
   border-radius: var(--radius-sm);
   border: 1px solid rgba(121, 156, 194, 0.08);
   background: rgba(255, 255, 255, 0.03);
@@ -692,9 +692,9 @@ h4,
 .command-hero-metrics span,
 .utility-metric-grid span {
   display: block;
-  font-size: 0.72rem;
+  font-size: 0.76rem;
   text-transform: uppercase;
-  letter-spacing: 0.14em;
+  letter-spacing: 0.075em;
   color: var(--color-text-muted);
 }
 
@@ -769,8 +769,8 @@ h4,
 }
 
 .metric-card {
-  min-height: 138px;
-  padding: 18px;
+  min-height: 116px;
+  padding: 16px;
 }
 
 .metric-card-note {
@@ -794,7 +794,7 @@ h4,
 }
 
 .alert-card {
-  min-height: 146px;
+  min-height: 120px;
   transition:
     transform var(--motion-base) var(--ease-standard),
     border-color var(--motion-base) var(--ease-standard),
@@ -894,8 +894,8 @@ h4,
 .reject-button,
 .compare-button,
 .danger-button {
-  min-height: 44px;
-  padding: 0 18px;
+  min-height: 40px;
+  padding: 0 15px;
   border-radius: var(--radius-sm);
   font-weight: 700;
   letter-spacing: 0.01em;
@@ -1046,7 +1046,7 @@ h4,
 .field input,
 .field select,
 .field textarea {
-  min-height: 48px;
+  min-height: 44px;
   border-radius: var(--radius-sm);
   border: 1px solid rgba(121, 156, 194, 0.16);
   background: rgba(5, 14, 23, 0.62);
@@ -1094,29 +1094,29 @@ h4,
 }
 
 .workspace-topbar h1 {
-  max-width: 18ch;
-  font-size: clamp(1.45rem, 1.8vw, 2.05rem);
-  line-height: 1.02;
+  max-width: 20ch;
+  font-size: clamp(1.34rem, 1.55vw, 1.82rem);
+  line-height: 1.08;
 }
 
 .workspace-topbar-copy {
   display: block;
   max-width: 58ch;
   overflow: visible;
-  font-size: 0.95rem;
+  font-size: 0.93rem;
   line-height: 1.45;
   -webkit-line-clamp: unset;
 }
 
 .panel-header h2,
 .page-intro-panel h2 {
-  font-size: clamp(1.2rem, 1.5vw, 1.62rem);
-  line-height: 1.12;
+  font-size: clamp(1.12rem, 1.25vw, 1.42rem);
+  line-height: 1.16;
 }
 
 .summary-value {
-  font-size: clamp(1.7rem, 2.4vw, 2.45rem);
-  line-height: 0.98;
+  font-size: clamp(1.48rem, 1.9vw, 2.08rem);
+  line-height: 1.02;
 }
 
 .panel-badge,
@@ -1411,7 +1411,7 @@ tbody tr:hover {
 
 .public-signin-card,
 .public-signin-story {
-  min-height: 100%;
+  min-height: auto;
 }
 
 .public-shell .public-signin-card {
@@ -1447,17 +1447,17 @@ tbody tr:hover {
   display: flex;
   flex-wrap: wrap;
   gap: 10px;
-  margin: 16px 0 20px;
+  margin: 14px 0 18px;
 }
 
 .enterprise-status-pill {
   display: inline-flex;
   align-items: center;
-  min-height: 34px;
-  padding: 0 12px;
+  min-height: 32px;
+  padding: 0 11px;
   border-radius: 999px;
   color: #dce8f4;
-  font-size: 0.8rem;
+  font-size: 0.79rem;
   font-weight: 600;
 }
 
@@ -1496,7 +1496,7 @@ tbody tr:hover {
 .alerts-center-grid,
 .orders-center-grid,
 .inventory-intelligence-grid {
-  gap: 24px;
+  gap: 20px;
 }
 
 .public-hero {
@@ -1505,16 +1505,16 @@ tbody tr:hover {
 
 .enterprise-public-hero {
   grid-template-columns: minmax(0, 1fr) minmax(340px, 0.82fr);
-  gap: 22px;
-  padding-top: 24px;
+  gap: 20px;
+  padding-top: 18px;
 }
 
 .public-hero-copy {
   display: grid;
-  gap: 18px;
+  gap: 16px;
   align-content: start;
   min-width: 0;
-  padding-top: 14px;
+  padding-top: 10px;
 }
 
 .public-hero-copy > p {
@@ -1538,12 +1538,12 @@ tbody tr:hover {
 .workspace-next-list,
 .workspace-boundary-list {
   display: grid;
-  gap: 16px;
+  gap: 14px;
 }
 
 .public-hero-metrics {
   grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 14px;
+  gap: 12px;
 }
 
 .public-hero-metric-card,
@@ -1557,7 +1557,7 @@ tbody tr:hover {
 .public-positioning-card,
 .public-final-cta-card {
   position: relative;
-  padding: 18px 20px;
+  padding: 16px 18px;
   border-radius: var(--radius-md);
   border: 1px solid rgba(121, 156, 194, 0.14);
   background: linear-gradient(180deg, rgba(19, 31, 49, 0.9), rgba(12, 22, 35, 0.94));
@@ -1572,7 +1572,7 @@ tbody tr:hover {
   color: var(--color-text-muted);
   font-size: 0.78rem;
   font-weight: 700;
-  letter-spacing: 0.1em;
+  letter-spacing: 0.065em;
   text-transform: uppercase;
 }
 
@@ -1871,9 +1871,9 @@ tbody tr:hover {
 
 .public-workspace-step {
   display: grid;
-  gap: 10px;
+  gap: 8px;
   align-content: start;
-  padding: 18px 20px;
+  padding: 16px 18px;
   border-right: 1px solid rgba(132, 156, 184, 0.1);
 }
 
@@ -1882,7 +1882,7 @@ tbody tr:hover {
 }
 
 .public-command-lane ul {
-  margin: 14px 0 0;
+  margin: 12px 0 0;
   padding: 0;
   list-style: none;
   display: grid;
@@ -1928,7 +1928,7 @@ tbody tr:hover {
 }
 
 .public-list-item {
-  min-height: 82px;
+  min-height: 72px;
   display: flex;
   align-items: center;
 }
@@ -1938,8 +1938,8 @@ tbody tr:hover {
 .public-proof-card,
 .public-onboarding-card {
   display: grid;
-  gap: 12px;
-  min-height: 188px;
+  gap: 10px;
+  min-height: 156px;
 }
 
 .public-onboarding-card {
@@ -1950,25 +1950,25 @@ tbody tr:hover {
 
 .public-step-marker {
   width: fit-content;
-  min-height: 28px;
-  padding: 0 12px;
+  min-height: 26px;
+  padding: 0 10px;
   border-radius: 999px;
   border: 1px solid var(--public-border-quiet);
   background: rgba(255, 255, 255, 0.025);
   color: var(--public-text-muted);
-  letter-spacing: 0.12em;
+  letter-spacing: 0.075em;
 }
 
 .public-final-cta {
-  margin-top: 34px;
+  margin-top: 28px;
 }
 
 .public-final-cta-card {
   display: flex;
-  gap: 22px;
+  gap: 18px;
   align-items: center;
   justify-content: space-between;
-  padding: 24px 26px;
+  padding: 20px 22px;
   border-radius: var(--radius-lg);
   border-color: var(--public-border-quiet);
   background: var(--public-surface-working);
@@ -1987,7 +1987,7 @@ tbody tr:hover {
 
 .enterprise-signin-story {
   display: grid;
-  gap: 16px;
+  gap: 14px;
   align-content: start;
 }
 
@@ -2012,7 +2012,7 @@ tbody tr:hover {
 .signin-support-row {
   display: grid;
   gap: 6px;
-  padding: 14px 0;
+  padding: 12px 0;
   border-bottom: 1px solid rgba(121, 156, 194, 0.1);
 }
 
@@ -2067,7 +2067,7 @@ tbody tr:hover {
 .workspace-review-grid,
 .workspace-next-grid {
   display: grid;
-  gap: 16px;
+  gap: 14px;
 }
 
 .signin-status-grid {
@@ -2093,7 +2093,7 @@ tbody tr:hover {
 .signin-feedback-card,
 .workspace-review-card,
 .workspace-kickoff-card {
-  padding: 18px 20px;
+  padding: 16px 18px;
 }
 
 .workspace-kickoff-card {
@@ -2114,14 +2114,14 @@ tbody tr:hover {
   color: var(--color-text-muted);
   font-size: 0.78rem;
   font-weight: 700;
-  letter-spacing: 0.08em;
+  letter-spacing: 0.06em;
   text-transform: uppercase;
 }
 
 .signin-feedback-card {
   display: grid;
   gap: 8px;
-  margin-top: 18px;
+  margin-top: 14px;
 }
 
 .signin-feedback-card.tone-info {
@@ -2140,7 +2140,7 @@ tbody tr:hover {
 
 .signin-trust-ledger {
   gap: 1px;
-  margin-top: 18px;
+  margin-top: 14px;
   overflow: hidden;
   border-radius: var(--radius-md);
   border: 1px solid var(--public-border-quiet);
@@ -2149,7 +2149,7 @@ tbody tr:hover {
 .signin-trust-row {
   display: grid;
   gap: 6px;
-  padding: 15px 18px;
+  padding: 12px 16px;
   background: var(--public-surface-supporting);
 }
 
@@ -2165,8 +2165,8 @@ tbody tr:hover {
 .workspace-wizard-shell {
   display: grid;
   grid-template-columns: minmax(280px, 0.9fr) minmax(0, 1.35fr);
-  gap: 28px;
-  margin-top: 22px;
+  gap: 22px;
+  margin-top: 18px;
 }
 
 .workspace-wizard-sidebar,
@@ -2186,24 +2186,24 @@ tbody tr:hover {
 
 .workspace-wizard-sidebar,
 .workspace-wizard-panel {
-  padding: 24px;
+  padding: 20px;
 }
 
 .workspace-wizard-sidebar {
   display: grid;
-  gap: 20px;
+  gap: 16px;
   align-content: start;
 }
 
 .workspace-wizard-panel {
   display: grid;
-  gap: 20px;
+  gap: 16px;
   align-content: start;
 }
 
 .workspace-wizard-header {
   display: flex;
-  gap: 16px;
+  gap: 14px;
   align-items: flex-start;
   justify-content: space-between;
 }
@@ -2220,7 +2220,7 @@ tbody tr:hover {
 
 .workspace-step-card,
 .workspace-step-row {
-  padding: 14px 16px;
+  padding: 12px 14px;
   text-align: left;
   transition:
     transform var(--motion-base) var(--ease-standard),
@@ -2256,7 +2256,7 @@ tbody tr:hover {
 .workspace-wizard-review,
 .workspace-kickoff-shell {
   display: grid;
-  gap: 18px;
+  gap: 14px;
 }
 
 .workspace-wizard-grid {
@@ -2273,7 +2273,7 @@ tbody tr:hover {
 
 .workspace-review-card {
   display: grid;
-  gap: 14px;
+  gap: 12px;
 }
 
 .workspace-review-grid,
@@ -2287,7 +2287,7 @@ tbody tr:hover {
 }
 
 .workspace-next-card {
-  padding: 16px 18px;
+  padding: 14px 16px;
 }
 
 .workspace-wizard-actions {
@@ -2306,7 +2306,7 @@ tbody tr:hover {
 .workspace-guidance-block {
   display: grid;
   gap: 8px;
-  padding: 16px 18px;
+  padding: 14px 16px;
   background: var(--public-surface-supporting);
 }
 
@@ -2320,7 +2320,7 @@ tbody tr:hover {
 .workspace-boundary-row {
   display: grid;
   gap: 6px;
-  padding: 14px 0;
+  padding: 12px 0;
   border-bottom: 1px solid rgba(132, 156, 184, 0.1);
 }
 
@@ -2347,7 +2347,7 @@ tbody tr:hover {
 .workspace-kickoff-progress {
   display: grid;
   gap: 6px;
-  padding: 16px 18px;
+  padding: 14px 16px;
   border-radius: var(--radius-md);
   border: 1px solid rgba(99, 216, 255, 0.14);
   background: rgba(99, 216, 255, 0.06);
@@ -2355,7 +2355,7 @@ tbody tr:hover {
 
 .workspace-kickoff-checklist {
   display: grid;
-  gap: 14px;
+  gap: 12px;
 }
 
 .workspace-kickoff-card {
@@ -2408,7 +2408,7 @@ tbody tr:hover {
 .dashboard-operational-answer {
   display: grid;
   grid-template-columns: minmax(320px, 0.9fr) minmax(420px, 1.1fr);
-  gap: 18px;
+  gap: 16px;
 }
 
 .dashboard-command-identity,
@@ -2429,9 +2429,9 @@ tbody tr:hover {
 
 .dashboard-command-identity h2 {
   margin: 0;
-  font-size: clamp(2.15rem, 3vw, 3.35rem);
-  line-height: 0.95;
-  letter-spacing: -0.05em;
+  font-size: clamp(1.82rem, 2.25vw, 2.72rem);
+  line-height: 1;
+  letter-spacing: -0.04em;
 }
 
 .dashboard-state-row {
@@ -2443,20 +2443,20 @@ tbody tr:hover {
 
 .dashboard-state-copy {
   max-width: 58ch;
-  font-size: 1rem;
+  font-size: 0.96rem;
   color: var(--color-text-secondary);
 }
 
 .dashboard-health-strip {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 12px;
-  margin-bottom: 18px;
+  gap: 10px;
+  margin-bottom: 16px;
 }
 
 .dashboard-attention-panel {
   align-content: start;
-  padding: 16px;
+  padding: 14px;
   border-radius: var(--radius-lg);
   border: 1px solid rgba(121, 156, 194, 0.14);
   background: rgba(5, 14, 23, 0.54);
@@ -2465,13 +2465,13 @@ tbody tr:hover {
 .dashboard-attention-list {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 10px;
+  gap: 8px;
 }
 
 .dashboard-attention-item,
 .dashboard-attention-clear {
-  min-height: 160px;
-  padding: 14px;
+  min-height: 124px;
+  padding: 12px;
   border-radius: var(--radius-md);
   border: 1px solid rgba(121, 156, 194, 0.14);
   background: linear-gradient(180deg, rgba(19, 31, 49, 0.86), rgba(11, 20, 33, 0.94));
@@ -2500,7 +2500,7 @@ tbody tr:hover {
 
 .dashboard-health-card,
 .dashboard-lane-card {
-  padding: 16px 18px;
+  padding: 14px 16px;
   border-radius: var(--radius-md);
   border: 1px solid rgba(121, 156, 194, 0.14);
   background: linear-gradient(180deg, rgba(19, 31, 49, 0.9), rgba(12, 22, 35, 0.94));
@@ -2515,11 +2515,11 @@ tbody tr:hover {
 
 .dashboard-signal-grid {
   grid-template-columns: repeat(4, minmax(0, 1fr));
-  margin-bottom: 20px;
+  margin-bottom: 16px;
 }
 
 .dashboard-signal-card {
-  min-height: 132px;
+  min-height: 112px;
 }
 
 .dashboard-operations-grid {
@@ -2534,7 +2534,7 @@ tbody tr:hover {
 .dashboard-response-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 16px;
+  gap: 14px;
 }
 
 .dashboard-lane-card {
@@ -2561,8 +2561,8 @@ tbody tr:hover {
 .dashboard-lane-metrics span {
   display: inline-flex;
   align-items: center;
-  min-height: 30px;
-  padding: 0 10px;
+  min-height: 28px;
+  padding: 0 9px;
   border-radius: 999px;
   border: 1px solid rgba(121, 156, 194, 0.14);
   background: rgba(255, 255, 255, 0.035);
@@ -2578,16 +2578,16 @@ tbody tr:hover {
 }
 
 .dashboard-response-panel .section-card {
-  min-height: 100%;
+  min-height: auto;
 }
 
 .ops-command-hero {
   display: grid;
   grid-template-columns: minmax(0, 1.15fr) minmax(260px, 0.85fr);
-  gap: 18px;
+  gap: 16px;
   align-items: start;
-  margin-bottom: 24px;
-  padding: 22px 24px;
+  margin-bottom: 18px;
+  padding: 18px 20px;
   border-radius: var(--radius-lg);
   border: 1px solid rgba(121, 156, 194, 0.14);
   background:
@@ -2599,10 +2599,10 @@ tbody tr:hover {
 .runtime-decision-hero {
   display: grid;
   grid-template-columns: minmax(320px, 0.88fr) minmax(420px, 1.12fr);
-  gap: 18px;
+  gap: 16px;
   align-items: start;
-  margin-bottom: 18px;
-  padding: 22px 24px;
+  margin-bottom: 16px;
+  padding: 18px 20px;
   border-radius: var(--radius-lg);
   border: 1px solid rgba(121, 156, 194, 0.14);
   background:
@@ -2647,22 +2647,22 @@ tbody tr:hover {
 
 .runtime-decision-title h2 {
   margin: 0;
-  font-size: clamp(1.65rem, 2.2vw, 2.45rem);
-  line-height: 1.05;
-  letter-spacing: -0.04em;
+  font-size: clamp(1.45rem, 1.7vw, 2.05rem);
+  line-height: 1.1;
+  letter-spacing: -0.03em;
 }
 
 .runtime-decision-badge {
   display: inline-flex;
   width: fit-content;
-  min-height: 32px;
+  min-height: 30px;
   align-items: center;
-  padding: 0 12px;
+  padding: 0 11px;
   border-radius: 999px;
   border: 1px solid rgba(121, 156, 194, 0.16);
-  font-size: 0.76rem;
+  font-size: 0.78rem;
   font-weight: 800;
-  letter-spacing: 0.14em;
+  letter-spacing: 0.075em;
 }
 
 .runtime-decision-factors {
@@ -2671,8 +2671,8 @@ tbody tr:hover {
 }
 
 .runtime-factor-card {
-  min-height: 108px;
-  padding: 14px;
+  min-height: 92px;
+  padding: 12px;
   border-radius: var(--radius-md);
   border: 1px solid rgba(121, 156, 194, 0.14);
   background: rgba(5, 14, 23, 0.48);
@@ -2692,10 +2692,10 @@ tbody tr:hover {
 .workflow-decision-hero {
   display: grid;
   grid-template-columns: minmax(320px, 0.92fr) minmax(420px, 1.08fr);
-  gap: 18px;
+  gap: 16px;
   align-items: start;
-  margin-bottom: 18px;
-  padding: 20px 22px;
+  margin-bottom: 16px;
+  padding: 18px 20px;
   border-radius: var(--radius-lg);
   border: 1px solid rgba(121, 156, 194, 0.14);
   background: linear-gradient(180deg, rgba(14, 27, 43, 0.96), rgba(9, 18, 30, 0.98));
@@ -2726,7 +2726,7 @@ tbody tr:hover {
 }
 
 .workflow-action-card {
-  padding: 14px;
+  padding: 12px;
   border-radius: var(--radius-md);
   border: 1px solid rgba(121, 156, 194, 0.14);
   background: rgba(5, 14, 23, 0.5);
@@ -2737,7 +2737,7 @@ tbody tr:hover {
   color: var(--color-text-muted);
   font-size: 0.78rem;
   font-weight: 800;
-  letter-spacing: 0.08em;
+  letter-spacing: 0.06em;
   text-transform: uppercase;
 }
 
@@ -2750,17 +2750,17 @@ tbody tr:hover {
 .workflow-action-band {
   display: grid;
   grid-template-columns: minmax(0, 1fr) minmax(220px, max-content);
-  gap: 16px;
+  gap: 14px;
   align-items: center;
-  padding: 16px;
+  padding: 14px;
   border-radius: var(--radius-md);
   border: 1px solid rgba(80, 216, 171, 0.18);
   background: rgba(80, 216, 171, 0.06);
 }
 
 .workflow-action-band .secondary-button {
-  min-height: 48px;
-  padding-inline: 18px;
+  min-height: 42px;
+  padding-inline: 16px;
 }
 
 .workflow-evidence-grid {
@@ -2773,7 +2773,7 @@ tbody tr:hover {
 .scenario-history-workbench {
   display: grid;
   grid-template-columns: minmax(300px, 0.78fr) minmax(420px, 1.22fr);
-  gap: 18px;
+  gap: 16px;
 }
 
 .workflow-selected-panel {
@@ -2784,8 +2784,8 @@ tbody tr:hover {
 .approval-priority-grid,
 .approval-history-grid {
   display: grid;
-  gap: 16px;
-  margin-bottom: 16px;
+  gap: 14px;
+  margin-bottom: 14px;
 }
 
 .approval-priority-grid {
@@ -2798,7 +2798,7 @@ tbody tr:hover {
 }
 
 .approval-priority-card {
-  min-height: 260px;
+  min-height: 190px;
 }
 
 .scenario-planner-workflow {
@@ -2809,7 +2809,7 @@ tbody tr:hover {
 
 .scenario-filter-rail,
 .scenario-identity-panel {
-  padding: 16px;
+  padding: 14px;
   border-radius: var(--radius-md);
   border: 1px solid rgba(121, 156, 194, 0.14);
   background: rgba(5, 14, 23, 0.42);
@@ -2820,12 +2820,12 @@ tbody tr:hover {
 }
 
 .scenario-planner-actions .secondary-button {
-  min-height: 48px;
+  min-height: 42px;
 }
 
 .scenario-planner-actions .compare-button,
 .scenario-planner-actions .ghost-button {
-  min-height: 42px;
+  min-height: 40px;
 }
 
 .scenario-editor-card {
@@ -2853,7 +2853,7 @@ tbody tr:hover {
 .daily-ops-workbench {
   display: grid;
   grid-template-columns: minmax(320px, 0.82fr) minmax(430px, 1.18fr);
-  gap: 18px;
+  gap: 16px;
 }
 
 .daily-priority-grid {
@@ -2862,7 +2862,7 @@ tbody tr:hover {
 
 .daily-ops-workbench .signal-list-item.selectable-card,
 .daily-priority-grid .signal-list-item.selectable-card {
-  padding: 14px 16px;
+  padding: 12px 14px;
 }
 
 .catalog-admin-hero {
@@ -2872,8 +2872,8 @@ tbody tr:hover {
 .catalog-workflow-grid {
   display: grid;
   grid-template-columns: minmax(320px, 1fr) minmax(320px, 1fr) minmax(260px, 0.78fr);
-  gap: 16px;
-  margin-bottom: 18px;
+  gap: 14px;
+  margin-bottom: 16px;
 }
 
 .catalog-review-workbench {
@@ -2888,11 +2888,11 @@ tbody tr:hover {
 .catalog-field-group,
 .catalog-import-steps {
   display: grid;
-  gap: 12px;
+  gap: 10px;
 }
 
 .catalog-field-group {
-  padding: 14px;
+  padding: 12px;
   border-radius: var(--radius-md);
   border: 1px solid rgba(121, 156, 194, 0.14);
   background: rgba(5, 14, 23, 0.38);
@@ -2911,7 +2911,7 @@ tbody tr:hover {
 }
 
 .ops-command-actions {
-  gap: 12px;
+  gap: 10px;
   align-content: start;
   justify-items: stretch;
 }
@@ -2923,15 +2923,15 @@ tbody tr:hover {
 
 .experience-grid-three {
   grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 16px;
+  gap: 14px;
 }
 
 .inventory-spotlight-grid,
 .recommendation-board,
 .approval-status-grid {
   display: grid;
-  gap: 16px;
-  margin-bottom: 16px;
+  gap: 14px;
+  margin-bottom: 14px;
 }
 
 .inventory-spotlight-grid,
@@ -2946,8 +2946,8 @@ tbody tr:hover {
 .approval-board {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
-  gap: 16px;
-  margin-bottom: 16px;
+  gap: 14px;
+  margin-bottom: 14px;
 }
 
 .dashboard-card-button,
@@ -3037,7 +3037,7 @@ tbody tr:hover {
 .admin-form-section,
 .admin-review-card {
   display: grid;
-  gap: 12px;
+  gap: 10px;
 }
 
 .admin-subject-card {
@@ -3060,7 +3060,7 @@ tbody tr:hover {
 
 .admin-form-section,
 .admin-review-card {
-  padding: 14px;
+  padding: 12px;
   border-radius: var(--radius-md);
   border: 1px solid rgba(121, 156, 194, 0.14);
   background: rgba(5, 14, 23, 0.46);
@@ -3077,12 +3077,12 @@ tbody tr:hover {
 }
 
 .compact-action-button {
-  min-height: 36px;
-  padding: 0 12px;
+  min-height: 34px;
+  padding: 0 11px;
 }
 
 .signal-list-item.selectable-card {
-  padding: 16px 18px;
+  padding: 14px 16px;
 }
 
 .signal-list-item.selectable-card strong,
@@ -3094,7 +3094,7 @@ tbody tr:hover {
 .session-control-row {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
-  gap: 14px;
+  gap: 12px;
 }
 
 .session-field,
@@ -3107,8 +3107,8 @@ tbody tr:hover {
   align-items: center;
   justify-content: space-between;
   gap: 12px;
-  min-height: 48px;
-  padding: 12px 14px;
+  min-height: 44px;
+  padding: 10px 12px;
   border-radius: var(--radius-sm);
   border: 1px solid rgba(121, 156, 194, 0.16);
   background: rgba(5, 14, 23, 0.62);
@@ -3147,7 +3147,7 @@ tbody tr:hover {
 
 .data-grid-table th,
 .data-grid-table td {
-  padding: 12px 14px;
+  padding: 10px 12px;
   text-align: left;
   vertical-align: top;
 }
@@ -3156,9 +3156,9 @@ tbody tr:hover {
   border-bottom: 1px solid rgba(121, 156, 194, 0.14);
   background: rgba(255, 255, 255, 0.02);
   color: var(--color-text-muted);
-  font-size: 0.8rem;
+  font-size: 0.78rem;
   font-weight: 700;
-  letter-spacing: 0.08em;
+  letter-spacing: 0.055em;
   text-transform: uppercase;
 }
 
@@ -3168,7 +3168,7 @@ tbody tr:hover {
 
 .data-grid-table tbody td {
   color: var(--color-text-secondary);
-  line-height: 1.45;
+  line-height: 1.42;
 }
 
 .data-grid-sort {

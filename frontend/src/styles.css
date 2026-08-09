@@ -16,15 +16,15 @@
   border-radius: 22px;
   border: 1px solid rgba(121, 156, 194, 0.14);
   background: rgba(255, 255, 255, 0.03);
-  padding: 16px 18px;
+  padding: 14px 16px;
 }
 
 .hero-highlight-label {
   display: inline-block;
   margin-bottom: 10px;
   text-transform: uppercase;
-  letter-spacing: 0.14em;
-  font-size: 0.72rem;
+  letter-spacing: 0.08em;
+  font-size: 0.76rem;
   color: var(--color-text-muted);
 }
 
@@ -110,8 +110,8 @@
 .summary-grid,
 .content-grid {
   display: grid;
-  gap: 18px;
-  margin-top: 18px;
+  gap: 16px;
+  margin-top: 16px;
 }
 
 .summary-grid {
@@ -119,7 +119,7 @@
 }
 
 .summary-card {
-  padding: 18px;
+  padding: 16px;
 }
 
 .summary-value {
@@ -138,7 +138,7 @@
 
 .panel {
   border-radius: 28px;
-  padding: 22px;
+  padding: 20px;
 }
 
 .panel-wide {
@@ -157,15 +157,15 @@
 .priority-tag,
 .risk-chip {
   border-radius: 999px;
-  font-size: 0.78rem;
+  font-size: 0.76rem;
   font-weight: 700;
   text-transform: uppercase;
-  letter-spacing: 0.08em;
+  letter-spacing: 0.06em;
 }
 
 .panel-badge {
   align-self: flex-start;
-  padding: 8px 12px;
+  padding: 6px 10px;
 }
 
 .alert-badge { background: rgba(217, 73, 91, 0.14); color: #b93e55; }
@@ -182,8 +182,8 @@
 
 .stack-list {
   display: grid;
-  gap: 14px;
-  margin-top: 16px;
+  gap: 12px;
+  margin-top: 14px;
 }
 
 .stack-card p,
@@ -194,34 +194,34 @@
 .severity-tag,
 .priority-tag,
 .risk-chip {
-  padding: 7px 10px;
+  padding: 6px 9px;
 }
 
 .event-type-tag,
 .status-tag {
   border-radius: 999px;
-  padding: 7px 10px;
-  font-size: 0.74rem;
+  padding: 6px 9px;
+  font-size: 0.75rem;
   font-weight: 700;
-  letter-spacing: 0.08em;
+  letter-spacing: 0.06em;
   text-transform: uppercase;
 }
 
 .policy-tag {
   border-radius: 999px;
-  padding: 7px 10px;
-  font-size: 0.74rem;
+  padding: 6px 9px;
+  font-size: 0.75rem;
   font-weight: 700;
-  letter-spacing: 0.08em;
+  letter-spacing: 0.06em;
   text-transform: uppercase;
 }
 
 .stage-tag {
   border-radius: 999px;
-  padding: 7px 10px;
-  font-size: 0.74rem;
+  padding: 6px 9px;
+  font-size: 0.75rem;
   font-weight: 700;
-  letter-spacing: 0.08em;
+  letter-spacing: 0.06em;
   text-transform: uppercase;
 }
 
@@ -231,10 +231,10 @@
 }
 
 .scenario-type-tag {
-  padding: 7px 10px;
-  font-size: 0.74rem;
+  padding: 6px 9px;
+  font-size: 0.75rem;
   font-weight: 700;
-  letter-spacing: 0.08em;
+  letter-spacing: 0.06em;
   text-transform: uppercase;
 }
 
@@ -622,9 +622,9 @@
 
 .signin-trust-card span {
   display: block;
-  font-size: 0.72rem;
+  font-size: 0.76rem;
   text-transform: uppercase;
-  letter-spacing: 0.14em;
+  letter-spacing: 0.075em;
   color: var(--color-text-muted);
 }
 
@@ -671,8 +671,8 @@
 
 .experience-grid {
   display: grid;
-  gap: 16px;
-  margin-top: 18px;
+  gap: 14px;
+  margin-top: 16px;
 }
 
 .experience-grid-three {
@@ -686,7 +686,7 @@
 
 .section-card,
 .public-story-card {
-  min-height: 100%;
+  min-height: auto;
 }
 
 .signal-list {
@@ -716,13 +716,13 @@
 
 .public-story-grid {
   display: grid;
-  gap: 16px;
+  gap: 14px;
 }
 
 .public-cta-banner {
   max-width: 1360px;
-  margin: 16px auto 0;
-  padding: 28px;
+  margin: 14px auto 0;
+  padding: 22px;
   border-radius: 30px;
   border: 1px solid rgba(126, 168, 216, 0.14);
   background:
@@ -747,13 +747,13 @@
 
 .inventory-spotlight-grid {
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  margin-top: 18px;
+  margin-top: 16px;
 }
 
 .approvals-center-grid,
 .approval-status-grid {
   display: grid;
-  gap: 16px;
+  gap: 14px;
 }
 
 .approval-status-grid {
@@ -762,7 +762,7 @@
 
 .approval-status-grid .selectable-card,
 .approval-board .selectable-card {
-  min-height: 100%;
+  min-height: auto;
 }
 
 .action-card {
@@ -830,7 +830,7 @@
 .recommendation-board {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 16px;
+  gap: 14px;
 }
 
 .warehouse-stat-grid {
@@ -849,9 +849,9 @@
 .warehouse-stat-grid span {
   display: block;
   color: var(--color-text-muted);
-  font-size: 0.72rem;
+  font-size: 0.76rem;
   text-transform: uppercase;
-  letter-spacing: 0.12em;
+  letter-spacing: 0.075em;
 }
 
 .tenant-list-stack {
@@ -945,12 +945,12 @@
 @media (max-width: 720px) {
   .public-shell,
   .workspace-frame {
-    padding: 18px 14px 26px;
+    padding: 16px 14px 24px;
   }
 
   .workspace-topbar {
-    gap: 18px;
-    margin-bottom: 20px;
+    gap: 16px;
+    margin-bottom: 18px;
   }
 
   .workspace-utility-rail {
@@ -989,8 +989,8 @@
 .enterprise-public-hero {
   display: grid;
   grid-template-columns: minmax(0, 1.4fr) minmax(320px, 0.9fr);
-  gap: 24px;
-  padding: 24px 0 8px;
+  gap: 20px;
+  padding: 18px 0 6px;
 }
 
 @media (max-width: 980px) {
