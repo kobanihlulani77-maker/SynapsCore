@@ -502,6 +502,49 @@ Requires backend or DB:
 
 - no
 
+## `frontend\scripts\pilot-load-check.mjs`
+
+Purpose:
+
+- runs the controlled pre-pilot load, concurrency, resource, and realtime proof used by `npm.cmd run test:load:pilot`
+
+Checks:
+
+- authenticated HTTP read concurrency
+- controlled mutation traffic
+- backend readiness during load
+- actuator resource metrics when available
+- Hikari pool pressure when available
+- SockJS/STOMP connection establishment
+- realtime dashboard event delivery
+- dataset counts and basic integrity after load
+
+Safe to run anytime:
+
+- no, run only against an authorized local or explicitly approved test environment
+
+Changes anything:
+
+- yes, it authenticates, creates proof traffic, and can create test catalog/order data through supported APIs
+
+Requires backend or DB:
+
+- yes
+
+Recommended local command:
+
+```powershell
+cd frontend
+npm.cmd run test:load:pilot -- --stages 1,3,5,10,15,25 --wsStages 1,5,10,25,50 --durationSeconds 60 --warmupSeconds 10 --soakSeconds 300 --mutationUsers 1 --loginPauseMs 7000
+```
+
+Notes:
+
+- raw JSON output is written under `frontend\test-results\pilot-load\`
+- do not commit raw load artifacts
+- do not run this script against live Render unless the environment owner has explicitly approved a load window
+- see [performance-scale-proof.md](performance-scale-proof.md) for the accepted Gate 3 evidence and limitations
+
 ## `scripts\product-knowledge-check.ps1`
 
 Purpose:
