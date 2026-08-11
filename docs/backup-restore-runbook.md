@@ -89,6 +89,8 @@ Expected result:
 
 - backup file created
 - backup path printed
+- backup size printed
+- backup SHA256 checksum printed
 - no secret values printed
 - command exits successfully
 
@@ -113,6 +115,9 @@ Expected result:
 - restore drill target is prepared
 - backup is restored into the drill target
 - schema can be inspected after restore
+- source and restored Flyway state match
+- source and restored operational counts match
+- deterministic aggregate hashes match for critical tenant, user, catalog, inventory, replay, and scenario data
 - script exits successfully
 
 A restore drill should never casually overwrite the active local or live database. If a script asks for a target, verify the target before continuing.
@@ -124,7 +129,7 @@ Use this only when restore has been approved.
 1. Pause proof and user-facing validation.
 2. Stop backend write traffic if possible.
 3. Confirm backup file identity and timestamp.
-4. Confirm the restore target.
+4. Confirm the restore target printed by the script.
 5. Run the restore script.
 6. Start backend.
 7. Verify health/readiness/auth/websocket.
@@ -231,4 +236,3 @@ npm.cmd run test:e2e:prod
 ## Bottom Line
 
 SynapseCore should never claim operational trust after a database incident until restore posture is classified, readiness is back, and proof is allowed again.
-

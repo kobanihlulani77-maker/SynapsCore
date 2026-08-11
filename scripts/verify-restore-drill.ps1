@@ -57,6 +57,11 @@ $postgresUser = Get-ServiceEnvValue -Key "POSTGRES_USER"
 $postgresPassword = Get-ServiceEnvValue -Key "POSTGRES_PASSWORD"
 $containerId = Get-ServiceContainerId
 $containerBackupPath = "/tmp/synapsecore-restore-drill.sql"
+$backupItem = Get-Item -LiteralPath $BackupFile
+if ($backupItem.Length -le 0) {
+    throw "Restore drill backup file is empty: $BackupFile"
+}
+$backupHash = Get-FileHash -Algorithm SHA256 -Path $BackupFile
 
 function Invoke-PsqlScalar {
     param(
@@ -71,6 +76,68 @@ function Invoke-PsqlScalar {
     return ($result | Out-String).Trim()
 }
 
+$countQueries = [ordered]@{
+    "flyway_success"       = "SELECT COUNT(*) FROM flyway_schema_history WHERE success;"
+    "flyway_latest"        = "SELECT COALESCE(version, 'none') FROM flyway_schema_history WHERE success ORDER BY installed_rank DESC LIMIT 1;"
+    "public_table_count"   = "SELECT COUNT(*) FROM information_schema.tables WHERE table_schema = 'public';"
+    "workspace_count"      = "SELECT COUNT(*) FROM tenants;"
+    "user_count"           = "SELECT COUNT(*) FROM access_users;"
+    "catalog_count"        = "SELECT COUNT(*) FROM products;"
+    "order_count"          = "SELECT COUNT(*) FROM customer_orders;"
+    "inventory_count"      = "SELECT COUNT(*) FROM inventory;"
+    "alert_count"          = "SELECT COUNT(*) FROM alerts;"
+    "recommendation_count" = "SELECT COUNT(*) FROM recommendations;"
+    "connector_count"      = "SELECT COUNT(*) FROM integration_connectors;"
+    "failed_inbound_count" = "SELECT COUNT(*) FROM integration_inbound_records WHERE status <> 'ACCEPTED';"
+    "replay_count"         = "SELECT COUNT(*) FROM integration_replay_records;"
+    "scenario_count"       = "SELECT COUNT(*) FROM scenario_runs;"
+    "approval_count"       = "SELECT COUNT(*) FROM scenario_runs WHERE approval_status <> 'NOT_REQUIRED' OR approval_stage <> 'NOT_REQUIRED';"
+}
+
+$hashQueries = [ordered]@{
+    "tenants_hash"   = "SELECT md5(COALESCE(string_agg(id::text || ':' || code || ':' || name, ',' ORDER BY id),'')) FROM tenants;"
+    "users_hash"     = "SELECT md5(COALESCE(string_agg(id::text || ':' || COALESCE(tenant_id::text,'') || ':' || username || ':' || active::text || ':' || session_version::text, ',' ORDER BY id),'')) FROM access_users;"
+    "products_hash"  = "SELECT md5(COALESCE(string_agg(id::text || ':' || COALESCE(tenant_id::text,'') || ':' || sku || ':' || name, ',' ORDER BY id),'')) FROM products;"
+    "inventory_hash" = "SELECT md5(COALESCE(string_agg(id::text || ':' || COALESCE(tenant_id::text,'') || ':' || product_id::text || ':' || warehouse_id::text || ':' || quantity_available::text || ':' || reorder_threshold::text, ',' ORDER BY id),'')) FROM inventory;"
+    "orders_hash"    = "SELECT md5(COALESCE(string_agg(id::text || ':' || COALESCE(tenant_id::text,'') || ':' || external_order_id || ':' || status, ',' ORDER BY id),'')) FROM customer_orders;"
+    "inbound_hash"   = "SELECT md5(COALESCE(string_agg(id::text || ':' || COALESCE(tenant_code,'') || ':' || source_system || ':' || status, ',' ORDER BY id),'')) FROM integration_inbound_records;"
+    "replay_hash"    = "SELECT md5(COALESCE(string_agg(id::text || ':' || COALESCE(tenant_code,'') || ':' || source_system || ':' || status || ':' || replay_attempt_count::text, ',' ORDER BY id),'')) FROM integration_replay_records;"
+    "scenario_hash"  = "SELECT md5(COALESCE(string_agg(id::text || ':' || COALESCE(tenant_id::text,'') || ':' || type || ':' || approval_status || ':' || approval_stage, ',' ORDER BY id),'')) FROM scenario_runs;"
+}
+
+function Get-Measurements {
+    param(
+        [string]$Database,
+        [System.Collections.Specialized.OrderedDictionary]$Queries
+    )
+
+    $measurements = [ordered]@{}
+    foreach ($key in $Queries.Keys) {
+        $measurements[$key] = Invoke-PsqlScalar -Database $Database -Sql $Queries[$key]
+    }
+    return $measurements
+}
+
+function Assert-MeasurementsMatch {
+    param(
+        [string]$Label,
+        [System.Collections.Specialized.OrderedDictionary]$Source,
+        [System.Collections.Specialized.OrderedDictionary]$Restored
+    )
+
+    Write-Host ""
+    Write-Host "$Label comparison:"
+    foreach ($key in $Source.Keys) {
+        $sourceValue = $Source[$key]
+        $restoredValue = $Restored[$key]
+        $matches = $sourceValue -eq $restoredValue
+        Write-Host ("- {0}: source={1} restored={2} match={3}" -f $key, $sourceValue, $restoredValue, $matches)
+        if (-not $matches) {
+            throw "$Label mismatch for $key."
+        }
+    }
+}
+
 try {
     Write-Host "========================================"
     Write-Host "SYNAPSECORE RESTORE DRILL"
@@ -78,8 +145,13 @@ try {
     Write-Host "Compose file : $composePath"
     Write-Host "Service      : $ServiceName"
     Write-Host "Backup file  : $BackupFile"
+    Write-Host "Backup size  : $($backupItem.Length) bytes"
+    Write-Host "Backup SHA256: $($backupHash.Hash)"
     Write-Host "Scratch DB   : $scratchDbName"
     Write-Host ""
+
+    $sourceCounts = Get-Measurements -Database (Get-ServiceEnvValue -Key "POSTGRES_DB") -Queries $countQueries
+    $sourceHashes = Get-Measurements -Database (Get-ServiceEnvValue -Key "POSTGRES_DB") -Queries $hashQueries
 
     & docker compose -f $composePath exec -T $ServiceName env "PGPASSWORD=$postgresPassword" psql -v ON_ERROR_STOP=1 -U $postgresUser -d postgres -c "DROP DATABASE IF EXISTS $scratchDbName;"
     if ($LASTEXITCODE -ne 0) {
@@ -105,29 +177,16 @@ try {
         & docker compose -f $composePath exec -T $ServiceName rm -f $containerBackupPath | Out-Null
     }
 
-    $publicTableCount = [int](Invoke-PsqlScalar -Database $scratchDbName -Sql "SELECT COUNT(*) FROM information_schema.tables WHERE table_schema = 'public';")
-    $auditCount = [int](Invoke-PsqlScalar -Database $scratchDbName -Sql "SELECT COUNT(*) FROM audit_logs;")
-    $eventCount = [int](Invoke-PsqlScalar -Database $scratchDbName -Sql "SELECT COUNT(*) FROM business_events;")
-    $scenarioCount = [int](Invoke-PsqlScalar -Database $scratchDbName -Sql "SELECT COUNT(*) FROM scenario_runs;")
-
-    if ($publicTableCount -lt 10) {
-        throw "Restore drill loaded too few public tables ($publicTableCount)."
-    }
-    if ($auditCount -lt 1) {
-        throw "Restore drill found no audit logs in the restored snapshot."
-    }
-    if ($eventCount -lt 1) {
-        throw "Restore drill found no business events in the restored snapshot."
-    }
-    if ($scenarioCount -lt 1) {
-        throw "Restore drill found no scenario history in the restored snapshot."
-    }
+    $restoredCounts = Get-Measurements -Database $scratchDbName -Queries $countQueries
+    $restoredHashes = Get-Measurements -Database $scratchDbName -Queries $hashQueries
+    Assert-MeasurementsMatch -Label "Count" -Source $sourceCounts -Restored $restoredCounts
+    Assert-MeasurementsMatch -Label "Hash" -Source $sourceHashes -Restored $restoredHashes
 
     Write-Host "Restore drill passed."
-    Write-Host "Public tables : $publicTableCount"
-    Write-Host "Audit logs    : $auditCount"
-    Write-Host "Business events: $eventCount"
-    Write-Host "Scenario runs : $scenarioCount"
+    Write-Host "Public tables : $($restoredCounts["public_table_count"])"
+    Write-Host "Flyway latest : $($restoredCounts["flyway_latest"])"
+    Write-Host "Workspaces    : $($restoredCounts["workspace_count"])"
+    Write-Host "Users         : $($restoredCounts["user_count"])"
 } finally {
     & docker compose -f $composePath exec -T $ServiceName env "PGPASSWORD=$postgresPassword" psql -v ON_ERROR_STOP=1 -U $postgresUser -d postgres -c "DROP DATABASE IF EXISTS $scratchDbName;" | Out-Null
     if ($generatedBackup -and -not $KeepBackupFile -and (Test-Path -LiteralPath $BackupFile)) {

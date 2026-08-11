@@ -47,6 +47,7 @@ function Get-ServiceContainerId {
 
 $postgresUser = Get-ServiceEnvValue -Key "POSTGRES_USER"
 $postgresPassword = Get-ServiceEnvValue -Key "POSTGRES_PASSWORD"
+$targetDatabase = Get-ServiceEnvValue -Key "POSTGRES_DB"
 $containerId = Get-ServiceContainerId
 $containerBackupPath = "/tmp/synapsecore-restore.sql"
 
@@ -55,9 +56,10 @@ Write-Host "SYNAPSECORE POSTGRES RESTORE"
 Write-Host "========================================"
 Write-Host "Compose file : $composePath"
 Write-Host "Service      : $ServiceName"
+Write-Host "Target DB    : $targetDatabase"
 Write-Host "Backup file  : $backupPath"
 Write-Host ""
-Write-Host "Resetting target schema before restore..."
+Write-Host "Resetting target schema before restore. This is destructive for the target database above."
 
 & docker compose -f $composePath exec -T $ServiceName sh -lc 'PGPASSWORD="$POSTGRES_PASSWORD" psql -v ON_ERROR_STOP=1 -U "$POSTGRES_USER" -d "$POSTGRES_DB" -c "DROP SCHEMA public CASCADE; CREATE SCHEMA public;"'
 if ($LASTEXITCODE -ne 0) {
@@ -71,7 +73,7 @@ if ($LASTEXITCODE -ne 0) {
 }
 
 try {
-    & docker compose -f $composePath exec -T $ServiceName env "PGPASSWORD=$postgresPassword" psql -v ON_ERROR_STOP=1 -U $postgresUser -d (Get-ServiceEnvValue -Key "POSTGRES_DB") -f $containerBackupPath
+    & docker compose -f $composePath exec -T $ServiceName env "PGPASSWORD=$postgresPassword" psql -v ON_ERROR_STOP=1 -U $postgresUser -d $targetDatabase -f $containerBackupPath
     if ($LASTEXITCODE -ne 0) {
         throw "Restore failed while replaying the SQL backup."
     }

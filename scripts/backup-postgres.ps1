@@ -43,4 +43,12 @@ $dumpText = if ($dump -is [System.Array]) {
 }
 
 [System.IO.File]::WriteAllText($OutputFile, $dumpText, (New-Object System.Text.UTF8Encoding($false)))
+$backupItem = Get-Item -LiteralPath $OutputFile
+if ($backupItem.Length -le 0) {
+    throw "Postgres backup command produced an empty backup file."
+}
+$backupHash = Get-FileHash -Algorithm SHA256 -Path $OutputFile
+
 Write-Host "Backup written to $OutputFile"
+Write-Host "Backup size    : $($backupItem.Length) bytes"
+Write-Host "Backup SHA256  : $($backupHash.Hash)"
