@@ -72,7 +72,7 @@ powershell -ExecutionPolicy Bypass -File scripts\verify-deployment.ps1 -Frontend
 - Hibernate startup mode is `ddl-auto=validate`
 - Flyway validation passes before rollout
 - realtime runtime summary reports `REDIS_PUBSUB` when Redis fanout is intended
-- Prometheus exposes auth, catalog, replay, realtime, dispatch, and inventory conflict metrics
+- metrics instrumentation remains available through controlled observability paths; anonymous production `/actuator/metrics` and `/actuator/prometheus` must stay restricted
 - no unexpected replay backlog exists
 - no disabled connector is accidental
 - no critical system incident is unexplained

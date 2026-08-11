@@ -528,7 +528,7 @@ This verifies:
 
 - backend health
 - backend readiness
-- backend prometheus
+- backend runtime trust
 - frontend health
 - frontend runtime config
 - sign-in

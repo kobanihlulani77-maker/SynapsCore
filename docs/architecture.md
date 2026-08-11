@@ -73,7 +73,7 @@ The architecture should always preserve this operating loop:
   - alerts, recommendations, inventory, fulfillment overview, recent orders, business-event timeline, audit trail, integration operations, and scenario escalation channels
 - `observability/`
   - Micrometer-backed gauges and tenant-scoped counters
-  - Prometheus-ready metrics exposure through Actuator
+  - Prometheus-ready metrics instrumentation; public production actuator exposure is limited to health endpoints
 - `scenario/`
   - non-persistent what-if order impact analysis
   - multi-line order mix projection before commit
@@ -180,7 +180,7 @@ The architecture should always preserve this operating loop:
 - core write services now publish an internal operational state-change event instead of directly owning fan-out work
 - each state-change event is also stored as an `OperationalDispatchWorkItem`
 - a scheduled queue worker drains dispatch work in batches and records failed fan-out attempts for support visibility
-- Micrometer counters and gauges expose alert, fulfillment, replay, and dispatch health through `GET /actuator/prometheus`
+- Micrometer counters and gauges capture alert, fulfillment, replay, and dispatch health for controlled observability paths; public production actuator exposure is limited to health endpoints
 - Redis-backed realtime publisher proof verifies fanout across separate publisher instances without loopback duplication
 - realtime supports three explicit modes:
   - `SIMPLE_IN_MEMORY` for local single-node development

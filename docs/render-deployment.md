@@ -126,7 +126,8 @@ The production trust surfaces are:
 - `/actuator/health/readiness`
 - `/api/system/runtime`
 - `/api/system/incidents`
-- `/actuator/prometheus`
+
+Anonymous production actuator exposure is limited to health, liveness, and readiness. Metrics/prometheus scraping requires a controlled monitoring path.
 
 ## Post-Deploy Checks
 

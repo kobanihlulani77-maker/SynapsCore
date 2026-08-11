@@ -11,7 +11,8 @@ SynapseCore exposes these core operational surfaces:
 - `/actuator/health/readiness`
 - `/api/system/runtime`
 - `/api/system/incidents`
-- `/actuator/prometheus`
+
+Production note: anonymous actuator exposure is limited to health, liveness, and readiness. Metrics/prometheus scraping requires a controlled monitoring path.
 
 ## Safe Root Response
 
@@ -75,7 +76,7 @@ That means runtime is the best live source for confirming which backend commit t
 
 ## Metrics
 
-The Prometheus surface should be used for deeper operational trending.
+Metrics instrumentation should be used for deeper operational trending through a controlled monitoring path. The anonymous production `/actuator/prometheus` surface is intentionally restricted.
 
 Important families include:
 

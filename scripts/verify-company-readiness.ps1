@@ -292,8 +292,7 @@ $backendUrls = @(
     "$BackendUrl/actuator/health/readiness",
     "$BackendUrl/api/dashboard/summary",
     "$BackendUrl/api/system/runtime",
-    "$BackendUrl/api/system/incidents",
-    "$BackendUrl/actuator/prometheus"
+    "$BackendUrl/api/system/incidents"
 )
 foreach ($url in $backendUrls) {
     $statusCode = if ($url -like "$BackendUrl/actuator/*") {

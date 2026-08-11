@@ -47,7 +47,7 @@ powershell -ExecutionPolicy Bypass -File scripts\prepare-hosted-proof.ps1
 npm.cmd run test:e2e:prod
 ```
 
-7. Review `/api/system/runtime`, `/api/system/incidents`, and `/actuator/prometheus`.
+7. Review `/api/system/runtime` and `/api/system/incidents`; do not rely on anonymous production `/actuator/prometheus`.
 8. Probe a wrong-password login and expect a fast `401`, not a long-running request.
 
 The pilot is not considered live unless all eight steps pass.
@@ -123,7 +123,7 @@ Operators should watch:
 
 - `/api/system/runtime`
 - `/api/system/incidents`
-- `/actuator/prometheus`
+- controlled metrics instrumentation when an approved private scrape path exists
 - hosted proof success on the current deployment
 - auth failure, rate-limit rejection, catalog write, replay, realtime publish, dispatch, alert-hook failure, integration failure, and inventory lock-conflict metrics
 

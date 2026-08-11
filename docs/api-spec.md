@@ -629,7 +629,11 @@ Connector-related incidents now surface the most recent connector failure detail
 
 ### `GET /actuator/prometheus`
 
-Returns Prometheus-format metrics for external scraping and deeper observability.
+Production posture:
+
+- not exposed anonymously in production
+- should return `401`, `403`, or `404` from public unauthenticated production traffic
+- may be used only when a private, authenticated, or local monitoring path is explicitly configured
 
 Important metric families include:
 

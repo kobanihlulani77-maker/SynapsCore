@@ -28,7 +28,7 @@ That means:
 | `/api/system/runtime` | runtime trust summary | runtime page, reviewers |
 | `/api/system/incidents` | active operational incidents | operators |
 | `/api/dashboard/snapshot` | full operational snapshot | frontend, proof |
-| `/actuator/prometheus` | metrics scrape target | metrics stack |
+| `/actuator/prometheus` | metrics scrape target when explicitly exposed outside production | internal metrics stack |
 
 ## Health vs Readiness
 
@@ -145,13 +145,21 @@ Healthy websocket posture means:
 
 ## Prometheus Metrics
 
-`/actuator/prometheus` exposes metrics for future or current scrape tooling.
+`/actuator/prometheus` is intentionally not part of the anonymous production HTTP surface.
+
+In production, public actuator exposure is limited to the health endpoint family:
+
+- `/actuator/health`
+- `/actuator/health/liveness`
+- `/actuator/health/readiness`
+
+Metrics instrumentation remains useful, but production scraping should be added through a private, authenticated, or otherwise controlled monitoring path before a pilot depends on it.
 
 Current docs should not claim a complete enterprise metrics stack unless one is actually deployed and operated.
 
-Use the endpoint as:
+Use metrics as:
 
-- a metrics surface
+- an internal instrumentation surface
 - a future observability integration point
 - a local/reviewer check for instrumented runtime posture
 
@@ -240,4 +248,3 @@ Current honest limitations:
 ## Bottom Line
 
 SynapseCore observability is strongest when it is used as a truth system: classify runtime state first, recover second, prove last.
-

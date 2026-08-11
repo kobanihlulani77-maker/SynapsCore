@@ -145,7 +145,8 @@ The backend exposes multiple trust and observability layers:
 - `/actuator/health/liveness`
 - `/api/system/runtime`
 - `/api/system/incidents`
-- `/actuator/prometheus`
+
+Anonymous production actuator exposure is limited to health, liveness, and readiness. Metrics/prometheus scraping requires a controlled monitoring path.
 
 These surfaces communicate:
 

@@ -43,7 +43,6 @@ check_endpoint() {
 
 check_endpoint "backend health" "$BACKEND_URL/actuator/health"
 check_endpoint "backend readiness" "$BACKEND_URL/actuator/health/readiness"
-check_endpoint "backend prometheus" "$BACKEND_URL/actuator/prometheus"
 check_endpoint "frontend health" "$FRONTEND_URL/healthz"
 check_endpoint "frontend runtime config" "$FRONTEND_URL/runtime-config.js"
 

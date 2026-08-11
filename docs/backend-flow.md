@@ -350,8 +350,12 @@ Runtime and health surfaces include:
 - `/actuator/health/readiness`
 - `/api/system/runtime`
 - `/api/system/incidents`
-- `/actuator/prometheus`
 - `/ws/info`
+
+Production actuator posture:
+
+- health, liveness, and readiness are intentionally public for deployment and proof gating
+- `/actuator/metrics` and `/actuator/prometheus` are not anonymously exposed in production
 
 Interpretation:
 

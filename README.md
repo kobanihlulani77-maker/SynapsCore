@@ -247,7 +247,8 @@ Key trust endpoints:
 - `/actuator/health/readiness`
 - `/api/system/runtime`
 - `/api/system/incidents`
-- `/actuator/prometheus`
+
+Production actuator exposure is intentionally limited to health, liveness, and readiness. Metrics/prometheus endpoints must not be anonymously public in production.
 
 ## Final Hosted Proof Flow
 

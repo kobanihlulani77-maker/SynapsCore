@@ -122,7 +122,8 @@ Operators should treat these surfaces as authoritative:
 - `/actuator/health/readiness`
 - `/api/system/runtime`
 - `/api/system/incidents`
-- `/actuator/prometheus`
+
+Anonymous production actuator exposure is limited to health, liveness, and readiness. Metrics/prometheus scraping requires a controlled monitoring path.
 
 Important runtime truths:
 

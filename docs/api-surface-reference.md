@@ -84,7 +84,11 @@ Main routes:
 - `GET /actuator/health`
 - `GET /actuator/health/readiness`
 - `GET /actuator/health/liveness`
-- `GET /actuator/prometheus`
+
+Production note:
+
+- anonymous production actuator exposure is limited to health/liveness/readiness
+- `/actuator/metrics` and `/actuator/prometheus` are not public production API surfaces
 
 Operational importance:
 

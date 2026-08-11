@@ -94,10 +94,11 @@ What it does:
 - GET /api/system/incidents
 - GET /actuator/health
 - GET /actuator/health/readiness
-- GET /actuator/prometheus
+- GET /api/system/runtime
 What it does:
 - exposes runtime health, incidents, queue posture, and metrics
 - gives operators and admins a trust surface, not just a business surface
+- production actuator exposure is limited to health, liveness, and readiness
 
 10. REALTIME
 - WebSocket/SockJS endpoint at /ws

@@ -27,6 +27,12 @@ server:
         secure: ${SESSION_COOKIE_SECURE:true}
         same-site: ${SESSION_COOKIE_SAME_SITE:Lax}
 
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health
+
 synapsecore:
   access:
     allow-header-fallback: ${ALLOW_HEADER_FALLBACK:false}

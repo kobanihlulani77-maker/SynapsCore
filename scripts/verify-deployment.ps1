@@ -40,7 +40,6 @@ function Invoke-SessionCheck {
 
 Invoke-SynapseEndpointCheck -Label "backend health" -Url "$BackendUrl/actuator/health" -MaxAttempts $MaxAttempts -SleepSeconds $SleepSeconds
 Invoke-SynapseEndpointCheck -Label "backend readiness" -Url "$BackendUrl/actuator/health/readiness" -MaxAttempts $MaxAttempts -SleepSeconds $SleepSeconds
-Invoke-SynapseEndpointCheck -Label "backend prometheus" -Url "$BackendUrl/actuator/prometheus" -MaxAttempts $MaxAttempts -SleepSeconds $SleepSeconds
 Invoke-SynapseEndpointCheck -Label "frontend health" -Url "$FrontendUrl/healthz" -MaxAttempts $MaxAttempts -SleepSeconds $SleepSeconds
 Invoke-SynapseEndpointCheck -Label "frontend runtime config" -Url "$FrontendUrl/runtime-config.js" -MaxAttempts $MaxAttempts -SleepSeconds $SleepSeconds
 

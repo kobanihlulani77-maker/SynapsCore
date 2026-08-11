@@ -327,7 +327,8 @@ The platform exposes both operator-friendly and technical runtime surfaces:
 - `/actuator/health`
 - `/actuator/health/liveness`
 - `/actuator/health/readiness`
-- `/actuator/prometheus`
+
+Anonymous production actuator exposure is limited to health, liveness, and readiness. Metrics/prometheus scraping requires a controlled monitoring path.
 
 Runtime purpose:
 

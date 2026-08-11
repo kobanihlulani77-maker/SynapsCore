@@ -44,4 +44,16 @@ class DeploymentHardeningConfigurationTest {
         assertThat(baseConfig).contains("include: livenessState,ping");
         assertThat(baseConfig).contains("include: readinessState,db,redis,ping");
     }
+
+    @Test
+    void productionProfileOnlyExposesPublicHealthActuatorEndpoint() throws IOException {
+        String prodConfig = Files.readString(Path.of("src/main/resources/application-prod.yml"));
+        String baseConfig = Files.readString(Path.of("src/main/resources/application.yml"));
+
+        assertThat(baseConfig).contains("include: health,info,metrics,prometheus");
+        assertThat(prodConfig).contains("management:");
+        assertThat(prodConfig).contains("include: health");
+        assertThat(prodConfig).doesNotContain("include: health,info,metrics,prometheus");
+        assertThat(prodConfig).doesNotContain("include: '*'");
+    }
 }
