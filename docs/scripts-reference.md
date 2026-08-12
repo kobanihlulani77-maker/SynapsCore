@@ -502,6 +502,50 @@ Requires backend or DB:
 
 - no
 
+## `frontend\scripts\control-inventory.mjs`
+
+Purpose:
+
+- regenerates the authoritative source-level interactive control inventory for Pre-Pilot Gate 4
+
+Checks:
+
+- buttons
+- inputs
+- selects
+- textareas
+- checkboxes and radios
+- forms
+- role/button surfaces
+- non-semantic interactive surfaces with handlers
+- route/component ownership
+- visible labels and selector hints
+- static handler traces
+
+Safe to run anytime:
+
+- yes
+
+Changes anything:
+
+- no runtime behavior changes; it writes local report artifacts under `frontend\test-results\control-inventory\`
+
+Requires backend or DB:
+
+- no
+
+Recommended command:
+
+```powershell
+cd frontend
+npm.cmd run test:controls:inventory
+```
+
+Notes:
+
+- generated artifacts should not be committed
+- see [pre-pilot-gate-4-control-verification.md](pre-pilot-gate-4-control-verification.md) for current Gate 4 accounting
+
 ## `frontend\scripts\pilot-load-check.mjs`
 
 Purpose:

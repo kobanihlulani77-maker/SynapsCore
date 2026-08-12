@@ -12,6 +12,7 @@
     "preview": "vite preview --host 0.0.0.0 --port 4173",
     "test:e2e:prod": "playwright test -c playwright.prod.config.mjs",
     "test:e2e:realtime": "playwright test -c playwright.prod.config.mjs --grep @realtime",
+    "test:controls:inventory": "node scripts/control-inventory.mjs",
     "test:load:pilot": "node scripts/pilot-load-check.mjs",
     "verify": "npm run lint && npm run build"
   },

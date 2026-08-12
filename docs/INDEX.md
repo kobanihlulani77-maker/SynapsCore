@@ -259,6 +259,7 @@ This index links the main product, architecture, runbook, proof, and operator do
 - [hosted-proof.md](hosted-proof.md)
 - [proof-and-validation.md](proof-and-validation.md)
 - [performance-scale-proof.md](performance-scale-proof.md)
+- [pre-pilot-gate-4-control-verification.md](pre-pilot-gate-4-control-verification.md)
 - [verification-status.md](verification-status.md)
 - [release-evidence-2026-08-03.md](release-evidence-2026-08-03.md)
 - [frontend-demo-guide.md](frontend-demo-guide.md)
@@ -270,6 +271,7 @@ This index links the main product, architecture, runbook, proof, and operator do
 - [proof-and-validation.md](proof-and-validation.md)
 - [hosted-proof.md](hosted-proof.md)
 - [performance-scale-proof.md](performance-scale-proof.md)
+- [pre-pilot-gate-4-control-verification.md](pre-pilot-gate-4-control-verification.md)
 - [release-evidence-2026-08-03.md](release-evidence-2026-08-03.md)
 - [technical-reviewer-guide.md](technical-reviewer-guide.md)
 
@@ -393,4 +395,5 @@ This index links the main product, architecture, runbook, proof, and operator do
 - `scripts\prepare-hosted-proof.ps1`
 - `scripts\verify-deployment.ps1`
 - `scripts\verify-realtime.ps1`
+- `frontend\scripts\control-inventory.mjs`
 - `frontend\scripts\pilot-load-check.mjs`
