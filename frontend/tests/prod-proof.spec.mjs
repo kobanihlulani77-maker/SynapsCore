@@ -47,6 +47,7 @@ const configuredAuthRateLimitMaxAttempts = Number.parseInt(
 const authRateLimitAttemptBudget = Number.isFinite(configuredAuthRateLimitMaxAttempts) && configuredAuthRateLimitMaxAttempts > 0
   ? configuredAuthRateLimitMaxAttempts + 20
   : 50
+const signInHeadingPattern = /Access your operational workspace\.?|Enter the operational platform/i
 
 const users = {
   operationsLead: {
@@ -313,8 +314,7 @@ function safeResponseUrl(response, context = {}) {
 async function loginViaUi(page, credentials, options = {}) {
   const { requireDashboardSnapshot = false } = options
   await page.goto('/sign-in')
-  await expect(page.getByRole('heading', { name: 'Access your operational workspace.' })).toBeVisible()
-  const signInCard = page.locator('.public-signin-card')
+  const signInCard = await expectSignInShellReady(page)
   await waitForSignInReady(signInCard)
   await fillSignInForm(signInCard, credentials, credentials.password)
   await signInCard.getByRole('button', { name: 'Enter Platform' }).click()
@@ -329,8 +329,16 @@ async function signOutViaUi(page) {
   const signOutButton = page.getByRole('button', { name: 'Sign Out' }).first()
   if (await signOutButton.isVisible()) {
     await signOutButton.click()
-    await expect(page.getByRole('heading', { name: 'Access your operational workspace.' })).toBeVisible()
+    await expectSignInShellReady(page)
   }
+}
+
+async function expectSignInShellReady(page) {
+  await expect(page).toHaveURL(/\/sign-in(?:$|[?#])/)
+  const signInCard = page.locator('.public-signin-card')
+  await expect(signInCard).toBeVisible()
+  await expect(page.getByRole('heading', { name: signInHeadingPattern }).first()).toBeVisible()
+  return signInCard
 }
 
 async function fillSignInForm(signInCard, credentials, password) {
@@ -2458,8 +2466,7 @@ async function ensureAlertAndRecommendationCoverage(api) {
 
 test('auth flow and the full authenticated page system render cleanly in a browser', async ({ page }) => {
   await page.goto('/dashboard')
-  await expect(page.getByRole('heading', { name: 'Access your operational workspace.' })).toBeVisible()
-  const signInCard = page.locator('.public-signin-card')
+  const signInCard = await expectSignInShellReady(page)
   await waitForSignInReady(signInCard)
 
   await fillSignInForm(signInCard, users.operationsLead, 'wrong-code')
@@ -2920,8 +2927,7 @@ test('alerts, recommendations, orders, inventory, integrations, users, profile, 
 
 test('frontend surfaces backend auth rate limiting without getting stuck in a loading state', async ({ page }) => {
   await page.goto('/sign-in')
-  await expect(page.getByRole('heading', { name: 'Access your operational workspace.' })).toBeVisible()
-  const signInCard = page.locator('.public-signin-card')
+  const signInCard = await expectSignInShellReady(page)
   await waitForSignInReady(signInCard)
 
   await triggerUiAuthRateLimit(page, signInCard, users.operationsLead)
