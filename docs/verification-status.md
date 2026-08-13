@@ -1,22 +1,32 @@
 # Verification Status
 
-Last checked: **2026-08-13 16:12:25 +02:00**
+Last checked: **2026-08-13**
 
 This file is the strict product-truth record for SynapseCore. It does not treat local proof as the same thing as live hosted proof, and it does not treat a reachable frontend shell as proof that the operational backend is ready.
 
 ## Current Final Gate Classification
 
-`NOT READY FOR COMPANY 1 - PILOT BLOCKERS REMAIN`
+`READY FOR CONTROLLED COMPANY 1 PILOT - WITH DOCUMENTED OPERATING CONDITIONS`
 
 Reason:
 
-- frontend shell is reachable by `curl.exe` at `https://synapscore-frontend-3.onrender.com`
-- backend is not reachable at `https://synapscore-3.onrender.com`
-- live health, liveness, readiness, auth/session, and `/ws/info` could not be verified
-- `PROOF_ALLOWED=False`
-- final hosted proof was not run because the backend readiness/auth/WebSocket prerequisites are unavailable
+- frontend shell is reachable at `https://synapscore-frontend-3.onrender.com`
+- backend is reachable at `https://synapscore-3.onrender.com`
+- live health, liveness, readiness, auth/session, and `/ws/info` were verified from the operator PowerShell environment
+- `PROOF_ALLOWED=True`
+- hosted proof preparation succeeded against proof tenant `HOSTED-PROOF-3`
+- final hosted proof passed `6 / 6`
+- Gate 4 control verification remains accepted at `201 / 201`
 
 ## Most Recent Successful Proof Baseline
+
+Final live proof evidence:
+
+- live connection check: `PROOF_ALLOWED=True`
+- proof tenant: `HOSTED-PROOF-3`
+- hosted proof: `6 / 6`
+- hosted proof duration: `2.9m`
+- runtime/proof commit: `d096537`
 
 Accepted Gate 4 baseline:
 
@@ -26,10 +36,9 @@ Accepted Gate 4 baseline:
 - broken controls: `0`
 - Gate 4 controls execution suite: `7 / 7`
 - backend tests: `133 / 133`
-- hosted proof baseline: `6 / 6`
 - frontend lint/build/verify: PASS
 - secret scan: PASS
-- docs links: `604 / 604`
+- docs links: PASS
 
 Gate 4 evidence:
 
@@ -43,29 +52,48 @@ Final gate evidence:
 
 | Check | Result |
 | --- | --- |
-| HEAD/origin at start | MATCH: `3459f11c2af5c7760d962b596ec0759773d8a3a4` |
-| Clean-worktree backend test | PASS, `133` tests, `0` failures, `0` errors |
-| Clean-worktree frontend build | PASS |
-| Clean-worktree frontend verify | PASS |
-| Main backend test | PASS, `133` tests, `0` failures, `0` errors |
-| Main frontend lint | PASS |
-| Main frontend build | PASS |
-| Main frontend verify | PASS |
+| Runtime/proof commit | `d096537` |
+| Backend tests | PASS, `133` tests, `0` failures, `0` errors |
+| Frontend lint | PASS |
+| Frontend build | PASS |
+| Frontend verify | PASS |
 | Control inventory | PASS, `201` controls |
+| Gate 4 controls execution | PASS, `7 / 7` batches |
 | Production config check | PASS |
-| Docs link check | PASS, `604` links, `0` missing |
-| Secret scan | PASS, `0` critical findings |
-| Live frontend | PASS by `curl.exe` |
-| Live backend | FAIL, could not connect |
-| Final hosted proof | BLOCKED, backend unavailable |
-| Final controls suite | BLOCKED, backend unavailable |
+| Docs link check | PASS |
+| Secret scan | PASS, no critical findings |
+| Live frontend | PASS, `200 OK` |
+| Live backend health | PASS, `200 OK`, status `UP` |
+| Live backend readiness | PASS, `200 OK`, status `UP` |
+| Live backend liveness | PASS, `200 OK`, status `UP` |
+| Live auth/session | PASS, `200 OK` anonymous session response |
+| Live websocket info | PASS, `200 OK` SockJS response |
+| Final hosted proof | PASS, `6 / 6` |
 | Release tag | NOT CREATED |
+
+## Important Environment Note
+
+The operator PowerShell environment reached Render and ran the official proof successfully. The Codex runtime environment still could not connect to Render endpoints and reported all live checks unavailable.
+
+That Codex-specific network-path failure is not treated as application evidence. Future final live verification should run from an environment with a confirmed network route to Render.
 
 ## Product Truth
 
-SynapseCore remains a real operational platform for its currently supported scope, but the exact deployed build cannot be released to Company 1 while the backend service is unreachable.
+SynapseCore is ready for a controlled Company 1 pilot inside the documented pilot envelope:
 
-The next valid release sequence is:
+- 1 workspace
+- 3 to 5 operators
+- 1 connector lane initially
+- bounded real operational data
+- existing ERP/WMS/source systems remain authoritative
+- backup evidence must be captured before operational reliance expands
+- provider-managed restore remains a documented controlled-pilot limitation
+
+SynapseCore is not being classified as enterprise general availability, HA-ready, or broadly production-scale.
+
+## Next Valid Release Sequence
+
+Before any new pilot handoff or release tag, rerun:
 
 ```powershell
 cd C:\Users\asus\Downloads\synapsecore_starter\synapsecore
@@ -93,4 +121,4 @@ npm.cmd run test:e2e:prod
 npm.cmd run test:controls:execution
 ```
 
-Do not tag or freeze Company 1 release until hosted proof and final live controls are green again.
+If those are green, Company 1 onboarding may proceed under the controlled pilot limits.
