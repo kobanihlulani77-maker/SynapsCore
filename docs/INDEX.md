@@ -186,6 +186,7 @@ This index links the main product, architecture, runbook, proof, and operator do
 - [company-1-presentation-pack.md](company-1-presentation-pack.md)
 - [company-1-pilot-intake-pack.md](company-1-pilot-intake-pack.md)
 - [company-tenant-workspace-provisioning-runbook.md](company-tenant-workspace-provisioning-runbook.md)
+- [company-user-provisioning-runbook.md](company-user-provisioning-runbook.md)
 - [pilot-release-candidate.md](pilot-release-candidate.md)
 - [pilot-company-onboarding-checklist.md](pilot-company-onboarding-checklist.md)
 - [pilot-operator-checklist.md](pilot-operator-checklist.md)
@@ -202,6 +203,7 @@ This index links the main product, architecture, runbook, proof, and operator do
 - [templates/pilot-final-report-template.md](templates/pilot-final-report-template.md)
 - [templates/pilot-incident-log-template.md](templates/pilot-incident-log-template.md)
 - [templates/company-provisioning-record.md](templates/company-provisioning-record.md)
+- [templates/company-user-provisioning-record.md](templates/company-user-provisioning-record.md)
 
 ## Pilot Release Candidate
 
