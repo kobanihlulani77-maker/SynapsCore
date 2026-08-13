@@ -2391,6 +2391,16 @@ display: grid;
   margin-bottom: 16px;
 }
 
+.catalog-workflow-grid > .section-card {
+  min-width: 0;
+  position: relative;
+}
+
+.catalog-workflow-grid .history-action-row {
+  position: relative;
+  z-index: 2;
+}
+
 
 .catalog-review-workbench {
 grid-template-columns: minmax(420px, 1.12fr) minmax(320px, 0.88fr);
