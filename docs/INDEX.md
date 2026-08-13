@@ -201,6 +201,7 @@ This index links the main product, architecture, runbook, proof, and operator do
 
 ## Pilot Release Candidate
 
+- [final-pre-pilot-release-gate.md](final-pre-pilot-release-gate.md)
 - [pilot-release-candidate.md](pilot-release-candidate.md)
 - [release-evidence-2026-08-03.md](release-evidence-2026-08-03.md)
 - [pilot-company-onboarding-checklist.md](pilot-company-onboarding-checklist.md)

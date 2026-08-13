@@ -94,10 +94,14 @@ function Assert-EnvEquals {
 function Test-SynapsePlaceholderValues {
     param(
         [Parameter(Mandatory = $true)]
+        [AllowEmptyString()]
         [string[]]$Values
     )
 
     foreach ($value in $Values) {
+        if ([string]::IsNullOrWhiteSpace($value)) {
+            continue
+        }
         if ($value -match 'change-me|example\.com|example\.internal|set-at-release') {
             return $true
         }

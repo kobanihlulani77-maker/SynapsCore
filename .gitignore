@@ -15,6 +15,7 @@ backend/target/
 frontend/node_modules/
 frontend/dist/
 frontend/playwright-report/
+frontend/playwright-report-controls/
 frontend/test-results/
 frontend/.hosted-proof/
 frontend/.visual-audit/
