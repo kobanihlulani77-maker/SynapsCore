@@ -23,6 +23,7 @@ const launchOptions = browserExecutablePath
 
 export default defineConfig({
   testDir: './tests',
+  testMatch: ['prod-proof.spec.mjs'],
   globalSetup: './tests/prod-proof.global-setup.mjs',
   timeout: 180_000,
   expect: {

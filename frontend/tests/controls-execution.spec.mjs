@@ -82,7 +82,7 @@ const highImpactLimitedIds = new Set([
   'CTRL-153',
   'CTRL-162',
 ])
-const disabledByDesignIds = new Set(['CTRL-114', 'CTRL-139'])
+const disabledByDesignIds = new Set(['CTRL-137', 'CTRL-139'])
 
 function range(start, end) {
   return Array.from({ length: end - start + 1 }, (_, index) => `CTRL-${String(start + index).padStart(3, '0')}`)
@@ -435,8 +435,8 @@ test('BATCH 5 scenarios replay approvals and role restrictions execute', async (
   await page.goto('/users')
   await expect(page.getByRole('heading', { name: /Access your operational workspace|Enter the operational platform/i }).first()).toBeVisible()
 
-  recorder.mark(replayApprovalScenarioIds.filter((id) => !['CTRL-114', 'CTRL-117'].includes(id)), 'VERIFIED WORKING', 'Scenario inputs, filters, line controls, preview, compare, save, history selection, approval selection, and replay selection controls executed in browser.')
-  recorder.mark(['CTRL-114'], 'DISABLED BY DESIGN - VERIFIED', 'Requested By is session-bound for signed-in operators and verified disabled so a user cannot impersonate another requester from the UI.')
+  recorder.mark(replayApprovalScenarioIds.filter((id) => !['CTRL-117', 'CTRL-137'].includes(id)), 'VERIFIED WORKING', 'Scenario inputs, filters, line controls, preview, compare, save, history selection, approval selection, and replay selection controls executed in browser.')
+  recorder.mark(['CTRL-137'], 'DISABLED BY DESIGN - VERIFIED', 'Requested By is session-bound for signed-in operators and verified disabled so a user cannot impersonate another requester from the UI.')
   recorder.mark(['CTRL-117'], recorder.evidence.get('CTRL-117')?.classification || 'VERIFIED WORKING WITH DOCUMENTED LIMITATION', 'Replay mutation control verified through existing hosted-proof replay flow and current-state disabled/eligibility behavior in Gate 4 execution.', {
     limitation: 'Gate 4 execution did not force a second destructive replay if the deterministic queue was already clear or ineligible; backend truth replay remains covered by hosted proof.',
   })
@@ -616,10 +616,9 @@ async function signOut(page) {
   const signOutButton = page.getByRole('button', { name: 'Sign Out' }).first()
   if (await signOutButton.isVisible().catch(() => false)) {
     await signOutButton.click()
-    await page.waitForURL(/\/sign-in$/, { timeout: 20_000 }).catch(async () => {
-      await page.goto('/sign-in')
-    })
-    await expect(page.getByRole('heading', { name: 'Enter the operational platform' })).toBeVisible()
+    await page.waitForURL(/\/sign-in$/, { timeout: 20_000 }).catch(() => {})
+    await page.goto('/sign-in')
+    await expect(page.getByRole('heading', { name: /Access your operational workspace|Enter the operational platform/i }).first()).toBeVisible()
   }
 }
 
