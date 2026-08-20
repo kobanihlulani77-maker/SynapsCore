@@ -51,6 +51,20 @@ public class AccessControlService {
             actionDescription);
     }
 
+    public SynapseActorContext requireIntegrationRead(String actionDescription) {
+        AccessOperator operator = requireCurrentOperator(actionDescription);
+        if (operator == null) {
+            return new SynapseActorContext("dev-anonymous", Set.of(), java.util.List.of());
+        }
+        if (operator.getRoles().stream().noneMatch(role ->
+                role == SynapseAccessRole.INTEGRATION_ADMIN || role == SynapseAccessRole.INTEGRATION_OPERATOR)) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN,
+                "Signed-in operator " + operator.getActorName()
+                    + " requires an integration role to " + actionDescription + ".");
+        }
+        return actorContext(operator, operator.getRoles());
+    }
+
     public SynapseActorContext requireTenantAdmin(String actionDescription) {
         return requireAnyRole(Set.of(SynapseAccessRole.TENANT_ADMIN), actionDescription);
     }

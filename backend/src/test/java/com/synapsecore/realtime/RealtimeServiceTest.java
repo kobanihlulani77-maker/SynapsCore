@@ -148,6 +148,7 @@ class RealtimeServiceTest {
                 "/topic/tenant/STARTER-OPS/integrations.connectors",
                 "/topic/tenant/STARTER-OPS/integrations.imports",
                 "/topic/tenant/STARTER-OPS/integrations.replay",
+                "/topic/tenant/STARTER-OPS/integrations.changed",
                 "/topic/tenant/STARTER-OPS/scenarios.notifications",
                 "/topic/tenant/STARTER-OPS/scenarios.escalated"
             );
@@ -221,7 +222,8 @@ class RealtimeServiceTest {
                 "/topic/tenant/STARTER-OPS/system.incidents",
                 "/topic/tenant/STARTER-OPS/integrations.connectors",
                 "/topic/tenant/STARTER-OPS/integrations.imports",
-                "/topic/tenant/STARTER-OPS/integrations.replay"
+                "/topic/tenant/STARTER-OPS/integrations.replay",
+                "/topic/tenant/STARTER-OPS/integrations.changed"
             );
         assertThat(channel.payloadFor("/topic/tenant/STARTER-OPS/events.recent")).isEqualTo(recentEvents);
         assertThat(channel.payloadFor("/topic/tenant/STARTER-OPS/audit.recent")).isEqualTo(auditLogs);

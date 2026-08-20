@@ -3905,7 +3905,7 @@ class MvpFlowIntegrationTest {
         assertThat(replayRecord.getStatus()).isEqualTo(com.synapsecore.domain.entity.IntegrationReplayStatus.PENDING);
 
         mockMvc.perform(get("/api/integrations/orders/replay-queue")
-                .with(accessHeaders("Operations Lead", "TENANT_ADMIN"))
+                .with(accessHeaders("Integration Operator", "INTEGRATION_OPERATOR"))
                 .header("X-Synapse-Tenant", "STARTER-OPS"))
             .andExpect(status().isOk())
             .andExpect(jsonPath("$[?(@.externalOrderId == 'CSV-DISABLED-1001')].sourceSystem")
@@ -4121,7 +4121,7 @@ class MvpFlowIntegrationTest {
         assertThat(replayRecord.getFailureCode()).isEqualTo(com.synapsecore.integration.IntegrationFailureCode.CONNECTOR_DISABLED);
         assertThat(replayRecord.getReplayAttemptCount()).isZero();
         mockMvc.perform(get("/api/integrations/orders/replay-queue")
-                .with(accessHeaders("Operations Lead", "TENANT_ADMIN"))
+                .with(accessHeaders("Integration Operator", "INTEGRATION_OPERATOR"))
                 .header("X-Synapse-Tenant", "STARTER-OPS"))
             .andExpect(status().isOk())
             .andExpect(jsonPath("$[?(@.externalOrderId == 'CSV-AUTO-1001')].status")

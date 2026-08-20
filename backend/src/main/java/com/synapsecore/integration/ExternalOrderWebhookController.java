@@ -81,7 +81,7 @@ public class ExternalOrderWebhookController {
     @GetMapping("/connectors")
     public List<IntegrationConnectorResponse> getConnectors(@RequestParam(required = false) String sourceSystem,
                                                             @RequestParam(required = false) IntegrationConnectorType type) {
-        accessControlService.requireWorkspaceAccess("view integration connectors");
+        accessControlService.requireIntegrationRead("view integration connectors");
         return integrationConnectorService.getConnectors(sourceSystem, type);
     }
 
@@ -96,13 +96,13 @@ public class ExternalOrderWebhookController {
 
     @GetMapping("/imports/recent")
     public List<IntegrationImportRunResponse> getRecentImportRuns() {
-        accessControlService.requireWorkspaceAccess("view recent integration imports");
+        accessControlService.requireIntegrationRead("view recent integration imports");
         return integrationImportRunService.getRecentRuns();
     }
 
     @GetMapping("/replay-queue")
     public List<IntegrationReplayRecordResponse> getReplayQueue(@RequestParam(required = false) String externalOrderId) {
-        accessControlService.requireWorkspaceAccess("view integration replay queue");
+        accessControlService.requireIntegrationRead("view integration replay queue");
         return integrationReplayService.getReplayQueue(externalOrderId);
     }
 

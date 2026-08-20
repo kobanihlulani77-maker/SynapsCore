@@ -95,6 +95,7 @@ class PlatformTenantAccessBoundaryIntegrationTest {
         warehouseB = warehouseCodes.get(1);
 
         MockHttpSession admin = tenantLogin(REHEARSAL_TENANT, TENANT_ADMIN_USERNAME, TENANT_ADMIN_PASSWORD);
+        createRoleUser(admin, "boundary.tenant.admin", "TENANT_ADMIN", List.of());
         createRoleUser(admin, "boundary.review", "REVIEW_OWNER", List.of(warehouseA));
         createRoleUser(admin, "boundary.final", "FINAL_APPROVER", List.of(warehouseA));
         createRoleUser(admin, "boundary.escalation", "ESCALATION_OWNER", List.of(warehouseA));
@@ -181,6 +182,39 @@ class PlatformTenantAccessBoundaryIntegrationTest {
             mockMvc.perform(get("/api/access/admin/users").session(session))
                 .andExpect(status().isForbidden());
         }
+    }
+
+    @Test
+    void integrationReadVisibilityFollowsAssignedResponsibility() throws Exception {
+        for (String username : List.of(
+            "boundary.tenant.admin",
+            "boundary.review",
+            "boundary.final",
+            "boundary.escalation"
+        )) {
+            MockHttpSession session = tenantLogin(REHEARSAL_TENANT, username, ROLE_PASSWORD);
+            mockMvc.perform(get("/api/integrations/orders/connectors").session(session))
+                .andExpect(status().isForbidden());
+            mockMvc.perform(get("/api/integrations/orders/imports/recent").session(session))
+                .andExpect(status().isForbidden());
+            mockMvc.perform(get("/api/integrations/orders/replay-queue").session(session))
+                .andExpect(status().isForbidden());
+        }
+
+        for (String username : List.of("boundary.integration.admin", "boundary.integration.operator")) {
+            MockHttpSession session = tenantLogin(REHEARSAL_TENANT, username, ROLE_PASSWORD);
+            mockMvc.perform(get("/api/integrations/orders/connectors").session(session))
+                .andExpect(status().isOk());
+            mockMvc.perform(get("/api/integrations/orders/imports/recent").session(session))
+                .andExpect(status().isOk());
+            mockMvc.perform(get("/api/integrations/orders/replay-queue").session(session))
+                .andExpect(status().isOk());
+        }
+
+        MockHttpSession tenantAdmin = tenantLogin(REHEARSAL_TENANT, "boundary.tenant.admin", ROLE_PASSWORD);
+        mockMvc.perform(get("/api/access/admin/workspace").session(tenantAdmin))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.connectors").isArray());
     }
 
     @Test

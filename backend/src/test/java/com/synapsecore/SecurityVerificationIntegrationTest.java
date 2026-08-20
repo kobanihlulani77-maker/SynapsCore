@@ -188,7 +188,7 @@ class SecurityVerificationIntegrationTest {
             .andExpect(content().string(Matchers.not(Matchers.containsString(SECOND_TENANT_PRODUCT_SKU))));
 
         mockMvc.perform(get("/api/integrations/orders/replay-queue")
-                .session(fixture.starterAdminSession())
+                .session(fixture.starterIntegrationOperatorSession())
                 .header("X-Synapse-Tenant", SECOND_TENANT_CODE))
             .andExpect(status().isOk())
             .andExpect(content().string(Matchers.not(Matchers.containsString(SECOND_TENANT_REPLAY_ORDER_ID))));

@@ -1,9 +1,12 @@
 package com.synapsecore.config;
 
 import com.synapsecore.auth.AuthSessionService;
+import com.synapsecore.access.SynapseAccessRole;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Set;
+import java.util.stream.Collectors;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.context.annotation.Configuration;
@@ -29,6 +32,8 @@ import org.springframework.web.socket.server.HandshakeInterceptor;
 public class WebSocketConfig implements WebSocketMessageBrokerConfigurer {
 
     private static final String SESSION_TENANT_CODE_ATTRIBUTE = "synapsecoreTenantCode";
+    static final String SESSION_ROLES_ATTRIBUTE = "synapsecoreRoles";
+    static final String SESSION_TENANT_WIDE_ATTRIBUTE = "synapsecoreTenantWide";
     private static final Logger log = LoggerFactory.getLogger(WebSocketConfig.class);
 
     private final List<String> allowedOrigins;
@@ -124,6 +129,16 @@ public class WebSocketConfig implements WebSocketMessageBrokerConfigurer {
                         SESSION_TENANT_CODE_ATTRIBUTE,
                         authenticatedSession.tenant().getCode().trim().toUpperCase(Locale.ROOT)
                     );
+                    attributes.put(
+                        SESSION_ROLES_ATTRIBUTE,
+                        authenticatedSession.operator().getRoles().stream()
+                            .map(Enum::name)
+                            .collect(Collectors.toUnmodifiableSet())
+                    );
+                    attributes.put(
+                        SESSION_TENANT_WIDE_ATTRIBUTE,
+                        authenticatedSession.operator().getWarehouseScopes().isEmpty()
+                    );
                     return true;
                 })
                 .orElseGet(() -> {
@@ -144,7 +159,18 @@ public class WebSocketConfig implements WebSocketMessageBrokerConfigurer {
         }
     }
 
-    private static final class TenantSubscriptionChannelInterceptor implements ChannelInterceptor {
+    static final class TenantSubscriptionChannelInterceptor implements ChannelInterceptor {
+
+        private static final Set<String> TENANT_WIDE_RAW_SUFFIXES = Set.of(
+            "/INVENTORY",
+            "/FULFILLMENT.OVERVIEW",
+            "/ORDERS.RECENT",
+            "/SCENARIOS.NOTIFICATIONS",
+            "/SCENARIOS.ESCALATED",
+            "/INTEGRATIONS.CONNECTORS",
+            "/INTEGRATIONS.IMPORTS",
+            "/INTEGRATIONS.REPLAY"
+        );
 
         @Override
         public Message<?> preSend(Message<?> message, MessageChannel channel) {
@@ -184,7 +210,42 @@ public class WebSocketConfig implements WebSocketMessageBrokerConfigurer {
                 );
             }
 
+            if (!normalizedDestination.startsWith(expectedPrefix.toUpperCase(Locale.ROOT))) {
+                return message;
+            }
+
+            String destinationSuffix = normalizedDestination.substring(expectedPrefix.length());
+            Set<String> roles = readRoles(sessionAttributes);
+            boolean integrationRole = roles.contains(SynapseAccessRole.INTEGRATION_ADMIN.name())
+                || roles.contains(SynapseAccessRole.INTEGRATION_OPERATOR.name());
+            if (destinationSuffix.startsWith("INTEGRATIONS.") && !integrationRole) {
+                log.warn("Realtime integration subscription rejected for tenant {} because the session lacks an integration role.",
+                    tenantCode);
+                throw new IllegalArgumentException("An integration role is required for integration realtime subscriptions.");
+            }
+
+            boolean tenantWide = Boolean.TRUE.equals(sessionAttributes.get(SESSION_TENANT_WIDE_ATTRIBUTE));
+            String normalizedSuffix = "/" + destinationSuffix;
+            if (TENANT_WIDE_RAW_SUFFIXES.contains(normalizedSuffix) && !tenantWide) {
+                log.warn("Realtime raw subscription rejected for tenant {} because the session is warehouse-scoped.", tenantCode);
+                throw new IllegalArgumentException(
+                    "Warehouse-scoped sessions must refresh filtered operational data through tenant APIs."
+                );
+            }
+
             return message;
+        }
+
+        private Set<String> readRoles(Map<String, Object> sessionAttributes) {
+            Object value = sessionAttributes.get(SESSION_ROLES_ATTRIBUTE);
+            if (!(value instanceof Set<?> values)) {
+                return Set.of();
+            }
+            return values.stream()
+                .filter(String.class::isInstance)
+                .map(String.class::cast)
+                .map(role -> role.trim().toUpperCase(Locale.ROOT))
+                .collect(Collectors.toUnmodifiableSet());
         }
     }
 }

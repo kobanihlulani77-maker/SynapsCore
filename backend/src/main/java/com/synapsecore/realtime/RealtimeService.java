@@ -4,6 +4,8 @@ import com.synapsecore.audit.RequestTraceContext;
 import com.synapsecore.domain.service.DashboardService;
 import com.synapsecore.domain.service.OperationalViewService;
 import com.synapsecore.tenant.TenantContextService;
+import java.time.Instant;
+import java.util.Map;
 import java.util.Locale;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -41,6 +43,7 @@ public class RealtimeService {
             realtimePublisher.publish(topic(normalizedTenantCode, "/integrations.connectors"), operationalViewService.getIntegrationConnectors());
             realtimePublisher.publish(topic(normalizedTenantCode, "/integrations.imports"), operationalViewService.getRecentIntegrationImportRuns());
             realtimePublisher.publish(topic(normalizedTenantCode, "/integrations.replay"), operationalViewService.getIntegrationReplayQueue());
+            realtimePublisher.publish(topic(normalizedTenantCode, "/integrations.changed"), Map.of("changedAt", Instant.now()));
             realtimePublisher.publish(topic(normalizedTenantCode, "/scenarios.notifications"), operationalViewService.getScenarioNotifications());
             realtimePublisher.publish(topic(normalizedTenantCode, "/scenarios.escalated"), operationalViewService.getSlaEscalations());
         });
@@ -55,6 +58,7 @@ public class RealtimeService {
             realtimePublisher.publish(topic(normalizedTenantCode, "/integrations.connectors"), operationalViewService.getIntegrationConnectors());
             realtimePublisher.publish(topic(normalizedTenantCode, "/integrations.imports"), operationalViewService.getRecentIntegrationImportRuns());
             realtimePublisher.publish(topic(normalizedTenantCode, "/integrations.replay"), operationalViewService.getIntegrationReplayQueue());
+            realtimePublisher.publish(topic(normalizedTenantCode, "/integrations.changed"), Map.of("changedAt", Instant.now()));
         });
     }
 
