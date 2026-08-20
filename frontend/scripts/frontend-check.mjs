@@ -1,7 +1,7 @@
 import fs from 'node:fs/promises'
 import path from 'node:path'
 import process from 'node:process'
-import { fileURLToPath } from 'node:url'
+import { fileURLToPath, pathToFileURL } from 'node:url'
 
 const scriptDir = path.dirname(fileURLToPath(import.meta.url))
 const frontendRoot = path.resolve(scriptDir, '..')
@@ -125,6 +125,7 @@ async function main() {
   }
 
   const pageRegistry = await fs.readFile(path.join(srcDir, 'config', 'pageRegistry.js'), 'utf8')
+  const pageRegistryModule = await import(pathToFileURL(path.join(srcDir, 'config', 'pageRegistry.js')).href)
   const platformApplication = await fs.readFile(path.join(srcDir, 'components', 'PlatformApplication.jsx'), 'utf8')
   const tenantAppRoutes = await fs.readFile(path.join(srcDir, 'components', 'AppRoutes.jsx'), 'utf8')
   const workspaceAppModel = await fs.readFile(path.join(srcDir, 'hooks', 'useWorkspaceAppModel.js'), 'utf8')
@@ -147,6 +148,32 @@ async function main() {
   accessBoundarySignals.forEach(([valid, message]) => {
     if (!valid) failures.push(message)
   })
+
+  const restrictedPages = ['approvals', 'escalations', 'integrations', 'replay', 'users', 'settings']
+  const rolePageMatrix = {
+    TENANT_ADMIN: ['users', 'settings'],
+    INTEGRATION_ADMIN: ['integrations', 'replay'],
+    INTEGRATION_OPERATOR: ['integrations', 'replay'],
+    REVIEW_OWNER: ['approvals'],
+    FINAL_APPROVER: ['approvals'],
+    ESCALATION_OWNER: ['escalations'],
+  }
+
+  for (const [role, expectedPages] of Object.entries(rolePageMatrix)) {
+    const expected = new Set(expectedPages)
+    const navigationPages = new Set(
+      pageRegistryModule.buildRoleAwareNavGroups([role]).flatMap((group) => group.keys),
+    )
+    for (const pageKey of restrictedPages) {
+      const shouldAllow = expected.has(pageKey)
+      if (pageRegistryModule.canAccessWorkspacePage(pageKey, [role]) !== shouldAllow) {
+        failures.push(`${role} direct-route policy is incorrect for ${pageKey}.`)
+      }
+      if (navigationPages.has(pageKey) !== shouldAllow) {
+        failures.push(`${role} navigation policy is incorrect for ${pageKey}.`)
+      }
+    }
+  }
 
   if (failures.length) {
     console.error('Frontend launch-readiness check failed:\n')

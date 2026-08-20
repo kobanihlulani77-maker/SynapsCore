@@ -3,12 +3,15 @@ package com.synapsecore;
 import static org.springframework.http.MediaType.APPLICATION_JSON;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import com.synapsecore.access.BootstrapAccessService;
 import com.synapsecore.access.PlatformAdministrationAccessService;
+import com.synapsecore.domain.repository.AccessOperatorRepository;
+import com.synapsecore.domain.repository.AccessUserRepository;
 import com.synapsecore.domain.repository.WarehouseRepository;
 import com.synapsecore.domain.repository.ScenarioRunRepository;
 import com.synapsecore.domain.entity.ScenarioRunType;
@@ -64,6 +67,12 @@ class PlatformTenantAccessBoundaryIntegrationTest {
 
     @Autowired
     private WarehouseRepository warehouseRepository;
+
+    @Autowired
+    private AccessOperatorRepository accessOperatorRepository;
+
+    @Autowired
+    private AccessUserRepository accessUserRepository;
 
     @Autowired
     private ScenarioRunRepository scenarioRunRepository;
@@ -168,20 +177,181 @@ class PlatformTenantAccessBoundaryIntegrationTest {
     }
 
     @Test
-    void roleSessionsCannotReachPlatformOrUnrelatedAdministrativeActions() throws Exception {
-        for (String username : List.of(
-            "boundary.review",
-            "boundary.final",
-            "boundary.escalation",
-            "boundary.integration.admin",
-            "boundary.integration.operator"
-        )) {
-            MockHttpSession session = tenantLogin(REHEARSAL_TENANT, username, ROLE_PASSWORD);
-            mockMvc.perform(get("/api/platform/overview").session(session))
-                .andExpect(status().isForbidden());
-            mockMvc.perform(get("/api/access/admin/users").session(session))
+    void platformLogoutAndSignedOutRequestsCannotRetainAuthority() throws Exception {
+        MockHttpSession platformSession = platformLogin();
+
+        mockMvc.perform(get("/api/dashboard/summary").session(platformSession))
+            .andExpect(status().isForbidden());
+        mockMvc.perform(post("/api/platform/session/logout").session(platformSession))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.signedIn").value(false));
+
+        mockMvc.perform(get("/api/platform/session"))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.signedIn").value(false));
+        for (String endpoint : platformEndpoints()) {
+            mockMvc.perform(get(endpoint))
                 .andExpect(status().isForbidden());
         }
+    }
+
+    @Test
+    void allSixRolesExposeOnlyTheirOwnSessionIdentityAndExpectedWorkspaceReads() throws Exception {
+        for (RoleExpectation expectation : roleExpectations()) {
+            MockHttpSession session = tenantLogin(REHEARSAL_TENANT, expectation.username(), ROLE_PASSWORD);
+            var sessionResult = mockMvc.perform(get("/api/auth/session").session(session))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.signedIn").value(true))
+                .andExpect(jsonPath("$.tenantCode").value(REHEARSAL_TENANT))
+                .andExpect(jsonPath("$.username").value(expectation.username()))
+                .andExpect(jsonPath("$.roles[0]").value(expectation.role()));
+            if (expectation.tenantWide()) {
+                sessionResult.andExpect(jsonPath("$.warehouseScopes").isEmpty());
+            } else {
+                sessionResult.andExpect(jsonPath("$.warehouseScopes[0]").value(warehouseA));
+            }
+
+            for (String endpoint : List.of(
+                "/api/dashboard/summary",
+                "/api/products",
+                "/api/system/runtime",
+                "/api/events/recent",
+                "/api/audit/recent"
+            )) {
+                mockMvc.perform(get(endpoint).session(session))
+                    .andExpect(status().isOk());
+            }
+        }
+    }
+
+    @Test
+    void roleSessionsCannotReachPlatformOrUnrelatedAdministrativeActions() throws Exception {
+        for (RoleExpectation expectation : roleExpectations()) {
+            MockHttpSession session = tenantLogin(REHEARSAL_TENANT, expectation.username(), ROLE_PASSWORD);
+            mockMvc.perform(get("/api/platform/session").session(session))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.signedIn").value(false));
+            for (String endpoint : platformEndpoints()) {
+                mockMvc.perform(get(endpoint).session(session))
+                    .andExpect(status().isForbidden());
+            }
+            mockMvc.perform(get("/api/access/tenants").session(session))
+                .andExpect(status().isForbidden());
+
+            if (expectation.tenantWide()) {
+                mockMvc.perform(get("/api/access/admin/users").session(session))
+                    .andExpect(status().isOk());
+            } else {
+                mockMvc.perform(get("/api/access/admin/users").session(session))
+                    .andExpect(status().isForbidden());
+            }
+        }
+    }
+
+    @Test
+    void roleClashesDoNotGrantUnrelatedAdministrativeOrConnectorWrites() throws Exception {
+        for (RoleExpectation expectation : roleExpectations()) {
+            MockHttpSession session = tenantLogin(REHEARSAL_TENANT, expectation.username(), ROLE_PASSWORD);
+            if (!"TENANT_ADMIN".equals(expectation.role())) {
+                mockMvc.perform(post("/api/products")
+                        .session(session)
+                        .contentType(APPLICATION_JSON)
+                        .content("""
+                            {"sku":"BOUNDARY-ROLE-CLASH-SKU","name":"Role Clash Fixture","category":"Verification"}
+                            """))
+                    .andExpect(status().isForbidden());
+                mockMvc.perform(get("/api/access/admin/workspace").session(session))
+                    .andExpect(status().isForbidden());
+            }
+
+            if (!"INTEGRATION_ADMIN".equals(expectation.role())) {
+                mockMvc.perform(post("/api/integrations/orders/connectors")
+                        .session(session)
+                        .contentType(APPLICATION_JSON)
+                        .content(connectorPayload("boundary_role_clash_denied")))
+                    .andExpect(status().isForbidden());
+            }
+        }
+
+        MockHttpSession tenantAdmin = tenantLogin(REHEARSAL_TENANT, "boundary.tenant.admin", ROLE_PASSWORD);
+        mockMvc.perform(post("/api/products")
+                .session(tenantAdmin)
+                .contentType(APPLICATION_JSON)
+                .content("""
+                    {"sku":"BOUNDARY-ROLE-ADMIN-SKU","name":"Role Admin Fixture","category":"Verification"}
+                    """))
+            .andExpect(status().isCreated());
+
+        MockHttpSession integrationAdmin = tenantLogin(
+            REHEARSAL_TENANT,
+            "boundary.integration.admin",
+            ROLE_PASSWORD
+        );
+        mockMvc.perform(post("/api/integrations/orders/connectors")
+                .session(integrationAdmin)
+                .contentType(APPLICATION_JSON)
+                .content(connectorPayload("boundary_role_connector")))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.sourceSystem").value("boundary_role_connector"));
+
+        MockHttpSession integrationOperator = tenantLogin(
+            REHEARSAL_TENANT,
+            "boundary.integration.operator",
+            ROLE_PASSWORD
+        );
+        mockMvc.perform(get("/api/integrations/orders/connectors").session(integrationOperator))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$[?(@.sourceSystem == 'boundary_role_connector')]").exists());
+    }
+
+    @Test
+    void disabledUsersAreRevokedAndScopeChangesApplyToExistingSessions() throws Exception {
+        MockHttpSession admin = tenantLogin(REHEARSAL_TENANT, TENANT_ADMIN_USERNAME, TENANT_ADMIN_PASSWORD);
+        var user = accessUserRepository
+            .findByTenant_CodeIgnoreCaseAndUsernameIgnoreCase(REHEARSAL_TENANT, "boundary.integration.operator")
+            .orElseThrow();
+        var operator = accessOperatorRepository
+            .findByTenant_CodeIgnoreCaseAndActorNameIgnoreCase(REHEARSAL_TENANT, "boundary.integration.operator")
+            .orElseThrow();
+
+        MockHttpSession sessionProbe = tenantLogin(
+            REHEARSAL_TENANT,
+            "boundary.integration.operator",
+            ROLE_PASSWORD
+        );
+        MockHttpSession protectedRequest = tenantLogin(
+            REHEARSAL_TENANT,
+            "boundary.integration.operator",
+            ROLE_PASSWORD
+        );
+        updateUser(admin, user.getId(), false, operator.getActorName());
+        mockMvc.perform(get("/api/auth/session").session(sessionProbe))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.signedIn").value(false));
+        mockMvc.perform(get("/api/inventory").session(protectedRequest))
+            .andExpect(status().isForbidden());
+
+        updateUser(admin, user.getId(), true, operator.getActorName());
+        MockHttpSession scopeSession = tenantLogin(
+            REHEARSAL_TENANT,
+            "boundary.integration.operator",
+            ROLE_PASSWORD
+        );
+        updateOperator(admin, operator.getId(), warehouseB);
+        mockMvc.perform(get("/api/auth/session").session(scopeSession))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.warehouseScopes[0]").value(warehouseB));
+        mockMvc.perform(get("/api/inventory").session(scopeSession))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$[?(@.warehouseCode == '" + warehouseB + "')]").exists())
+            .andExpect(jsonPath("$[?(@.warehouseCode == '" + warehouseA + "')]").doesNotExist());
+
+        updateOperator(admin, operator.getId(), warehouseA);
+        mockMvc.perform(post("/api/auth/session/logout").session(scopeSession))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.signedIn").value(false));
+        mockMvc.perform(get("/api/inventory"))
+            .andExpect(status().isForbidden());
     }
 
     @Test
@@ -318,6 +488,51 @@ class PlatformTenantAccessBoundaryIntegrationTest {
             .andExpect(jsonPath("$.allowedOrigins").doesNotExist());
     }
 
+    private List<String> platformEndpoints() {
+        return List.of(
+            "/api/platform/overview",
+            "/api/platform/tenants",
+            "/api/platform/runtime",
+            "/api/platform/activity"
+        );
+    }
+
+    private List<RoleExpectation> roleExpectations() {
+        return List.of(
+            new RoleExpectation("boundary.tenant.admin", "TENANT_ADMIN", true),
+            new RoleExpectation("boundary.integration.admin", "INTEGRATION_ADMIN", false),
+            new RoleExpectation("boundary.integration.operator", "INTEGRATION_OPERATOR", false),
+            new RoleExpectation("boundary.review", "REVIEW_OWNER", false),
+            new RoleExpectation("boundary.final", "FINAL_APPROVER", false),
+            new RoleExpectation("boundary.escalation", "ESCALATION_OWNER", false)
+        );
+    }
+
+    private void updateUser(MockHttpSession admin,
+                            Long userId,
+                            boolean active,
+                            String operatorActorName) throws Exception {
+        mockMvc.perform(put("/api/access/admin/users/" + userId)
+                .session(admin)
+                .contentType(APPLICATION_JSON)
+                .content("""
+                    {"fullName":"Boundary Integration Operator","active":%s,"operatorActorName":"%s"}
+                    """.formatted(active, operatorActorName)))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.active").value(active));
+    }
+
+    private void updateOperator(MockHttpSession admin, Long operatorId, String warehouseCode) throws Exception {
+        mockMvc.perform(put("/api/access/admin/operators/" + operatorId)
+                .session(admin)
+                .contentType(APPLICATION_JSON)
+                .content("""
+                    {"actorName":"boundary.integration.operator","displayName":"Boundary Integration Operator","description":"Synthetic boundary rehearsal role","active":true,"roles":["INTEGRATION_OPERATOR"],"warehouseScopes":["%s"]}
+                    """.formatted(warehouseCode)))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.warehouseScopes[0]").value(warehouseCode));
+    }
+
     private void onboardTenant(String tenantCode,
                                String tenantName,
                                String adminUsername,
@@ -396,10 +611,30 @@ class PlatformTenantAccessBoundaryIntegrationTest {
             .formatted(warehouseCode, quantity);
     }
 
+    private String connectorPayload(String sourceSystem) {
+        return """
+            {
+              "sourceSystem":"%s",
+              "type":"CSV_ORDER_IMPORT",
+              "displayName":"Boundary Role Connector",
+              "enabled":false,
+              "syncMode":"BATCH_FILE_DROP",
+              "validationPolicy":"RELAXED",
+              "transformationPolicy":"NORMALIZE_CODES",
+              "allowDefaultWarehouseFallback":false,
+              "defaultWarehouseCode":"%s",
+              "notes":"Synthetic role boundary verification."
+            }
+            """.formatted(sourceSystem, warehouseA);
+    }
+
     private String orderPayload(String externalOrderId, String warehouseCode) {
         String externalOrder = externalOrderId == null ? "null" : "\"" + externalOrderId + "\"";
         return "{\"externalOrderId\":" + externalOrder
             + ",\"warehouseCode\":\"" + warehouseCode
             + "\",\"items\":[{\"productSku\":\"BOUNDARY-SKU\",\"quantity\":1,\"unitPrice\":10.00}]}";
+    }
+
+    private record RoleExpectation(String username, String role, boolean tenantWide) {
     }
 }

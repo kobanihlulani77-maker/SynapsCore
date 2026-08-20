@@ -13,6 +13,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import com.synapsecore.auth.StarterAccessUsers;
 import com.synapsecore.domain.repository.AccessUserRepository;
 import com.synapsecore.domain.repository.IntegrationReplayRecordRepository;
+import com.synapsecore.domain.repository.ScenarioRunRepository;
 import java.nio.charset.StandardCharsets;
 import org.hamcrest.Matchers;
 import org.junit.jupiter.api.Test;
@@ -56,6 +57,9 @@ class SecurityVerificationIntegrationTest {
 
     @Autowired
     private IntegrationReplayRecordRepository integrationReplayRecordRepository;
+
+    @Autowired
+    private ScenarioRunRepository scenarioRunRepository;
 
     @Test
     void loginAuthenticatesAnonymousSessionAndLogoutClearsOldIdentity() throws Exception {
@@ -193,6 +197,12 @@ class SecurityVerificationIntegrationTest {
             .andExpect(status().isOk())
             .andExpect(content().string(Matchers.not(Matchers.containsString(SECOND_TENANT_REPLAY_ORDER_ID))));
 
+        mockMvc.perform(get("/api/integrations/orders/connectors")
+                .session(fixture.starterIntegrationOperatorSession())
+                .header("X-Synapse-Tenant", SECOND_TENANT_CODE))
+            .andExpect(status().isOk())
+            .andExpect(content().string(Matchers.not(Matchers.containsString(SECOND_TENANT_REPLAY_SOURCE))));
+
         mockMvc.perform(get("/api/dashboard/snapshot")
                 .session(fixture.starterAdminSession())
                 .header("X-Synapse-Tenant", SECOND_TENANT_CODE))
@@ -210,6 +220,37 @@ class SecurityVerificationIntegrationTest {
                 .header("X-Synapse-Tenant", SECOND_TENANT_CODE))
             .andExpect(status().isOk())
             .andExpect(content().string(Matchers.not(Matchers.containsString(SECOND_TENANT_ADMIN_USERNAME))));
+
+        mockMvc.perform(get("/api/access/admin/workspace")
+                .session(fixture.starterAdminSession())
+                .header("X-Synapse-Tenant", SECOND_TENANT_CODE))
+            .andExpect(status().isOk())
+            .andExpect(content().string(Matchers.not(Matchers.containsString(SECOND_TENANT_CODE))))
+            .andExpect(content().string(Matchers.not(Matchers.containsString(SECOND_TENANT_REPLAY_SOURCE))));
+
+        mockMvc.perform(get("/api/events/recent")
+                .session(fixture.starterAdminSession())
+                .header("X-Synapse-Tenant", SECOND_TENANT_CODE))
+            .andExpect(status().isOk())
+            .andExpect(content().string(Matchers.not(Matchers.containsString(SECOND_TENANT_ORDER_ID))));
+
+        mockMvc.perform(get("/api/audit/recent")
+                .session(fixture.starterAdminSession())
+                .header("X-Synapse-Tenant", SECOND_TENANT_CODE))
+            .andExpect(status().isOk())
+            .andExpect(content().string(Matchers.not(Matchers.containsString(SECOND_TENANT_ADMIN_USERNAME))))
+            .andExpect(content().string(Matchers.not(Matchers.containsString(SECOND_TENANT_REPLAY_SOURCE))));
+
+        mockMvc.perform(get("/api/scenarios/history")
+                .session(fixture.starterAdminSession())
+                .header("X-Synapse-Tenant", SECOND_TENANT_CODE))
+            .andExpect(status().isOk())
+            .andExpect(content().string(Matchers.not(
+                Matchers.containsString("\"id\":" + fixture.scenarioRunId()))));
+
+        mockMvc.perform(get("/api/scenarios/" + fixture.scenarioRunId() + "/request")
+                .session(fixture.starterAdminSession()))
+            .andExpect(status().isNotFound());
 
         mockMvc.perform(get("/api/access/operators")
                 .session(fixture.starterAdminSession())
@@ -396,6 +437,30 @@ class SecurityVerificationIntegrationTest {
             .andExpect(status().isCreated())
             .andExpect(jsonPath("$.externalOrderId").value(SECOND_TENANT_ORDER_ID));
 
+        mockMvc.perform(post("/api/scenarios/order-impact")
+                .session(secondTenantAdminSession)
+                .contentType(APPLICATION_JSON)
+                .content("""
+                    {
+                      "externalOrderId": null,
+                      "warehouseCode": "WH-NORTH",
+                      "items": [
+                        {
+                          "productSku": "%s",
+                          "quantity": 1,
+                          "unitPrice": 199.00
+                        }
+                      ]
+                    }
+                    """.formatted(SECOND_TENANT_PRODUCT_SKU)))
+            .andExpect(status().isOk());
+        Long secondTenantScenarioRunId = scenarioRunRepository
+            .findTop12ByTenant_CodeIgnoreCaseOrderByCreatedAtDesc(SECOND_TENANT_CODE)
+            .stream()
+            .findFirst()
+            .orElseThrow()
+            .getId();
+
         mockMvc.perform(post("/api/access/admin/operators")
                 .session(secondTenantAdminSession)
                 .contentType(APPLICATION_JSON)
@@ -514,7 +579,8 @@ class SecurityVerificationIntegrationTest {
             starterAdminSession,
             starterIntegrationOperatorSession,
             secondTenantAdminSession,
-            replayRecordId
+            replayRecordId,
+            secondTenantScenarioRunId
         );
     }
 
@@ -563,7 +629,8 @@ class SecurityVerificationIntegrationTest {
         MockHttpSession starterAdminSession,
         MockHttpSession starterIntegrationOperatorSession,
         MockHttpSession secondTenantAdminSession,
-        Long replayRecordId
+        Long replayRecordId,
+        Long scenarioRunId
     ) {
     }
 }
