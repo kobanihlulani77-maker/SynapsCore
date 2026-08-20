@@ -1,4 +1,4 @@
-import { startTransition } from 'react'
+import { startTransition, useEffect } from 'react'
 import useApi from './useApi'
 import useAuth from './useAuth'
 import useCatalogActions from './useCatalogActions'
@@ -19,6 +19,7 @@ import {
 } from '../services/api'
 import {
   buildPagePath,
+  canAccessWorkspacePage,
   pageLookup,
   resolvePageFromPath,
 } from '../config/pageRegistry'
@@ -229,6 +230,15 @@ export default function useWorkspaceAppModel() {
   })
 
   const activeTenantCode = authSessionState.session?.tenantCode || ''
+
+  useEffect(() => {
+    const session = authSessionState.session
+    const currentMeta = pageLookup[currentPage]
+    if (!session || currentMeta?.audience !== 'app') return
+    if (!canAccessWorkspacePage(currentPage, session.roles || [])) {
+      redirectToPage('dashboard')
+    }
+  }, [authSessionState.session, currentPage])
   const primaryContext = buildScenarioContext(scenarioForm)
   const alternativeContext = buildScenarioContext(comparisonForm)
   const signedInActorName = authSessionState.session?.actorName || ''

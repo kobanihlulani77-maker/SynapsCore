@@ -73,7 +73,7 @@ export default function SignInPage({ context }) {
             <p>Use the workspace code from your company admin. SynapseCore checks tenant context and operator credentials before protected actions unlock.</p>
           </div>
           <div className="enterprise-status-row">
-            <span className="enterprise-status-pill">{tenantDirectoryState.loading ? 'Checking workspace directory' : `${tenantDirectoryState.items.length} workspaces visible`}</span>
+            <span className="enterprise-status-pill">Workspace code required</span>
             <span className={`enterprise-status-pill ${wsUrl ? 'status-live' : 'status-missing'}`}>{wsUrl ? 'Realtime path ready' : 'Realtime not configured'}</span>
           </div>
           <div className="signin-support-list">
@@ -89,25 +89,21 @@ export default function SignInPage({ context }) {
           <p className="panel-kicker">Company sign in</p>
           <h2>Enter the operational platform</h2>
           <p className="muted-text">Sign in with workspace code, username, and password. If access fails, the company workspace admin manages resets and role changes.</p>
-          {tenantDirectoryState.loading && !tenantDirectoryState.items.length ? <LoadingState label="Loading available workspaces..." /> : null}
+          {tenantDirectoryState.loading ? <LoadingState label="Preparing secure workspace sign-in..." /> : null}
           <form className="signin-form-shell" onSubmit={submitWithValidation}>
             <div className="signin-form-grid">
               <label className="field">
                 <span>Company workspace code</span>
                 <input
                   type="text"
-                  list="tenant-workspace-options"
                   value={authSessionState.tenantCode}
                   onChange={(event) => setAuthSessionState((current) => ({ ...current, tenantCode: event.target.value.toUpperCase() }))}
-                  placeholder={tenantDirectoryState.loading ? 'Loading workspace directory...' : 'Enter company workspace code'}
+                  placeholder="Enter company workspace code"
                   autoComplete="organization"
                   disabled={signInBusy}
                   aria-invalid={workspaceCodeMissing}
                   onBlur={() => handleFieldBlur('tenantCode')}
                 />
-                <datalist id="tenant-workspace-options">
-                  {tenantDirectoryState.items.map((tenant) => <option key={tenant.code} value={tenant.code}>{tenant.name}</option>)}
-                </datalist>
                 <span className={`field-hint ${workspaceCodeMissing ? 'field-validation-warning' : ''}`}>
                   {workspaceCodeMissing
                     ? 'Enter the workspace code so SynapseCore can open the correct company environment.'
@@ -160,7 +156,7 @@ export default function SignInPage({ context }) {
               <article className="signin-status-card">
                 <span>Workspace target</span>
                 <strong>{selectedTenantOption?.name || authSessionState.tenantCode.trim() || 'Choose workspace code'}</strong>
-                <p>{selectedTenantOption ? 'The live workspace directory recognizes this company environment.' : 'Workspace codes point operators into the correct company operations environment.'}</p>
+                <p>Workspace codes point operators into the correct company operations environment without exposing the global tenant directory.</p>
               </article>
               <article className="signin-status-card">
                 <span>Access flow</span>

@@ -124,6 +124,23 @@ async function main() {
     }
   }
 
+  const pageRegistry = await fs.readFile(path.join(srcDir, 'config', 'pageRegistry.js'), 'utf8')
+  const platformApplication = await fs.readFile(path.join(srcDir, 'components', 'PlatformApplication.jsx'), 'utf8')
+  const tenantAppRoutes = await fs.readFile(path.join(srcDir, 'components', 'AppRoutes.jsx'), 'utf8')
+  const accessBoundarySignals = [
+    [pageRegistry.includes("audience: 'platform'"), 'Platform routes must use the dedicated platform audience.'],
+    [pageRegistry.includes('buildRoleAwareNavGroups'), 'Tenant navigation must be generated from role-aware policy.'],
+    [!pageRegistry.includes("keys: ['users', 'settings', 'profile', 'platform'"), 'Tenant navigation must not include platform routes.'],
+    [platformApplication.includes('/api/platform/session/login'), 'Platform UI must authenticate through the platform session endpoint.'],
+    [platformApplication.includes('/api/platform/overview'), 'Platform UI must read the metadata-only overview endpoint.'],
+    [!platformApplication.includes('localStorage'), 'Platform authority must not be stored in localStorage.'],
+    [!platformApplication.includes('X-Synapse-Platform-Admin-Token'), 'The browser must not receive the automation platform token.'],
+    [!tenantAppRoutes.includes('PlatformAdminPage'), 'Tenant route rendering must not retain the previous platform-admin page path.'],
+  ]
+  accessBoundarySignals.forEach(([valid, message]) => {
+    if (!valid) failures.push(message)
+  })
+
   if (failures.length) {
     console.error('Frontend launch-readiness check failed:\n')
     failures.forEach((failure) => {

@@ -266,24 +266,18 @@ export default function useWorkspaceBootstrap({
   useEffect(() => {
     let active = true
     async function loadTenants() {
-      try {
-        const tenants = await fetchJson('/api/access/tenants')
-        if (active) {
-          tenantDirectoryStateSetter({ loading: false, error: '', items: tenants })
-          authSessionStateSetter((current) => ({
-            ...current,
-            tenantCode: current.session?.tenantCode || current.tenantCode || tenants[0]?.code || '',
-          }))
-        }
-      } catch (error) {
-        if (active) {
-          tenantDirectoryStateSetter({ loading: false, error: error.message, items: [] })
-        }
+      const signedInSession = authSessionState.session
+      if (active) {
+        tenantDirectoryStateSetter({
+          loading: false,
+          error: '',
+          items: signedInSession ? [{ code: signedInSession.tenantCode, name: signedInSession.tenantName }] : [],
+        })
       }
     }
     loadTenants()
     return () => { active = false }
-  }, [activeTenantCode])
+  }, [activeTenantCode, authSessionState.session])
 
   useEffect(() => {
     let active = true

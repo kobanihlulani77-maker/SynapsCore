@@ -65,10 +65,6 @@ export default function WorkspaceAuthenticatedApp({
   usersContext,
   settingsContext,
   profileContext,
-  platformAdminContext,
-  tenantsContext,
-  systemConfigContext,
-  releasesContext,
 }) {
   return (
     <AppShell
@@ -157,10 +153,6 @@ export default function WorkspaceAuthenticatedApp({
         usersContext={usersContext}
         settingsContext={settingsContext}
         profileContext={profileContext}
-        platformAdminContext={platformAdminContext}
-        tenantsContext={tenantsContext}
-        systemConfigContext={systemConfigContext}
-        releasesContext={releasesContext}
       />
     </AppShell>
   )

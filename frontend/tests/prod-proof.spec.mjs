@@ -87,11 +87,9 @@ const appPages = [
   ['/users', 'Users and access control'],
   ['/company-settings', 'Tenant and workspace settings'],
   ['/profile', 'Personal profile and session controls'],
-  ['/platform-admin', 'Platform overview and cross-tenant trust'],
-  ['/tenant-management', 'Tenant onboarding and workspace rollout'],
-  ['/system-config', 'System configuration and operational defaults'],
-  ['/releases', 'Release, deployment, and environment'],
 ]
+
+const platformProtectedRoutes = ['/platform-admin', '/tenant-management', '/system-config', '/releases']
 
 test.describe.configure({ mode: 'serial' })
 
@@ -2487,6 +2485,16 @@ test('auth flow and the full authenticated page system render cleanly in a brows
     await expect(page.locator('.workspace-topbar')).toBeVisible()
     await expectNoFatalUiErrors(page)
   }
+
+  const tenantPlatformResponse = await page.request.get(`${backendUrl}/api/platform/overview`)
+  expect(tenantPlatformResponse.status()).toBe(403)
+  for (const route of platformProtectedRoutes) {
+    await page.goto(route)
+    await expect(page.getByRole('heading', { level: 1, name: 'Access the SynapseCore control plane.' })).toBeVisible()
+    await expect(page.getByText('Separate platform authority')).toBeVisible()
+  }
+  await page.goto('/dashboard')
+  await waitForDashboardSnapshotReady(page)
 
   await signOutViaUi(page)
 })

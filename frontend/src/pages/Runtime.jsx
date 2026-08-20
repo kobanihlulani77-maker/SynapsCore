@@ -92,7 +92,7 @@ export default function RuntimePage({ context }) {
       { label: 'Queue depth', value: runtime.backbone.pendingDispatchCount, note: 'Pending work currently inside the dispatch backbone.' },
       { label: 'Failed dispatch', value: runtime.backbone.failedDispatchCount, note: 'Dispatch work already needing operator attention.' },
       { label: 'Realtime broker', value: formatCodeLabel(runtime.backbone.realtimeBrokerMode || 'unknown'), note: 'Current websocket delivery strategy for live state.' },
-      { label: 'Alert hook', value: runtime.backbone.alertHookConfigured ? 'Configured' : 'Not configured', note: 'Whether severe operational failures can trigger external alerting.' },
+      { label: 'Latest dispatch', value: formatTimestamp(runtime.backbone.latestProcessedAt), note: 'Latest tenant-scoped operational update processed by the dispatch path.' },
       { label: 'Observed', value: formatTimestamp(runtime.observedAt), note: 'Latest runtime observation point.' },
     ]
     : []
@@ -177,7 +177,7 @@ export default function RuntimePage({ context }) {
               <div className="signal-list">
                 <div className="signal-list-item">
                   <strong>Dispatch backbone</strong>
-                  <p>Drains every {runtime.backbone.dispatchIntervalMs} ms in batches of {runtime.backbone.batchSize}.</p>
+                  <p>Tenant operational updates are queued and dispatched through the configured realtime backbone.</p>
                   <p className="muted-text">Oldest queued work {runtime.backbone.oldestPendingAgeSeconds == null ? 'clear' : `${runtime.backbone.oldestPendingAgeSeconds}s`} | Latest processed {formatTimestamp(runtime.backbone.latestProcessedAt)}</p>
                 </div>
                 <div className="signal-list-item">
@@ -249,7 +249,7 @@ export default function RuntimePage({ context }) {
               <div><span>Failed dispatch</span><strong>{runtime?.backbone?.failedDispatchCount ?? 0}</strong></div>
               <div><span>Realtime</span><strong>{formatCodeLabel(runtime?.backbone?.realtimeBrokerMode || 'unknown')}</strong></div>
               <div><span>High severity</span><strong>{highSeverityIncidents}</strong></div>
-              <div><span>Alert hook</span><strong>{runtime?.backbone?.alertHookConfigured ? 'Configured' : 'Off'}</strong></div>
+              <div><span>Latest dispatch</span><strong>{formatTimestamp(runtime?.backbone?.latestProcessedAt)}</strong></div>
               <div><span>Oldest queued</span><strong>{runtime?.backbone?.oldestPendingAgeSeconds == null ? 'Clear' : `${runtime.backbone.oldestPendingAgeSeconds}s`}</strong></div>
             </div>
             <div className="signal-list">

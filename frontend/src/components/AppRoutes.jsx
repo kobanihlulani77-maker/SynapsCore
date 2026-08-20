@@ -9,18 +9,14 @@ import IntegrationsPage from '../pages/Integrations'
 import InventoryPage from '../pages/Inventory'
 import LocationsPage from '../pages/Locations'
 import OrdersPage from '../pages/Orders'
-import PlatformAdminPage from '../pages/PlatformAdmin'
 import ProfilePage from '../pages/Profile'
 import RecommendationsPage from '../pages/Recommendations'
-import ReleasesPage from '../pages/Releases'
 import ReplayPage from '../pages/Replay'
 import RuntimePage from '../pages/Runtime'
 import ScenarioControlPage from '../pages/ScenarioControl'
 import ScenarioHistoryPage from '../pages/ScenarioHistory'
 import ScenarioPlannerPage from '../pages/ScenarioPlanner'
 import SettingsPage from '../pages/Settings'
-import SystemConfigPage from '../pages/SystemConfig'
-import TenantsPage from '../pages/Tenants'
 import UsersPage from '../pages/Users'
 
 export default function AppRoutes({
@@ -44,10 +40,6 @@ export default function AppRoutes({
   usersContext,
   settingsContext,
   profileContext,
-  platformAdminContext,
-  tenantsContext,
-  systemConfigContext,
-  releasesContext,
 }) {
   return (
     <>
@@ -71,10 +63,6 @@ export default function AppRoutes({
       <UsersPage context={usersContext} />
       <SettingsPage context={settingsContext} />
       <ProfilePage context={profileContext} />
-      <PlatformAdminPage context={platformAdminContext} />
-      <TenantsPage context={tenantsContext} />
-      <SystemConfigPage context={systemConfigContext} />
-      <ReleasesPage context={releasesContext} />
     </>
   )
 }

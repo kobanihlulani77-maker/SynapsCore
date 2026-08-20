@@ -1,5 +1,5 @@
 import useWorkspaceChrome from './useWorkspaceChrome'
-import { navGroups, pageLookup, publicPages } from '../config/pageRegistry'
+import { buildRoleAwareNavGroups, pageLookup, publicPages } from '../config/pageRegistry'
 import {
   buildWarehouseOptions,
   currency,
@@ -198,6 +198,7 @@ export default function useWorkspacePageContexts({
   const operators = operatorDirectoryState.items
   const signedInSession = authSessionState.session
   const signedInRoles = signedInSession?.roles || []
+  const navGroups = buildRoleAwareNavGroups(signedInRoles)
   const signedInWarehouseScopes = signedInSession?.warehouseScopes || []
   const isAuthenticated = Boolean(signedInSession)
   const passwordRotationRequired = Boolean(signedInSession?.passwordRotationRequired)

@@ -237,49 +237,25 @@ export const appPages = [
     description: 'Review your current identity, password posture, session expiry, and personal account hygiene.',
     focus: ['Current session', 'Password rotation', 'Personal security'],
   },
-  {
-    key: 'platform',
-    path: '/platform-admin',
-    audience: 'app',
-    group: 'admin',
-    label: 'Platform Admin',
-    title: 'Platform overview and cross-tenant trust',
-    description: 'Use the platform view to understand global health, cross-tenant posture, and release readiness.',
-    focus: ['Platform health', 'Tenant posture', 'Release state'],
-  },
-  {
-    key: 'tenants',
-    path: '/tenant-management',
-    audience: 'app',
-    group: 'admin',
-    label: 'Tenant Management',
-    title: 'Tenant onboarding and workspace rollout',
-    description: 'Bootstrap new workspaces, inspect tenant setup, and move new companies cleanly into live use.',
-    focus: ['Tenant creation', 'Workspace setup', 'Rollout readiness'],
-  },
-  {
-    key: 'system-config',
-    path: '/system-config',
-    audience: 'app',
-    group: 'admin',
-    label: 'System Config',
-    title: 'System configuration and operational defaults',
-    description: 'Review runtime posture, connector defaults, dispatch intervals, and the system-wide control envelope.',
-    focus: ['System defaults', 'Dispatch posture', 'Operational rules'],
-  },
-  {
-    key: 'releases',
-    path: '/releases',
-    audience: 'app',
-    group: 'admin',
-    label: 'Releases',
-    title: 'Release, deployment, and environment',
-    description: 'Track build fingerprints, runtime versions, deployment health, and environment readiness.',
-    focus: ['Build fingerprint', 'Deployment health', 'Environment posture'],
-  },
 ]
 
-export const allPages = [...publicPages, ...appPages]
+export const platformPages = [
+  {
+    key: 'platform-sign-in',
+    path: '/platform-sign-in',
+    audience: 'platform',
+    label: 'Platform Owner Sign In',
+    title: 'Access the SynapseCore control plane.',
+    description: 'Authenticate with the dedicated platform-owner account. Customer workspace credentials cannot open this surface.',
+    focus: ['Platform authority', 'Metadata only', 'Separate session'],
+  },
+  { key: 'platform', path: '/platform-admin', audience: 'platform', label: 'Platform Overview' },
+  { key: 'tenants', path: '/tenant-management', audience: 'platform', label: 'Tenant Directory' },
+  { key: 'system-config', path: '/system-config', audience: 'platform', label: 'Platform Runtime' },
+  { key: 'releases', path: '/releases', audience: 'platform', label: 'Release Trust' },
+]
+
+export const allPages = [...publicPages, ...appPages, ...platformPages]
 export const pageLookup = Object.fromEntries(allPages.map((page) => [page.key, page]))
 
 export const routeAliases = {
@@ -295,8 +271,29 @@ export const navGroups = [
   { label: 'Operations', keys: ['orders', 'inventory', 'catalog', 'locations', 'fulfillment'] },
   { label: 'Control', keys: ['scenarios', 'scenario-history', 'approvals', 'escalations'] },
   { label: 'Systems', keys: ['integrations', 'replay', 'runtime', 'audit'] },
-  { label: 'Settings', keys: ['users', 'settings', 'profile', 'platform', 'tenants', 'system-config', 'releases'] },
+  { label: 'Settings', keys: ['users', 'settings', 'profile'] },
 ]
+
+const pageRolePolicy = {
+  approvals: ['REVIEW_OWNER', 'FINAL_APPROVER'],
+  escalations: ['ESCALATION_OWNER'],
+  integrations: ['INTEGRATION_ADMIN', 'INTEGRATION_OPERATOR'],
+  replay: ['INTEGRATION_ADMIN', 'INTEGRATION_OPERATOR'],
+  users: ['TENANT_ADMIN'],
+  settings: ['TENANT_ADMIN'],
+}
+
+export const canAccessWorkspacePage = (pageKey, roles = []) => {
+  const requiredRoles = pageRolePolicy[pageKey]
+  return !requiredRoles || requiredRoles.some((role) => roles.includes(role))
+}
+
+export const buildRoleAwareNavGroups = (roles = []) => navGroups
+  .map((group) => ({
+    ...group,
+    keys: group.keys.filter((pageKey) => canAccessWorkspacePage(pageKey, roles)),
+  }))
+  .filter((group) => group.keys.length)
 
 export const pageSectionMap = {
   dashboard: [
