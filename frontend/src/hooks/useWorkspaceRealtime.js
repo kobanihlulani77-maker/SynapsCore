@@ -11,6 +11,8 @@ const enableRealtimeConsoleLogs = Boolean(import.meta.env.DEV)
 export default function useWorkspaceRealtime({
   activeTenantCode,
   signedInTenantCode,
+  signedInRoles = [],
+  signedInWarehouseScopes = [],
   websocketBrokerUrl,
   sockJsUrl,
   buildTenantTopicPrefix,
@@ -24,6 +26,9 @@ export default function useWorkspaceRealtime({
   setConnectionState,
   emptySnapshot,
 }) {
+  const signedInRoleKey = [...signedInRoles].sort().join('|')
+  const signedInWarehouseScopeKey = [...signedInWarehouseScopes].sort().join('|')
+
   useEffect(() => {
     let active = true
     let connectionMode = 'connecting'
@@ -236,6 +241,9 @@ export default function useWorkspaceRealtime({
     }
 
     const topicPrefix = buildTenantTopicPrefix(activeTenantCode)
+    const roleSet = new Set(signedInRoleKey.split('|').filter(Boolean))
+    const hasIntegrationAccess = roleSet.has('INTEGRATION_ADMIN') || roleSet.has('INTEGRATION_OPERATOR')
+    const hasTenantWideWarehouseAccess = !signedInWarehouseScopeKey
     updateConnectionState('connecting')
     publishRealtimeDebug({
       topicPrefix,
@@ -369,7 +377,11 @@ export default function useWorkspaceRealtime({
           updateConnectionState('live')
           nextClient.subscribe(`${topicPrefix}/dashboard.summary`, (message) => {
             mergeSnapshot({ summary: JSON.parse(message.body) })
-            scheduleDecisionSurfaceRefresh('dashboard-summary-topic')
+            if (hasTenantWideWarehouseAccess) {
+              scheduleDecisionSurfaceRefresh('dashboard-summary-topic')
+            } else {
+              void fetchSnapshot()
+            }
           })
           nextClient.subscribe(`${topicPrefix}/alerts`, (message) => {
             mergeSnapshot({ alerts: JSON.parse(message.body) })
@@ -379,23 +391,32 @@ export default function useWorkspaceRealtime({
             mergeSnapshot({ recommendations: JSON.parse(message.body) })
             scheduleDecisionSurfaceRefresh('recommendations-topic')
           })
-          nextClient.subscribe(`${topicPrefix}/inventory`, (message) => {
-            mergeSnapshot({ inventory: JSON.parse(message.body) })
-            scheduleDecisionSurfaceRefresh('inventory-topic')
-          })
-          nextClient.subscribe(`${topicPrefix}/fulfillment.overview`, (message) => mergeSnapshot({ fulfillment: JSON.parse(message.body) }))
-          nextClient.subscribe(`${topicPrefix}/orders.recent`, (message) => mergeSnapshot({ recentOrders: JSON.parse(message.body) }))
+          if (hasTenantWideWarehouseAccess) {
+            nextClient.subscribe(`${topicPrefix}/inventory`, (message) => {
+              mergeSnapshot({ inventory: JSON.parse(message.body) })
+              scheduleDecisionSurfaceRefresh('inventory-topic')
+            })
+            nextClient.subscribe(`${topicPrefix}/fulfillment.overview`, (message) => mergeSnapshot({ fulfillment: JSON.parse(message.body) }))
+            nextClient.subscribe(`${topicPrefix}/orders.recent`, (message) => mergeSnapshot({ recentOrders: JSON.parse(message.body) }))
+          }
           nextClient.subscribe(`${topicPrefix}/events.recent`, (message) => {
             mergeSnapshot({ recentEvents: JSON.parse(message.body) })
             scheduleDecisionSurfaceRefresh('events-recent-topic')
           })
           nextClient.subscribe(`${topicPrefix}/audit.recent`, (message) => mergeSnapshot({ auditLogs: JSON.parse(message.body) }))
           nextClient.subscribe(`${topicPrefix}/system.incidents`, (message) => mergeSnapshot({ systemIncidents: JSON.parse(message.body) }))
-          nextClient.subscribe(`${topicPrefix}/integrations.connectors`, (message) => mergeSnapshot({ integrationConnectors: JSON.parse(message.body) }))
-          nextClient.subscribe(`${topicPrefix}/integrations.imports`, (message) => mergeSnapshot({ integrationImportRuns: JSON.parse(message.body) }))
-          nextClient.subscribe(`${topicPrefix}/integrations.replay`, (message) => mergeSnapshot({ integrationReplayQueue: JSON.parse(message.body) }))
-          nextClient.subscribe(`${topicPrefix}/scenarios.notifications`, (message) => mergeSnapshot({ scenarioNotifications: JSON.parse(message.body) }))
-          nextClient.subscribe(`${topicPrefix}/scenarios.escalated`, (message) => mergeSnapshot({ slaEscalations: JSON.parse(message.body) }))
+          if (hasIntegrationAccess) {
+            nextClient.subscribe(`${topicPrefix}/integrations.changed`, () => void fetchSnapshot())
+            if (hasTenantWideWarehouseAccess) {
+              nextClient.subscribe(`${topicPrefix}/integrations.connectors`, (message) => mergeSnapshot({ integrationConnectors: JSON.parse(message.body) }))
+              nextClient.subscribe(`${topicPrefix}/integrations.imports`, (message) => mergeSnapshot({ integrationImportRuns: JSON.parse(message.body) }))
+              nextClient.subscribe(`${topicPrefix}/integrations.replay`, (message) => mergeSnapshot({ integrationReplayQueue: JSON.parse(message.body) }))
+            }
+          }
+          if (hasTenantWideWarehouseAccess) {
+            nextClient.subscribe(`${topicPrefix}/scenarios.notifications`, (message) => mergeSnapshot({ scenarioNotifications: JSON.parse(message.body) }))
+            nextClient.subscribe(`${topicPrefix}/scenarios.escalated`, (message) => mergeSnapshot({ slaEscalations: JSON.parse(message.body) }))
+          }
         },
         onStompError: (frame) => {
           handleTransportFailure(nextClient, 'degraded', {
@@ -439,5 +460,5 @@ export default function useWorkspaceRealtime({
       })
       activeClient?.deactivate().catch(() => {})
     }
-  }, [activeTenantCode, signedInTenantCode, websocketBrokerUrl, sockJsUrl])
+  }, [activeTenantCode, signedInTenantCode, signedInRoleKey, signedInWarehouseScopeKey, websocketBrokerUrl, sockJsUrl])
 }

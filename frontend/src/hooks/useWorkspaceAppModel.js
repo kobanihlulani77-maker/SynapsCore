@@ -324,6 +324,8 @@ export default function useWorkspaceAppModel() {
   useWorkspaceRealtime({
     activeTenantCode,
     signedInTenantCode: authSessionState.session?.tenantCode,
+    signedInRoles: authSessionState.session?.roles || [],
+    signedInWarehouseScopes: authSessionState.session?.warehouseScopes || [],
     websocketBrokerUrl,
     sockJsUrl,
     buildTenantTopicPrefix,

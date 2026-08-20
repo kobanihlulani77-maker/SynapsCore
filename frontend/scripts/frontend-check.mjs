@@ -127,6 +127,8 @@ async function main() {
   const pageRegistry = await fs.readFile(path.join(srcDir, 'config', 'pageRegistry.js'), 'utf8')
   const platformApplication = await fs.readFile(path.join(srcDir, 'components', 'PlatformApplication.jsx'), 'utf8')
   const tenantAppRoutes = await fs.readFile(path.join(srcDir, 'components', 'AppRoutes.jsx'), 'utf8')
+  const workspaceAppModel = await fs.readFile(path.join(srcDir, 'hooks', 'useWorkspaceAppModel.js'), 'utf8')
+  const workspaceRealtime = await fs.readFile(path.join(srcDir, 'hooks', 'useWorkspaceRealtime.js'), 'utf8')
   const accessBoundarySignals = [
     [pageRegistry.includes("audience: 'platform'"), 'Platform routes must use the dedicated platform audience.'],
     [pageRegistry.includes('buildRoleAwareNavGroups'), 'Tenant navigation must be generated from role-aware policy.'],
@@ -136,6 +138,11 @@ async function main() {
     [!platformApplication.includes('localStorage'), 'Platform authority must not be stored in localStorage.'],
     [!platformApplication.includes('X-Synapse-Platform-Admin-Token'), 'The browser must not receive the automation platform token.'],
     [!tenantAppRoutes.includes('PlatformAdminPage'), 'Tenant route rendering must not retain the previous platform-admin page path.'],
+    [workspaceAppModel.includes('signedInRoles:'), 'Realtime policy must receive the signed-in role set.'],
+    [workspaceAppModel.includes('signedInWarehouseScopes:'), 'Realtime policy must receive warehouse scopes.'],
+    [workspaceRealtime.includes("hasIntegrationAccess"), 'Integration realtime subscriptions must be role-aware.'],
+    [workspaceRealtime.includes("/integrations.changed"), 'Scoped integration realtime must use the metadata-only change signal.'],
+    [workspaceRealtime.includes('hasTenantWideWarehouseAccess'), 'Raw tenant-wide realtime topics must be scope-aware.'],
   ]
   accessBoundarySignals.forEach(([valid, message]) => {
     if (!valid) failures.push(message)
