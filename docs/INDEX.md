@@ -124,6 +124,8 @@ This index links the main product, architecture, runbook, proof, and operator do
 
 ## Security / Trust
 
+- [platform-control-plane-access-boundary.md](platform-control-plane-access-boundary.md)
+- [templates/platform-tenant-access-boundary-record.md](templates/platform-tenant-access-boundary-record.md)
 - [security-and-trust-model.md](security-and-trust-model.md)
 - [security-test-plan.md](security-test-plan.md)
 - [leakage-audit.md](leakage-audit.md)
