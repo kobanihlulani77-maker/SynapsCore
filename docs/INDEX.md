@@ -191,6 +191,8 @@ This index links the main product, architecture, runbook, proof, and operator do
 - [company-data-onboarding-runbook.md](company-data-onboarding-runbook.md)
 - [company-operational-configuration-runbook.md](company-operational-configuration-runbook.md)
 - [company-pre-handover-verification-checklist.md](company-pre-handover-verification-checklist.md)
+- [company-customer-handover-procedure.md](company-customer-handover-procedure.md)
+- [company-customer-handover-pack.md](company-customer-handover-pack.md)
 - [pilot-release-candidate.md](pilot-release-candidate.md)
 - [pilot-company-onboarding-checklist.md](pilot-company-onboarding-checklist.md)
 - [pilot-operator-checklist.md](pilot-operator-checklist.md)
@@ -213,6 +215,8 @@ This index links the main product, architecture, runbook, proof, and operator do
 - [templates/company-data-mapping-record.md](templates/company-data-mapping-record.md)
 - [templates/company-operational-configuration-record.md](templates/company-operational-configuration-record.md)
 - [templates/company-pre-handover-verification-record.md](templates/company-pre-handover-verification-record.md)
+- [templates/company-customer-handover-record.md](templates/company-customer-handover-record.md)
+- [templates/company-customer-access-message.md](templates/company-customer-access-message.md)
 
 ## Pilot Release Candidate
 
