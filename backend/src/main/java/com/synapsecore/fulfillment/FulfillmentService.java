@@ -1,6 +1,7 @@
 package com.synapsecore.fulfillment;
 
 import com.synapsecore.alert.AlertService;
+import com.synapsecore.access.AccessDirectoryService;
 import com.synapsecore.audit.AuditLogService;
 import com.synapsecore.decision.RecommendationService;
 import com.synapsecore.domain.dto.FulfillmentOverviewResponse;
@@ -72,6 +73,7 @@ public class FulfillmentService {
     private final TenantScopeGuard tenantScopeGuard;
     private final OperationalMetricsService operationalMetricsService;
     private final TenantOperationalPolicyService tenantOperationalPolicyService;
+    private final AccessDirectoryService accessDirectoryService;
 
     @Value("${synapsecore.fulfillment.default-dispatch-hours:2}")
     private long defaultDispatchHours;
@@ -178,6 +180,15 @@ public class FulfillmentService {
         String tenantCode = tenantContextService.getCurrentTenantCodeOrDefault();
         List<FulfillmentTask> activeTasks = fulfillmentTaskRepository
             .findAllByTenant_CodeIgnoreCaseAndStatusInOrderByUpdatedAtDesc(tenantCode, ACTIVE_STATUSES);
+        var currentOperator = accessDirectoryService.getCurrentOperator();
+        if (currentOperator.isPresent()) {
+            activeTasks = activeTasks.stream()
+                .filter(task -> accessDirectoryService.hasWarehouseAccess(
+                    currentOperator.get(),
+                    task.getWarehouse().getCode()
+                ))
+                .toList();
+        }
         if (activeTasks.isEmpty()) {
             return new FulfillmentOverviewResponse(0, 0, 0, 0, List.of(), Instant.now());
         }
@@ -212,6 +223,17 @@ public class FulfillmentService {
             responses,
             now
         );
+    }
+
+    @Transactional(readOnly = true)
+    public String getOrderWarehouseCode(String externalOrderId) {
+        String tenantCode = tenantContextService.getCurrentTenantCodeOrDefault();
+        CustomerOrder order = customerOrderRepository
+            .findByTenant_CodeIgnoreCaseAndExternalOrderId(tenantCode, externalOrderId.trim())
+            .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND,
+                "Order not found: " + externalOrderId));
+        tenantScopeGuard.requireCustomerOrder(order, "fulfillment warehouse lookup");
+        return order.getWarehouse().getCode();
     }
 
     private void applyUpdate(FulfillmentTask task, FulfillmentUpdateRequest request) {

@@ -62,5 +62,7 @@ public interface IntegrationConnectorRepository extends JpaRepository<Integratio
 
     long countByEnabledFalse();
 
+    long countByTenant_CodeIgnoreCase(String tenantCode);
+
     long countByTenant_CodeIgnoreCaseAndEnabledFalse(String tenantCode);
 }

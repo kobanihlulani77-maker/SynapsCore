@@ -39,6 +39,11 @@ synapsecore:
   bootstrap:
     initial-token: ${SYNAPSECORE_BOOTSTRAP_INITIAL_TOKEN:}
     platform-admin-token: ${SYNAPSECORE_PLATFORM_ADMIN_TOKEN:}
+  platform-owner:
+    username: ${SYNAPSECORE_PLATFORM_OWNER_USERNAME:}
+    password-hash: ${SYNAPSECORE_PLATFORM_OWNER_PASSWORD_HASH:}
+    display-name: ${SYNAPSECORE_PLATFORM_OWNER_DISPLAY_NAME:SynapseCore Platform Owner}
+    session-timeout-minutes: ${SYNAPSECORE_PLATFORM_OWNER_SESSION_TIMEOUT_MINUTES:120}
   public:
     app-url: ${PUBLIC_APP_URL:}
     api-url: ${PUBLIC_API_URL:}

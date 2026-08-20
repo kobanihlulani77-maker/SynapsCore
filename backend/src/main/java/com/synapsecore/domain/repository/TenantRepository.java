@@ -10,4 +10,6 @@ public interface TenantRepository extends JpaRepository<Tenant, Long> {
     Optional<Tenant> findByCodeIgnoreCase(String code);
 
     List<Tenant> findAllByActiveTrueOrderByNameAsc();
+
+    List<Tenant> findAllByOrderByNameAsc();
 }

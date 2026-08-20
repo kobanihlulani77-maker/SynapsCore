@@ -66,6 +66,8 @@ import org.springframework.web.context.request.RequestContextHolder;
 @Transactional
 class MvpFlowIntegrationTest {
 
+    private static final String TEST_PLATFORM_ADMIN_TOKEN = "test-only-platform-admin-token";
+
     @Autowired
     private MockMvc mockMvc;
 
@@ -2539,7 +2541,8 @@ class MvpFlowIntegrationTest {
 
     @Test
     void integrationConnectorsCanBeListedAndDisabledForWebhookIngress() throws Exception {
-        mockMvc.perform(get("/api/access/tenants"))
+        mockMvc.perform(get("/api/access/tenants")
+                .header("X-Synapse-Platform-Admin-Token", TEST_PLATFORM_ADMIN_TOKEN))
             .andExpect(status().isOk())
             .andExpect(jsonPath("$[0].code").value("STARTER-OPS"))
             .andExpect(jsonPath("$[0].name").value("Starter Operations Workspace"));
@@ -2637,7 +2640,9 @@ class MvpFlowIntegrationTest {
             .andExpect(jsonPath("$.enabled").value(false))
             .andExpect(jsonPath("$.mappingVersion").value(1));
 
-        mockMvc.perform(get("/api/dashboard/snapshot"))
+        mockMvc.perform(get("/api/dashboard/snapshot")
+                .with(accessHeaders("Integration Lead", "INTEGRATION_ADMIN"))
+                .header("X-Synapse-Tenant", "STARTER-OPS"))
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.integrationConnectors[?(@.sourceSystem == 'erp_north' && @.type == 'WEBHOOK_ORDER')].enabled")
                 .value(org.hamcrest.Matchers.hasItem(false)));
@@ -2735,10 +2740,9 @@ class MvpFlowIntegrationTest {
     }
 
     @Test
-    void tenantAdminCanOnboardTenantWorkspaceAndUseBootstrapSession() throws Exception {
+    void platformAutomationCanOnboardTenantWorkspaceAndAdminCanUseSession() throws Exception {
         mockMvc.perform(post("/api/access/tenants")
-                .with(accessHeaders("Operations Lead", "TENANT_ADMIN"))
-                .header("X-Synapse-Tenant", "STARTER-OPS")
+                .header("X-Synapse-Platform-Admin-Token", TEST_PLATFORM_ADMIN_TOKEN)
                 .contentType(APPLICATION_JSON)
                 .content("""
                     {
@@ -2764,7 +2768,8 @@ class MvpFlowIntegrationTest {
                 .value(org.hamcrest.Matchers.hasItems("WH-NORTH", "WH-COAST")))
             .andExpect(jsonPath("$.createdAt").exists());
 
-        mockMvc.perform(get("/api/access/tenants"))
+        mockMvc.perform(get("/api/access/tenants")
+                .header("X-Synapse-Platform-Admin-Token", TEST_PLATFORM_ADMIN_TOKEN))
             .andExpect(status().isOk())
             .andExpect(jsonPath("$[?(@.code == 'ACME-OPS')].name")
                 .value(org.hamcrest.Matchers.hasItem("Acme Operations")));
@@ -2845,8 +2850,7 @@ class MvpFlowIntegrationTest {
     @Test
     void signedInTenantCannotQueryAnotherTenantOperatorDirectory() throws Exception {
         mockMvc.perform(post("/api/access/tenants")
-                .with(accessHeaders("Operations Lead", "TENANT_ADMIN"))
-                .header("X-Synapse-Tenant", "STARTER-OPS")
+                .header("X-Synapse-Platform-Admin-Token", TEST_PLATFORM_ADMIN_TOKEN)
                 .contentType(APPLICATION_JSON)
                 .content("""
                     {
@@ -2890,8 +2894,7 @@ class MvpFlowIntegrationTest {
     @DirtiesContext(methodMode = DirtiesContext.MethodMode.AFTER_METHOD)
     void onboardedTenantAdminCanOpenWorkspaceThroughSignedInSession() throws Exception {
         mockMvc.perform(post("/api/access/tenants")
-                .with(accessHeaders("Operations Lead", "TENANT_ADMIN"))
-                .header("X-Synapse-Tenant", "STARTER-OPS")
+                .header("X-Synapse-Platform-Admin-Token", TEST_PLATFORM_ADMIN_TOKEN)
                 .contentType(APPLICATION_JSON)
                 .content("""
                     {
@@ -2987,8 +2990,7 @@ class MvpFlowIntegrationTest {
     @Test
     void seedBackfillRemainsSafeAfterAdditionalTenantsExist() throws Exception {
         mockMvc.perform(post("/api/access/tenants")
-                .with(accessHeaders("Operations Lead", "TENANT_ADMIN"))
-                .header("X-Synapse-Tenant", "STARTER-OPS")
+                .header("X-Synapse-Platform-Admin-Token", TEST_PLATFORM_ADMIN_TOKEN)
                 .contentType(APPLICATION_JSON)
                 .content("""
                     {
@@ -3705,7 +3707,9 @@ class MvpFlowIntegrationTest {
             .andExpect(jsonPath("$[0].ordersImported").value(1))
             .andExpect(jsonPath("$[0].ordersFailed").value(1));
 
-        mockMvc.perform(get("/api/dashboard/snapshot"))
+        mockMvc.perform(get("/api/dashboard/snapshot")
+                .with(accessHeaders("Integration Lead", "INTEGRATION_ADMIN"))
+                .header("X-Synapse-Tenant", "STARTER-OPS"))
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.integrationImportRuns[0].sourceSystem").value("erp_batch"))
             .andExpect(jsonPath("$.integrationImportRuns[0].connectorType").value("CSV_ORDER_IMPORT"))
@@ -3775,7 +3779,9 @@ class MvpFlowIntegrationTest {
             .andExpect(jsonPath("$[0].externalOrderId").value("CSV-RPL-1001"))
             .andExpect(jsonPath("$[0].status").value("PENDING"));
 
-        mockMvc.perform(get("/api/dashboard/snapshot"))
+        mockMvc.perform(get("/api/dashboard/snapshot")
+                .with(accessHeaders("Integration Lead", "INTEGRATION_ADMIN"))
+                .header("X-Synapse-Tenant", "STARTER-OPS"))
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.integrationReplayQueue.length()").value(1))
             .andExpect(jsonPath("$.integrationReplayQueue[0].externalOrderId").value("CSV-RPL-1001"));
@@ -3822,7 +3828,9 @@ class MvpFlowIntegrationTest {
             .andExpect(jsonPath("$[0].externalOrderId").value("CSV-RPL-1001"))
             .andExpect(jsonPath("$[0].warehouseCode").value("WH-NORTH"));
 
-        mockMvc.perform(get("/api/dashboard/snapshot"))
+        mockMvc.perform(get("/api/dashboard/snapshot")
+                .with(accessHeaders("Integration Lead", "INTEGRATION_ADMIN"))
+                .header("X-Synapse-Tenant", "STARTER-OPS"))
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.integrationReplayQueue.length()").value(0));
 
@@ -3908,7 +3916,7 @@ class MvpFlowIntegrationTest {
                 .value(org.hamcrest.Matchers.hasItem("PENDING")));
 
         mockMvc.perform(get("/api/dashboard/snapshot")
-                .with(accessHeaders("Operations Lead", "TENANT_ADMIN"))
+                .with(accessHeaders("Integration Lead", "INTEGRATION_ADMIN"))
                 .header("X-Synapse-Tenant", "STARTER-OPS"))
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.integrationReplayQueue[?(@.externalOrderId == 'CSV-DISABLED-1001')].failureCode")
@@ -4119,7 +4127,7 @@ class MvpFlowIntegrationTest {
             .andExpect(jsonPath("$[?(@.externalOrderId == 'CSV-AUTO-1001')].status")
                 .value(org.hamcrest.Matchers.hasItem("PENDING")));
         mockMvc.perform(get("/api/dashboard/snapshot")
-                .with(accessHeaders("Operations Lead", "TENANT_ADMIN"))
+                .with(accessHeaders("Integration Lead", "INTEGRATION_ADMIN"))
                 .header("X-Synapse-Tenant", "STARTER-OPS"))
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.integrationReplayQueue[?(@.externalOrderId == 'CSV-AUTO-1001')].status")
@@ -4570,11 +4578,11 @@ class MvpFlowIntegrationTest {
                 .header("X-Synapse-Tenant", runtimeTenant.getCode()))
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.applicationName").value("synapsecore-backend"))
-            .andExpect(jsonPath("$.activeProfiles[0]").value("test"))
+            .andExpect(jsonPath("$.activeProfiles").doesNotExist())
             .andExpect(jsonPath("$.overallStatus").value("UP"))
             .andExpect(jsonPath("$.livenessState").value("CORRECT"))
             .andExpect(jsonPath("$.readinessState").value("ACCEPTING_TRAFFIC"))
-            .andExpect(jsonPath("$.headerFallbackEnabled").value(true))
+            .andExpect(jsonPath("$.headerFallbackEnabled").doesNotExist())
             .andExpect(jsonPath("$.secureSessionCookies").value(false))
             .andExpect(jsonPath("$.simulationEnabled").doesNotExist())
             .andExpect(jsonPath("$.simulationIntervalMs").doesNotExist())
@@ -4589,8 +4597,8 @@ class MvpFlowIntegrationTest {
             .andExpect(jsonPath("$.telemetry.failedDispatchCount").value(0))
             .andExpect(jsonPath("$.backbone.pendingDispatchCount").value(0))
             .andExpect(jsonPath("$.backbone.failedDispatchCount").value(0))
-            .andExpect(jsonPath("$.backbone.dispatchIntervalMs").value(1500))
-            .andExpect(jsonPath("$.backbone.batchSize").value(16))
+            .andExpect(jsonPath("$.backbone.dispatchIntervalMs").doesNotExist())
+            .andExpect(jsonPath("$.backbone.batchSize").doesNotExist())
             .andExpect(jsonPath("$.metrics.ordersIngested").value(org.hamcrest.Matchers.greaterThanOrEqualTo(0.0)))
             .andExpect(jsonPath("$.metrics.fulfillmentUpdates").value(org.hamcrest.Matchers.greaterThanOrEqualTo(0.0)))
             .andExpect(jsonPath("$.metrics.integrationImportRuns").value(org.hamcrest.Matchers.greaterThanOrEqualTo(0.0)))
@@ -4608,10 +4616,10 @@ class MvpFlowIntegrationTest {
             .andExpect(jsonPath("$.metrics.failedHttpRequests").value(org.hamcrest.Matchers.greaterThanOrEqualTo(0.0)))
             .andExpect(jsonPath("$.metrics.averageHttpRequestLatencyMs").value(org.hamcrest.Matchers.greaterThanOrEqualTo(0.0)))
             .andExpect(jsonPath("$.backbone.realtimeBrokerMode").value("SIMPLE_IN_MEMORY"))
-            .andExpect(jsonPath("$.backbone.realtimeDistributedMode").value(false))
+            .andExpect(jsonPath("$.backbone.realtimeDistributedMode").doesNotExist())
             .andExpect(jsonPath("$.diagnostics.windowHours").value(24))
             .andExpect(jsonPath("$.diagnostics.activeIncidentCount").value(0))
-            .andExpect(jsonPath("$.allowedOrigins.length()").value(org.hamcrest.Matchers.greaterThanOrEqualTo(1)));
+            .andExpect(jsonPath("$.allowedOrigins").doesNotExist());
     }
 
     @Test

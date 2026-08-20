@@ -1,6 +1,7 @@
 package com.synapsecore.api.controller;
 
 import com.synapsecore.access.AccessControlService;
+import com.synapsecore.access.SynapseActorContext;
 import com.synapsecore.domain.dto.WarehouseResponse;
 import com.synapsecore.domain.service.WarehouseService;
 import java.util.List;
@@ -19,7 +20,9 @@ public class WarehouseController {
 
     @GetMapping
     public List<WarehouseResponse> getWarehouses() {
-        accessControlService.requireWorkspaceAccess("view warehouses");
-        return warehouseService.getWarehouses();
+        SynapseActorContext actor = accessControlService.requireWorkspaceAccess("view warehouses");
+        return warehouseService.getWarehouses().stream()
+            .filter(warehouse -> actor.canAccessWarehouse(warehouse.code()))
+            .toList();
     }
 }

@@ -70,7 +70,9 @@ public class InventoryController {
 
     @GetMapping
     public List<InventoryStatusResponse> getInventory() {
-        accessControlService.requireWorkspaceAccess("view inventory posture");
-        return operationalViewService.getInventoryOverview();
+        var actor = accessControlService.requireWorkspaceAccess("view inventory posture");
+        return operationalViewService.getInventoryOverview().stream()
+            .filter(item -> actor.canAccessWarehouse(item.warehouseCode()))
+            .toList();
     }
 }

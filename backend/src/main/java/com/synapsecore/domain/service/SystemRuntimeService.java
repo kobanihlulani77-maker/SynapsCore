@@ -9,6 +9,9 @@ import com.synapsecore.domain.dto.SystemDiagnosticsSummary;
 import com.synapsecore.domain.dto.SystemMetricsSummary;
 import com.synapsecore.domain.dto.SystemTelemetrySummary;
 import com.synapsecore.domain.dto.SystemRuntimeResponse;
+import com.synapsecore.domain.dto.TenantBackboneSummary;
+import com.synapsecore.domain.dto.TenantRuntimeResponse;
+import com.synapsecore.platform.dto.PlatformRuntimeResponse;
 import com.synapsecore.domain.entity.AuditStatus;
 import com.synapsecore.domain.entity.BusinessEventType;
 import com.synapsecore.domain.entity.IntegrationImportStatus;
@@ -151,6 +154,74 @@ public class SystemRuntimeService {
             buildMetricsSummary(),
             buildDiagnosticsSummary(),
             buildConnectorDiagnostics(),
+            Instant.now()
+        );
+    }
+
+    public TenantRuntimeResponse getTenantRuntimeStatus() {
+        LivenessState livenessState = applicationAvailability.getLivenessState();
+        ReadinessState readinessState = applicationAvailability.getReadinessState();
+        String tenantCode = tenantContextService.getCurrentTenantCodeOrDefault();
+        drainOperationalDispatchQueue(tenantCode);
+        SystemBackboneSummary backbone = buildBackboneSummary();
+
+        return new TenantRuntimeResponse(
+            applicationName,
+            new SystemBuildInfo(buildVersion, buildCommit, buildTime, null, null, null, null, null),
+            resolveOverallStatus(livenessState, readinessState),
+            livenessState.name(),
+            readinessState.name(),
+            secureSessionCookies,
+            buildTelemetrySummary(),
+            new TenantBackboneSummary(
+                backbone.realtimeBrokerMode(),
+                backbone.realtimeBrokerDetail(),
+                backbone.pendingDispatchCount(),
+                backbone.failedDispatchCount(),
+                backbone.oldestPendingAgeSeconds(),
+                backbone.latestProcessedAt()
+            ),
+            buildMetricsSummary(),
+            buildDiagnosticsSummary(),
+            buildConnectorDiagnostics(),
+            Instant.now()
+        );
+    }
+
+    public PlatformRuntimeResponse getPlatformRuntimeStatus() {
+        List<String> activeProfiles = Arrays.asList(environment.getActiveProfiles());
+        if (activeProfiles.isEmpty()) {
+            activeProfiles = Arrays.asList(environment.getDefaultProfiles());
+        }
+        LivenessState livenessState = applicationAvailability.getLivenessState();
+        ReadinessState readinessState = applicationAvailability.getReadinessState();
+        RealtimeBrokerMode brokerMode = realtimeService.brokerMode();
+
+        return new PlatformRuntimeResponse(
+            applicationName,
+            new SystemBuildInfo(
+                buildVersion,
+                buildCommit,
+                buildTime,
+                emptyToNull(renderGitBranch),
+                renderRuntime ? "render" : "local",
+                emptyToNull(renderServiceName),
+                emptyToNull(renderServiceId),
+                emptyToNull(renderInstanceId)
+            ),
+            activeProfiles,
+            resolveOverallStatus(livenessState, readinessState),
+            livenessState.name(),
+            readinessState.name(),
+            secureSessionCookies,
+            brokerMode.name(),
+            brokerMode != RealtimeBrokerMode.SIMPLE_IN_MEMORY,
+            brokerMode == RealtimeBrokerMode.REDIS_PUBSUB,
+            brokerMode == RealtimeBrokerMode.STOMP_RELAY,
+            operationalAlertHookService.isConfigured(),
+            operationalDispatchWorkItemRepository.countByStatusIn(
+                List.of(OperationalDispatchStatus.PENDING, OperationalDispatchStatus.PROCESSING)),
+            operationalDispatchWorkItemRepository.countByStatusIn(List.of(OperationalDispatchStatus.FAILED)),
             Instant.now()
         );
     }

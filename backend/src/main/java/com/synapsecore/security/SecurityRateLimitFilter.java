@@ -117,7 +117,8 @@ public class SecurityRateLimitFilter extends OncePerRequestFilter {
         String path = request.getRequestURI();
         String method = request.getMethod();
         SynapseSecurityProperties.RateLimitProperties properties = securityProperties.getRateLimit();
-        if ("POST".equalsIgnoreCase(method) && "/api/auth/session/login".equals(path)) {
+        if ("POST".equalsIgnoreCase(method)
+                && ("/api/auth/session/login".equals(path) || "/api/platform/session/login".equals(path))) {
             return new BucketDefinition(
                 "AUTH_LOGIN",
                 properties.getAuthLogin().getMaxAttempts(),

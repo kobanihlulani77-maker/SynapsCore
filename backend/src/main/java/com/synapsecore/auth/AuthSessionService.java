@@ -9,6 +9,7 @@ import com.synapsecore.domain.entity.AccessUser;
 import com.synapsecore.domain.entity.Tenant;
 import com.synapsecore.domain.repository.AuditLogRepository;
 import com.synapsecore.observability.OperationalMetricsService;
+import com.synapsecore.platform.PlatformOwnerSessionService;
 import com.synapsecore.domain.repository.AccessUserRepository;
 import java.time.Duration;
 import java.time.Instant;
@@ -40,6 +41,7 @@ public class AuthSessionService {
     private final AuditLogRepository auditLogRepository;
     private final RequestTraceContext requestTraceContext;
     private final OperationalMetricsService operationalMetricsService;
+    private final PlatformOwnerSessionService platformOwnerSessionService;
 
     @Transactional(readOnly = true)
     public AuthSessionResponse signIn(jakarta.servlet.http.HttpServletRequest request,
@@ -76,6 +78,7 @@ public class AuthSessionService {
         Instant authenticatedAt = Instant.now();
         jakarta.servlet.http.HttpSession existingSession = request.getSession(false);
         if (existingSession != null) {
+            platformOwnerSessionService.clearSessionIdentity(existingSession);
             clearSessionIdentity(existingSession);
             rotateSessionIdSafely(request);
         }

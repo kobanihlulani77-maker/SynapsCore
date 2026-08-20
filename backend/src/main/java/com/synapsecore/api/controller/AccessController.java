@@ -22,7 +22,7 @@ import com.synapsecore.access.dto.TenantWorkspaceUpdateRequest;
 import com.synapsecore.access.dto.TenantWorkspaceWarehouseUpdateRequest;
 import com.synapsecore.access.dto.TenantResponse;
 import com.synapsecore.auth.AuthSessionService;
-import com.synapsecore.config.SynapseStarterProperties;
+import com.synapsecore.platform.PlatformOwnerSessionService;
 import com.synapsecore.domain.dto.WarehouseResponse;
 import com.synapsecore.integration.dto.IntegrationConnectorResponse;
 import jakarta.servlet.http.HttpServletRequest;
@@ -50,13 +50,23 @@ public class AccessController {
     private final AccessDirectoryService accessDirectoryService;
     private final BootstrapAccessService bootstrapAccessService;
     private final PlatformAdministrationAccessService platformAdministrationAccessService;
-    private final SynapseStarterProperties starterProperties;
     private final TenantWorkspaceAdministrationService tenantWorkspaceAdministrationService;
     private final TenantOnboardingService tenantOnboardingService;
     private final AuthSessionService authSessionService;
+    private final PlatformOwnerSessionService platformOwnerSessionService;
 
     @GetMapping("/tenants")
-    public List<TenantResponse> getActiveTenants() {
+    public List<TenantResponse> getActiveTenants(HttpServletRequest httpRequest) {
+        if (platformAdministrationAccessService.isPlatformAdminRequest(httpRequest)) {
+            platformAdministrationAccessService.requirePlatformAdministration(httpRequest);
+        } else if (bootstrapAccessService.isBootstrapRequest(httpRequest)) {
+            bootstrapAccessService.requireInitialBootstrap(httpRequest);
+        } else {
+            platformOwnerSessionService.requirePlatformOwner(
+                httpRequest.getSession(false),
+                "view the global tenant directory"
+            );
+        }
         return accessDirectoryService.getActiveTenants();
     }
 
@@ -71,8 +81,11 @@ public class AccessController {
         } else if (platformAdministrationAccessService.isPlatformAdminRequest(httpRequest)) {
             platformAdministrationAccessService.requirePlatformAdministration(httpRequest);
             actorName = "platform-admin";
-        } else if (starterProperties.isAllowTenantAdminTenantOnboarding()) {
-            actorName = accessControlService.requireTenantAdmin("create tenant workspaces").actorName();
+        } else if (platformOwnerSessionService.hasSessionIdentity(httpRequest.getSession(false))) {
+            actorName = platformOwnerSessionService.requirePlatformOwner(
+                httpRequest.getSession(false),
+                "create tenant workspaces"
+            );
         } else {
             throw new ResponseStatusException(HttpStatus.FORBIDDEN,
                 "Tenant workspace creation requires platform administration in this environment.");

@@ -382,10 +382,11 @@ function Invoke-SynapseJson {
 function Get-JsonArray {
     param(
         [string]$Url,
-        [Microsoft.PowerShell.Commands.WebRequestSession]$Session = $null
+        [Microsoft.PowerShell.Commands.WebRequestSession]$Session = $null,
+        [hashtable]$Headers = @{}
     )
 
-    $raw = Invoke-SynapseJson -Method GET -Url $Url -Session $Session
+    $raw = Invoke-SynapseJson -Method GET -Url $Url -Session $Session -Headers $Headers
     if ($null -eq $raw) {
         return @()
     }
@@ -836,7 +837,15 @@ if (-not [string]::IsNullOrWhiteSpace($FrontendBaseUrlValue)) {
         } | Out-Null
 }
 
-$tenants = @(Get-JsonArray -Url "$script:ApiBaseUrlValue/api/access/tenants")
+$tenantDirectoryHeaders = @{}
+if (-not [string]::IsNullOrWhiteSpace($PlatformAdminTokenValue)) {
+    $tenantDirectoryHeaders["X-Synapse-Platform-Admin-Token"] = $PlatformAdminTokenValue
+} elseif (-not [string]::IsNullOrWhiteSpace($BootstrapInitialTokenValue)) {
+    $tenantDirectoryHeaders["X-Synapse-Bootstrap-Token"] = $BootstrapInitialTokenValue
+} else {
+    throw "A private bootstrap or platform-administration token is required to inspect the hosted tenant directory. Tenant sessions cannot list unrelated workspaces."
+}
+$tenants = @(Get-JsonArray -Url "$script:ApiBaseUrlValue/api/access/tenants" -Headers $tenantDirectoryHeaders)
 $tenant = $tenants | Where-Object { $null -ne $_ -and (Get-PropertyValue -Object $_ -PropertyName "code") -ieq $script:TenantCodeValue } | Select-Object -First 1
 
 if ($null -eq $tenant) {

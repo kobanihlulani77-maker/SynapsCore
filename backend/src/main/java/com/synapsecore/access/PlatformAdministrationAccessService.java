@@ -3,6 +3,8 @@ package com.synapsecore.access;
 import com.synapsecore.config.SynapseBootstrapProperties;
 import jakarta.servlet.http.HttpServletRequest;
 import lombok.RequiredArgsConstructor;
+import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.web.server.ResponseStatusException;
@@ -36,6 +38,9 @@ public class PlatformAdministrationAccessService {
         if (providedToken == null || providedToken.isBlank() || !bootstrapProperties.hasPlatformAdminToken()) {
             return false;
         }
-        return providedToken.trim().equals(bootstrapProperties.getPlatformAdminToken().trim());
+        return MessageDigest.isEqual(
+            providedToken.trim().getBytes(StandardCharsets.UTF_8),
+            bootstrapProperties.getPlatformAdminToken().trim().getBytes(StandardCharsets.UTF_8)
+        );
     }
 }

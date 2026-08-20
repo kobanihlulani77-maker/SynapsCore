@@ -32,6 +32,8 @@ management:
       enabled: false
 
 synapsecore:
+  bootstrap:
+    platform-admin-token: test-only-platform-admin-token
   access:
     allow-header-fallback: true
   security:

@@ -39,13 +39,18 @@ public class OrderController {
     @ResponseStatus(HttpStatus.OK)
     public OrderResponse transitionOrder(@PathVariable String externalOrderId,
                                          @Valid @RequestBody OrderLifecycleTransitionRequest request) {
-        accessControlService.requireWorkspaceAccess("transition order lifecycle");
+        accessControlService.requireWorkspaceWarehouseAccess(
+            orderService.getOrderWarehouseCode(externalOrderId),
+            "transition order lifecycle"
+        );
         return orderService.transitionOrder(externalOrderId, request, "order-api");
     }
 
     @GetMapping("/recent")
     public List<OrderResponse> getRecentOrders(@RequestParam(required = false) String externalOrderId) {
-        accessControlService.requireWorkspaceAccess("view recent orders");
-        return operationalViewService.getRecentOrders(externalOrderId);
+        var actor = accessControlService.requireWorkspaceAccess("view recent orders");
+        return operationalViewService.getRecentOrders(externalOrderId).stream()
+            .filter(order -> actor.canAccessWarehouse(order.warehouseCode()))
+            .toList();
     }
 }

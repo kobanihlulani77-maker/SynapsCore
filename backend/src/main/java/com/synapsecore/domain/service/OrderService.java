@@ -188,6 +188,17 @@ public class OrderService {
         return toOrderResponse(savedOrder);
     }
 
+    @Transactional(readOnly = true)
+    public String getOrderWarehouseCode(String externalOrderId) {
+        String tenantCode = tenantContextService.getCurrentTenantCodeOrDefault();
+        CustomerOrder order = customerOrderRepository
+            .findByTenant_CodeIgnoreCaseAndExternalOrderId(tenantCode, externalOrderId.trim())
+            .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND,
+                "Order not found: " + externalOrderId));
+        tenantScopeGuard.requireCustomerOrder(order, "order warehouse lookup");
+        return order.getWarehouse().getCode();
+    }
+
     @Transactional
     public CustomerOrder synchronizeOrderLifecycleFromFulfillment(FulfillmentTask task,
                                                                   int requestedFulfilledUnits,

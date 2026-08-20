@@ -36,6 +36,8 @@ import org.springframework.transaction.annotation.Transactional;
 @Transactional
 class SecurityVerificationIntegrationTest {
 
+    private static final String TEST_PLATFORM_ADMIN_TOKEN = "test-only-platform-admin-token";
+
     private static final String SECOND_TENANT_CODE = "ACME-SEC";
     private static final String SECOND_TENANT_ADMIN_USERNAME = "acme.sec.admin";
     private static final String SECOND_TENANT_ADMIN_PASSWORD = "Acme-Sec-Admin-2026";
@@ -318,7 +320,7 @@ class SecurityVerificationIntegrationTest {
         );
 
         mockMvc.perform(post("/api/access/tenants")
-                .session(starterAdminSession)
+                .header("X-Synapse-Platform-Admin-Token", TEST_PLATFORM_ADMIN_TOKEN)
                 .contentType(APPLICATION_JSON)
                 .content("""
                     {
@@ -487,7 +489,7 @@ class SecurityVerificationIntegrationTest {
             .andExpect(content().string(Matchers.containsString(SECOND_TENANT_PRODUCT_SKU)));
 
         mockMvc.perform(get("/api/dashboard/snapshot")
-                .session(secondTenantAdminSession))
+                .session(secondTenantIntegrationSession))
             .andExpect(status().isOk())
             .andExpect(content().string(Matchers.containsString(SECOND_TENANT_REPLAY_ORDER_ID)));
 

@@ -2,7 +2,7 @@ package com.synapsecore.api.controller;
 
 import com.synapsecore.access.AccessControlService;
 import com.synapsecore.domain.dto.SystemIncidentResponse;
-import com.synapsecore.domain.dto.SystemRuntimeResponse;
+import com.synapsecore.domain.dto.TenantRuntimeResponse;
 import com.synapsecore.domain.service.SystemIncidentService;
 import com.synapsecore.domain.service.SystemRuntimeService;
 import java.util.List;
@@ -21,9 +21,9 @@ public class SystemController {
     private final SystemIncidentService systemIncidentService;
 
     @GetMapping("/runtime")
-    public SystemRuntimeResponse getRuntimeStatus() {
+    public TenantRuntimeResponse getRuntimeStatus() {
         accessControlService.requireWorkspaceAccess("view runtime status");
-        return systemRuntimeService.getRuntimeStatus();
+        return systemRuntimeService.getTenantRuntimeStatus();
     }
 
     @GetMapping("/incidents")

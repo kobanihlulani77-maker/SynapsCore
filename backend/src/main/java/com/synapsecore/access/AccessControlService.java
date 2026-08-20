@@ -58,7 +58,7 @@ public class AccessControlService {
     public SynapseActorContext requireTenantAdminControl(String actionDescription) {
         AccessOperator operator = requireCurrentOperator(actionDescription);
         if (operator == null) {
-            return new SynapseActorContext("dev-anonymous", Set.of());
+            return new SynapseActorContext("dev-anonymous", Set.of(), java.util.List.of());
         }
         if (!operator.getRoles().contains(SynapseAccessRole.TENANT_ADMIN)) {
             throw new ResponseStatusException(HttpStatus.FORBIDDEN,
@@ -67,24 +67,24 @@ public class AccessControlService {
                     + Set.of(SynapseAccessRole.TENANT_ADMIN)
                     + " to " + actionDescription + ".");
         }
-        return new SynapseActorContext(operator.getActorName(), operator.getRoles());
+        return actorContext(operator, operator.getRoles());
     }
 
     public SynapseActorContext requireWorkspaceAccess(String actionDescription) {
         AccessOperator operator = requireCurrentOperator(actionDescription);
         if (operator == null) {
-            return new SynapseActorContext("dev-anonymous", Set.of());
+            return new SynapseActorContext("dev-anonymous", Set.of(), java.util.List.of());
         }
-        return new SynapseActorContext(operator.getActorName(), operator.getRoles());
+        return actorContext(operator, operator.getRoles());
     }
 
     public SynapseActorContext requireWorkspaceWarehouseAccess(String warehouseCode, String actionDescription) {
         AccessOperator operator = requireCurrentOperator(actionDescription);
         if (operator == null) {
-            return new SynapseActorContext("dev-anonymous", Set.of());
+            return new SynapseActorContext("dev-anonymous", Set.of(), java.util.List.of());
         }
         accessDirectoryService.requireWarehouseAccess(operator, warehouseCode, actionDescription);
-        return new SynapseActorContext(operator.getActorName(), operator.getRoles());
+        return actorContext(operator, operator.getRoles());
     }
 
     private SynapseActorContext requireAnyRole(Set<SynapseAccessRole> requiredRoles, String actionDescription) {
@@ -105,7 +105,7 @@ public class AccessControlService {
                             + " does not have one of the required roles " + requiredRoles
                             + " to " + actionDescription + ".");
                 }
-                return new SynapseActorContext(sessionOperator.getActorName(), sessionOperator.getRoles());
+                return actorContext(sessionOperator, sessionOperator.getRoles());
             }
         }
 
@@ -138,7 +138,7 @@ public class AccessControlService {
                     + requiredRoles + " to " + actionDescription + ".");
         }
 
-        return new SynapseActorContext(operator.getActorName(), actorRoles);
+        return actorContext(operator, actorRoles);
     }
 
     private AccessOperator requireCurrentOperator(String actionDescription) {
@@ -228,6 +228,14 @@ public class AccessControlService {
             case REQUESTER -> throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
                 "Scenario requester role is not valid for protected review actions.");
         };
+    }
+
+    private SynapseActorContext actorContext(AccessOperator operator, Set<SynapseAccessRole> roles) {
+        return new SynapseActorContext(
+            operator.getActorName(),
+            roles,
+            accessDirectoryService.getWarehouseScopes(operator)
+        );
     }
 
     private HttpServletRequest currentRequest() {
