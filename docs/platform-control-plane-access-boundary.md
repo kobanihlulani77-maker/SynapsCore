@@ -4,6 +4,14 @@
 
 This document is the authoritative access-boundary model for the SynapseCore pilot build. It describes implemented behavior, not a future IAM design.
 
+Current gate status:
+
+- local implementation and source-level access review are complete;
+- frontend role-navigation/direct-route checks, documentation links, and secret scanning pass;
+- the expanded backend rehearsal has been added but its current execution is pending because the local test runner cannot access the Maven cache through the active Codex sandbox;
+- live platform-owner, six-role tenant, logout, privacy, and direct-API verification are **PENDING - RENDER INCIDENT**;
+- the access gate is not closed and Phase 10 is not authorized until the pending backend and live evidence complete.
+
 The governing rule is:
 
 > Platform owner sees the platform. Tenant sees its company. Role sees its responsibility. Warehouse scope limits the operation. Backend authority is final.
@@ -179,7 +187,36 @@ All roles require an authenticated tenant session. All data remains tenant-scope
 
 Common workspace pages are Dashboard, Alerts, Recommendations, Orders, Inventory, Catalog, Locations, Fulfillment, Scenarios, Scenario History, Runtime, Audit, and Profile. Catalog reads are common; catalog writes are tenant-admin only.
 
-Current backend policy allows authenticated workspace users to view connector/import/replay APIs, while the tenant navigation and dashboard integration sections are limited to integration roles. Mutating connectors and replay execution remain role-protected. This read-policy breadth is documented as a future least-privilege refinement, not a cross-tenant leak.
+### Integration and replay read matrix
+
+The backend, navigation, dashboard projection, and realtime subscriptions now use the same responsibility boundary. The three full-detail read APIs are:
+
+- `GET /api/integrations/orders/connectors`;
+- `GET /api/integrations/orders/imports/recent`;
+- `GET /api/integrations/orders/replay-queue`.
+
+| Role | Connector configuration/policy | Import history | Failed inbound/replay queue | Classification |
+| --- | --- | --- | --- | --- |
+| `TENANT_ADMIN` | No full endpoint; dedicated Company Settings workspace support metadata only | No | No | Full integration reads not required; limited support ownership metadata is optional but justified |
+| `REVIEW_OWNER` | No | No | No | Not required; scenario and approval APIs carry the governance evidence |
+| `FINAL_APPROVER` | No | No | No | Not required; scenario and approval APIs carry the governance evidence |
+| `ESCALATION_OWNER` | No | No | No | Not required; escalation and scenario APIs carry the assigned evidence |
+| `INTEGRATION_ADMIN` | Yes | Yes | Yes | Required for connector administration and recovery ownership |
+| `INTEGRATION_OPERATOR` | Yes, read-only | Yes | Yes | Required for operational monitoring and authorized replay |
+
+The three APIs reject all sessions without `INTEGRATION_ADMIN` or `INTEGRATION_OPERATOR`, regardless of frontend navigation. Connector mutations remain `INTEGRATION_ADMIN` only. Manual replay remains `INTEGRATION_ADMIN` or `INTEGRATION_OPERATOR`. Tenant admins can still read the purpose-specific connector support metadata returned by `/api/access/admin/workspace`; this does not grant the full connector, import, or replay resources.
+
+### Realtime read boundary
+
+Realtime authorization is enforced during STOMP subscription, not only when the browser builds navigation:
+
+- every tenant topic must match the authenticated session tenant;
+- raw integration topics require an integration role;
+- warehouse-scoped sessions cannot subscribe to tenant-wide raw inventory, order, fulfillment, scenario, or integration collections;
+- scoped integration sessions subscribe to the metadata-only `integrations.changed` signal and refresh through warehouse-filtered REST APIs;
+- governance and tenant-admin-only sessions do not subscribe to integration topics.
+
+The change signal carries only `changedAt`; it does not contain connector, import, replay, order, or payload data.
 
 ## Platform Owner Capability Matrix
 
@@ -223,6 +260,14 @@ tenant session + active operator + assigned roles + warehouse scopes
 - Dashboard inventory, fulfillment, recent order, connector, replay, scenario, and notification collections are filtered before response serialization.
 - Tenant scope remains mandatory before warehouse scope; a warehouse code cannot move a session into another tenant.
 
+## Session Revocation And Access Changes
+
+- Disabling a tenant user increments that user's session version. Existing sessions become invalid on their next session probe or protected request.
+- Remapping a user to another operator also increments the session version and requires a new sign-in.
+- Operator role, active-state, and warehouse-scope checks are resolved from persisted authority during session validation. An active session therefore receives the updated operator boundary rather than retaining a stale browser-side role or scope.
+- Explicit logout invalidates the current server session. A signed-out request cannot retain tenant or platform authority.
+- An empty warehouse-scope assignment remains tenant-wide and must be handled as a high-impact access change.
+
 ## Synthetic Rehearsal Evidence
 
 The automated integration rehearsal provisions only ephemeral H2 test data through supported HTTP APIs.
@@ -231,8 +276,8 @@ The automated integration rehearsal provisions only ephemeral H2 test data throu
 | --- | --- |
 | Primary tenant | `ACCESS-BOUNDARY-REHEARSAL` |
 | Isolation tenant | `ACCESS-BOUNDARY-ISOLATION` |
-| Tenant admin | `boundary.admin` |
-| Role identities | `boundary.review`, `boundary.final`, `boundary.escalation`, `boundary.integration.admin`, `boundary.integration.operator` |
+| Tenant bootstrap administrator | `boundary.admin` (multi-role provisioning identity) |
+| Six single-role identities | `boundary.tenant.admin`, `boundary.review`, `boundary.final`, `boundary.escalation`, `boundary.integration.admin`, `boundary.integration.operator` |
 | Warehouse scopes | Two starter warehouse codes; each non-admin role receives one scope, while tenant admin has empty/tenant-wide scope |
 
 Passwords are test fixtures inside the test process and are not operational credentials. No customer data or real company name is used.
@@ -240,16 +285,29 @@ Passwords are test fixtures inside the test process and are not operational cred
 `PlatformTenantAccessBoundaryIntegrationTest` proves:
 
 - wrong platform password rejection and successful dedicated platform session;
+- platform logout, signed-out platform denial, and platform-session denial from tenant operations;
 - platform overview/runtime/activity access and metadata privacy;
-- tenant admin and all five non-admin role identities denied platform and tenant-user administration APIs;
+- all six single-role tenant identities expose only their own session identity, roles, tenant, and warehouse scopes;
+- tenant admin and all five non-admin role identities are denied every protected platform API and the global tenant directory;
+- all five non-admin roles are denied tenant-user administration APIs;
+- role clashes do not grant product writes, tenant administration, connector mutation, or unrelated governance authority;
+- single-role tenant admin and all three governance roles denied full connector/import/replay reads;
+- both integration roles allowed the three required integration/replay reads;
+- tenant admin retained only the purpose-specific workspace support projection;
 - tenant session cannot inherit platform authority;
 - tenant admin cannot list or create unrelated tenants;
+- disabled-user sessions are revoked and protected requests are denied;
+- warehouse-scope changes take effect for an existing session, and logout removes subsequent authority;
 - two-tenant event isolation;
 - tenant runtime excludes profiles, origins, header fallback, and instance identity;
 - scoped inventory, order, fulfillment, scenario, and replay-related views/actions do not disclose or mutate the other warehouse;
 - empty-scope tenant admin sees both tenant warehouses.
 
-The existing `SecurityVerificationIntegrationTest` covers products, inventory, orders, alerts, recommendations, replay, dashboard, runtime, users, and operator-directory isolation across tenants. Existing MVP and security tests cover governance role matching, assigned actor checks, connector management, replay role enforcement, and session lifecycle.
+`WebSocketAccessBoundaryTest` additionally proves cross-tenant topic denial, governance-role integration topic denial, warehouse-scoped raw-topic denial, safe change-signal access for scoped integration users, and raw integration-topic access for tenant-wide integration users.
+
+The expanded `SecurityVerificationIntegrationTest` covers products, inventory, orders, alerts, recommendations, connectors, replay, dashboard, runtime, workspace settings, events, audit, scenarios, users, and operator-directory isolation across two tenants. Existing MVP and security tests cover governance role matching, assigned actor checks, connector management, replay role enforcement, and session lifecycle.
+
+`frontend/scripts/frontend-check.mjs` executes the six-role navigation and direct-route matrix for Approvals, Escalations, Integrations, Replay Queue, Users, and Company Settings. This supplements, but never replaces, backend authorization.
 
 ## Information-Boundary Rule
 
@@ -267,7 +325,7 @@ The existing `SecurityVerificationIntegrationTest` covers products, inventory, o
 - The live deployment must configure the platform-owner username and BCrypt password hash before human control-plane sign-in can succeed. This must be verified after deployment without printing credentials.
 - Platform activity is a recent metadata projection over current event/audit records, not a separate durable platform incident ledger.
 - Platform support is metadata-first. There is intentionally no deep tenant support/impersonation workflow.
-- Tenant connector/import/replay read endpoints remain workspace-readable at backend level; frontend navigation limits them to integration roles and all mutations remain role-protected. Narrowing those reads is a future least-privilege improvement if pilot evidence requires it.
+- Import-run records are tenant-level operational metadata and do not currently carry a warehouse identifier. They are restricted to integration roles, but cannot be further warehouse-filtered until the import data model records an authoritative warehouse association. This is a medium least-privilege limitation, not cross-tenant exposure.
 
 These limitations do not permit cross-tenant access or tenant acquisition of platform authority.
 
@@ -289,3 +347,5 @@ git diff --check
 ```
 
 Hosted proof is required only after the deployed backend has the platform-owner settings and the deployment is healthy. Do not place human passwords, BCrypt hashes, bootstrap tokens, or automation tokens in this document or in browser configuration.
+
+During the current external Render incident, all hosted access evidence remains **PENDING - RENDER INCIDENT**. Pending is not a pass or a failure, and no live conclusion may be inferred from local evidence.
