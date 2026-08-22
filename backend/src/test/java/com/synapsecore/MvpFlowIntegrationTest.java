@@ -1098,7 +1098,8 @@ class MvpFlowIntegrationTest {
             .orElseThrow()
             .getId();
 
-        mockMvc.perform(post("/api/scenarios/" + scenarioRunId + "/execute"))
+        mockMvc.perform(post("/api/scenarios/" + scenarioRunId + "/execute")
+                .with(accessHeaders("Naledi Lead", "REVIEW_OWNER")))
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.scenarioRunId").value(scenarioRunId))
             .andExpect(jsonPath("$.scenarioTitle").value(org.hamcrest.Matchers.containsString("WH-NORTH")))
@@ -1204,7 +1205,8 @@ class MvpFlowIntegrationTest {
             .andExpect(jsonPath("$.request.warehouseCode").value("WH-NORTH"))
             .andExpect(jsonPath("$.request.items[0].quantity").value(3));
 
-        mockMvc.perform(post("/api/scenarios/" + savedPlanId + "/execute"))
+        mockMvc.perform(post("/api/scenarios/" + savedPlanId + "/execute")
+                .with(accessHeaders("Naledi Lead", "REVIEW_OWNER")))
             .andExpect(status().isBadRequest())
             .andExpect(jsonPath("$.message").value(org.hamcrest.Matchers.containsString("approved saved plans")));
 
@@ -1230,7 +1232,8 @@ class MvpFlowIntegrationTest {
             .andExpect(jsonPath("$[0].approvedBy").value("Naledi Lead"))
             .andExpect(jsonPath("$[0].executable").value(true));
 
-        mockMvc.perform(post("/api/scenarios/" + savedPlanId + "/execute"))
+        mockMvc.perform(post("/api/scenarios/" + savedPlanId + "/execute")
+                .with(accessHeaders("Naledi Lead", "REVIEW_OWNER")))
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.scenarioRunId").value(savedPlanId))
             .andExpect(jsonPath("$.order.warehouseCode").value("WH-NORTH"))
@@ -1329,7 +1332,8 @@ class MvpFlowIntegrationTest {
             .andExpect(status().isBadRequest())
             .andExpect(jsonPath("$.message").value(org.hamcrest.Matchers.containsString("save a new plan")));
 
-        mockMvc.perform(post("/api/scenarios/" + savedPlanId + "/execute"))
+        mockMvc.perform(post("/api/scenarios/" + savedPlanId + "/execute")
+                .with(accessHeaders("Naledi Lead", "REVIEW_OWNER")))
             .andExpect(status().isBadRequest())
             .andExpect(jsonPath("$.message").value(org.hamcrest.Matchers.containsString("approved saved plans")));
 
@@ -1722,7 +1726,8 @@ class MvpFlowIntegrationTest {
         overdueRun.setApprovalDueAt(Instant.now().minusSeconds(300));
         scenarioRunRepository.saveAndFlush(overdueRun);
 
-        mockMvc.perform(post("/api/scenarios/" + scenarioId + "/execute"))
+        mockMvc.perform(post("/api/scenarios/" + scenarioId + "/execute")
+                .with(accessHeaders("Naledi Lead", "REVIEW_OWNER")))
             .andExpect(status().isBadRequest())
             .andExpect(jsonPath("$.message").value(org.hamcrest.Matchers.containsString("cannot be executed")));
 
@@ -2075,7 +2080,8 @@ class MvpFlowIntegrationTest {
             .orElseThrow()
             .getId();
 
-        mockMvc.perform(post("/api/scenarios/" + comparisonScenarioId + "/execute"))
+        mockMvc.perform(post("/api/scenarios/" + comparisonScenarioId + "/execute")
+                .with(accessHeaders("Naledi Lead", "REVIEW_OWNER")))
             .andExpect(status().isBadRequest())
             .andExpect(jsonPath("$.message").value(org.hamcrest.Matchers.containsString("cannot be executed")));
     }

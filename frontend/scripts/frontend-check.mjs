@@ -129,6 +129,7 @@ async function main() {
   const platformApplication = await fs.readFile(path.join(srcDir, 'components', 'PlatformApplication.jsx'), 'utf8')
   const tenantAppRoutes = await fs.readFile(path.join(srcDir, 'components', 'AppRoutes.jsx'), 'utf8')
   const workspaceAppModel = await fs.readFile(path.join(srcDir, 'hooks', 'useWorkspaceAppModel.js'), 'utf8')
+  const workspaceChrome = await fs.readFile(path.join(srcDir, 'hooks', 'useWorkspaceChrome.js'), 'utf8')
   const workspaceRealtime = await fs.readFile(path.join(srcDir, 'hooks', 'useWorkspaceRealtime.js'), 'utf8')
   const accessBoundarySignals = [
     [pageRegistry.includes("audience: 'platform'"), 'Platform routes must use the dedicated platform audience.'],
@@ -140,6 +141,8 @@ async function main() {
     [!platformApplication.includes('X-Synapse-Platform-Admin-Token'), 'The browser must not receive the automation platform token.'],
     [!tenantAppRoutes.includes('PlatformAdminPage'), 'Tenant route rendering must not retain the previous platform-admin page path.'],
     [workspaceAppModel.includes('signedInRoles:'), 'Realtime policy must receive the signed-in role set.'],
+    [workspaceChrome.includes('canAccessWorkspacePage'), 'Workspace search and quick actions must reuse role-aware page policy.'],
+    [workspaceChrome.includes('accessibleWorkspacePageKeys.has(action.target)'), 'Top-bar quick actions must exclude unauthorized page targets.'],
     [workspaceAppModel.includes('signedInWarehouseScopes:'), 'Realtime policy must receive warehouse scopes.'],
     [workspaceRealtime.includes("hasIntegrationAccess"), 'Integration realtime subscriptions must be role-aware.'],
     [workspaceRealtime.includes("/integrations.changed"), 'Scoped integration realtime must use the metadata-only change signal.'],

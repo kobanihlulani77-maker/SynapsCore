@@ -305,6 +305,56 @@ class PlatformTenantAccessBoundaryIntegrationTest {
     }
 
     @Test
+    void scenarioExecutionRequiresGovernanceRoleAndWarehouseScope() throws Exception {
+        MockHttpSession tenantAdmin = tenantLogin(REHEARSAL_TENANT, "boundary.tenant.admin", ROLE_PASSWORD);
+        mockMvc.perform(post("/api/scenarios/order-impact")
+                .session(tenantAdmin)
+                .contentType(APPLICATION_JSON)
+                .content(orderPayload(null, warehouseA)))
+            .andExpect(status().isOk());
+
+        long reviewScenarioId = scenarioRunRepository.findTop12ByOrderByCreatedAtDesc().stream()
+            .filter(run -> run.getType() == ScenarioRunType.PREVIEW)
+            .filter(run -> warehouseA.equalsIgnoreCase(run.getWarehouseCode()))
+            .findFirst()
+            .orElseThrow()
+            .getId();
+
+        for (String username : List.of(
+            "boundary.tenant.admin",
+            "boundary.integration.admin",
+            "boundary.integration.operator",
+            "boundary.escalation"
+        )) {
+            MockHttpSession session = tenantLogin(REHEARSAL_TENANT, username, ROLE_PASSWORD);
+            mockMvc.perform(post("/api/scenarios/" + reviewScenarioId + "/execute").session(session))
+                .andExpect(status().isForbidden());
+        }
+
+        MockHttpSession reviewOwner = tenantLogin(REHEARSAL_TENANT, "boundary.review", ROLE_PASSWORD);
+        mockMvc.perform(post("/api/scenarios/" + reviewScenarioId + "/execute").session(reviewOwner))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.order.warehouseCode").value(warehouseA));
+
+        mockMvc.perform(post("/api/scenarios/order-impact")
+                .session(tenantAdmin)
+                .contentType(APPLICATION_JSON)
+                .content(orderPayload(null, warehouseA)))
+            .andExpect(status().isOk());
+        long finalScenarioId = scenarioRunRepository.findTop12ByOrderByCreatedAtDesc().stream()
+            .filter(run -> run.getType() == ScenarioRunType.PREVIEW)
+            .filter(run -> warehouseA.equalsIgnoreCase(run.getWarehouseCode()))
+            .findFirst()
+            .orElseThrow()
+            .getId();
+
+        MockHttpSession finalApprover = tenantLogin(REHEARSAL_TENANT, "boundary.final", ROLE_PASSWORD);
+        mockMvc.perform(post("/api/scenarios/" + finalScenarioId + "/execute").session(finalApprover))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.order.warehouseCode").value(warehouseA));
+    }
+
+    @Test
     void disabledUsersAreRevokedAndScopeChangesApplyToExistingSessions() throws Exception {
         MockHttpSession admin = tenantLogin(REHEARSAL_TENANT, TENANT_ADMIN_USERNAME, TENANT_ADMIN_PASSWORD);
         var user = accessUserRepository
@@ -385,6 +435,59 @@ class PlatformTenantAccessBoundaryIntegrationTest {
         mockMvc.perform(get("/api/access/admin/workspace").session(tenantAdmin))
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.connectors").isArray());
+    }
+
+    @Test
+    void disabledWebhookFailureRemainsVisibleForAuthorizedRecovery() throws Exception {
+        MockHttpSession integrationAdmin = tenantLogin(
+            REHEARSAL_TENANT,
+            "boundary.integration.admin",
+            ROLE_PASSWORD
+        );
+
+        mockMvc.perform(post("/api/integrations/orders/connectors")
+                .session(integrationAdmin)
+                .contentType(APPLICATION_JSON)
+                .content("""
+                    {
+                      "sourceSystem":"boundary_disabled_webhook",
+                      "type":"WEBHOOK_ORDER",
+                      "displayName":"Boundary Disabled Webhook",
+                      "enabled":false,
+                      "syncMode":"REALTIME_PUSH",
+                      "validationPolicy":"RELAXED",
+                      "transformationPolicy":"NORMALIZE_CODES",
+                      "allowDefaultWarehouseFallback":false,
+                      "defaultWarehouseCode":"%s",
+                      "notes":"Synthetic disabled webhook recovery verification."
+                    }
+                    """.formatted(warehouseA)))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.enabled").value(false));
+
+        mockMvc.perform(post("/api/integrations/orders/webhook")
+                .session(integrationAdmin)
+                .contentType(APPLICATION_JSON)
+                .content("""
+                    {
+                      "sourceSystem":"boundary_disabled_webhook",
+                      "externalOrderId":"BOUNDARY-WEBHOOK-FAILED",
+                      "warehouseCode":"%s",
+                      "customerReference":"BOUNDARY-CUSTOMER",
+                      "occurredAt":"2026-08-22T10:00:00Z",
+                      "items":[{"productSku":"BOUNDARY-SKU","quantity":1,"unitPrice":10.00}]
+                    }
+                    """.formatted(warehouseA)))
+            .andExpect(status().isForbidden())
+            .andExpect(jsonPath("$.message").value(org.hamcrest.Matchers.containsString("is disabled")));
+
+        mockMvc.perform(get("/api/integrations/orders/replay-queue")
+                .session(integrationAdmin)
+                .param("externalOrderId", "BOUNDARY-WEBHOOK-FAILED"))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$[0].externalOrderId").value("BOUNDARY-WEBHOOK-FAILED"))
+            .andExpect(jsonPath("$[0].failureCode").value("CONNECTOR_DISABLED"))
+            .andExpect(jsonPath("$[0].status").value("PENDING"));
     }
 
     @Test

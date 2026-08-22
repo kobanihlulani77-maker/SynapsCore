@@ -103,7 +103,7 @@ public class ScenarioController {
     @PostMapping("/{scenarioRunId}/execute")
     @ResponseStatus(HttpStatus.OK)
     public ScenarioExecutionResponse executeScenario(@PathVariable long scenarioRunId) {
-        accessControlService.requireWorkspaceWarehouseAccess(
+        accessControlService.requireScenarioExecutor(
             scenarioHistoryService.getScenarioRun(scenarioRunId).getWarehouseCode(),
             "execute approved scenarios"
         );

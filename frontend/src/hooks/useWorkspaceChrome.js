@@ -1,5 +1,5 @@
 import { useDeferredValue } from 'react'
-import { appPages, pageSectionMap } from '../config/pageRegistry'
+import { appPages, canAccessWorkspacePage, pageSectionMap } from '../config/pageRegistry'
 
 const currency = new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 })
 
@@ -35,6 +35,9 @@ export default function useWorkspaceChrome({
   formatBuildValue,
   formatCodeLabel,
 }) {
+  const signedInRoles = signedInSession?.roles || []
+  const accessibleWorkspacePages = appPages.filter((page) => canAccessWorkspacePage(page.key, signedInRoles))
+  const accessibleWorkspacePageKeys = new Set(accessibleWorkspacePages.map((page) => page.key))
   const resolvedActiveAlertCount = Math.max(summary?.activeAlerts ?? 0, snapshot.alerts.activeAlerts.length)
   const resolvedRecommendationCount = Math.max(summary?.recommendationsCount ?? 0, snapshot.recommendations.length)
   const resolvedRecentOrderCount = Math.max(summary?.recentOrderCount ?? 0, snapshot.recentOrders.length)
@@ -183,7 +186,7 @@ export default function useWorkspaceChrome({
       {
         key: 'pages',
         label: 'Pages',
-        items: appPages
+        items: accessibleWorkspacePages
           .filter((page) => page.label.toLowerCase().includes(deferredWorkspaceSearch) || page.title.toLowerCase().includes(deferredWorkspaceSearch))
           .map((page) => ({ id: `page-${page.key}`, title: page.label, meta: page.description, target: page.key })),
       },
@@ -252,7 +255,7 @@ export default function useWorkspaceChrome({
       default:
         return [{ label: 'Open alerts', target: 'alerts' }, { label: 'Open approvals', target: 'approvals' }]
     }
-  })()
+  })().filter((action) => accessibleWorkspacePageKeys.has(action.target))
 
   const utilityTimeline = [
     ...systemIncidents.slice(0, 2).map((incident) => ({

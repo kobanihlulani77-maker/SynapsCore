@@ -47,8 +47,9 @@ export default function ScenarioDecisionConsole({ scenario, title, emptyMessage,
   const approvalNoteRequired = scenario.approvalPolicy === 'ESCALATED' || scenario.approvalStage === 'PENDING_FINAL_APPROVAL'
   const canLoadScenario = Boolean(scenario.loadable)
   const canApproveScenario = scenario.type === 'SAVED_PLAN' && scenario.approvalStatus === 'PENDING_APPROVAL'
-  const canRejectScenario = scenario.type === 'SAVED_PLAN' && scenario.approvalStatus !== 'REJECTED'
+  const canRejectScenario = scenario.type === 'SAVED_PLAN' && scenario.approvalStatus === 'PENDING_APPROVAL'
   const canExecuteScenario = Boolean(scenario.executable)
+    && (signedInRoles.includes('REVIEW_OWNER') || signedInRoles.includes('FINAL_APPROVER'))
   const canAcknowledgeEscalation = Boolean(scenario.slaEscalated && !scenario.slaAcknowledged)
   const actionStateSummary = canApproveScenario
     ? `${approvalActionLabel} needs ${formatCodeLabel(approvalRole)} authority${approvalNoteRequired ? ' and a decision note' : ''}.`
