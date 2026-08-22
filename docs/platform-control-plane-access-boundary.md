@@ -6,11 +6,12 @@ This document is the authoritative access-boundary model for the SynapseCore pil
 
 Current gate status:
 
-- local implementation and source-level access review are complete;
-- frontend role-navigation/direct-route checks, documentation links, and secret scanning pass;
-- the expanded backend rehearsal has been added but its current execution is pending because the local test runner cannot access the Maven cache through the active Codex sandbox;
-- live platform-owner, six-role tenant, logout, privacy, and direct-API verification are **PENDING - RENDER INCIDENT**;
-- the access gate is not closed and Phase 10 is not authorized until the pending backend and live evidence complete.
+- dedicated platform-owner configuration and sign-in are live on Render;
+- the platform-owner and all six single-role tenant identities were exercised through the rendered UI and direct APIs on 2026-08-22;
+- scenario execution now requires `REVIEW_OWNER` or `FINAL_APPROVER` plus warehouse scope, and role-aware navigation, search, and top-bar actions share one policy;
+- backend verification passes `149/149`; frontend lint, build, and verify pass;
+- Critical blockers: `0`; High blockers: `0`;
+- the gate is technically complete with the documented disabled-webhook replay limitation below. Phase 10 remains stopped until the gate owner accepts this record.
 
 The governing rule is:
 
@@ -309,6 +310,45 @@ The expanded `SecurityVerificationIntegrationTest` covers products, inventory, o
 
 `frontend/scripts/frontend-check.mjs` executes the six-role navigation and direct-route matrix for Approvals, Escalations, Integrations, Replay Queue, Users, and Company Settings. This supplements, but never replaces, backend authorization.
 
+## Live Closure Evidence
+
+Live environment: Render frontend and backend, using synthetic rehearsal tenants only. No customer data, plaintext password, password hash, token, session cookie, connector secret, or raw inbound payload is recorded here.
+
+### Platform owner
+
+- `/platform-sign-in` loaded and established the dedicated server-side platform session.
+- Platform Overview, Tenant Directory, Platform Runtime, Platform Activity, and Release Trust loaded in the platform shell.
+- Platform Activity remained metadata-only. The control plane did not expose raw orders, order items, product rows, inventory rows, inbound/replay payloads, connector secrets, or customer credentials.
+- Platform sign-out removed authority; signed-out platform APIs were denied.
+- Every tested tenant role was denied `/api/platform/*`, and direct platform navigation returned the separate platform sign-in surface.
+
+### Six-role rendered matrix
+
+| Role | Rendered authority | Direct/backend denial evidence | Result |
+| --- | --- | --- | --- |
+| `TENANT_ADMIN` | Tenant-wide identity, Users, and Company Settings; tenant administration controls | Integration/replay, approvals, and platform authority denied; scenario execution now denied | PASS |
+| `INTEGRATION_ADMIN` | `WH-COAST`; Integrations, Replay Queue, connector policy controls | Users, governance, platform, unrelated product writes, and scenario execution denied | PASS |
+| `INTEGRATION_OPERATOR` | `WH-COAST`; integration reads and replay/recovery lane | Users, connector policy mutation, governance, platform, and scenario execution denied | PASS |
+| `REVIEW_OWNER` | `WH-COAST`; Approvals and review actions; eligible scenario execution | Integrations, Users, Escalations, and platform authority denied | PASS |
+| `FINAL_APPROVER` | `WH-COAST`; Approvals and final-decision actions; eligible scenario execution | Integrations, Users, Escalations, and platform authority denied | PASS |
+| `ESCALATION_OWNER` | `WH-COAST`; Escalations and acknowledgement lane | Approvals, Integrations, Users, platform authority, and scenario execution denied | PASS |
+
+All roles showed the expected identity and warehouse scope, retained general workspace reads, loaded tenant Runtime and Activity rather than platform variants, and signed out safely. Hidden navigation was not accepted as security evidence: direct routes and protected APIs were attempted separately. Cross-tenant reads/writes, wrong-warehouse mutations, global tenant directory access, and platform APIs were denied.
+
+### Corrective findings closed during the walkthrough
+
+1. Scenario execution previously required only workspace and warehouse access. The backend now requires `REVIEW_OWNER` or `FINAL_APPROVER`; a new integration test denies tenant-admin, integration, and escalation-only identities. The deployed UI hides execution from non-governance roles. Live fresh-session evidence returned `403` for non-governance roles and `200` for a scoped Review Owner.
+2. Top-bar shortcuts and global page search previously used the unfiltered workspace page list. They now reuse `canAccessWorkspacePage`; the deployed Escalation Owner dashboard shows Escalations but does not advertise Approvals.
+3. Approved scenarios no longer render a misleading rejection action. Rejection remains available only while a saved plan is pending approval.
+
+### Realtime, session, and recovery evidence
+
+- Cross-tenant topics, governance-role integration topics, warehouse-scoped raw topics, and wrong-tenant topics were denied.
+- Scoped integration roles received the metadata-only change signal and refreshed filtered REST state; tenant-wide integration scope received only its authorized raw topic.
+- Disable/re-enable, role/scope refresh, explicit tenant logout, explicit platform logout, and signed-out denial were exercised. One pre-redeploy PowerShell session retained from the deliberate revocation exercise returned a transient `500`; a fresh active session repeated the same forbidden scenario action as `403`. No authority was granted. This remains a Low support observation for stale clients across deployment boundaries.
+- The supported CSV failure -> evidence -> correction -> replay -> duplicate-safety lane passed live.
+- Disabled `WEBHOOK_ORDER` currently returns `403` and records failure/import evidence, but the corresponding filtered replay queue can remain empty on Render. Local integration coverage expects a `CONNECTOR_DISABLED` pending replay row. The mismatch is a Medium limitation because disabled-webhook replay is not in the approved pilot recovery lane. If a pilot requires this webhook recovery path, it becomes a High blocker until resolved and live-proven.
+
 ## Information-Boundary Rule
 
 **Platform owner sees:** platform health, tenant metadata, aggregate support state, platform activity metadata, and approved administrative information.
@@ -326,6 +366,8 @@ The expanded `SecurityVerificationIntegrationTest` covers products, inventory, o
 - Platform activity is a recent metadata projection over current event/audit records, not a separate durable platform incident ledger.
 - Platform support is metadata-first. There is intentionally no deep tenant support/impersonation workflow.
 - Import-run records are tenant-level operational metadata and do not currently carry a warehouse identifier. They are restricted to integration roles, but cannot be further warehouse-filtered until the import data model records an authoritative warehouse association. This is a medium least-privilege limitation, not cross-tenant exposure.
+- Disabled-webhook failure visibility is not yet deterministic between local integration proof and Render replay-queue readback. The Company 1 pilot must use the proven CSV recovery lane unless this mismatch is fixed and re-proven.
+- A stale client session retained across deliberate revocation and redeployment produced one `500` denial response; fresh sessions denied correctly with `403`. Treat unexpected stale-session errors as support evidence and require a fresh sign-in.
 
 These limitations do not permit cross-tenant access or tenant acquisition of platform authority.
 
@@ -348,4 +390,4 @@ git diff --check
 
 Hosted proof is required only after the deployed backend has the platform-owner settings and the deployment is healthy. Do not place human passwords, BCrypt hashes, bootstrap tokens, or automation tokens in this document or in browser configuration.
 
-During the current external Render incident, all hosted access evidence remains **PENDING - RENDER INCIDENT**. Pending is not a pass or a failure, and no live conclusion may be inferred from local evidence.
+**Final access-gate classification:** `ACCEPTED WITH DOCUMENTED LIMITATIONS`, pending gate-owner review before Phase 10. Critical blockers: `0`. High blockers: `0`.
