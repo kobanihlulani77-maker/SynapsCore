@@ -195,6 +195,7 @@ This index links the main product, architecture, runbook, proof, and operator do
 - [company-pre-handover-verification-checklist.md](company-pre-handover-verification-checklist.md)
 - [company-customer-handover-procedure.md](company-customer-handover-procedure.md)
 - [company-customer-handover-pack.md](company-customer-handover-pack.md)
+- [company-day-one-pilot-guide.md](company-day-one-pilot-guide.md) - canonical Phase 10 first operating-day control model
 - [pilot-release-candidate.md](pilot-release-candidate.md)
 - [pilot-company-onboarding-checklist.md](pilot-company-onboarding-checklist.md)
 - [pilot-operator-checklist.md](pilot-operator-checklist.md)
@@ -219,6 +220,7 @@ This index links the main product, architecture, runbook, proof, and operator do
 - [templates/company-pre-handover-verification-record.md](templates/company-pre-handover-verification-record.md)
 - [templates/company-customer-handover-record.md](templates/company-customer-handover-record.md)
 - [templates/company-customer-access-message.md](templates/company-customer-access-message.md)
+- [templates/company-day-one-pilot-record.md](templates/company-day-one-pilot-record.md)
 
 ## Pilot Release Candidate
 
