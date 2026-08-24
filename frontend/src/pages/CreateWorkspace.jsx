@@ -418,7 +418,7 @@ export default function CreateWorkspacePage({ context }) {
             ) : (
               <>
                 <button className="secondary-button" onClick={() => navigateToPage('product')} type="button">Review Product Surface</button>
-                <button className="primary-button" onClick={continueToSignIn} type="button">Continue to Sign In After Provisioning</button>
+                <button className="primary-button" onClick={continueToSignIn} type="button">Continue to Sign In</button>
               </>
             )}
           </div>
