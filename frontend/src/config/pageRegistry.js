@@ -249,10 +249,46 @@ export const platformPages = [
     description: 'Authenticate with the dedicated platform-owner account. Customer workspace credentials cannot open this surface.',
     focus: ['Platform authority', 'Metadata only', 'Separate session'],
   },
-  { key: 'platform', path: '/platform-admin', audience: 'platform', label: 'Platform Overview' },
-  { key: 'tenants', path: '/tenant-management', audience: 'platform', label: 'Tenant Directory' },
-  { key: 'system-config', path: '/system-config', audience: 'platform', label: 'Platform Runtime' },
-  { key: 'releases', path: '/releases', audience: 'platform', label: 'Release Trust' },
+  {
+    key: 'platform',
+    path: '/platform-admin',
+    audience: 'platform',
+    label: 'Platform Overview',
+    title: 'Platform overview and cross-tenant trust',
+    description: 'Review metadata-only platform posture, tenant support signals, runtime health, and release trust.',
+  },
+  {
+    key: 'tenants',
+    path: '/tenant-management',
+    audience: 'platform',
+    label: 'Tenant Directory',
+    title: 'Tenant onboarding and workspace rollout',
+    description: 'Provision isolated workspaces and review portfolio-level support metadata.',
+  },
+  {
+    key: 'system-config',
+    path: '/system-config',
+    audience: 'platform',
+    label: 'Platform Runtime',
+    title: 'System configuration and operational defaults',
+    description: 'Inspect display-safe runtime, dispatch, origin, session, and realtime posture.',
+  },
+  {
+    key: 'platform-activity',
+    path: '/platform-activity',
+    audience: 'platform',
+    label: 'Platform Activity',
+    title: 'Platform activity and evidence',
+    description: 'Review metadata-only activity signals across the platform without opening tenant payloads.',
+  },
+  {
+    key: 'releases',
+    path: '/releases',
+    audience: 'platform',
+    label: 'Release Trust',
+    title: 'Release, deployment, and environment',
+    description: 'Compare deployed build identity with current runtime evidence before accepting a release.',
+  },
 ]
 
 export const allPages = [...publicPages, ...appPages, ...platformPages]
@@ -345,6 +381,11 @@ export const pageSectionMap = {
     { label: 'Build fingerprint', targetId: 'releases-builds' },
     { label: 'Deployment health', targetId: 'releases-checklist' },
     { label: 'Environment posture', targetId: 'workspace-page-focus' },
+  ],
+  'platform-activity': [
+    { label: 'Activity feed', targetId: 'platform-activity-feed' },
+    { label: 'Evidence boundary', targetId: 'platform-activity-boundary' },
+    { label: 'Next checks', targetId: 'platform-activity-next-checks' },
   ],
 }
 

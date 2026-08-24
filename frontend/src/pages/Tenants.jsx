@@ -21,7 +21,7 @@ export default function TenantsPage({ context }) {
   if (!isAuthenticated || !isTenantsPage) return null
 
   const currentTenant = tenantDirectoryState.items.find((tenant) => tenant.code === signedInSession?.tenantCode)
-  const canCreateWorkspace = signedInRoles.includes('TENANT_ADMIN')
+  const canCreateWorkspace = signedInRoles.includes('TENANT_ADMIN') || signedInRoles.includes('PLATFORM_OWNER')
   const tenantFormReady = Boolean(
     tenantOnboardingForm.tenantCode.trim()
       && tenantOnboardingForm.tenantName.trim()
@@ -37,7 +37,7 @@ export default function TenantsPage({ context }) {
         <div className="panel-header">
           <div>
             <p className="panel-kicker">Workspace rollout</p>
-            <h2>Bootstrap and monitor company workspace rollout</h2>
+            <h2>Tenant onboarding and workspace rollout</h2>
           </div>
           <span className="panel-badge scenario-badge">{tenantDirectoryState.items.length}</span>
         </div>

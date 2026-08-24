@@ -27,7 +27,7 @@ export default function SystemConfigPage({ context }) {
         <div className="panel-header">
           <div>
             <p className="panel-kicker">System configuration</p>
-            <h2>Runtime defaults, dispatch cadence, and control envelope</h2>
+            <h2>System configuration and operational defaults</h2>
           </div>
           <span className="panel-badge audit-badge">{runtime?.activeProfiles?.join(', ') || 'Loading'}</span>
         </div>

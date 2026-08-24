@@ -31,7 +31,7 @@ export default function PlatformAdminPage({ context }) {
         <div className="panel-header">
           <div>
             <p className="panel-kicker">Platform admin</p>
-            <h2>Cross-tenant overview and release trust</h2>
+            <h2>Platform overview and cross-tenant trust</h2>
           </div>
           <span className={`panel-badge ${runtime ? getRuntimeStatusClassName(runtime.overallStatus) : 'audit-badge'}`}>{runtime ? runtime.overallStatus : 'Loading'}</span>
         </div>

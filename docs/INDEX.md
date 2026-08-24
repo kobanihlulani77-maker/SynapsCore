@@ -431,3 +431,7 @@ This index links the main product, architecture, runbook, proof, and operator do
 - `scripts\verify-realtime.ps1`
 - `frontend\scripts\control-inventory.mjs`
 - `frontend\scripts\pilot-load-check.mjs`
+
+## Operational Page Guidance Evidence
+
+- [operational-page-guidance-wave-1.md](evidence/operational-page-guidance-wave-1.md)

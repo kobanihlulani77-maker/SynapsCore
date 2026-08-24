@@ -30,7 +30,7 @@ export default function ReleasesPage({ context }) {
         <div className="panel-header">
           <div>
             <p className="panel-kicker">Release and environment</p>
-            <h2>Deployment fingerprint, uptime posture, and environment trust</h2>
+            <h2>Release, deployment, and environment</h2>
           </div>
           <span className={`panel-badge ${runtime ? getRuntimeStatusClassName(runtime.overallStatus) : 'audit-badge'}`}>{runtime ? runtime.overallStatus : 'Loading'}</span>
         </div>
