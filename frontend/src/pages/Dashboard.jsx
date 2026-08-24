@@ -14,6 +14,7 @@ export default function DashboardPage({ context }) {
     canManageTenantAccess,
     accessAdminUsers,
     signedInSession,
+    signedInRoles,
     connectionState,
     liveClockLabel,
     pageStatus,
@@ -58,6 +59,9 @@ export default function DashboardPage({ context }) {
   const dashboardAlertPreview = activeAlerts.slice(0, 4)
   const dashboardRecommendationPreview = snapshot.recommendations.slice(0, 4)
   const dashboardApprovalPreview = pendingApprovalScenarios.slice(0, 4)
+  const canReviewApprovals = signedInRoles.includes('REVIEW_OWNER') || signedInRoles.includes('FINAL_APPROVER')
+  const approvalDestination = canReviewApprovals ? 'approvals' : 'scenario-history'
+  const approvalActionLabel = canReviewApprovals ? 'Review Approvals' : 'View Scenario History'
   const dashboardReplayPreview = snapshot.integrationReplayQueue.slice(0, 4)
   const dashboardActivityItems = utilityTimeline.slice(0, 6).map((item) => ({
     id: item.id,
@@ -182,16 +186,16 @@ export default function DashboardPage({ context }) {
       tag: 'Approvals',
       title: `${overdueApprovalCount} overdue approval${overdueApprovalCount === 1 ? '' : 's'}`,
       note: 'Governed changes are blocked until an approver resolves the queue.',
-      target: 'approvals',
-      actionLabel: 'Review Approvals',
+       target: approvalDestination,
+       actionLabel: approvalActionLabel,
       tone: 'status-failure',
     } : pendingApprovalScenarios.length ? {
       id: 'approval-pending',
       tag: 'Approvals',
       title: `${pendingApprovalScenarios.length} scenario${pendingApprovalScenarios.length === 1 ? '' : 's'} awaiting decision`,
       note: 'Review approval posture before the team expects execution to move.',
-      target: 'approvals',
-      actionLabel: 'Review Approvals',
+       target: approvalDestination,
+       actionLabel: approvalActionLabel,
       tone: 'status-partial',
     } : null,
     degradedConnectorCount ? {
@@ -358,8 +362,8 @@ export default function DashboardPage({ context }) {
         `${snapshot.recentScenarios.length} recent scenarios`,
         `${dashboardApprovalPreview.length} priority items`,
       ],
-      actionLabel: 'Open Approvals',
-      target: 'approvals',
+       actionLabel: canReviewApprovals ? 'Open Approvals' : 'View Scenario History',
+       target: approvalDestination,
     },
     {
       title: 'Alerts and guidance',
@@ -586,7 +590,7 @@ export default function DashboardPage({ context }) {
                 className="signal-list-item selectable-card"
                 onClick={() => {
                   setSelectedScenarioId(scenario.id)
-                  navigateToPage('approvals')
+                   navigateToPage(approvalDestination)
                 }}
                 type="button"
               >

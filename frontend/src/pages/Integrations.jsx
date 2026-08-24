@@ -16,6 +16,7 @@ export default function IntegrationsPage({ context }) {
     navigateToPage,
     formatCodeLabel,
     formatTimestamp,
+    signedInRoles,
   } = context
 
   if (!isAuthenticated || !isIntegrationsPage) {
@@ -41,6 +42,7 @@ export default function IntegrationsPage({ context }) {
   const supportedModeLabel = (connector) => (connector?.supportedSyncModes || [])
     .map((mode) => formatCodeLabel(mode))
     .join(' | ')
+  const canManageConnectorPolicy = signedInRoles.includes('INTEGRATION_ADMIN')
 
   const getConnectorTone = (connector) => {
     if (connector.healthStatus === 'OFFLINE') {
@@ -245,7 +247,7 @@ export default function IntegrationsPage({ context }) {
                   </p>
                 ) : null}
                 <div className="history-action-row">
-                  <button className="ghost-button" onClick={() => navigateToPage('settings')} type="button">Manage Policies</button>
+                  {canManageConnectorPolicy ? <button className="ghost-button" onClick={() => navigateToPage('settings')} type="button">Manage Policies</button> : <span className="muted-text">Connector policy changes require Integration Admin.</span>}
                   <button className="ghost-button" onClick={() => navigateToPage('replay')} type="button">Open Replay Queue</button>
                 </div>
               </div>
