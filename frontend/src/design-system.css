@@ -5478,6 +5478,15 @@ body {
   min-width: 0;
 }
 
+.workspace-shell .runtime-factor-card .stack-title-row {
+  justify-content: flex-start;
+  flex-wrap: wrap;
+}
+
+.workspace-shell .runtime-factor-card .stack-title-row > :first-child {
+  flex: 1 1 100%;
+}
+
 .panel-header-actions,
 .history-action-row,
 .control-row,
