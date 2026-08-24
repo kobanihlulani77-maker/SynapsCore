@@ -49,6 +49,7 @@ export default function UsersPage({ context }) {
     : 'Waiting'
   const accessDataError = accessAdminState.error || pageError
   const accessDataLoading = accessAdminState.loading
+  const displayAccessCount = (value) => accessDataLoading ? 'Loading' : accessDataError ? 'Unavailable' : value
 
   return (
     <section className="content-grid">
@@ -58,7 +59,7 @@ export default function UsersPage({ context }) {
             <p className="panel-kicker">Access control</p>
             <h2>Manage operators, roles, and user access</h2>
           </div>
-          <span className="panel-badge integration-badge">{accessAdminOperators.length + accessAdminUsers.length}</span>
+          <span className="panel-badge integration-badge">{displayAccessCount(accessAdminOperators.length + accessAdminUsers.length)}</span>
         </div>
 
         <OperationalGuidance
@@ -80,8 +81,8 @@ export default function UsersPage({ context }) {
               Keep those two concepts visible before changing access.
             </p>
             <div className="ops-pill-row">
-              <span className="workspace-meta-pill">{accessReviewCount} review signals</span>
-              <span className="workspace-meta-pill">{adminOperators} tenant admins</span>
+              <span className="workspace-meta-pill">{displayAccessCount(accessReviewCount)} review signals</span>
+              <span className="workspace-meta-pill">{displayAccessCount(adminOperators)} tenant admins</span>
               <span className="workspace-meta-pill">{canManageTenantAccess ? 'Admin editing enabled' : 'Read-only access'}</span>
             </div>
           </div>
@@ -108,15 +109,15 @@ export default function UsersPage({ context }) {
         </div>
 
         <div className="summary-grid compact-summary-grid">
-          <MetricCard label="Operators" value={accessAdminOperators.length} accent="teal" note="Operational actors that carry company roles and warehouse scope." />
-          <MetricCard label="User accounts" value={accessAdminUsers.length} accent="blue" note="Workspace sign-in identities linked to operator lanes." />
-          <MetricCard label="Tenant admins" value={adminOperators} accent="amber" note="Admins currently able to manage workspace policy and access." />
-          <MetricCard label="Review signals" value={accessReviewCount} accent="rose" note="Disabled, inactive, password, or linked-lane access conditions that deserve admin review." />
+          <MetricCard label="Operators" value={displayAccessCount(accessAdminOperators.length)} accent="teal" note="Operational actors that carry company roles and warehouse scope." />
+          <MetricCard label="User accounts" value={displayAccessCount(accessAdminUsers.length)} accent="blue" note="Workspace sign-in identities linked to operator lanes." />
+          <MetricCard label="Tenant admins" value={displayAccessCount(adminOperators)} accent="amber" note="Admins currently able to manage workspace policy and access." />
+          <MetricCard label="Review signals" value={displayAccessCount(accessReviewCount)} accent="rose" note="Disabled, inactive, password, or linked-lane access conditions that deserve admin review." />
         </div>
 
         <div className="experience-grid experience-grid-three">
           <article className="stack-card section-card admin-list-panel">
-            <div className="stack-title-row"><strong>Operator lanes</strong><span className="scenario-type-tag">{accessAdminOperators.length}</span></div>
+            <div className="stack-title-row"><strong>Operator lanes</strong><span className="scenario-type-tag">{displayAccessCount(accessAdminOperators.length)}</span></div>
             <p className="muted-text">Operational identities, roles, and warehouse scope. These lanes explain who can act.</p>
             <div className="signal-list">
               {accessDataLoading ? <LoadingState label="Loading operator lanes..." /> : accessDataError ? <p className="error-text">Operator lanes are unavailable because the access administration read failed.</p> : accessAdminOperators.length ? accessAdminOperators.slice(0, 5).map((operator) => (
@@ -138,7 +139,7 @@ export default function UsersPage({ context }) {
           </article>
 
           <article className="stack-card section-card admin-list-panel">
-            <div className="stack-title-row"><strong>User roster</strong><span className="scenario-type-tag">{accessAdminUsers.length}</span></div>
+            <div className="stack-title-row"><strong>User roster</strong><span className="scenario-type-tag">{displayAccessCount(accessAdminUsers.length)}</span></div>
             <p className="muted-text">Sign-in identities linked to operator lanes. These accounts explain who can authenticate.</p>
             <div className="signal-list">
               {accessDataLoading ? <LoadingState label="Loading user accounts..." /> : accessDataError ? <p className="error-text">User accounts are unavailable because the access administration read failed.</p> : accessAdminUsers.length ? accessAdminUsers.slice(0, 5).map((user) => (
@@ -161,12 +162,12 @@ export default function UsersPage({ context }) {
           <article className="stack-card section-card">
             <div className="stack-title-row"><strong>Permission posture</strong><span className="scenario-type-tag">{canManageTenantAccess ? 'Admin tools' : 'Read only'}</span></div>
             <div className="utility-metric-grid">
-              <div><span>Tenant admins</span><strong>{adminOperators}</strong></div>
-              <div><span>Integration roles</span><strong>{integrationOperators}</strong></div>
-              <div><span>Approval roles</span><strong>{reviewOperators}</strong></div>
-              <div><span>Warehouses</span><strong>{workspaceAdmin?.warehouses?.length || 0}</strong></div>
-              <div><span>Disabled users</span><strong>{disabledAccounts}</strong></div>
-              <div><span>Inactive lanes</span><strong>{inactiveOperators}</strong></div>
+              <div><span>Tenant admins</span><strong>{displayAccessCount(adminOperators)}</strong></div>
+              <div><span>Integration roles</span><strong>{displayAccessCount(integrationOperators)}</strong></div>
+              <div><span>Approval roles</span><strong>{displayAccessCount(reviewOperators)}</strong></div>
+              <div><span>Warehouses</span><strong>{displayAccessCount(workspaceAdmin?.warehouses?.length || 0)}</strong></div>
+              <div><span>Disabled users</span><strong>{displayAccessCount(disabledAccounts)}</strong></div>
+              <div><span>Inactive lanes</span><strong>{displayAccessCount(inactiveOperators)}</strong></div>
             </div>
             <p className="muted-text">Make role boundaries obvious so operators understand whether access is tenant-wide, warehouse-specific, or limited to support and integration workflows.</p>
           </article>
@@ -214,10 +215,10 @@ export default function UsersPage({ context }) {
           <article className="stack-card section-card">
             <div className="stack-title-row"><strong>Users requiring review</strong><span className="scenario-type-tag">{canManageTenantAccess ? 'Admin controlled' : 'Review only'}</span></div>
             <div className="utility-metric-grid">
-              <div><span>Reset required</span><strong>{workspaceAdmin?.supportDiagnostics?.activeUsersRequiringPasswordChange || 0}</strong></div>
-              <div><span>Rotation overdue</span><strong>{workspaceAdmin?.supportDiagnostics?.activeUsersPastPasswordRotation || 0}</strong></div>
-              <div><span>Blocked by lane</span><strong>{workspaceAdmin?.supportDiagnostics?.activeUsersBlockedByInactiveOperator || 0}</strong></div>
-              <div><span>Unowned connectors</span><strong>{workspaceAdmin?.supportDiagnostics?.connectorsWithoutSupportOwner || 0}</strong></div>
+              <div><span>Reset required</span><strong>{displayAccessCount(workspaceAdmin?.supportDiagnostics?.activeUsersRequiringPasswordChange || 0)}</strong></div>
+              <div><span>Rotation overdue</span><strong>{displayAccessCount(workspaceAdmin?.supportDiagnostics?.activeUsersPastPasswordRotation || 0)}</strong></div>
+              <div><span>Blocked by lane</span><strong>{displayAccessCount(workspaceAdmin?.supportDiagnostics?.activeUsersBlockedByInactiveOperator || 0)}</strong></div>
+              <div><span>Unowned connectors</span><strong>{displayAccessCount(workspaceAdmin?.supportDiagnostics?.connectorsWithoutSupportOwner || 0)}</strong></div>
             </div>
             <div className="history-action-row">
               <button className="ghost-button" onClick={() => navigateToPage('settings')} type="button">Open Settings</button>

@@ -348,6 +348,7 @@ export default function useWorkspacePageContexts({
     enabledConnectorCount,
     pendingReplayCount,
     canManageTenantAccess,
+    accessAdminState,
     accessAdminUsers,
     passwordChangeRequired,
     passwordRotationRequired,

@@ -25,6 +25,7 @@ export default function useWorkspaceChrome({
   enabledConnectorCount,
   pendingReplayCount,
   canManageTenantAccess,
+  accessAdminState,
   accessAdminUsers,
   passwordChangeRequired,
   passwordRotationRequired,
@@ -42,6 +43,8 @@ export default function useWorkspaceChrome({
   const resolvedRecommendationCount = Math.max(summary?.recommendationsCount ?? 0, snapshot.recommendations.length)
   const resolvedRecentOrderCount = Math.max(summary?.recentOrderCount ?? 0, snapshot.recentOrders.length)
   const resolvedLowStockCount = Math.max(summary?.lowStockItems ?? 0, snapshot.inventory.filter((item) => item.lowStock).length)
+  const accessAdminLoading = Boolean(accessAdminState?.loading)
+  const accessAdminError = Boolean(accessAdminState?.error)
 
   const pageBadgeMap = {
     dashboard: summary?.totalOrders ?? 0,
@@ -60,7 +63,7 @@ export default function useWorkspaceChrome({
     replay: pendingReplayCount,
     runtime: systemIncidents.length,
     audit: snapshot.auditLogs.length,
-    users: accessAdminUsers.length,
+    users: accessAdminLoading ? '...' : accessAdminError ? '!' : accessAdminUsers.length,
     settings: canManageTenantAccess ? (summary?.totalWarehouses ?? warehouseOptions.length) : 0,
     profile: signedInSession ? 1 : 0,
     platform: systemIncidents.length,
@@ -98,7 +101,11 @@ export default function useWorkspaceChrome({
     replay: isAuthenticated ? (pendingReplayCount ? `${pendingReplayCount} replay item${pendingReplayCount === 1 ? '' : 's'} waiting` : 'Replay queue is clear') : 'Protected by workspace sign-in',
     runtime: isAuthenticated ? (runtime?.overallStatus ? `Runtime ${runtime.overallStatus}` : 'Loading trust signals') : 'Protected by workspace sign-in',
     audit: isAuthenticated ? (snapshot.auditLogs.length ? `${snapshot.auditLogs.length} recent audit entr${snapshot.auditLogs.length === 1 ? 'y' : 'ies'}` : 'Traceability feed is quiet') : 'Protected by workspace sign-in',
-    users: isAuthenticated ? (canManageTenantAccess ? `${accessAdminUsers.length} tenant user${accessAdminUsers.length === 1 ? '' : 's'} managed` : 'Tenant admin access required') : 'Sign in with an admin workspace account',
+    users: isAuthenticated
+      ? (canManageTenantAccess
+        ? (accessAdminLoading ? 'Loading tenant user roster' : accessAdminError ? 'Tenant user roster unavailable' : `${accessAdminUsers.length} tenant user${accessAdminUsers.length === 1 ? '' : 's'} managed`)
+        : 'Tenant admin access required')
+      : 'Sign in with an admin workspace account',
     settings: isAuthenticated ? (canManageTenantAccess ? 'Workspace controls ready for tenant configuration' : 'Tenant admin access required') : 'Sign in with an admin workspace account',
     profile: isAuthenticated ? (passwordChangeRequired || passwordRotationRequired ? 'Password hygiene needs attention' : 'Personal access posture is healthy') : 'Sign in to access profile controls',
     platform: isAuthenticated ? 'Cross-tenant and release trust view' : 'Protected by workspace sign-in',
