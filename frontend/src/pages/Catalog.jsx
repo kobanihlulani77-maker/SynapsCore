@@ -2,6 +2,7 @@ import DataGrid from '../components/DataGrid'
 import EmptyState from '../components/EmptyState'
 import Panel from '../components/Panel'
 import { MetricCard } from '../components/Card'
+import OperationalGuidance from '../components/OperationalGuidance'
 
 export default function CatalogPage({ context }) {
   const {
@@ -16,6 +17,8 @@ export default function CatalogPage({ context }) {
     importCatalogProducts,
     resetCatalogForm,
     canManageTenantAccess,
+    pageLoading,
+    pageError,
   } = context
 
   if (!isAuthenticated || !isCatalogPage) return null
@@ -99,7 +102,18 @@ export default function CatalogPage({ context }) {
         {catalogState.error ? <p className="error-text">{catalogState.error}</p> : null}
         {catalogState.success ? <p className="success-text">{catalogState.success}</p> : null}
 
-        <div className="catalog-workflow-grid">
+        <OperationalGuidance
+          stateLabel={pageLoading ? 'Loading catalog' : pageError ? 'Unavailable' : 'Catalog read'}
+          stateTone={pageError ? 'status-failure' : pageLoading ? 'status-partial' : 'status-success'}
+          stateDetail={pageLoading ? 'Catalog products are still loading.' : pageError ? 'The catalog read is unavailable; do not interpret the visible product count as zero.' : `${products.length} product${products.length === 1 ? '' : 's'} are currently persisted for this tenant workspace.`}
+          attention={catalogState.importResult?.failed ? `${catalogState.importResult.failed} import row${catalogState.importResult.failed === 1 ? '' : 's'} need correction before recovery can continue.` : 'Product identity and SKU mapping are the main operational attention points on this surface.'}
+          nextAction={canManageTenantAccess ? 'Verify the source SKU, use the supported create/import path, inspect row outcomes, then return to replay eligibility when correcting failed inbound data.' : 'Review the catalog and ask a Tenant Admin to create, import, or correct product identity.'}
+          evidence="The table and row results show persisted tenant catalog state and supported import outcomes; they do not prove source-system reconciliation."
+          role={canManageTenantAccess ? 'Your Tenant Admin authority permits supported catalog maintenance.' : 'This role is read-only for catalog maintenance.'}
+          limitation="Correcting catalog data only to clear an inbound failure is unsafe until the source SKU and mapping are verified."
+        />
+
+        <div className="catalog-workflow-grid" id="catalog-workflow">
           <article className="stack-card section-card workflow-selected-panel">
             <div className="stack-title-row">
               <strong>Zone 1: create one product</strong>
@@ -216,6 +230,10 @@ export default function CatalogPage({ context }) {
               <div className="signal-list-item">
                 <strong>What comes next</strong>
                 <p>After products exist, inventory, order intake, and integration mapping can reference these workspace SKUs.</p>
+              </div>
+              <div className="signal-list-item">
+                <strong>Source and recovery boundary</strong>
+                <p>SynapseCore stores the tenant catalog used by supported operational flows. Source systems remain authoritative; verify a failed inbound SKU before correcting it and replaying the record.</p>
               </div>
             </div>
           </article>

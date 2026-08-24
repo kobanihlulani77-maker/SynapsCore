@@ -1,6 +1,7 @@
 import EmptyState from '../components/EmptyState'
 import Panel from '../components/Panel'
 import { MetricCard } from '../components/Card'
+import OperationalGuidance from '../components/OperationalGuidance'
 
 const severityPriority = {
   CRITICAL: 3,
@@ -17,6 +18,8 @@ export default function AlertsPage({ context }) {
     selectedAlertId,
     setSelectedAlertId,
     formatTimestamp,
+    pageLoading,
+    pageError,
   } = context
 
   if (!isAuthenticated || !isAlertsPage) {
@@ -86,6 +89,17 @@ export default function AlertsPage({ context }) {
             </div>
           </div>
         </div>
+
+        <OperationalGuidance
+          stateLabel={pageLoading ? 'Loading feed' : pageError ? 'Unavailable' : 'Active feed'}
+          stateTone={pageError ? 'status-failure' : pageLoading ? 'status-partial' : 'status-success'}
+          stateDetail={pageLoading ? 'The active alert feed is still loading.' : pageError ? 'The alert read is unavailable; do not interpret the visible count as zero.' : `${activeAlerts.length} active alert record${activeAlerts.length === 1 ? '' : 's'} returned for this workspace.`}
+          attention={activeAlerts.length ? `${actionableAlertCount} alert${actionableAlertCount === 1 ? '' : 's'} include a recommended response; severity and affected warehouse still need operator review.` : 'No active alert records are present in the current feed.'}
+          nextAction={selectedAlert ? 'Inspect the selected condition, then follow its evidence path to Inventory, Orders, Integrations, Runtime, or a governed scenario.' : 'Wait for an active record or review Runtime if the workspace itself appears unhealthy.'}
+          evidence="Alert records expose condition, timing, impact, and available recommendation context; they do not establish ownership or causation."
+          role="Alert response remains an operator responsibility; no alert owner is assigned by this page."
+          limitation="This surface is an active-alert feed. Resolved or historical alert state is not represented as an actionable queue here."
+        />
 
         <div className="summary-grid compact-summary-grid">
           <MetricCard label="Active alerts" value={activeAlerts.length} accent="amber" note="Operational warnings currently shaping the workspace response queue." />

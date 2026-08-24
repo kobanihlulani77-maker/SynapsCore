@@ -1,6 +1,7 @@
 import { SummaryCard } from '../components/Card'
 import Panel from '../components/Panel'
 import EmptyState from '../components/EmptyState'
+import OperationalGuidance from '../components/OperationalGuidance'
 
 export default function FulfillmentPage({ context }) {
   const {
@@ -15,6 +16,9 @@ export default function FulfillmentPage({ context }) {
     enabledConnectorCount,
     snapshot,
     pendingReplayCount,
+    signedInRoles,
+    pageLoading,
+    pageError,
   } = context
 
   if (!isAuthenticated || !isFulfillmentPage) return null
@@ -34,11 +38,21 @@ export default function FulfillmentPage({ context }) {
 
   return (
     <section className="content-grid">
-      <Panel wide>
+      <Panel wide id="fulfillment-state">
         <div className="panel-header">
           <div><p className="panel-kicker">Fulfillment and logistics</p><h2>Backlog, dispatch, and delivery pressure</h2></div>
           <span className="panel-badge fulfillment-badge">{fulfillmentOverview.activeFulfillments.length}</span>
         </div>
+        <OperationalGuidance
+          stateLabel={pageLoading ? 'Loading fulfillment' : pageError ? 'Unavailable' : 'Flow read'}
+          stateTone={pageError ? 'status-failure' : pageLoading ? 'status-partial' : fulfillmentOverview.delayedShipmentCount ? 'status-partial' : 'status-success'}
+          stateDetail={pageLoading ? 'Fulfillment lanes are still loading.' : pageError ? 'The fulfillment read is unavailable; do not interpret visible counts as zero.' : `${fulfillmentOverview.activeFulfillments.length} active fulfillment lane${fulfillmentOverview.activeFulfillments.length === 1 ? '' : 's'} are visible.`}
+          attention={fulfillmentOverview.delayedShipmentCount || fulfillmentOverview.overdueDispatchCount ? `${fulfillmentOverview.delayedShipmentCount} delayed shipment${fulfillmentOverview.delayedShipmentCount === 1 ? '' : 's'} and ${fulfillmentOverview.overdueDispatchCount} overdue dispatch lane${fulfillmentOverview.overdueDispatchCount === 1 ? '' : 's'} need review.` : 'No delayed or overdue fulfillment pressure is currently returned.'}
+          nextAction={selectedFulfillment ? 'Inspect the affected order and warehouse, then verify connector, inventory, replay, or scenario evidence before changing the operating path.' : 'Monitor the flow; no fulfillment mutation is exposed on this page.'}
+          evidence="Fulfillment state reflects SynapseCore records and connector support signals; it does not prove completion in every external source system."
+          role={signedInRoles.includes('INTEGRATION_ADMIN') || signedInRoles.includes('INTEGRATION_OPERATOR') ? 'Integration authority governs supported fulfillment writes.' : 'This page is an operational read for the current role; direct fulfillment writes remain governed by integration authority.'}
+          limitation="Do not interpret a local fulfillment status as source-authoritative completion without reconciliation."
+        />
         <div className="summary-grid compact-summary-grid">
           <SummaryCard label="Backlog" value={fulfillmentOverview.backlogCount} accent="amber" />
           <SummaryCard label="Overdue dispatch" value={fulfillmentOverview.overdueDispatchCount} accent="orange" />
@@ -110,4 +124,3 @@ export default function FulfillmentPage({ context }) {
     </section>
   )
 }
-

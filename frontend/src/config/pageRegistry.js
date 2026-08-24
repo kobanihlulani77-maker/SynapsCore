@@ -367,6 +367,31 @@ export const pageSectionMap = {
     { label: 'Audit trail', targetId: 'audit-logs' },
     { label: 'Recoverability', targetId: 'workspace-page-focus' },
   ],
+  catalog: [
+    { label: 'Catalog workflow', targetId: 'catalog-workflow' },
+    { label: 'Import outcomes', targetId: 'workspace-page-focus' },
+    { label: 'Product evidence', targetId: 'workspace-page-focus' },
+  ],
+  locations: [
+    { label: 'Location scope', targetId: 'locations-state' },
+    { label: 'Pressure by site', targetId: 'locations-state' },
+    { label: 'Site action queue', targetId: 'workspace-page-focus' },
+  ],
+  fulfillment: [
+    { label: 'Fulfillment state', targetId: 'fulfillment-state' },
+    { label: 'Lane pressure', targetId: 'workspace-page-focus' },
+    { label: 'Delivery support', targetId: 'workspace-page-focus' },
+  ],
+  'scenario-history': [
+    { label: 'Execution memory', targetId: 'scenario-history-evidence' },
+    { label: 'Scenario records', targetId: 'scenario-history-evidence' },
+    { label: 'Action console', targetId: 'workspace-page-focus' },
+  ],
+  escalations: [
+    { label: 'Escalation inbox', targetId: 'escalation-inbox' },
+    { label: 'Ownership focus', targetId: 'workspace-page-focus' },
+    { label: 'Governance boundary', targetId: 'workspace-page-focus' },
+  ],
   settings: [
     { label: 'Workspace profile', targetId: 'settings-profile' },
     { label: 'Security policy', targetId: 'settings-security' },

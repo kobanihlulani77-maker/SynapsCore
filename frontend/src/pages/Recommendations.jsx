@@ -1,6 +1,7 @@
 import EmptyState from '../components/EmptyState'
 import Panel from '../components/Panel'
 import { MetricCard } from '../components/Card'
+import OperationalGuidance from '../components/OperationalGuidance'
 
 export default function RecommendationsPage({ context }) {
   const {
@@ -13,6 +14,8 @@ export default function RecommendationsPage({ context }) {
     selectedRecommendationId,
     setSelectedRecommendationId,
     formatTimestamp,
+    pageLoading,
+    pageError,
   } = context
 
   if (!isAuthenticated || !isRecommendationsPage) {
@@ -57,7 +60,7 @@ export default function RecommendationsPage({ context }) {
             <div className="ops-pill-row">
               <span className="workspace-meta-pill">{nextDecisionLabel}</span>
               <span className="workspace-meta-pill">{evidenceBackedCount} evidence backed</span>
-              <span className="workspace-meta-pill">Human approved action</span>
+              <span className="workspace-meta-pill">Human decision required</span>
             </div>
           </div>
           <div className="workflow-action-console">
@@ -78,6 +81,17 @@ export default function RecommendationsPage({ context }) {
             </div>
           </div>
         </div>
+
+        <OperationalGuidance
+          stateLabel={pageLoading ? 'Loading guidance' : pageError ? 'Unavailable' : 'Decision support'}
+          stateTone={pageError ? 'status-failure' : pageLoading ? 'status-partial' : 'status-success'}
+          stateDetail={pageLoading ? 'Recommendation signals are still loading.' : pageError ? 'The recommendation read is unavailable; do not treat the visible lanes as empty.' : `${snapshot.recommendations.length} recommendation${snapshot.recommendations.length === 1 ? '' : 's'} are available for human review.`}
+          attention={recommendationNow.length ? `${recommendationNow.length} urgent recommendation${recommendationNow.length === 1 ? '' : 's'} need the fastest review.` : recommendationSoon.length ? `${recommendationSoon.length} recommendation${recommendationSoon.length === 1 ? '' : 's'} should be scheduled before they become active pressure.` : 'No urgent recommendation pressure is currently returned.'}
+          nextAction={selectedRecommendation ? 'Inspect the supporting signal, decide whether a scenario is needed, and use Approvals before any governed consequence.' : 'Monitor the workspace signals; no automatic action is created by this page.'}
+          evidence="Rationale is shown only when the backend provides policy context; otherwise the item remains an operator-review signal."
+          role="Recommendations are not decisions and never execute work automatically."
+          limitation="Priority is an operating queue signal, not proof that a recommendation is correct or urgent in every source system."
+        />
 
         <div className="summary-grid compact-summary-grid">
           <MetricCard label="Urgent now" value={recommendationNow.length} accent="rose" note="Recommendations that should shape the next operator action immediately." />
@@ -135,7 +149,7 @@ export default function RecommendationsPage({ context }) {
                   <div><span>Decision</span><strong>{selectedRecommendation.priority === 'HIGH' ? 'Act' : selectedRecommendation.priority === 'MEDIUM' ? 'Plan' : 'Watch'}</strong></div>
                   <div><span>Evidence</span><strong>{selectedRecommendation.policyExplanation ? 'Present' : 'Basic'}</strong></div>
                   <div><span>Owner</span><strong>Operator</strong></div>
-                  <div><span>Automation</span><strong>Guidance</strong></div>
+              <div><span>Automation</span><strong>None</strong></div>
                 </div>
               </div>
             ) : (

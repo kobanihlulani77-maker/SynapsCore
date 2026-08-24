@@ -1,6 +1,7 @@
 import { SummaryCard } from '../components/Card'
 import Panel from '../components/Panel'
 import EmptyState from '../components/EmptyState'
+import OperationalGuidance from '../components/OperationalGuidance'
 
 export default function LocationsPage({ context }) {
   const {
@@ -11,6 +12,10 @@ export default function LocationsPage({ context }) {
     fulfillmentOverview,
     activeAlerts,
     formatCodeLabel,
+    signedInWarehouseScopes,
+    signedInRoles,
+    pageLoading,
+    pageError,
   } = context
 
   if (!isAuthenticated || !isLocationsPage) return null
@@ -22,7 +27,7 @@ export default function LocationsPage({ context }) {
     const orderLoad = snapshot.recentOrders.filter((order) => order.warehouseCode === warehouse.code).length
     const fulfillmentLoad = fulfillmentOverview.activeFulfillments.filter((task) => task.warehouseCode === warehouse.code)
     const delayedCount = fulfillmentLoad.filter((task) => task.fulfillmentStatus === 'DELAYED').length
-    const healthScore = Math.max(38, 100 - (lowStockCount * 10) - (highRiskCount * 12) - (delayedCount * 12) - (orderLoad * 4))
+    const pressureScore = Math.max(0, 100 - (lowStockCount * 10) - (highRiskCount * 12) - (delayedCount * 12) - (orderLoad * 4))
 
     return {
       ...warehouse,
@@ -31,7 +36,7 @@ export default function LocationsPage({ context }) {
       orderLoad,
       backlogCount: fulfillmentLoad.length,
       delayedCount,
-      healthScore,
+      pressureScore,
     }
   })
 
@@ -42,11 +47,21 @@ export default function LocationsPage({ context }) {
 
   return (
     <section className="content-grid">
-      <Panel wide id="dashboard-act-now">
+      <Panel wide id="locations-state">
         <div className="panel-header">
-          <div><p className="panel-kicker">Locations</p><h2>Operational health across sites</h2></div>
+          <div><p className="panel-kicker">Locations</p><h2>Operational pressure across sites</h2></div>
           <span className="panel-badge inventory-badge">{warehouseHealthCards.length}</span>
         </div>
+        <OperationalGuidance
+          stateLabel={pageLoading ? 'Loading locations' : pageError ? 'Unavailable' : 'Scope read'}
+          stateTone={pageError ? 'status-failure' : pageLoading ? 'status-partial' : 'status-success'}
+          stateDetail={pageLoading ? 'Warehouse scope and operating signals are still loading.' : pageError ? 'The location read is unavailable; do not interpret the visible site count as zero.' : `${warehouseHealthCards.length} warehouse${warehouseHealthCards.length === 1 ? '' : 's'} define the visible operating context.`}
+          attention={selectedWarehouse ? `${selectedWarehouse.name} has the highest derived pressure from the current inventory, order, and fulfillment signals.` : 'No warehouse records are available in the current context.'}
+          nextAction={selectedWarehouse ? 'Inspect the hottest lane, then follow its alert, recommendation, inventory, order, or fulfillment evidence.' : 'Verify workspace setup and Tenant Admin configuration before treating the location surface as empty.'}
+          evidence="Location pressure is derived from the loaded tenant snapshot; it is not a backend health check or source-system reconciliation."
+          role={signedInWarehouseScopes.length ? `This operator is restricted to ${signedInWarehouseScopes.join(', ')}.` : signedInRoles.includes('TENANT_ADMIN') ? 'An empty warehouse scope means tenant-wide authority for this session.' : 'An empty warehouse scope means tenant-wide operating scope for this session; configuration authority still depends on role.'}
+          limitation="Tenant Admin manages supported warehouse/access configuration; other roles operate within their assigned scope and cannot infer configuration authority from this page."
+        />
         <div className="summary-grid compact-summary-grid">
           <SummaryCard label="Sites" value={warehouseHealthCards.length} accent="blue" />
           <SummaryCard label="Low-stock lanes" value={warehouseHealthCards.filter((warehouse) => warehouse.lowStockCount).length} accent="amber" />
@@ -58,7 +73,7 @@ export default function LocationsPage({ context }) {
             <article key={warehouse.code} className="warehouse-health-card">
               <div className="stack-title-row">
                 <strong>{warehouse.name}</strong>
-                <span className={`status-tag ${warehouse.healthScore >= 80 ? 'status-success' : warehouse.healthScore >= 60 ? 'status-partial' : 'status-failure'}`}>Health {warehouse.healthScore}</span>
+                <span className={`status-tag ${warehouse.pressureScore >= 80 ? 'status-success' : warehouse.pressureScore >= 60 ? 'status-partial' : 'status-failure'}`}>Pressure {100 - warehouse.pressureScore}</span>
               </div>
               <p>{warehouse.code}</p>
               <div className="warehouse-stat-grid">
@@ -75,8 +90,8 @@ export default function LocationsPage({ context }) {
           <article className="stack-card section-card">
             <div className="stack-title-row">
               <strong>{selectedWarehouse ? `${selectedWarehouse.name} detail` : 'Location detail'}</strong>
-              <span className={`status-tag ${selectedWarehouse && selectedWarehouse.healthScore >= 80 ? 'status-success' : selectedWarehouse && selectedWarehouse.healthScore >= 60 ? 'status-partial' : 'status-failure'}`}>
-                {selectedWarehouse ? `Health ${selectedWarehouse.healthScore}` : 'Waiting'}
+              <span className={`status-tag ${selectedWarehouse && selectedWarehouse.pressureScore >= 80 ? 'status-success' : selectedWarehouse && selectedWarehouse.pressureScore >= 60 ? 'status-partial' : 'status-failure'}`}>
+                {selectedWarehouse ? `Pressure ${100 - selectedWarehouse.pressureScore}` : 'Waiting'}
               </span>
             </div>
             {selectedWarehouse ? (
@@ -87,7 +102,7 @@ export default function LocationsPage({ context }) {
                   <p className="muted-text">{selectedWarehouse.lowStockCount} low-stock items | {selectedWarehouse.highRiskCount} high-risk items | {selectedWarehouse.delayedCount} delayed lanes</p>
                 </div>
                 <div className="signal-list-item">
-                  <strong>Inventory focus</strong>
+                  <strong>Hottest lane inventory focus</strong>
                   <p>{selectedWarehouseInventory.filter((item) => item.lowStock).length} low-stock SKUs in this site.</p>
                   <p className="muted-text">{selectedWarehouseInventory.slice(0, 3).map((item) => item.productName).join(', ') || 'Waiting for live inventory mix.'}</p>
                 </div>

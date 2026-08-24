@@ -2,6 +2,7 @@ import { MetricCard } from '../components/Card'
 import Panel from '../components/Panel'
 import EmptyState from '../components/EmptyState'
 import ScenarioDecisionConsole from '../components/ScenarioDecisionConsole'
+import OperationalGuidance from '../components/OperationalGuidance'
 
 export default function ScenarioHistoryPage({ context }) {
   const {
@@ -13,6 +14,8 @@ export default function ScenarioHistoryPage({ context }) {
     formatCodeLabel,
     formatTimestamp,
     scenarioDecisionContext,
+    pageLoading,
+    pageError,
   } = context
 
   if (!isAuthenticated || !isScenarioHistoryPage) return null
@@ -26,7 +29,7 @@ export default function ScenarioHistoryPage({ context }) {
 
   return (
     <section className="content-grid">
-      <Panel wide>
+      <Panel wide id="scenario-history-evidence">
         <div className="panel-header">
           <div>
             <p className="panel-kicker">Scenario history</p>
@@ -60,6 +63,17 @@ export default function ScenarioHistoryPage({ context }) {
             </button>
           </div>
         </div>
+
+        <OperationalGuidance
+          stateLabel={pageLoading ? 'Loading history' : pageError ? 'Unavailable' : executableCount ? 'Action-ready evidence' : 'Historical evidence'}
+          stateTone={pageError ? 'status-failure' : pageLoading ? 'status-partial' : executableCount ? 'status-partial' : 'status-success'}
+          stateDetail={pageLoading ? 'Scenario history is still loading.' : pageError ? 'The history read is unavailable; do not interpret the visible list as empty.' : `${scenarioHistoryItems.length} scenario record${scenarioHistoryItems.length === 1 ? '' : 's'} are available for traceability.`}
+          attention={executableCount ? `${executableCount} approved plan${executableCount === 1 ? '' : 's'} may have a governed next action.` : 'Historical records are evidence until a current scenario state exposes a supported action.'}
+          nextAction={selectedHistoryScenario ? 'Inspect the selected record, then use the current scenario or approval surface for any live action.' : 'Select a saved plan or revision to inspect its evidence trail.'}
+          evidence="History preserves type, timing, warehouse, approval stage, ownership, revision, and execution posture when the backend provides them."
+          role="Historical visibility does not grant approval or execution authority."
+          limitation="Do not treat a historical row as a current executable control; PREVIEW records remain analysis-only."
+        />
 
         <div className="summary-grid compact-summary-grid">
           <MetricCard label="Saved plans" value={savedPlans} accent="blue" note="Scenario plans currently retained for comparison and approval." />

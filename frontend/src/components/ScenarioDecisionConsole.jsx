@@ -1,4 +1,4 @@
-export default function ScenarioDecisionConsole({ scenario, title, emptyMessage, context }) {
+export default function ScenarioDecisionConsole({ scenario, title, emptyMessage, context, surface = 'governance' }) {
   const {
     getScenarioApprovalRole,
     getScenarioRejectionRole,
@@ -169,6 +169,9 @@ export default function ScenarioDecisionConsole({ scenario, title, emptyMessage,
               : 'This surface keeps the decision evidence visible even when no action is currently available.'}
         </p>
       </div>
+      {surface === 'escalation' ? (
+        <p className="muted-text">Escalation acknowledgment records ownership of the escalation only. Approval, rejection, and execution remain separate governed actions and are available only when the current scenario state and role permit them.</p>
+      ) : null}
       <div className="session-control-row">
         <label className="field planner-name-field">
           <span>Acting As</span>

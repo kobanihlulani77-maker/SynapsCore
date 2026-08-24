@@ -1,6 +1,7 @@
 import Panel from '../components/Panel'
 import EmptyState from '../components/EmptyState'
 import ScenarioDecisionConsole from '../components/ScenarioDecisionConsole'
+import OperationalGuidance from '../components/OperationalGuidance'
 
 export default function EscalationsPage({ context }) {
   const {
@@ -15,17 +16,29 @@ export default function EscalationsPage({ context }) {
     formatTimestamp,
     getIncidentStatusClassName,
     scenarioDecisionContext,
+    pageLoading,
+    pageError,
   } = context
 
   if (!isAuthenticated || !isEscalationsPage) return null
 
   return (
     <section className="content-grid">
-      <Panel wide>
+      <Panel wide id="escalation-inbox">
         <div className="panel-header">
           <div><p className="panel-kicker">Escalation inbox</p><h2>Urgent operational items needing ownership</h2></div>
           <span className="panel-badge notification-badge">{snapshot.slaEscalations.length + systemIncidents.length}</span>
         </div>
+        <OperationalGuidance
+          stateLabel={pageLoading ? 'Loading escalations' : pageError ? 'Unavailable' : snapshot.slaEscalations.length || systemIncidents.length ? 'Ownership needed' : 'No active escalation'}
+          stateTone={pageError ? 'status-failure' : pageLoading ? 'status-partial' : snapshot.slaEscalations.length || systemIncidents.length ? 'status-partial' : 'status-success'}
+          stateDetail={pageLoading ? 'Escalation and incident records are still loading.' : pageError ? 'The escalation read is unavailable; do not interpret the visible count as zero.' : `${snapshot.slaEscalations.length + systemIncidents.length} escalation or runtime incident record${snapshot.slaEscalations.length + systemIncidents.length === 1 ? '' : 's'} are visible.`}
+          attention={selectedEscalationScenario ? `${selectedEscalationScenario.title} is waiting on explicit ownership and governance follow-through.` : systemIncidents.length ? 'Review runtime incident evidence before treating the inbox as clear.' : 'No active escalation record is currently returned.'}
+          nextAction={selectedEscalationScenario ? 'Acknowledge ownership only when assigned; use Approvals or the current scenario surface for approval and execution.' : 'Monitor this inbox and inspect Runtime when a system incident appears.'}
+          evidence="Escalation records expose timing, owner, stage, and related workflow evidence where available; they do not establish an SLA breach unless the backend state says so."
+          role="Acknowledge Escalation is separate from Approve Plan and Execute Scenario; each action keeps its own backend authority boundary."
+          limitation="Do not use escalation acknowledgment as a substitute for scenario approval or execution."
+        />
         <div className="approval-board">
           {escalatedScenarios.map((scenario) => (
             <button key={scenario.id} className={`stack-card selectable-card ${selectedEscalationScenario?.id === scenario.id ? 'is-selected' : ''}`} onClick={() => setSelectedScenarioId(scenario.id)} type="button">
@@ -72,6 +85,7 @@ export default function EscalationsPage({ context }) {
             scenario={selectedEscalationScenario}
             title="Escalation action console"
             emptyMessage="Select an escalated plan to acknowledge it, reject it, or move it toward final approval."
+            surface="escalation"
             context={scenarioDecisionContext}
           />
         </div>
