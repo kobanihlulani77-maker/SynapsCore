@@ -1,6 +1,6 @@
 # Operational Page Guidance Wave 2 Evidence
 
-Status: implementation evidence; rendered deployment closure follows after redeploy.
+Status: implementation evidence; rendered deployment closure remains open.
 
 ## Scope
 
@@ -34,6 +34,7 @@ The existing operational pages were already materially deeper than CRUD screens.
 - Integrations surfaces the CSV recovery lane and disabled-webhook replay/readback limitation only when the selected connector state makes that limitation relevant.
 - Replay now states the controlled recovery sequence, the duplicate/reconciliation check, and the requirement to verify the resulting effect rather than treating HTTP success as recovery completion.
 - Orders now separates SynapseCore observation from source-authoritative or reconciled state and states that direct mutations remain role/backend controlled.
+- Scenario approval and rejection now respect the reported assigned owner in the UI. A different operator sees the assignment boundary and is not encouraged to submit an action that the backend will reject.
 
 No backend endpoint, backend contract, route, proof selector, or visual theme was changed.
 
@@ -81,7 +82,7 @@ Focused source review confirmed the inventory authority in `InventoryController`
 
 ## Rendered / Hosted Closure
 
-Pending after the focused source commit is deployed:
+The first deployed Wave 2 bundle was verified by asset inspection, but the complete rendered closure remains open:
 
 - Rendered 1366x768 walkthrough of all eight routes.
 - Loading, normal, empty, attention/degraded, and error states where naturally available.
@@ -91,9 +92,33 @@ Pending after the focused source commit is deployed:
 
 The Wave 2 verdict remains open until those rendered checks are completed. No Wave 3 or Phase 14 work may start before closure.
 
+## Hosted Proof Findings
+
+The existing synthetic proof tenant was used for the first deployed Wave 2 proof run:
+
+- Tests 1-3 passed: authentication/page rendering, catalog onboarding, and realtime dashboard updates.
+- Replay recovery exposed a stale disabled connector detail after backend re-enable. The selected-connector reconciliation was corrected in `ab7dd70` and passed local verification; the deployed bundle was then updated.
+- Scenario governance reached a real backend assignment boundary. The API-created scenario was assigned to a synthetic Review Owner other than the signed-in tenant-admin identity. The backend correctly left the scenario `PENDING_REVIEW` and rejected the wrong assigned operator; the UI at that revision incorrectly said `Approval action is available.`
+- The UI mismatch was corrected in `0bd296f`: approval and rejection are now blocked when the reported owner does not match the signed-in actor, with explicit assignment guidance.
+
+This is not a reason to weaken the backend, alter the proof assertion, or make the button appear successful. The reused proof tenant must be prepared through the supported bootstrap path so the proof fixture has a deterministic assigned Review Owner, or the proof flow must use the supported assigned governance identity. No proof test was modified.
+
+Current hosted-proof status: `3 passed, 1 failed, 2 not run` in the last complete run before `0bd296f` deployment. A fresh deterministic governance fixture and a full proof rerun are required before Wave 2 can be accepted.
+
 ## Known Limitations
 
 - Disabled-webhook replay/readback remains not fully proven and is surfaced contextually rather than presented as a complete recovery lane.
 - Import warehouse attribution remains unknown where the backend cannot establish it; Replay does not claim certainty.
 - Source-system reconciliation remains a pilot responsibility unless the backend explicitly reports reconciliation evidence.
 - Natural empty/error state coverage depends on available synthetic data and safe failure injection; no live data is deleted or manually altered to manufacture a state.
+
+## Open Gate Findings
+
+- High: hosted scenario governance proof is pending a deterministic assigned Review Owner in the reused synthetic tenant. The backend boundary is correct and the previous UI authority copy was corrected. Do not accept Wave 2 until assigned-owner approval and governed execution pass on the corrected deployment.
+- Medium/Low: natural empty and injected error states remain only partially exercised live.
+
+## Current Verdict
+
+`OPERATIONAL PAGE GUIDANCE WAVE 2 NOT ACCEPTED`
+
+Wave 3 and Phase 14 remain held. The next action is supported proof-tenant preparation and a full proof rerun, not additional UI scope.
