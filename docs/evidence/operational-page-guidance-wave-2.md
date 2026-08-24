@@ -1,6 +1,6 @@
 # Operational Page Guidance Wave 2 Evidence
 
-Status: implementation evidence; rendered deployment closure remains open.
+Status: Wave 2 rendered and hosted closure complete; accepted with documented medium/low limitations.
 
 ## Scope
 
@@ -82,15 +82,28 @@ Focused source review confirmed the inventory authority in `InventoryController`
 
 ## Rendered / Hosted Closure
 
-The first deployed Wave 2 bundle was verified by asset inspection, but the complete rendered closure remains open:
+The corrected deployed bundle was verified through the fresh deterministic proof tenant:
 
-- Rendered 1366x768 walkthrough of all eight routes.
-- Loading, normal, empty, attention/degraded, and error states where naturally available.
-- Synthetic proof action walkthroughs: integration attention, replay decision, scenario governance, Preview blocking, and inventory authority.
-- Role/direct-route/backend authority checks using existing proof identities without recording credentials.
-- Deployed revision confirmation.
+- Tenant: `HOSTED-PROOF-WAVE2-20260824`
+- Deployed frontend bundle: `index-KqBPFdlG.js`
+- Backend readiness, liveness, auth session, and SockJS checks: PASS
+- Full hosted proof: 6/6 PASS in 3.8 minutes
+- No proof test was modified and no backend contract was changed.
 
-The Wave 2 verdict remains open until those rendered checks are completed. No Wave 3 or Phase 14 work may start before closure.
+The dedicated authenticated 1366x768 sweep also passed for all eight Wave 2 routes. Each route retained the authenticated tenant session, rendered the expected page heading, had document/body width equal to the viewport, and produced no visible overflow candidates:
+
+| Route | Result |
+| --- | --- |
+| `/dashboard` | PASS; no overflow or clipping candidate |
+| `/integrations` | PASS; no overflow or clipping candidate |
+| `/replay-queue` | PASS; no overflow or clipping candidate |
+| `/scenarios` | PASS; no overflow or clipping candidate |
+| `/approvals` | PASS; no overflow or clipping candidate |
+| `/orders` | PASS; no overflow or clipping candidate |
+| `/inventory` | PASS; authenticated `Inventory intelligence` render |
+| `/runtime` | PASS; no overflow or clipping candidate |
+
+The first sweep contained one one-off inventory sign-in-shell observation caused by the standalone harness navigation timing. An isolated rerun and the final per-route sweep both confirmed an authenticated inventory render with 200 session responses and no console errors. It is classified as a harness timing artifact, not a product defect.
 
 ## Hosted Proof Findings
 
@@ -103,7 +116,32 @@ The existing synthetic proof tenant was used for the first deployed Wave 2 proof
 
 This is not a reason to weaken the backend, alter the proof assertion, or make the button appear successful. The reused proof tenant must be prepared through the supported bootstrap path so the proof fixture has a deterministic assigned Review Owner, or the proof flow must use the supported assigned governance identity. No proof test was modified.
 
-Current hosted-proof status: `3 passed, 1 failed, 2 not run` in the last complete run before `0bd296f` deployment. A fresh deterministic governance fixture and a full proof rerun are required before Wave 2 can be accepted.
+The fresh deterministic rerun completed after the corrected bundle was deployed:
+
+- Test 1: authentication and complete authenticated page system, PASS
+- Test 2: tenant-scoped catalog onboarding, PASS
+- Test 3: realtime dashboard update without browser refresh, PASS
+- Test 4: replay recovery, scenario approval/execution, and role gating, PASS
+- Test 5: alerts, recommendations, orders, inventory, integrations, users, profile, settings, PASS
+- Test 6: auth rate limiting without a stuck loading state, PASS
+
+Final hosted-proof result: `6 passed`.
+
+Post-proof sanitized fixture inspection confirmed:
+
+- persisted Review Owner: `Operations Lead`
+- persisted Final Approver: `Executive Operations Director`
+- governance warehouse: `WH-NORTH`
+- assigned Review Owner approval: HTTP 200 and `APPROVED`
+- unassigned planner approval attempt: HTTP 403
+- PREVIEW persisted with `approvalStatus=NOT_REQUIRED` and `executable=false`
+- PREVIEW execute attempt: HTTP 400 with the supported non-executable error
+- approved governed scenario: `executable=true`; full proof executed the governed scenario and verified the resulting order
+- inventory and replay fixtures were created and reconciled by the full proof; replay queue ended clear
+
+The fresh tenant's proof operators are tenant-wide (`warehouseScopes=[]`), so a restricted-warehouse identity was not part of this fixture. Wrong-warehouse denial was therefore not live-exercised as a distinct scoped-operator case; warehouse enforcement remains covered by the existing backend contract and the proof's `WH-NORTH` workflow.
+
+After the green run, the browser sweep reported no console errors. The only request failures observed in the first diagnostic harness were navigation-cancelled API requests (`net::ERR_ABORTED`); the final sweep filtered expected API navigation cancellations and reported only the expected SockJS navigation cancellation. No unexpected 4xx, 5xx, React errors, blank transitions, or failed non-API resources were observed.
 
 ## Known Limitations
 
@@ -114,11 +152,14 @@ Current hosted-proof status: `3 passed, 1 failed, 2 not run` in the last complet
 
 ## Open Gate Findings
 
-- High: hosted scenario governance proof is pending a deterministic assigned Review Owner in the reused synthetic tenant. The backend boundary is correct and the previous UI authority copy was corrected. Do not accept Wave 2 until assigned-owner approval and governed execution pass on the corrected deployment.
-- Medium/Low: natural empty and injected error states remain only partially exercised live.
+- Medium: a restricted-warehouse identity was not provisioned in the fresh proof fixture, so wrong-warehouse denial was not a distinct live browser/API case. The tested fixture is tenant-wide and the backend warehouse boundary remains authoritative.
+- Low: natural empty and injected error states remain only partially exercised live. No destructive data manipulation or fault injection was used to manufacture them.
 
 ## Current Verdict
 
-`OPERATIONAL PAGE GUIDANCE WAVE 2 NOT ACCEPTED`
+`OPERATIONAL PAGE GUIDANCE WAVE 2 ACCEPTED WITH DOCUMENTED MEDIUM/LOW LIMITATIONS`
 
-Wave 3 and Phase 14 remain held. The next action is supported proof-tenant preparation and a full proof rerun, not additional UI scope.
+Critical blockers: 0
+High blockers: 0
+
+Wave 2 is accepted. Wave 3 and Phase 14 remain out of scope for this closure and must not start from this record.
