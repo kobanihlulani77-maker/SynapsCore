@@ -201,6 +201,7 @@ This index links the main product, architecture, runbook, proof, and operator do
 - [company-day-one-pilot-guide.md](company-day-one-pilot-guide.md) - canonical Phase 10 first operating-day control model
 - [company-daily-operator-sop.md](company-daily-operator-sop.md) - canonical Phase 11 normal-day operating procedure
 - [company-incident-rollback-recovery-pack.md](company-incident-rollback-recovery-pack.md) - canonical Phase 12 incident and recovery control
+- [company-pilot-change-management.md](company-pilot-change-management.md) - canonical Phase 13 active-pilot change control
 - [pilot-release-candidate.md](pilot-release-candidate.md)
 - [pilot-company-onboarding-checklist.md](pilot-company-onboarding-checklist.md)
 - [pilot-operator-checklist.md](pilot-operator-checklist.md)
@@ -228,6 +229,7 @@ This index links the main product, architecture, runbook, proof, and operator do
 - [templates/company-day-one-pilot-record.md](templates/company-day-one-pilot-record.md)
 - [templates/company-daily-operator-record.md](templates/company-daily-operator-record.md)
 - [templates/company-incident-recovery-record.md](templates/company-incident-recovery-record.md)
+- [templates/company-pilot-change-record.md](templates/company-pilot-change-record.md)
 
 ## Pilot Release Candidate
 
