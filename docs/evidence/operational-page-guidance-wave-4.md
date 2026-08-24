@@ -19,8 +19,8 @@ work was started during this verification.
 
 ## Deployment And Proof Baseline
 
-- Repository HEAD: `800fcefb70454fdb57a7791a50e9483748655417`
-- Served frontend asset observed: `index-2InG-0Wb.js`
+- Repository HEAD: `9e5de98e7f938ef5b762fc98f0da81929246aac7`
+- Served frontend assets observed: `index-BwUmB85M.js` and `index-Cn-HwJCA.css`
 - The served asset confirms a new frontend deployment, but the runtime does
   not expose an exact source commit, so the asset and repository revision are
   recorded separately.
@@ -65,6 +65,13 @@ The first rendered review found one real issue: the page summary displayed
 now renders a loading/unavailable state until the access read completes. The
 updated deployed bundle was rechecked in visible Chrome; the old zero-loading
 state was absent and the loaded roster rendered correctly.
+
+The same rendered pass found a sidebar geometry defect at `1366x768`: the
+sidebar footer overlapped Orders, Inventory, and Catalog navigation links when
+the navigation was taller than the viewport. The canonical navigation rule was
+corrected so the footer follows the full navigation content. The final bundle
+was rechecked with zero footer/navigation overlap on Users, Company Settings,
+and Profile.
 
 ### Company Settings
 
@@ -199,8 +206,9 @@ These are not Wave 4 Critical or High blockers:
 - Frontend build: PASS before this evidence-only closure
 - Frontend verify: PASS before this evidence-only closure
 - Frontend lint/build/verify after the loading-state fix: PASS
-- Hosted proof after the loading-state fix: `6/6 PASS`
+- Hosted proof after the loading-state and sidebar fixes: `6/6 PASS`
 - Headed Chrome at `1366x768`: PASS for all public/auth and tenant route checks
+- Final sidebar geometry at `1366x768`: PASS, zero footer/navigation overlaps
 - Browser console/page errors: none observed
 - HTTP 4xx/5xx during final route sweep: none observed
 - `git diff --check`: PASS
