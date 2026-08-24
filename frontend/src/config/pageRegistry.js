@@ -113,7 +113,7 @@ export const appPages = [
     audience: 'app',
     group: 'core',
     label: 'Locations',
-    title: 'Warehouse scope and operating pressure',
+    title: 'Warehouse and site health',
     description: 'Understand warehouse scope, derived pressure, and local evidence without confusing it with runtime health.',
     focus: ['Location scope', 'Pressure by site', 'Evidence'],
   },
