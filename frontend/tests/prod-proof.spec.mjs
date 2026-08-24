@@ -2826,9 +2826,17 @@ test('replay recovery, scenario approval, execution, and browser role gating wor
 
   await loginViaUi(page, users.operationsPlanner)
   await page.goto('/users')
-  await expect(page.getByRole('heading', { level: 1, name: 'Users and access control' })).toBeVisible()
-  await expect(page.getByText('Tenant admin access required')).toBeVisible()
-  await expect(page.getByText('Operators', { exact: true }).first()).toBeVisible()
+  await expect(page).toHaveURL(/\/dashboard$/)
+  await expect(page.getByRole('heading', { level: 1, name: 'Live operational command center' })).toBeVisible()
+  await expect(page.getByRole('button', { name: /^Users\b/ })).toHaveCount(0)
+
+  const plannerApi = await createApiContext(users.operationsPlanner)
+  try {
+    const usersResponse = await plannerApi.get('/api/access/admin/users')
+    expect(usersResponse.status()).toBe(403)
+  } finally {
+    await plannerApi.dispose()
+  }
 })
 
 test('alerts, recommendations, orders, inventory, integrations, users, profile, and settings surfaces stay connected to the live backend', async ({ page }, testInfo) => {
