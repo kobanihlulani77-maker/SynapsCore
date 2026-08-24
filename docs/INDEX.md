@@ -135,6 +135,7 @@ This index links the main product, architecture, runbook, proof, and operator do
 
 ## Recovery / Resilience
 
+- [company-incident-rollback-recovery-pack.md](company-incident-rollback-recovery-pack.md)
 - [deployment-recovery-guide.md](deployment-recovery-guide.md)
 - [render-recovery-playbook.md](render-recovery-playbook.md)
 - [local-recovery-playbook.md](local-recovery-playbook.md)
@@ -144,6 +145,7 @@ This index links the main product, architecture, runbook, proof, and operator do
 
 ## Incident Handling
 
+- [company-incident-rollback-recovery-pack.md](company-incident-rollback-recovery-pack.md) - canonical Company 1 Phase 12 incident, rollback, and recovery control
 - [operator-incident-guide.md](operator-incident-guide.md)
 - [runtime-observability.md](runtime-observability.md)
 - [observability-and-metrics-reference.md](observability-and-metrics-reference.md)
@@ -198,6 +200,7 @@ This index links the main product, architecture, runbook, proof, and operator do
 - [company-customer-handover-pack.md](company-customer-handover-pack.md)
 - [company-day-one-pilot-guide.md](company-day-one-pilot-guide.md) - canonical Phase 10 first operating-day control model
 - [company-daily-operator-sop.md](company-daily-operator-sop.md) - canonical Phase 11 normal-day operating procedure
+- [company-incident-rollback-recovery-pack.md](company-incident-rollback-recovery-pack.md) - canonical Phase 12 incident and recovery control
 - [pilot-release-candidate.md](pilot-release-candidate.md)
 - [pilot-company-onboarding-checklist.md](pilot-company-onboarding-checklist.md)
 - [pilot-operator-checklist.md](pilot-operator-checklist.md)
@@ -224,6 +227,7 @@ This index links the main product, architecture, runbook, proof, and operator do
 - [templates/company-customer-access-message.md](templates/company-customer-access-message.md)
 - [templates/company-day-one-pilot-record.md](templates/company-day-one-pilot-record.md)
 - [templates/company-daily-operator-record.md](templates/company-daily-operator-record.md)
+- [templates/company-incident-recovery-record.md](templates/company-incident-recovery-record.md)
 
 ## Pilot Release Candidate
 
