@@ -2,123 +2,208 @@
 
 Date: 2026-08-24
 
-## Scope
+## Closure Scope
 
-Wave 4 covers the remaining administrative and lighter tenant surfaces, plus
-application-wide consistency review:
+Wave 4 covers the remaining administrative and lighter tenant surfaces plus
+the application-wide public/auth and role-aware consistency review:
 
 - `/users`
 - `/company-settings`
 - `/profile`
-- public/auth boundary wording
-- role-aware next actions and navigation
-- terminology, status, privacy, and source-authority consistency
+- `/create-workspace`
+- `/sign-in` and `/platform-sign-in`
+- public routes and role-aware next actions
 
-Phase 14 remains held.
+Phase 14 remains held until this closure is formally reviewed. No Phase 14
+work was started during this verification.
 
-## Starting Point
+## Deployment And Proof Baseline
 
-Starting HEAD: `a1b4c39e2d13852ca8f04cf46b9c5a30088decf0`
+- Repository HEAD: `7d89d0e0b0d3b990ce166660598e85d960d0a8ec`
+- Served frontend asset observed: `index-BbjEXF_9.js`
+- The served asset confirms a new frontend deployment, but the runtime does
+  not expose an exact source commit, so the asset and repository revision are
+  recorded separately.
+- Live connection classification supplied after backend recovery:
 
-Unrelated local changes were preserved and not staged:
+```text
+FRONTEND_UP=True
+BACKEND_UP=True
+DB_READY=True
+AUTH_READY=True
+WS_READY=True
+PROOF_ALLOWED=True
+```
 
-- `frontend/Dockerfile`
-- `.gitattributes`
+- Hosted production proof: `6/6 PASS`
+- Existing proof tenant/state was reused: `HOSTED-PROOF-WAVE2-20260824`
+- No new tenant was created during this closure.
 
-## Findings And Changes
+The attempted `prepare-hosted-proof.ps1` run refused tenant inspection because
+the PowerShell session did not contain the private platform/bootstrap token.
+This is classified as an operator-preparation condition, not a product
+defect, Render outage, or proof failure. The ignored proof state remained
+valid and Playwright completed the full 6/6 proof without printing secrets.
+
+## Wave 4 Implementation Evidence
 
 ### Users
 
-The page was already a useful access roster, but it did not explain all six
-tenant roles, distinguish loading from an empty roster, or make the
-tenant-wide meaning of an empty warehouse-scope list explicit. It now provides
-role-lane definitions, explicit access readout state, review consequences, and
-post-change verification guidance. It remains Tenant Admin controlled; no
-backend authority changed.
+The page now explains the six tenant role lanes, tenant-wide versus warehouse
+scope, role/scope consequences, access readback expectations, and the
+Tenant-Admin boundary. Loading, unavailable, and empty states are distinct;
+an empty roster is not presented as a completed load. Rendered classification:
+**STRONG for the supported Tenant Admin surface**.
+
+The prepared operations-lead identity carried Tenant Admin plus additional
+tenant roles in its live session. A separate Integration Admin session was
+used as the non-admin rendered check. It did not receive Users or Company
+Settings access and direct route navigation returned it to Dashboard.
 
 ### Company Settings
 
-The page was already a supported tenant configuration surface, but its
-operational boundary and persistence verification path were implicit. It now
-explains the supported tenant-scoped controls, high-impact consequences,
-Tenant Admin authority, readback expectations, and what remains outside the
-page. Warehouse and connector panels distinguish loading, unavailable, and
-empty states.
+The page identifies tenant-scoped configuration, supported workspace/security/
+warehouse/connector boundaries, material-change consequences, and save/readback
+expectations. It does not imply control of platform infrastructure, DB, Redis,
+deployment, MFA/SSO, or arbitrary workflow rules. Rendered classification:
+**ADEQUATE, appropriate to the currently supported configuration surface**.
 
 ### Profile
 
-The page remains intentionally simple. It now explicitly separates identity,
-password, role, warehouse, and session responsibilities. Approval quick routes
-are shown only to review-capable roles, and non-admin users are not offered a
-Company Settings action that would redirect them through the route guard.
+The page remains intentionally simple and distinguishes identity, tenant,
+roles, warehouse scope, password rotation, session posture, and the controls
+that remain with an administrator. It does not advertise self-service role,
+warehouse, tenant, governance, MFA/SSO, or unsupported recovery controls.
+Rendered classification: **INTENTIONALLY SIMPLE / STRONG FOR PURPOSE**.
 
-### Public And Auth Boundary
+### Create Workspace And Public/Auth Boundaries
 
-Create Workspace now states that it prepares an intake/setup brief only. It
-does not create a tenant, workspace, or account. Platform Owner provisioning
-and the post-provisioning sign-in path are explicit. Existing proof-critical
-labels, including `Continue to Sign In`, were preserved.
+`/create-workspace` states that the customer submits company context and a
+proposed first-admin brief; Platform Owner provisioning remains the controlled
+next step. It does not claim that a customer self-creates a live tenant.
+`/sign-in` clearly requires workspace code, username, and password. The
+dedicated `/platform-sign-in` surface identifies the separate control-plane
+identity. Public home, product, and contact routes remain pilot-scoped and do
+not claim ERP/WMS replacement, automatic consequential decisions, HA,
+unlimited scale, arbitrary integrations, or customer self-provisioning.
 
-### Application-Wide Consistency
+## Headed Chrome Verification
 
-Dashboard approval cards now send non-approvers to Scenario History rather than
-an approval route they cannot access. Integration operators see connector
-recovery but not the Integration Admin-only policy-management action. This is
-frontend navigation clarity only; backend enforcement remains authoritative.
+Verification used installed visible Google Chrome at `1366x768`.
 
-## Route Census
+### Public/auth routes
 
-The current registry contains 30 routes:
+All five public routes rendered without overflow, blank states, console errors,
+page errors, or HTTP error responses:
 
-- Public/auth: 5
+| Route | Result |
+| --- | --- |
+| `/` | PASS |
+| `/product` | PASS |
+| `/create-workspace` | PASS |
+| `/sign-in` | PASS |
+| `/contact` | PASS |
+
+The dedicated platform sign-in route was also rendered successfully. A public
+route sweep observed one navigation-cancelled request on `/product` and no
+HTTP error; this was normal browser navigation cleanup, not a failed resource.
+
+### Tenant routes
+
+The final slower sweep rendered all 19 actual tenant routes with their expected
+headings, no sign-in redirects, no horizontal overflow, no console/page errors,
+and no HTTP 4xx/5xx responses:
+
+`/dashboard`, `/alerts`, `/recommendations`, `/orders`, `/inventory`,
+`/catalog`, `/locations`, `/fulfillment`, `/scenarios`, `/scenario-history`,
+`/approvals`, `/escalations`, `/integrations`, `/replay-queue`, `/runtime`,
+`/audit-events`, `/users`, `/company-settings`, `/profile`.
+
+The integration-admin session separately rendered `/integrations`,
+`/replay-queue`, `/audit-events`, and `/profile`, while `/users` and
+`/company-settings` correctly redirected to Dashboard under frontend route
+policy. The operations-lead session rendered the Wave 4 administrative routes
+and systems routes. Its role claims included the supported integration and
+escalation permissions, so the fixture is not a pure single-role Tenant Admin;
+this is a fixture limitation, not a tenant-boundary bypass.
+
+Realtime visibly moved from `Connecting` to `Live control signal` after warm-up;
+runtime moved from pending to an operational state. Navigation-cancelled
+requests during rapid route changes were expected and no unexpected browser
+errors were observed.
+
+### Platform routes
+
+The dedicated platform sign-in route rendered correctly. Direct navigation to
+`/platform-admin`, `/tenant-management`, `/system-config`, `/platform-activity`,
+and `/releases` while signed out consistently returned the platform sign-in
+surface. This reconfirms the protected boundary. Authenticated metadata-only
+platform content remains covered by the accepted Wave 1 evidence; no platform
+secret was needed or printed for this closure.
+
+## Route Census And Page Depth
+
+The current registry reconciles to 30 routes:
+
+- Public: 5
 - Tenant workspace: 19
-- Platform: 6
+- Platform control plane, including platform sign-in: 6
 
-The 19 tenant routes include Dashboard, Alerts, Recommendations, Orders,
-Inventory, Catalog, Locations, Fulfillment, Scenarios, Scenario History,
-Approvals, Escalations, Integrations, Replay Queue, Runtime, Audit & Events,
-Users, Company Settings, and Profile.
+Depth census:
 
-## Source Verification
+- **STRONG: 16** tenant operational routes
+- **ADEQUATE: 7** two tenant administration routes plus five authenticated platform routes
+- **INTENTIONALLY SIMPLE: 7** five public routes, platform sign-in, and Profile
+- **SHALLOW: 0**
+- **CRUD-LIKE: 0**
+- **MISLEADING: 0**
+- **BROKEN: 0**
 
-- Frontend lint: PASS
-- Frontend build: PASS
-- Frontend verify: PASS
+The classifications reflect current supported responsibility, not a claim that
+every page has equal operational depth.
+
+## Consistency Review
+
+- Tenant/workspace/company language remains audience-specific and consistent.
+- Warehouse/location means operating scope; runtime health remains a separate trust signal.
+- Recommendations guide decisions; scenarios model decisions; Preview is not executable.
+- Review, final approval, escalation acknowledgement, and governed execution remain distinct.
+- CSV failure evidence, correction, duplicate check, replay, and post-replay verification remain the proven recovery lane.
+- Disabled-webhook replay/readback remains a documented limitation rather than an implied capability.
+- Customer source systems remain authoritative during the pilot, while supported Tenant Admin inventory maintenance remains explicit.
+- Platform Owner is not described as a tenant role.
+- No new raw payload, secret, credential, or cross-tenant data exposure was introduced.
+- Representative next actions land on existing meaningful routes; role-aware navigation avoids known unauthorized destinations.
+
+## Carried Medium/Low Limitations
+
+These are not Wave 4 Critical or High blockers:
+
+- restricted-warehouse rendered proof remains limited by the tenant-wide fixture
+- destructive fault-injected error-state screenshots are not part of this sweep
+- disabled-webhook replay/readback remains limited
+- import warehouse attribution remains limited
+- managed provider restore evidence is not proven in this browser gate
+- bounded live scale evidence, HA/failover, MFA/SSO/OIDC, generic approval, and arbitrary connector frameworks remain outside supported scope
+- customer self-provisioning is intentionally unsupported; Platform Owner provisioning is required
+
+## Verification
+
+- Frontend lint: PASS before this evidence-only closure
+- Frontend build: PASS before this evidence-only closure
+- Frontend verify: PASS before this evidence-only closure
+- Hosted proof: `6/6 PASS`
+- Headed Chrome at `1366x768`: PASS for all public/auth and tenant route checks
+- Browser console/page errors: none observed
+- HTTP 4xx/5xx during final route sweep: none observed
 - `git diff --check`: PASS
-- Proof-critical label scan: PASS
+- docs link check: PASS, 764 local links
+- secret scan: PASS, 0 critical findings; 5 known fixture findings
 
-## Live Verification Boundary
+## Wave 4 Verdict
 
-The frontend deployment served a new bundle after the Wave 4 push. During the
-final verification window, the backend host
-`https://synapscore-3.onrender.com` was TCP-unreachable for health, readiness,
-auth-session, and `/ws/info`. The live connection classification was:
+**OPERATIONAL PAGE GUIDANCE WAVE 4 ACCEPTED WITH DOCUMENTED MEDIUM/LOW LIMITATIONS**
 
-```text
-FRONTEND_UP=False  (PowerShell connection check; direct curl shell later returned the frontend shell)
-BACKEND_UP=False
-DB_READY=False
-AUTH_READY=False
-WS_READY=False
-PROOF_ALLOWED=False
-```
+Critical blockers: `0`
 
-The frontend shell itself returned HTTP 200 and exposed the deployed bundle,
-but authenticated rendered verification and hosted proof were not run while
-the backend prerequisite was unavailable. This is a deployment/environment
-blocker, not evidence of a frontend authority change.
-
-## Commits
-
-- `b256a1170857e073ebbd30be8631912aec27da38` — Deepen Wave 4 administrative page guidance
-- `039b15d6e5e379155fe9d68d890985c859fc9282` — Align Wave 4 role-aware navigation
-- `54b69964d0874d9f1c0fca1a829c948cbc639f23` — Preserve workspace proof selector
-
-## Current Verdict
-
-Wave 4 source implementation is complete and locally verified. Wave 4 cannot
-be accepted yet because the required deployed backend/readiness/auth/realtime
-and hosted-proof evidence is pending.
-
-**OPERATIONAL PAGE GUIDANCE WAVE 4 NOT YET ACCEPTED — LIVE VERIFICATION PENDING**
-
+High blockers: `0`
