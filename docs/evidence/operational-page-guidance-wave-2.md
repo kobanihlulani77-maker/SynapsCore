@@ -35,6 +35,7 @@ The existing operational pages were already materially deeper than CRUD screens.
 - Replay now states the controlled recovery sequence, the duplicate/reconciliation check, and the requirement to verify the resulting effect rather than treating HTTP success as recovery completion.
 - Orders now separates SynapseCore observation from source-authoritative or reconciled state and states that direct mutations remain role/backend controlled.
 - Scenario approval and rejection now respect the reported assigned owner in the UI. A different operator sees the assignment boundary and is not encouraged to submit an action that the backend will reject.
+- Headed Chrome review found Runtime factor labels and status badges colliding inside narrow cards at 1366px. The smallest CSS-only fix wraps the status beneath the label in `128631c`.
 
 No backend endpoint, backend contract, route, proof selector, or visual theme was changed.
 
@@ -85,7 +86,7 @@ Focused source review confirmed the inventory authority in `InventoryController`
 The corrected deployed bundle was verified through the fresh deterministic proof tenant:
 
 - Tenant: `HOSTED-PROOF-WAVE2-20260824`
-- Deployed frontend bundle: `index-KqBPFdlG.js`
+- Deployed frontend bundle: `index-Bgy2DQh-.js`
 - Backend readiness, liveness, auth session, and SockJS checks: PASS
 - Full hosted proof: 6/6 PASS in 3.8 minutes
 - No proof test was modified and no backend contract was changed.
@@ -103,7 +104,32 @@ The dedicated authenticated 1366x768 sweep also passed for all eight Wave 2 rout
 | `/inventory` | PASS; authenticated `Inventory intelligence` render |
 | `/runtime` | PASS; no overflow or clipping candidate |
 
-The first sweep contained one one-off inventory sign-in-shell observation caused by the standalone harness navigation timing. An isolated rerun and the final per-route sweep both confirmed an authenticated inventory render with 200 session responses and no console errors. It is classified as a harness timing artifact, not a product defect.
+The first automated sweep contained one one-off inventory sign-in-shell observation caused by standalone harness navigation timing. An isolated rerun and the final per-route sweep both confirmed an authenticated inventory render with 200 session responses and no console errors. It is classified as a harness timing artifact, not a product defect.
+
+## Final Headed Chrome Walkthrough
+
+The final rendered validation used installed Google Chrome in a visible headed session at `1366x768` against the fresh proof tenant. Passwords, tokens, cookies, and raw customer payloads were not recorded.
+
+| Page | Route | Chrome result | Guidance/trust result | Layout | Verdict |
+| --- | --- | --- | --- | --- | --- |
+| Dashboard | `/dashboard` | Opened as tenant admin | Workspace, attention, runtime, and next-action context visible | No overflow or clipping | STRONG |
+| Integrations | `/integrations` | Opened as tenant admin and Integration Lead | Connector/recovery posture and ownership guidance visible | No overflow or clipping | STRONG |
+| Replay Queue | `/replay-queue` | Opened as tenant admin and Integration Lead | Empty queue explains that no failed inbound requires recovery | No overflow or clipping | STRONG |
+| Scenarios | `/scenarios` | Opened as tenant admin | `PREVIEW IS NOT EXECUTABLE` visible in the planning flow | No overflow or clipping | STRONG |
+| Approvals | `/approvals` | Opened as tenant admin | Assignment and governance context visible | No overflow or clipping | STRONG |
+| Orders | `/orders` | Opened as tenant admin | Order posture, warehouse, and source/reconciliation wording visible | No overflow or clipping | STRONG |
+| Inventory | `/inventory` | Opened as tenant admin and Planner | Tenant-admin maintenance guidance visible; Planner had no maintenance buttons | No overflow or clipping | STRONG |
+| Runtime | `/runtime` | Opened as tenant admin | Runtime trust, readiness, realtime, and incident interpretation visible | Runtime card collision fixed and rechecked | STRONG |
+
+Cross-page journeys were followed in Chrome:
+
+- Dashboard -> Integrations -> Replay Queue: the command center routes into connector investigation and the clear recovery queue state.
+- Scenarios -> Approvals -> governed result: planning and governance surfaces explain the approval boundary; the executed result is verified by hosted proof.
+- Dashboard/Inventory -> Inventory: stock posture and controlled maintenance context remain connected without inventing unsupported workflow links.
+
+The available prepared identities supported tenant-admin, Integration Admin/Operator, and Planner views. Review Owner, Final Approver, and Escalation Owner were represented in persisted governance data and automated authority proof, but separate fresh passwords for those roles were not present in the ignored Wave 2 proof state. The tenant-wide warehouse-scope limitation remains unchanged.
+
+Chrome reported no console errors, no unexpected 5xx responses, no failed non-API resources, and no visual overflow. A transient realtime `Connecting` label appeared during one runtime capture while the websocket settled; the final runtime render showed the corrected card layout and the runtime state remained supported by the live API. No additional defect remained after the recheck.
 
 ## Hosted Proof Findings
 
@@ -125,7 +151,7 @@ The fresh deterministic rerun completed after the corrected bundle was deployed:
 - Test 5: alerts, recommendations, orders, inventory, integrations, users, profile, settings, PASS
 - Test 6: auth rate limiting without a stuck loading state, PASS
 
-Final hosted-proof result: `6 passed`.
+Final hosted-proof result after the Runtime CSS deployment: `6 passed` in 2.2 minutes.
 
 Post-proof sanitized fixture inspection confirmed:
 
