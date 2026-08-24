@@ -1,154 +1,86 @@
 import { MetricCard } from '../components/Card'
 import Panel from '../components/Panel'
+import LoadingState from '../components/LoadingState'
+import StatusBadge from '../components/StatusBadge'
+
+const statusTone = (value) => {
+  const normalized = String(value || '').toUpperCase()
+  if (['UP', 'CORRECT', 'ACCEPTING_TRAFFIC'].includes(normalized)) return 'healthy'
+  if (['DEGRADED', 'UNKNOWN', ''].includes(normalized)) return 'warning'
+  return 'critical'
+}
+
+const formatValue = (value, fallback = 'Not reported') => value || fallback
 
 export default function SystemConfigPage({ context }) {
-  const {
-    isAuthenticated,
-    isSystemConfigPage,
-    runtime,
-    formatMetricValue,
-  } = context
+  const { isAuthenticated, isSystemConfigPage, runtime } = context
 
   if (!isAuthenticated || !isSystemConfigPage) return null
-  const runtimeReady = runtime?.readinessState === 'UP' || runtime?.overallStatus === 'UP'
-  const queueAttention = (runtime?.backbone?.failedDispatchCount ?? 0) > 0 || (runtime?.backbone?.oldestPendingAgeSeconds ?? 0) > 0
-  const originAttention = runtime && !runtime.allowedOrigins?.length
-  const configPosture = !runtime
-    ? 'Unavailable'
-    : runtimeReady && !queueAttention && !originAttention
-      ? 'Safe'
-      : queueAttention || originAttention
-        ? 'Watch'
-        : 'Incomplete'
+  if (!runtime) return <section className="content-grid"><Panel wide><LoadingState label="Loading platform runtime evidence..." /></Panel></section>
+
+  const readiness = formatValue(runtime.readinessState, 'UNKNOWN')
+  const liveness = formatValue(runtime.livenessState, 'UNKNOWN')
+  const overallStatus = formatValue(runtime.overallStatus, 'UNKNOWN')
+  const brokerMode = formatValue(runtime.realtimeBrokerMode, 'UNKNOWN')
+  const runtimeHealthy = overallStatus === 'UP' && readiness === 'ACCEPTING_TRAFFIC' && liveness === 'CORRECT'
+  const runtimePosture = runtimeHealthy ? 'Healthy' : overallStatus === 'DEGRADED' ? 'Degraded' : 'Review'
+  const queueNeedsReview = runtime.failedDispatchCount > 0 || runtime.pendingDispatchCount > 0
 
   return (
     <section className="content-grid">
       <Panel wide>
         <div className="panel-header">
-          <div>
-            <p className="panel-kicker">System configuration</p>
-            <h2>System configuration and operational defaults</h2>
-          </div>
-          <span className="panel-badge audit-badge">{runtime?.activeProfiles?.join(', ') || 'Loading'}</span>
+          <div><p className="panel-kicker">System configuration</p><h2>System configuration and operational defaults</h2></div>
+          <StatusBadge tone={statusTone(overallStatus)}>{overallStatus}</StatusBadge>
         </div>
 
         <div className="workflow-decision-hero config-trust-hero">
           <div className="workflow-decision-copy">
-            <strong>Platform operating envelope</strong>
-            <p>
-              Translate runtime configuration into operational trust: which environment is visible, which capability could
-              be affected, and what a technical administrator should check next.
-            </p>
+            <strong>Platform runtime trust</strong>
+            <p>Use the runtime facts reported by the platform control-plane API to decide whether the service is accepting traffic, degraded, or requires investigation. This page does not infer causes that the backend did not report.</p>
             <div className="ops-pill-row">
-              <span className="workspace-meta-pill">Posture {configPosture}</span>
-              <span className="workspace-meta-pill">{runtime?.activeProfiles?.join(', ') || 'Environment not reported'}</span>
-              <span className="workspace-meta-pill">{runtime?.allowedOrigins?.length ?? 0} allowed origins</span>
+              <span className="workspace-meta-pill">Posture {runtimePosture}</span>
+              <span className="workspace-meta-pill">Liveness {liveness}</span>
+              <span className="workspace-meta-pill">Readiness {readiness}</span>
             </div>
           </div>
           <div className="workflow-action-console">
-            <div className="workflow-action-card">
-              <span>Primary capability</span>
-              <strong>{queueAttention ? 'Realtime dispatch needs review' : 'Realtime dispatch configured'}</strong>
-              <p>Queue cadence and dispatch pressure affect how operational updates fan out across the workspace.</p>
-            </div>
-            <div className="workflow-action-card">
-              <span>Technical next check</span>
-              <strong>{originAttention ? 'Review allowed origins' : runtimeReady ? 'Monitor runtime evidence' : 'Confirm readiness'}</strong>
-              <p>Only display-safe configuration is shown here; secrets and credentials stay out of the browser.</p>
-            </div>
+            <div className="workflow-action-card"><span>Operational meaning</span><strong>{runtimeHealthy ? 'Accepting traffic' : `${runtimePosture} runtime`}</strong><p>Liveness and readiness are shown separately so accepting traffic is not treated as the entire trust decision.</p></div>
+            <div className="workflow-action-card"><span>Next diagnostic</span><strong>{queueNeedsReview ? 'Review dispatch pressure' : runtimeHealthy ? 'Continue monitoring evidence' : 'Confirm runtime health'}</strong><p>Use Release Trust for build identity and Activity for metadata-only evidence.</p></div>
           </div>
         </div>
 
         <div className="summary-grid compact-summary-grid">
-          <MetricCard label="Dispatch interval" value={runtime ? `${runtime.backbone.dispatchIntervalMs} ms` : '...'} accent="blue" note="How frequently the internal dispatch queue drains pending operational work." />
-          <MetricCard label="Batch size" value={runtime?.backbone?.batchSize ?? 0} accent="teal" note="How much queue work the platform processes per dispatch cycle." />
-          <MetricCard label="Average latency" value={runtime ? `${formatMetricValue(runtime.metrics.averageHttpRequestLatencyMs)} ms` : '...'} accent="amber" note="Observed average request latency across the current runtime window." />
-          <MetricCard label="Allowed origins" value={runtime?.allowedOrigins?.length ?? 0} accent="rose" note="Browser origins currently trusted to interact with the live platform." />
+          <MetricCard label="Overall" value={overallStatus} accent="blue" note="Combined liveness and readiness posture reported by the backend." />
+          <MetricCard label="Liveness" value={liveness} accent="teal" note="Whether the application process reports itself alive." />
+          <MetricCard label="Readiness" value={readiness} accent="amber" note="Whether the application reports that it can accept traffic." />
+          <MetricCard label="Realtime" value={brokerMode} accent="rose" note="Broker mode reported for platform realtime delivery." />
         </div>
 
         <div className="experience-grid experience-grid-split">
-          <article className="stack-card section-card workflow-selected-panel admin-focus-panel">
-            <div className="stack-title-row"><strong>Realtime and queue backbone</strong><span className={`status-tag ${queueAttention ? 'status-partial' : 'status-success'}`}>{queueAttention ? 'Watch' : 'Configured'}</span></div>
+          <article className="stack-card section-card workflow-selected-panel admin-focus-panel" id="platform-runtime-trust">
+            <div className="stack-title-row"><strong>Trust dimensions</strong><StatusBadge tone={statusTone(runtimePosture)}>{runtimePosture}</StatusBadge></div>
             <div className="signal-list">
-              <div className="signal-list-item">
-                <strong>Dispatch cadence</strong>
-                <p>Dispatch queue drains every {runtime?.backbone?.dispatchIntervalMs ?? '...'} ms in batches of {runtime?.backbone?.batchSize ?? '...'}.</p>
-                <p className="muted-text">Operational impact: realtime dashboard and incident updates depend on this fan-out path.</p>
-                <p className="muted-text">Oldest queued work {runtime?.backbone?.oldestPendingAgeSeconds == null ? 'clear' : `${runtime.backbone.oldestPendingAgeSeconds}s`} | Failed dispatch {runtime?.backbone?.failedDispatchCount ?? 0}</p>
-              </div>
-              <div className="signal-list-item">
-                <strong>Broker posture</strong>
-                <p>Alert hook {runtime?.backbone?.alertHookConfigured ? 'configured' : 'not configured'} | Broker {runtime?.backbone?.realtimeBrokerMode || 'unknown'}</p>
-                <p className="muted-text">Use this to understand how live operational state propagates across the platform.</p>
-              </div>
+              <div className="signal-list-item"><strong>Liveness</strong><p>{liveness}</p><p className="muted-text">If liveness is not CORRECT, treat the application as unavailable rather than merely waiting for readiness.</p></div>
+              <div className="signal-list-item"><strong>Readiness</strong><p>{readiness}</p><p className="muted-text">If readiness is not ACCEPTING_TRAFFIC, pause operational use and proof until the dependency posture is understood.</p></div>
+              <div className="signal-list-item"><strong>Session security</strong><p>{runtime.secureSessionCookies ? 'Secure cookies enabled' : 'Secure cookies not reported as enabled'}</p><p className="muted-text">This is a display-safe security posture; credentials and secrets are never shown.</p></div>
             </div>
           </article>
 
-          <article className="stack-card section-card admin-risk-panel">
-            <div className="stack-title-row"><strong>Session and origin posture</strong><span className={`status-tag ${runtime?.secureSessionCookies ? 'status-success' : 'status-partial'}`}>{runtime?.secureSessionCookies ? 'Secure' : 'Local HTTP'}</span></div>
+          <article className="stack-card section-card admin-risk-panel" id="platform-runtime-realtime">
+            <div className="stack-title-row"><strong>Realtime and dispatch</strong><StatusBadge tone={queueNeedsReview ? 'warning' : 'healthy'}>{queueNeedsReview ? 'Review' : 'Reported clear'}</StatusBadge></div>
             <div className="signal-list">
-              <div className="signal-list-item">
-                <strong>Allowed origins</strong>
-                <p>{runtime?.allowedOrigins?.join(', ') || 'Configuration value not reported'}</p>
-                <p className="muted-text">Review this before rollout to ensure browser sessions, CORS, and realtime connect cleanly.</p>
-              </div>
-              <div className="signal-list-item">
-                <strong>Tenant resolution</strong>
-                <p>{runtime?.headerFallbackEnabled ? 'Header fallback enabled' : 'Session-only tenant resolution'}</p>
-                <p className="muted-text">Session-only resolution is the secure production target for company workspaces.</p>
-              </div>
+              <div className="signal-list-item"><strong>Broker</strong><p>{brokerMode}</p><p className="muted-text">Distributed mode {runtime.realtimeDistributedMode ? 'enabled' : 'not enabled'}; Redis pub/sub {runtime.realtimeRedisPubSubConfigured ? 'configured' : 'not reported'}; STOMP relay {runtime.realtimeStompRelayConfigured ? 'configured' : 'not reported'}.</p></div>
+              <div className="signal-list-item"><strong>Dispatch queue</strong><p>Pending {runtime.pendingDispatchCount} | Failed {runtime.failedDispatchCount}</p><p className="muted-text">These are platform-level queue counts. They do not identify a cause or expose tenant payloads.</p></div>
+              <div className="signal-list-item"><strong>Alert hook</strong><p>{runtime.alertHookConfigured ? 'Configured' : 'Not reported as configured'}</p><p className="muted-text">Use the reported value as an integration signal, not as proof that every alert was delivered.</p></div>
             </div>
           </article>
         </div>
 
         <div className="experience-grid experience-grid-three">
-          <article className="stack-card section-card admin-form-panel">
-            <div className="stack-title-row"><strong>Request and access posture</strong><span className="scenario-type-tag">{runtime?.activeProfiles?.join(', ') || 'Loading'}</span></div>
-            <div className="signal-list">
-              <div className="signal-list-item">
-                <strong>Average request latency</strong>
-                <p>{runtime ? `${formatMetricValue(runtime.metrics.averageHttpRequestLatencyMs)} ms` : '...'}</p>
-                <p className="muted-text">Tracks the average response time across live workspace traffic.</p>
-              </div>
-              <div className="signal-list-item">
-                <strong>Access pressure</strong>
-                <p>{formatMetricValue(runtime?.metrics?.authFailures)} auth failures | {formatMetricValue(runtime?.metrics?.rateLimitRejections)} rate-limit rejections</p>
-                <p className="muted-text">Helps teams distinguish normal traffic from sign-in abuse or endpoint pressure.</p>
-              </div>
-            </div>
-          </article>
-
-          <article className="stack-card section-card admin-form-panel">
-            <div className="stack-title-row"><strong>Dispatch envelope</strong><span className="scenario-type-tag">Queue-backed</span></div>
-            <div className="signal-list">
-              <div className="signal-list-item">
-                <strong>Queued now</strong>
-                <p>{runtime?.backbone?.pendingDispatchCount ?? 0}</p>
-                <p className="muted-text">Tracks the internal dispatch queue used to fan out state changes safely.</p>
-              </div>
-              <div className="signal-list-item">
-                <strong>Processed total</strong>
-                <p>{formatMetricValue(runtime?.metrics?.dispatchProcessed)}</p>
-                <p className="muted-text">Use together with failures and oldest age to decide when to intervene operationally.</p>
-              </div>
-            </div>
-          </article>
-
-          <article className="stack-card section-card admin-risk-panel">
-            <div className="stack-title-row"><strong>Failure signals</strong><span className="scenario-type-tag">Operator readable</span></div>
-            <div className="signal-list">
-              <div className="signal-list-item">
-                <strong>Integration pressure</strong>
-                <p>{formatMetricValue(runtime?.metrics?.integrationFailures)} integration failures | {formatMetricValue(runtime?.metrics?.replayFailures)} replay failures</p>
-                <p className="muted-text">Use this alongside replay backlog and connector diagnostics to decide when inbound lanes need intervention.</p>
-              </div>
-              <div className="signal-list-item">
-                <strong>Production posture</strong>
-                <p>Live-only</p>
-                <p className="muted-text">Development-only reseed helpers are not part of the live operational path.</p>
-              </div>
-            </div>
-          </article>
+          <article className="stack-card section-card admin-form-panel"><div className="stack-title-row"><strong>Release context</strong><span className="scenario-type-tag">{runtime.activeProfiles?.join(', ') || 'Unknown'}</span></div><div className="signal-list"><div className="signal-list-item"><strong>Build</strong><p>{formatValue(runtime.build?.version)}</p><p className="muted-text">Commit {formatValue(runtime.build?.commit)} | Built {formatValue(runtime.build?.builtAt)}</p></div></div></article>
+          <article className="stack-card section-card admin-form-panel"><div className="stack-title-row"><strong>Deployment context</strong><span className="scenario-type-tag">{formatValue(runtime.build?.runtime, 'Unknown')}</span></div><div className="signal-list"><div className="signal-list-item"><strong>Observed</strong><p>{formatValue(runtime.observedAt)}</p><p className="muted-text">Use this timestamp when correlating platform evidence with an incident or release check.</p></div></div></article>
+          <article className="stack-card section-card admin-risk-panel"><div className="stack-title-row"><strong>Next action</strong><span className="scenario-type-tag">Operator guidance</span></div><div className="signal-list"><div className="signal-list-item"><strong>{runtimeHealthy && !queueNeedsReview ? 'Monitor' : 'Investigate'}</strong><p>{runtimeHealthy && !queueNeedsReview ? 'Continue monitoring runtime evidence.' : 'Confirm the failing or degraded dimension before operating or proving.'}</p><p className="muted-text">Platform Activity and Release Trust provide the next evidence surfaces.</p></div></div></article>
         </div>
       </Panel>
     </section>

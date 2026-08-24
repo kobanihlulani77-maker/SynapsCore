@@ -23,7 +23,7 @@ export default function PlatformAdminPage({ context }) {
 
   if (!isAuthenticated || !isPlatformPage) return null
   const runtimeLabel = runtime?.overallStatus || 'Loading'
-  const platformAttentionCount = systemIncidents.length + pendingReplayCount + (runtime?.backbone?.failedDispatchCount ?? 0)
+  const platformAttentionCount = systemIncidents.length + pendingReplayCount + (runtime?.failedDispatchCount ?? 0)
 
   return (
     <section className="content-grid">
@@ -74,7 +74,7 @@ export default function PlatformAdminPage({ context }) {
         <div className="summary-grid compact-summary-grid">
           <MetricCard label="Workspaces" value={tenantDirectoryState.items.length} accent="blue" note="Company environments currently visible in the platform portfolio." />
           <MetricCard label="Incidents" value={systemIncidents.length} accent="rose" note="Cross-tenant runtime or connector incidents needing global review." />
-          <MetricCard label="Pending dispatch" value={runtime?.backbone?.pendingDispatchCount ?? 0} accent="amber" note="Internal queue work still waiting to fan out across the platform." />
+          <MetricCard label="Pending dispatch" value={runtime?.pendingDispatchCount ?? 0} accent="amber" note="Internal queue work still waiting to fan out across the platform." />
           <MetricCard label="Replay pressure" value={pendingReplayCount} accent="teal" note="Recovery backlog currently visible across the platform surface." />
         </div>
 
@@ -122,7 +122,7 @@ export default function PlatformAdminPage({ context }) {
               </div>
               <div className="signal-list-item">
                 <strong>Dispatch posture</strong>
-                <p>Pending {runtime?.backbone?.pendingDispatchCount ?? 0} | Failed {runtime?.backbone?.failedDispatchCount ?? 0}</p>
+                <p>Pending {runtime?.pendingDispatchCount ?? 0} | Failed {runtime?.failedDispatchCount ?? 0}</p>
                 <p className="muted-text">Use this lane to watch backbone pressure before it turns into tenant-facing impact.</p>
               </div>
             </div>
@@ -149,7 +149,7 @@ export default function PlatformAdminPage({ context }) {
             <div className="utility-metric-grid">
               <div><span>Workspaces</span><strong>{tenantDirectoryState.items.length}</strong></div>
               <div><span>Incidents</span><strong>{systemIncidents.length}</strong></div>
-              <div><span>Queued</span><strong>{runtime?.backbone?.pendingDispatchCount ?? 0}</strong></div>
+              <div><span>Queued</span><strong>{runtime?.pendingDispatchCount ?? 0}</strong></div>
               <div><span>Replay</span><strong>{pendingReplayCount}</strong></div>
             </div>
             <div className="history-action-row">

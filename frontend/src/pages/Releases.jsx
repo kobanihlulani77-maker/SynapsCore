@@ -146,7 +146,7 @@ export default function ReleasesPage({ context }) {
               </div>
               <div className="signal-list-item">
                 <strong>Queue pressure</strong>
-                <p>Pending {runtime?.backbone?.pendingDispatchCount ?? 0} | Failed {runtime?.backbone?.failedDispatchCount ?? 0}</p>
+                <p>Pending {runtime?.pendingDispatchCount ?? 0} | Failed {runtime?.failedDispatchCount ?? 0}</p>
                 <p className="muted-text">Release health includes live operational pressure, not just versioning.</p>
               </div>
             </div>
