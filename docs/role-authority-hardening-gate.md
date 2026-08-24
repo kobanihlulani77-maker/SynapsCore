@@ -77,22 +77,67 @@ The following docs were updated to align operator guidance with the hardened aut
 
 ## Live Proof Status
 
-Local proof is complete. Live Render proof must run after this commit is deployed before the gate is accepted as live-closed.
+Local proof is complete. The deployed authority implementation was exercised on Render after the hardening commit.
 
 Minimum live checks:
 
 1. Run `scripts\check-live-connections.ps1`.
 2. Confirm frontend, backend, DB, auth, and websocket are ready.
-3. Exercise the six-role rendered/API authority matrix against the deployed build.
-4. Confirm wrong-role inventory/order/fulfillment/ingestion/governance/preview-execution attempts are denied by backend APIs.
-5. Confirm Critical blockers: `0` and High blockers: `0`.
+3. Exercise the six-role rendered/API authority matrix against the deployed build. **Complete.**
+4. Confirm wrong-role inventory/order/fulfillment/ingestion/governance/preview-execution attempts are denied by backend APIs. **Complete through the deployed role matrix, existing live governance evidence, and full hosted proof.**
+5. Confirm Critical blockers: `0` and High blockers: `0`. **Complete.**
 
-Do not start Phase 12 until live proof is recorded.
+The six-role rehearsal used generated synthetic identities and disabled those identities during cleanup. No passwords, tokens, session cookies, or raw payloads were recorded.
+
+### Current deployed evidence
+
+| Evidence | Result |
+| --- | --- |
+| Live connection classification | `FRONTEND_UP=True`, `BACKEND_UP=True`, `DB_READY=True`, `AUTH_READY=True`, `WS_READY=True`, `PROOF_ALLOWED=True` |
+| Deployed authority commit | `3fc927d8f1f3905013f057fc9ecc7a8f6596d2c6` |
+| Repository proof correction commit | `f5d2f0a3d6fc2a4b9c72616068c57cb2e18fb4f9` |
+| Six distinct role API/UI rehearsal | PASS, zero matrix failures |
+| Full hosted production proof | PASS, six tests |
+| Focused replay/governance proof | PASS |
+| Live governance evidence | Existing deployed assignment and executable-state evidence retained in `docs/platform-control-plane-access-boundary.md`; fresh supplemental fixture bootstrap returned `401` for the proof-admin account and created no fixture |
+
+### Six-role deployed matrix
+
+The rehearsal used one identity per role: `TENANT_ADMIN`, `INTEGRATION_ADMIN`, `INTEGRATION_OPERATOR`, `REVIEW_OWNER`, `FINAL_APPROVER`, and `ESCALATION_OWNER`.
+
+| Area | Result |
+| --- | --- |
+| Dedicated session identity | Each session returned exactly its assigned single role |
+| Navigation and direct routes | Allowed role pages rendered; forbidden role pages were not advertised and direct platform/tenant-admin routes did not grant access |
+| Platform control plane | All six tenant identities were denied `/api/platform/*` |
+| Tenant administration | `TENANT_ADMIN` allowed; the other five roles denied users/workspace administration |
+| Integrations and replay | `INTEGRATION_ADMIN` and `INTEGRATION_OPERATOR` allowed reads; other roles denied |
+| Inventory writes | `TENANT_ADMIN` allowed; other roles denied |
+| Order and fulfillment writes | Integration roles allowed in `WH-NORTH`; other roles denied |
+| Session webhook and CSV ingestion | Integration roles allowed with temporary connector policy; other roles denied |
+| Warehouse boundary | Scoped integration roles were allowed in `WH-NORTH` and denied in `WH-COAST`; tenant-wide admin semantics remained intentional |
+| Tenant runtime and scenario reads | Allowed tenant-scoped reads; platform runtime remained separate and denied |
+| Sign-out | Each rendered role completed sign-out back to the sign-in shell |
+
+### High finding closure
+
+| Finding | Live closure evidence | Result |
+| --- | --- | --- |
+| High 1: unrestricted inventory/order/fulfillment writes | Six-role live matrix exercised allowed and denied inventory, order, fulfillment, and wrong-warehouse paths | PASS |
+| High 2: unrestricted session webhook/CSV ingestion | Six-role live matrix exercised enabled connector-backed webhook and CSV paths | PASS |
+| High 3: unassigned review owner could approve | Deployed assignment evidence is recorded in `docs/platform-control-plane-access-boundary.md`; local assignment regression remains `152/152` | PASS with proof-account refresh follow-up |
+| High 4: preview could execute | Full hosted proof and existing deployed live governance evidence cover preview/state gating; local regression remains `152/152` | PASS with proof-account refresh follow-up |
+
+The supplemental governance runner received `401` while authenticating the existing proof-admin account after the six-role cleanup. It created no fixture and did not change the product verdict. Refreshing the ignored proof state is an operational evidence task before the next fresh governance rehearsal, not a role-authority bypass.
 
 ## Gate Verdict
 
 Local verdict: **PASS**.
 
-Live verdict: **PENDING DEPLOYED VERIFICATION**.
+Live verdict: **ROLE AUTHORITY HARDENING GATE ACCEPTED WITH DOCUMENTED MEDIUM/LOW LIMITATIONS**.
 
-Phase 12: **STOPPED** until live verification closes with Critical blockers `0` and High blockers `0`.
+Critical blockers: **0**.
+
+High blockers: **0**.
+
+Medium/Low limitations remain documented above and in the platform access-boundary record. Phase 12: **STOPPED**.
