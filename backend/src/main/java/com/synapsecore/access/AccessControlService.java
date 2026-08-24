@@ -69,6 +69,28 @@ public class AccessControlService {
         return requireAnyRole(Set.of(SynapseAccessRole.TENANT_ADMIN), actionDescription);
     }
 
+    public SynapseActorContext requireInventoryWrite(String warehouseCode, String actionDescription) {
+        SynapseActorContext actor = requireTenantAdmin(actionDescription);
+        requireWorkspaceWarehouseAccess(warehouseCode, actionDescription);
+        return actor;
+    }
+
+    public SynapseActorContext requireOperationalWrite(String warehouseCode, String actionDescription) {
+        SynapseActorContext actor = requireAnyRole(
+            Set.of(SynapseAccessRole.INTEGRATION_ADMIN, SynapseAccessRole.INTEGRATION_OPERATOR),
+            actionDescription
+        );
+        requireWorkspaceWarehouseAccess(warehouseCode, actionDescription);
+        return actor;
+    }
+
+    public SynapseActorContext requireHumanIngestion(String actionDescription) {
+        return requireAnyRole(
+            Set.of(SynapseAccessRole.INTEGRATION_ADMIN, SynapseAccessRole.INTEGRATION_OPERATOR),
+            actionDescription
+        );
+    }
+
     public SynapseActorContext requireScenarioExecutor(String warehouseCode, String actionDescription) {
         SynapseActorContext actor = requireAnyRole(
             Set.of(SynapseAccessRole.REVIEW_OWNER, SynapseAccessRole.FINAL_APPROVER),

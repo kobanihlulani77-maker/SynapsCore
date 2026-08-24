@@ -2,6 +2,7 @@ package com.synapsecore;
 
 import static org.springframework.http.MediaType.APPLICATION_JSON;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.multipart;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
@@ -10,12 +11,18 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 import com.synapsecore.access.BootstrapAccessService;
 import com.synapsecore.access.PlatformAdministrationAccessService;
+import com.synapsecore.domain.entity.ScenarioApprovalPolicy;
+import com.synapsecore.domain.entity.ScenarioApprovalStage;
+import com.synapsecore.domain.entity.ScenarioApprovalStatus;
+import com.synapsecore.domain.entity.ScenarioReviewPriority;
 import com.synapsecore.domain.repository.AccessOperatorRepository;
 import com.synapsecore.domain.repository.AccessUserRepository;
 import com.synapsecore.domain.repository.WarehouseRepository;
 import com.synapsecore.domain.repository.ScenarioRunRepository;
 import com.synapsecore.domain.entity.ScenarioRunType;
 import com.synapsecore.config.SynapsePlatformOwnerProperties;
+import java.nio.charset.StandardCharsets;
+import java.time.Instant;
 import java.util.List;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
@@ -24,6 +31,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.mock.web.MockHttpSession;
+import org.springframework.mock.web.MockMultipartFile;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.test.annotation.DirtiesContext;
 import org.springframework.test.web.servlet.MockMvc;
@@ -106,9 +114,13 @@ class PlatformTenantAccessBoundaryIntegrationTest {
         MockHttpSession admin = tenantLogin(REHEARSAL_TENANT, TENANT_ADMIN_USERNAME, TENANT_ADMIN_PASSWORD);
         createRoleUser(admin, "boundary.tenant.admin", "TENANT_ADMIN", List.of());
         createRoleUser(admin, "boundary.review", "REVIEW_OWNER", List.of(warehouseA));
+        createRoleUser(admin, "boundary.review.alt", "REVIEW_OWNER", List.of(warehouseA));
         createRoleUser(admin, "boundary.final", "FINAL_APPROVER", List.of(warehouseA));
+        createRoleUser(admin, "boundary.final.alt", "FINAL_APPROVER", List.of(warehouseA));
         createRoleUser(admin, "boundary.escalation", "ESCALATION_OWNER", List.of(warehouseA));
+        createRoleUser(admin, "boundary.escalation.alt", "ESCALATION_OWNER", List.of(warehouseA));
         createRoleUser(admin, "boundary.integration.admin", "INTEGRATION_ADMIN", List.of(warehouseA));
+        createRoleUser(admin, "boundary.integration.admin.all", "INTEGRATION_ADMIN", List.of());
         createRoleUser(admin, "boundary.integration.operator", "INTEGRATION_OPERATOR", List.of(warehouseA));
 
         mockMvc.perform(post("/api/products")
@@ -120,8 +132,9 @@ class PlatformTenantAccessBoundaryIntegrationTest {
             .andExpect(status().isCreated());
         updateInventory(admin, warehouseA, 12L);
         updateInventory(admin, warehouseB, 24L);
+        MockHttpSession integrationAdmin = tenantLogin(REHEARSAL_TENANT, "boundary.integration.admin.all", ROLE_PASSWORD);
         mockMvc.perform(post("/api/orders")
-                .session(admin)
+                .session(integrationAdmin)
                 .contentType(APPLICATION_JSON)
                 .content(orderPayload("BOUNDARY-WH-B-ORDER", warehouseB)))
             .andExpect(status().isCreated());
@@ -130,6 +143,129 @@ class PlatformTenantAccessBoundaryIntegrationTest {
                 .contentType(APPLICATION_JSON)
                 .content(orderPayload(null, warehouseB)))
             .andExpect(status().isOk());
+    }
+
+    @Test
+    void operationalWriteAuthoritySeparatesSetupIntegrationAndGovernanceResponsibilities() throws Exception {
+        MockHttpSession tenantAdmin = tenantLogin(REHEARSAL_TENANT, "boundary.tenant.admin", ROLE_PASSWORD);
+        MockHttpSession integrationAdmin = tenantLogin(REHEARSAL_TENANT, "boundary.integration.admin", ROLE_PASSWORD);
+        MockHttpSession integrationOperator = tenantLogin(REHEARSAL_TENANT, "boundary.integration.operator", ROLE_PASSWORD);
+        updateInventory(tenantAdmin, warehouseA, 500L);
+
+        for (String username : List.of(
+            "boundary.integration.admin",
+            "boundary.integration.operator",
+            "boundary.review",
+            "boundary.final",
+            "boundary.escalation"
+        )) {
+            MockHttpSession session = tenantLogin(REHEARSAL_TENANT, username, ROLE_PASSWORD);
+            mockMvc.perform(post("/api/inventory/update")
+                    .session(session)
+                    .contentType(APPLICATION_JSON)
+                    .content(inventoryPayload(warehouseA, 33L)))
+                .andExpect(status().isForbidden());
+            mockMvc.perform(post("/api/inventory/receive")
+                    .session(session)
+                    .contentType(APPLICATION_JSON)
+                    .content("{\"productSku\":\"BOUNDARY-SKU\",\"warehouseCode\":\"%s\",\"quantityReceived\":3}".formatted(warehouseA)))
+                .andExpect(status().isForbidden());
+            mockMvc.perform(post("/api/inventory/adjust")
+                    .session(session)
+                    .contentType(APPLICATION_JSON)
+                    .content("{\"productSku\":\"BOUNDARY-SKU\",\"warehouseCode\":\"%s\",\"quantityDelta\":-1,\"reason\":\"Boundary denial\"}".formatted(warehouseA)))
+                .andExpect(status().isForbidden());
+            mockMvc.perform(post("/api/inventory/reconcile")
+                    .session(session)
+                    .contentType(APPLICATION_JSON)
+                    .content("{\"productSku\":\"BOUNDARY-SKU\",\"warehouseCode\":\"%s\",\"countedOnHand\":31,\"note\":\"Boundary denial\"}".formatted(warehouseA)))
+                .andExpect(status().isForbidden());
+        }
+
+        for (String username : List.of(
+            "boundary.tenant.admin",
+            "boundary.review",
+            "boundary.final",
+            "boundary.escalation"
+        )) {
+            MockHttpSession session = tenantLogin(REHEARSAL_TENANT, username, ROLE_PASSWORD);
+            mockMvc.perform(post("/api/orders")
+                    .session(session)
+                    .contentType(APPLICATION_JSON)
+                    .content(orderPayload("BOUNDARY-DENIED-ORDER-" + username.replace(".", "-").toUpperCase(), warehouseA)))
+                .andExpect(status().isForbidden());
+            mockMvc.perform(post("/api/fulfillment/updates")
+                    .session(session)
+                    .contentType(APPLICATION_JSON)
+                    .content("{\"externalOrderId\":\"BOUNDARY-WH-B-ORDER\",\"status\":\"PICKING\"}"))
+                .andExpect(status().isForbidden());
+        }
+
+        mockMvc.perform(post("/api/orders")
+                .session(integrationAdmin)
+                .contentType(APPLICATION_JSON)
+                .content(orderPayload("BOUNDARY-INTEGRATION-ORDER", warehouseA)))
+            .andExpect(status().isCreated());
+        mockMvc.perform(post("/api/orders/BOUNDARY-INTEGRATION-ORDER/transition")
+                .session(integrationOperator)
+                .contentType(APPLICATION_JSON)
+                .content("{\"status\":\"PROCESSING\",\"note\":\"Boundary allowed integration transition\",\"restockInventory\":false}"))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.status").value("PROCESSING"));
+        mockMvc.perform(post("/api/fulfillment/updates")
+                .session(integrationOperator)
+                .contentType(APPLICATION_JSON)
+                .content("{\"externalOrderId\":\"BOUNDARY-INTEGRATION-ORDER\",\"status\":\"PICKING\"}"))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.fulfillmentStatus").value("PICKING"));
+    }
+
+    @Test
+    void humanSessionIngestionRequiresIntegrationResponsibility() throws Exception {
+        MockHttpSession integrationAdmin = tenantLogin(REHEARSAL_TENANT, "boundary.integration.admin", ROLE_PASSWORD);
+        updateInventory(tenantLogin(REHEARSAL_TENANT, "boundary.tenant.admin", ROLE_PASSWORD), warehouseA, 500L);
+        mockMvc.perform(post("/api/integrations/orders/connectors")
+                .session(integrationAdmin)
+                .contentType(APPLICATION_JSON)
+                .content(enabledConnectorPayload("boundary_ingestion_allowed", "WEBHOOK_ORDER")))
+            .andExpect(status().isOk());
+        mockMvc.perform(post("/api/integrations/orders/connectors")
+                .session(integrationAdmin)
+                .contentType(APPLICATION_JSON)
+                .content(enabledConnectorPayload("boundary_csv_allowed", "CSV_ORDER_IMPORT")))
+            .andExpect(status().isOk());
+
+        for (String username : List.of(
+            "boundary.tenant.admin",
+            "boundary.review",
+            "boundary.final",
+            "boundary.escalation"
+        )) {
+            MockHttpSession session = tenantLogin(REHEARSAL_TENANT, username, ROLE_PASSWORD);
+            mockMvc.perform(post("/api/integrations/orders/webhook")
+                    .session(session)
+                    .contentType(APPLICATION_JSON)
+                    .content(webhookPayload("boundary_ingestion_allowed", "BOUNDARY-WEBHOOK-DENIED-" + username.replace(".", "-").toUpperCase())))
+                .andExpect(status().isForbidden());
+            mockMvc.perform(multipart("/api/integrations/orders/csv-import")
+                    .file(csvFile("BOUNDARY-CSV-DENIED-" + username.replace(".", "-").toUpperCase(), "boundary_csv_allowed"))
+                    .param("sourceSystem", "boundary_csv_allowed")
+                    .session(session))
+                .andExpect(status().isForbidden());
+        }
+
+        mockMvc.perform(post("/api/integrations/orders/webhook")
+                .session(integrationAdmin)
+                .contentType(APPLICATION_JSON)
+                .content(webhookPayload("boundary_ingestion_allowed", "BOUNDARY-WEBHOOK-ALLOWED")))
+            .andExpect(status().isCreated());
+        MockHttpSession integrationOperator = tenantLogin(REHEARSAL_TENANT, "boundary.integration.operator", ROLE_PASSWORD);
+        mockMvc.perform(multipart("/api/integrations/orders/csv-import")
+                .file(csvFile("BOUNDARY-CSV-ALLOWED", "boundary_csv_allowed"))
+                .param("sourceSystem", "boundary_csv_allowed")
+                .session(integrationOperator))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.ordersImported").value(1));
     }
 
     @Test
@@ -305,7 +441,7 @@ class PlatformTenantAccessBoundaryIntegrationTest {
     }
 
     @Test
-    void scenarioExecutionRequiresGovernanceRoleAndWarehouseScope() throws Exception {
+    void scenarioGovernanceEnforcesAssignmentsAndApprovedSavedPlanExecution() throws Exception {
         MockHttpSession tenantAdmin = tenantLogin(REHEARSAL_TENANT, "boundary.tenant.admin", ROLE_PASSWORD);
         mockMvc.perform(post("/api/scenarios/order-impact")
                 .session(tenantAdmin)
@@ -333,25 +469,124 @@ class PlatformTenantAccessBoundaryIntegrationTest {
 
         MockHttpSession reviewOwner = tenantLogin(REHEARSAL_TENANT, "boundary.review", ROLE_PASSWORD);
         mockMvc.perform(post("/api/scenarios/" + reviewScenarioId + "/execute").session(reviewOwner))
-            .andExpect(status().isOk())
-            .andExpect(jsonPath("$.order.warehouseCode").value(warehouseA));
-
-        mockMvc.perform(post("/api/scenarios/order-impact")
-                .session(tenantAdmin)
-                .contentType(APPLICATION_JSON)
-                .content(orderPayload(null, warehouseA)))
-            .andExpect(status().isOk());
-        long finalScenarioId = scenarioRunRepository.findTop12ByOrderByCreatedAtDesc().stream()
-            .filter(run -> run.getType() == ScenarioRunType.PREVIEW)
-            .filter(run -> warehouseA.equalsIgnoreCase(run.getWarehouseCode()))
-            .findFirst()
-            .orElseThrow()
-            .getId();
+            .andExpect(status().isBadRequest())
+            .andExpect(jsonPath("$.message").value(org.hamcrest.Matchers.containsString("Only approved saved plans")));
 
         MockHttpSession finalApprover = tenantLogin(REHEARSAL_TENANT, "boundary.final", ROLE_PASSWORD);
-        mockMvc.perform(post("/api/scenarios/" + finalScenarioId + "/execute").session(finalApprover))
+        mockMvc.perform(post("/api/scenarios/" + reviewScenarioId + "/execute").session(finalApprover))
+            .andExpect(status().isBadRequest())
+            .andExpect(jsonPath("$.message").value(org.hamcrest.Matchers.containsString("Only approved saved plans")));
+
+        long assignedStandardPlanId = saveStandardScenarioPlan(
+            tenantAdmin,
+            "Boundary assigned standard approval",
+            "boundary.review",
+            warehouseA
+        );
+        MockHttpSession alternateReviewOwner = tenantLogin(REHEARSAL_TENANT, "boundary.review.alt", ROLE_PASSWORD);
+        mockMvc.perform(post("/api/scenarios/" + assignedStandardPlanId + "/approve")
+                .session(alternateReviewOwner)
+                .contentType(APPLICATION_JSON)
+                .content("{\"actorRole\":\"REVIEW_OWNER\",\"approverName\":\"boundary.review.alt\",\"approvalNote\":\"Wrong owner should fail\"}"))
+            .andExpect(status().isBadRequest())
+            .andExpect(jsonPath("$.message").value(org.hamcrest.Matchers.containsString("assigned review owner")));
+        mockMvc.perform(post("/api/scenarios/" + assignedStandardPlanId + "/approve")
+                .session(reviewOwner)
+                .contentType(APPLICATION_JSON)
+                .content("{\"actorRole\":\"REVIEW_OWNER\",\"approverName\":\"boundary.review\",\"approvalNote\":\"Assigned owner approves\"}"))
+            .andExpect(status().isOk());
+        mockMvc.perform(post("/api/scenarios/" + assignedStandardPlanId + "/execute").session(reviewOwner))
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.order.warehouseCode").value(warehouseA));
+
+        long rejectedPlanId = saveStandardScenarioPlan(
+            tenantAdmin,
+            "Boundary assigned standard rejection",
+            "boundary.review",
+            warehouseA
+        );
+        mockMvc.perform(post("/api/scenarios/" + rejectedPlanId + "/reject")
+                .session(alternateReviewOwner)
+                .contentType(APPLICATION_JSON)
+                .content("{\"actorRole\":\"REVIEW_OWNER\",\"reviewerName\":\"boundary.review.alt\",\"reason\":\"Wrong owner should fail\"}"))
+            .andExpect(status().isBadRequest())
+            .andExpect(jsonPath("$.message").value(org.hamcrest.Matchers.containsString("assigned review owner")));
+        mockMvc.perform(post("/api/scenarios/" + rejectedPlanId + "/reject")
+                .session(reviewOwner)
+                .contentType(APPLICATION_JSON)
+                .content("{\"actorRole\":\"REVIEW_OWNER\",\"reviewerName\":\"boundary.review\",\"reason\":\"Assigned owner rejects\"}"))
+            .andExpect(status().isOk());
+
+        long escalatedPlanId = saveStandardScenarioPlan(
+            tenantAdmin,
+            "Boundary final approval assignment",
+            "boundary.review",
+            warehouseA
+        );
+        var escalatedRun = scenarioRunRepository.findById(escalatedPlanId).orElseThrow();
+        escalatedRun.setApprovalPolicy(ScenarioApprovalPolicy.ESCALATED);
+        escalatedRun.setApprovalStage(ScenarioApprovalStage.PENDING_FINAL_APPROVAL);
+        escalatedRun.setApprovalStatus(ScenarioApprovalStatus.PENDING_APPROVAL);
+        escalatedRun.setReviewApprovedBy("boundary.review");
+        escalatedRun.setReviewApprovedAt(Instant.now());
+        escalatedRun.setFinalApprovalOwner("boundary.final");
+        escalatedRun.setApprovalDueAt(Instant.now().plusSeconds(3600));
+        scenarioRunRepository.save(escalatedRun);
+
+        MockHttpSession alternateFinalApprover = tenantLogin(REHEARSAL_TENANT, "boundary.final.alt", ROLE_PASSWORD);
+        mockMvc.perform(post("/api/scenarios/" + escalatedPlanId + "/approve")
+                .session(alternateFinalApprover)
+                .contentType(APPLICATION_JSON)
+                .content("{\"actorRole\":\"FINAL_APPROVER\",\"approverName\":\"boundary.final.alt\",\"approvalNote\":\"Wrong final owner should fail\"}"))
+            .andExpect(status().isBadRequest())
+            .andExpect(jsonPath("$.message").value(org.hamcrest.Matchers.containsString("assigned final approval owner")));
+        mockMvc.perform(post("/api/scenarios/" + escalatedPlanId + "/approve")
+                .session(finalApprover)
+                .contentType(APPLICATION_JSON)
+                .content("{\"actorRole\":\"FINAL_APPROVER\",\"approverName\":\"boundary.final\",\"approvalNote\":\"Assigned final owner approves\"}"))
+            .andExpect(status().isOk());
+        mockMvc.perform(post("/api/scenarios/" + escalatedPlanId + "/execute").session(finalApprover))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.order.warehouseCode").value(warehouseA));
+    }
+
+    @Test
+    void escalationAcknowledgementRequiresAssignedEscalationOwner() throws Exception {
+        MockHttpSession tenantAdmin = tenantLogin(REHEARSAL_TENANT, "boundary.tenant.admin", ROLE_PASSWORD);
+        long escalatedPlanId = saveStandardScenarioPlan(
+            tenantAdmin,
+            "Boundary assigned escalation acknowledgement",
+            "boundary.review",
+            warehouseA
+        );
+        var escalatedRun = scenarioRunRepository.findById(escalatedPlanId).orElseThrow();
+        escalatedRun.setApprovalPolicy(ScenarioApprovalPolicy.ESCALATED);
+        escalatedRun.setApprovalStage(ScenarioApprovalStage.PENDING_FINAL_APPROVAL);
+        escalatedRun.setApprovalStatus(ScenarioApprovalStatus.PENDING_APPROVAL);
+        escalatedRun.setReviewApprovedBy("boundary.review");
+        escalatedRun.setReviewApprovedAt(Instant.now());
+        escalatedRun.setFinalApprovalOwner("boundary.final");
+        escalatedRun.setReviewPriority(ScenarioReviewPriority.HIGH);
+        escalatedRun.setApprovalDueAt(Instant.now().minusSeconds(3600));
+        escalatedRun.setSlaEscalatedTo("boundary.escalation");
+        escalatedRun.setSlaEscalatedAt(Instant.now().minusSeconds(60));
+        scenarioRunRepository.save(escalatedRun);
+
+        MockHttpSession alternateEscalationOwner = tenantLogin(REHEARSAL_TENANT, "boundary.escalation.alt", ROLE_PASSWORD);
+        mockMvc.perform(post("/api/scenarios/" + escalatedPlanId + "/acknowledge-escalation")
+                .session(alternateEscalationOwner)
+                .contentType(APPLICATION_JSON)
+                .content("{\"actorRole\":\"ESCALATION_OWNER\",\"acknowledgedBy\":\"boundary.escalation.alt\",\"note\":\"Wrong owner should fail\"}"))
+            .andExpect(status().isBadRequest())
+            .andExpect(jsonPath("$.message").value(org.hamcrest.Matchers.containsString("assigned escalation owner")));
+
+        MockHttpSession escalationOwner = tenantLogin(REHEARSAL_TENANT, "boundary.escalation", ROLE_PASSWORD);
+        mockMvc.perform(post("/api/scenarios/" + escalatedPlanId + "/acknowledge-escalation")
+                .session(escalationOwner)
+                .contentType(APPLICATION_JSON)
+                .content("{\"actorRole\":\"ESCALATION_OWNER\",\"acknowledgedBy\":\"boundary.escalation\",\"note\":\"Assigned owner acknowledges\"}"))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.slaAcknowledgedBy").value("boundary.escalation"));
     }
 
     @Test
@@ -698,6 +933,27 @@ class PlatformTenantAccessBoundaryIntegrationTest {
             .andExpect(status().isOk());
     }
 
+    private long saveStandardScenarioPlan(MockHttpSession session,
+                                          String title,
+                                          String reviewOwner,
+                                          String warehouseCode) throws Exception {
+        mockMvc.perform(post("/api/scenarios/save")
+                .session(session)
+                .contentType(APPLICATION_JSON)
+                .content("""
+                    {"title":"%s","requestedBy":"boundary.tenant.admin","reviewOwner":"%s","request":{"warehouseCode":"%s","items":[{"productSku":"BOUNDARY-SKU","quantity":1,"unitPrice":10.00}]}}
+                    """.formatted(title, reviewOwner, warehouseCode)))
+            .andExpect(status().isCreated())
+            .andExpect(jsonPath("$.title").value(title))
+            .andExpect(jsonPath("$.reviewOwner").value(reviewOwner));
+        return scenarioRunRepository.findTop12ByOrderByCreatedAtDesc().stream()
+            .filter(run -> run.getType() == ScenarioRunType.SAVED_PLAN)
+            .filter(run -> title.equals(run.getTitle()))
+            .findFirst()
+            .orElseThrow()
+            .getId();
+    }
+
     private String tenantPayload(String tenantCode, String tenantName, String username, String password) {
         return """
             {"tenantCode":"%s","tenantName":"%s","description":"Synthetic access-boundary rehearsal.","adminFullName":"Boundary Administrator","adminUsername":"%s","adminPassword":"%s","primaryLocation":"Boundary Warehouse A","secondaryLocation":"Boundary Warehouse B"}
@@ -729,6 +985,47 @@ class PlatformTenantAccessBoundaryIntegrationTest {
               "notes":"Synthetic role boundary verification."
             }
             """.formatted(sourceSystem, warehouseA);
+    }
+
+    private String enabledConnectorPayload(String sourceSystem, String type) {
+        return """
+            {
+              "sourceSystem":"%s",
+              "type":"%s",
+              "displayName":"Boundary Ingestion Connector",
+              "enabled":true,
+              "syncMode":"BATCH_FILE_DROP",
+              "validationPolicy":"RELAXED",
+              "transformationPolicy":"NORMALIZE_CODES",
+              "allowDefaultWarehouseFallback":false,
+              "defaultWarehouseCode":"%s",
+              "notes":"Synthetic ingestion authority verification."
+            }
+            """.formatted(sourceSystem, type, warehouseA);
+    }
+
+    private String webhookPayload(String sourceSystem, String externalOrderId) {
+        return """
+            {
+              "sourceSystem":"%s",
+              "externalOrderId":"%s",
+              "warehouseCode":"%s",
+              "customerReference":"BOUNDARY-CUSTOMER",
+              "occurredAt":"2026-08-22T10:00:00Z",
+              "items":[{"productSku":"BOUNDARY-SKU","quantity":1,"unitPrice":10.00}]
+            }
+            """.formatted(sourceSystem, externalOrderId, warehouseA);
+    }
+
+    private MockMultipartFile csvFile(String externalOrderId, String sourceSystem) {
+        String csv = "sourceSystem,externalOrderId,warehouseCode,productSku,quantity,unitPrice\n"
+            + sourceSystem + "," + externalOrderId + "," + warehouseA + ",BOUNDARY-SKU,1,10.00\n";
+        return new MockMultipartFile(
+            "file",
+            "orders.csv",
+            "text/csv",
+            csv.getBytes(StandardCharsets.UTF_8)
+        );
     }
 
     private String orderPayload(String externalOrderId, String warehouseCode) {

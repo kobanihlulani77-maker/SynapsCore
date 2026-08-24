@@ -8,8 +8,9 @@ Current gate status:
 
 - dedicated platform-owner configuration and sign-in are live on Render;
 - the platform-owner and all six single-role tenant identities were exercised through the rendered UI and direct APIs on 2026-08-22;
-- scenario execution now requires `REVIEW_OWNER` or `FINAL_APPROVER` plus warehouse scope, and role-aware navigation, search, and top-bar actions share one policy;
-- backend verification passes `149/149`; frontend lint, build, and verify pass;
+- scenario execution now requires an approved `SAVED_PLAN` with stored request payload plus `REVIEW_OWNER` or `FINAL_APPROVER` authority and warehouse scope;
+- inventory, order, fulfillment, ingestion, replay, and governance write boundaries are role-specific and backend enforced;
+- backend verification passes `152/152`; frontend lint, build, and verify pass;
 - Critical blockers: `0`; High blockers: `0`;
 - the gate is technically complete with the documented disabled-webhook replay limitation below. Phase 10 remains stopped until the gate owner accepts this record.
 
@@ -179,14 +180,34 @@ All roles require an authenticated tenant session. All data remains tenant-scope
 
 | Role | Primary reads/pages | Protected writes/high-impact actions | Expected denials |
 | --- | --- | --- | --- |
-| `TENANT_ADMIN` | All common workspace pages; Users; Company Settings | Manage tenant operators/users, passwords, workspace/security policy, warehouse metadata, connector support ownership, operational policy, product create/update/import | Platform APIs, global tenant directory without platform authority, unrelated tenant mutation; integration/governance actions unless separately assigned |
-| `REVIEW_OWNER` | Common workspace pages; Approvals | Assigned review-stage approve/reject for in-scope scenarios | Tenant administration, platform control plane, final approval, escalation acknowledgement, connector management |
-| `FINAL_APPROVER` | Common workspace pages; Approvals | Assigned final-stage approve/reject for in-scope scenarios | Tenant administration, platform control plane, review-stage substitution, escalation acknowledgement, connector management |
-| `ESCALATION_OWNER` | Common workspace pages; Escalations | Acknowledge assigned in-scope SLA escalations | Tenant administration, platform control plane, approval substitution, connector management |
-| `INTEGRATION_ADMIN` | Common workspace pages; Integrations; Replay | Create/update connector policy; perform replay actions allowed to integration operators | Tenant administration, platform control plane, governance actions unless separately assigned |
-| `INTEGRATION_OPERATOR` | Common workspace pages; Integrations; Replay | Replay failed inbound work in assigned warehouse scope | Connector management, tenant administration, platform control plane, governance actions unless separately assigned |
+| `TENANT_ADMIN` | All common workspace pages; Users; Company Settings | Manage tenant operators/users, passwords, workspace/security policy, warehouse metadata, connector support ownership, operational policy, product create/update/import, inventory update/receive/adjust/reconcile | Platform APIs, global tenant directory without platform authority, direct order/fulfillment writes, human-session ingestion, integration/replay detail, governance actions unless separately assigned |
+| `REVIEW_OWNER` | Common workspace pages; Approvals | Assigned review-stage approve/reject for in-scope scenarios; execute only approved saved plans with stored request payloads | Tenant administration, platform control plane, final approval, escalation acknowledgement, connector management, inventory/order/fulfillment/ingestion writes |
+| `FINAL_APPROVER` | Common workspace pages; Approvals | Assigned final-stage approve/reject for in-scope scenarios; execute only approved saved plans with stored request payloads | Tenant administration, platform control plane, review-stage substitution, escalation acknowledgement, connector management, inventory/order/fulfillment/ingestion writes |
+| `ESCALATION_OWNER` | Common workspace pages; Escalations | Acknowledge assigned in-scope SLA escalations | Tenant administration, platform control plane, approval substitution, connector management, inventory/order/fulfillment/ingestion writes, scenario execution by this role alone |
+| `INTEGRATION_ADMIN` | Common workspace pages; Integrations; Replay | Create/update connector policy; human-session webhook/CSV ingestion; direct operational order and fulfillment writes; perform replay actions allowed to integration operators | Tenant administration, platform control plane, governance actions unless separately assigned, inventory maintenance writes |
+| `INTEGRATION_OPERATOR` | Common workspace pages; Integrations; Replay | Human-session webhook/CSV ingestion; direct operational order and fulfillment writes; replay failed inbound work in assigned warehouse scope | Connector management, tenant administration, platform control plane, governance actions unless separately assigned, inventory maintenance writes |
 
 Common workspace pages are Dashboard, Alerts, Recommendations, Orders, Inventory, Catalog, Locations, Fulfillment, Scenarios, Scenario History, Runtime, Audit, and Profile. Catalog reads are common; catalog writes are tenant-admin only.
+
+### State-changing authority boundary
+
+The pilot build deliberately separates setup, integration, and governance mutation paths:
+
+| Operation family | Required authority | Additional boundary |
+| --- | --- | --- |
+| Product/catalog create, update, and import | `TENANT_ADMIN` | Tenant scope |
+| Inventory update, receive, adjust, reconcile | `TENANT_ADMIN` | Tenant and warehouse scope |
+| Direct order creation and order transition | `INTEGRATION_ADMIN` or `INTEGRATION_OPERATOR` | Tenant and warehouse scope |
+| Fulfillment status update | `INTEGRATION_ADMIN` or `INTEGRATION_OPERATOR` | Tenant and warehouse scope |
+| Human-session webhook or CSV ingestion | `INTEGRATION_ADMIN` or `INTEGRATION_OPERATOR` | Tenant and connector policy |
+| Connector create/update | `INTEGRATION_ADMIN` | Tenant scope and connector policy |
+| Manual replay | `INTEGRATION_ADMIN` or `INTEGRATION_OPERATOR` | Tenant, connector, warehouse, duplicate, and eligibility checks |
+| Standard review approve/reject | Assigned `REVIEW_OWNER` | Scenario assignment, stage, tenant, and warehouse scope |
+| Final approval approve/reject | Assigned `FINAL_APPROVER` | Scenario assignment, stage, tenant, and warehouse scope |
+| Escalation acknowledgement | Assigned `ESCALATION_OWNER` | Scenario assignment, escalation state, tenant, and warehouse scope |
+| Scenario execution | `REVIEW_OWNER` or `FINAL_APPROVER` | Only approved `SAVED_PLAN` records with stored request payloads; `PREVIEW` records are loadable but not executable |
+
+Hidden navigation is not accepted as proof. The backend denies wrong-role, wrong-actor, wrong-stage, wrong-warehouse, and wrong-tenant attempts directly.
 
 ### Integration and replay read matrix
 

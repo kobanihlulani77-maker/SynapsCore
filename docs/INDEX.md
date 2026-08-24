@@ -125,6 +125,7 @@ This index links the main product, architecture, runbook, proof, and operator do
 ## Security / Trust
 
 - [platform-control-plane-access-boundary.md](platform-control-plane-access-boundary.md)
+- [role-authority-hardening-gate.md](role-authority-hardening-gate.md)
 - [templates/platform-tenant-access-boundary-record.md](templates/platform-tenant-access-boundary-record.md)
 - [security-and-trust-model.md](security-and-trust-model.md)
 - [security-test-plan.md](security-test-plan.md)
@@ -283,6 +284,7 @@ This index links the main product, architecture, runbook, proof, and operator do
 ## Hosted Proof And Verification
 
 - [hosted-proof.md](hosted-proof.md)
+- [role-authority-hardening-gate.md](role-authority-hardening-gate.md)
 - [proof-and-validation.md](proof-and-validation.md)
 - [performance-scale-proof.md](performance-scale-proof.md)
 - [pre-pilot-gate-4-control-verification.md](pre-pilot-gate-4-control-verification.md)

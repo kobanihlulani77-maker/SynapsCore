@@ -244,6 +244,7 @@ public class ScenarioHistoryService {
             if (run.getApprovalPolicy() == ScenarioApprovalPolicy.ESCALATED) {
                 run = processEscalatedApproval(run, trimmedApproverName, approvalNote);
             } else {
+                requireAssignedReviewOwner(run, trimmedApproverName, "approve");
                 run.setApprovalStatus(ScenarioApprovalStatus.APPROVED);
                 run.setApprovalStage(ScenarioApprovalStage.APPROVED);
                 run.setApprovedBy(trimmedApproverName);
@@ -298,8 +299,7 @@ public class ScenarioHistoryService {
             accessControlService.requireScenarioActor(request.actorRole(), reviewerName, "reject scenario plans");
             requireActorRole(run.getId(), "reject this scenario", request.actorRole(), requiredRole);
             requireWarehouseAccess(reviewerName, run.getWarehouseCode(), "reject scenario plans");
-            if (run.getApprovalPolicy() == ScenarioApprovalPolicy.ESCALATED
-                && requiredRole == ScenarioActorRole.REVIEW_OWNER) {
+            if (requiredRole == ScenarioActorRole.REVIEW_OWNER) {
                 requireAssignedReviewOwner(run, reviewerName, "reject");
             }
             if (requiredRole == ScenarioActorRole.FINAL_APPROVER) {
@@ -354,6 +354,7 @@ public class ScenarioHistoryService {
         String acknowledgedBy = request.acknowledgedBy().trim();
         accessControlService.requireScenarioActor(request.actorRole(), acknowledgedBy, "acknowledge escalated scenario plans");
         requireWarehouseAccess(acknowledgedBy, run.getWarehouseCode(), "acknowledge escalated scenario plans");
+        requireAssignedEscalationOwner(run, acknowledgedBy, "acknowledge");
         if (isSlaAcknowledged(run)) {
             if (run.getSlaAcknowledgedBy() != null && run.getSlaAcknowledgedBy().equalsIgnoreCase(acknowledgedBy)) {
                 return toScenarioRunResponse(run);
@@ -379,7 +380,7 @@ public class ScenarioHistoryService {
     public OrderCreateRequest getExecutableOrderRequest(ScenarioRun run) {
         if (!isExecutable(run) || run.getRequestPayload() == null || run.getRequestPayload().isBlank()) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
-                "Scenario " + run.getId() + " cannot be executed. Only preview scenarios and approved saved plans with stored request payloads are executable.");
+                "Scenario " + run.getId() + " cannot be executed. Only approved saved plans with stored request payloads are executable.");
         }
 
         return deserializeOrderRequest(run, "executed");
@@ -469,9 +470,6 @@ public class ScenarioHistoryService {
     }
 
     private boolean isExecutable(ScenarioRun run) {
-        if (run.getType() == ScenarioRunType.PREVIEW) {
-            return true;
-        }
         return run.getType() == ScenarioRunType.SAVED_PLAN && run.getApprovalStatus() == ScenarioApprovalStatus.APPROVED;
     }
 
@@ -895,6 +893,14 @@ public class ScenarioHistoryService {
             && !run.getFinalApprovalOwner().equalsIgnoreCase(actorName)) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
                 "Scenario " + run.getId() + " requires the assigned final approval owner to " + actionLabel + " this plan.");
+        }
+    }
+
+    private void requireAssignedEscalationOwner(ScenarioRun run, String actorName, String actionLabel) {
+        if (run.getSlaEscalatedTo() != null && !run.getSlaEscalatedTo().isBlank()
+            && !run.getSlaEscalatedTo().equalsIgnoreCase(actorName)) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                "Scenario " + run.getId() + " requires the assigned escalation owner to " + actionLabel + " this escalation.");
         }
     }
 

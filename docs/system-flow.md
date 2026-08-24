@@ -880,11 +880,12 @@ General workspace operators can:
 
 - view dashboard summary and snapshot
 - view alerts, recommendations, orders, inventory, runtime, incidents, recent events, and recent audit history
-- perform basic operational actions that require workspace access rather than elevated admin roles
+- perform only actions allowed by their assigned role and warehouse scope
 
 Primary path:
 
 - `AccessControlService.requireWorkspaceAccess(...)`
+- role-specific write gates for inventory, operational writes, ingestion, replay, and governance
 - `DashboardController`
 - `InventoryController`
 - `OrderController`
@@ -910,33 +911,38 @@ Primary path:
 
 Review owners can:
 
-- approve review-stage plans
-- reject plans with reasons
+- approve assigned review-stage plans
+- reject assigned review-stage plans with reasons
 - move escalated plans into final approval
+- execute only approved saved plans with stored request payloads
 
 Primary path:
 
 - `ScenarioController.approveScenarioPlan(...)`
 - `AccessControlService.requireScenarioActor(REVIEW_OWNER, ...)`
 - `ScenarioHistoryService.approvePlan(...)`
+- `ScenarioHistoryService.executeScenario(...)`
 
 #### Final approver
 
 Final approvers can:
 
-- approve escalated plans that require a higher governance lane
+- approve assigned escalated plans that require a higher governance lane
+- reject assigned final-stage plans when required
+- execute only approved saved plans with stored request payloads
 
 Primary path:
 
 - `ScenarioController.approveScenarioPlan(...)`
 - `AccessControlService.requireScenarioActor(FINAL_APPROVER, ...)`
 - `ScenarioHistoryService.approvePlan(...)`
+- `ScenarioHistoryService.executeScenario(...)`
 
 #### Escalation owner
 
 Escalation owners can:
 
-- acknowledge SLA escalations
+- acknowledge assigned SLA escalations
 - keep overdue review flows visible until resolved
 
 Primary path:
@@ -951,11 +957,16 @@ Integration admins can:
 - create or update connectors
 - manage connector visibility and support ownership
 - control whether a connector is enabled for live ingestion
+- perform human-session webhook and CSV ingestion
+- perform direct operational order and fulfillment writes within scope
+- replay eligible failed inbound work
 
 Primary path:
 
 - `ExternalOrderWebhookController.saveConnector(...)`
 - `AccessControlService.requireIntegrationAdmin(...)`
+- `AccessControlService.requireHumanIngestion(...)`
+- `AccessControlService.requireOperationalWrite(...)`
 - `IntegrationConnectorService.upsertConnector(...)`
 
 #### Integration operator
@@ -963,10 +974,14 @@ Primary path:
 Integration operators can:
 
 - inspect replay queues
+- perform human-session webhook and CSV ingestion
+- perform direct operational order and fulfillment writes within scope
 - manually replay eligible failed inbound work
 
 Primary path:
 
+- `AccessControlService.requireHumanIngestion(...)`
+- `AccessControlService.requireOperationalWrite(...)`
 - `ExternalOrderWebhookController.getReplayQueue(...)`
 - `ExternalOrderWebhookController.replayFailedOrder(...)`
 - `IntegrationReplayService.getReplayQueue(...)`
@@ -1541,7 +1556,8 @@ It shows the primary request chains and where truth is stored or fanned out.
 - standard policy -> review owner can approve directly
 - escalated policy -> review owner advances to final approval
 - rejected plan -> execution stops; planner must resubmit
-- approved plan -> executable live order path
+- approved saved plan with stored request payload -> executable live order path
+- preview -> loadable planning evidence only, not executable
 
 **User-visible result**
 

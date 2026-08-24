@@ -236,6 +236,13 @@ This pattern powers:
 - scenario planning and execution
 - runtime and incident views
 
+The current authority split is deliberate:
+
+- `TENANT_ADMIN` owns tenant setup, catalog, configuration, and inventory maintenance writes
+- `INTEGRATION_ADMIN` and `INTEGRATION_OPERATOR` own human-session ingestion, direct operational order/fulfillment writes, and replay within scope
+- `REVIEW_OWNER`, `FINAL_APPROVER`, and `ESCALATION_OWNER` own assigned governance decisions only
+- scenario execution is limited to approved saved plans with stored request payloads; previews are not executable live-order commands
+
 ## Product / Catalog APIs
 
 Catalog ownership lives in product and warehouse surfaces.
@@ -262,6 +269,8 @@ Inventory responsibilities:
 - trigger low-stock and depletion logic
 - refresh downstream alerts/recommendations/runtime signals
 
+Inventory mutation requires `TENANT_ADMIN` plus tenant and warehouse scope.
+
 ## Orders APIs
 
 Representative order surfaces:
@@ -277,6 +286,8 @@ Order responsibilities:
 - reduce inventory
 - refresh alerts/recommendations
 - record business events and audit signals
+
+Direct order mutation requires `INTEGRATION_ADMIN` or `INTEGRATION_OPERATOR` plus tenant and warehouse scope.
 
 ## Integration Connector APIs
 
@@ -294,6 +305,8 @@ Connector truths:
 - connectors can be enabled/disabled
 - connector health and limitations are operator-visible
 - connector scope is intentionally narrow today
+
+Human-session webhook and CSV ingestion require `INTEGRATION_ADMIN` or `INTEGRATION_OPERATOR`. Connector-token ingestion remains available for trusted external sources.
 
 ## CSV Import
 
@@ -318,6 +331,7 @@ Representative surface:
 Important proof truth:
 
 - manual replay must remain intentional and observable
+- manual replay requires `INTEGRATION_ADMIN` or `INTEGRATION_OPERATOR` and remains bounded by tenant, connector, warehouse, duplicate, and eligibility checks
 
 ## Scenario APIs
 
@@ -339,6 +353,8 @@ Representative scenario surfaces:
 - `/api/scenarios/{scenarioRunId}/approve`
 - `/api/scenarios/{scenarioRunId}/reject`
 - `/api/scenarios/{scenarioRunId}/execute`
+
+Scenario governance enforces actor assignment. Standard review decisions require the assigned `REVIEW_OWNER`, final decisions require the assigned `FINAL_APPROVER`, escalation acknowledgement requires the assigned `ESCALATION_OWNER`, and execution requires an approved saved plan.
 
 ## Runtime / Health APIs
 

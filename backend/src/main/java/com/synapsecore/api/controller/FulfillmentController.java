@@ -32,7 +32,7 @@ public class FulfillmentController {
     @PostMapping("/updates")
     @ResponseStatus(HttpStatus.OK)
     public FulfillmentStatusResponse recordUpdate(@Valid @RequestBody FulfillmentUpdateRequest request) {
-        accessControlService.requireWorkspaceWarehouseAccess(
+        accessControlService.requireOperationalWrite(
             fulfillmentService.getOrderWarehouseCode(request.externalOrderId()),
             "record fulfillment updates"
         );

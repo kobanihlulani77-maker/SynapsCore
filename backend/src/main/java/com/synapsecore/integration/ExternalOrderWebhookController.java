@@ -49,7 +49,7 @@ public class ExternalOrderWebhookController {
             "accept webhook orders"
         );
         if (authenticatedConnector.isEmpty()) {
-            accessControlService.requireWorkspaceAccess("ingest webhook orders");
+            accessControlService.requireHumanIngestion("ingest webhook orders");
         }
         return externalOrderWebhookService.ingest(request, authenticatedConnector.orElse(null));
     }
@@ -73,7 +73,7 @@ public class ExternalOrderWebhookController {
             "accept CSV imports"
         );
         if (authenticatedConnector.isEmpty()) {
-            accessControlService.requireWorkspaceAccess("import CSV orders");
+            accessControlService.requireHumanIngestion("import CSV orders");
         }
         return externalOrderCsvImportService.ingest(file, sourceSystem, authenticatedConnector.orElse(null));
     }

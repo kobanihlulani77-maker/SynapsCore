@@ -41,14 +41,25 @@ import com.synapsecore.domain.repository.TenantRepository;
 import com.synapsecore.domain.repository.WarehouseRepository;
 import com.synapsecore.domain.service.SeedService;
 import com.synapsecore.event.OperationalUpdateType;
+import jakarta.servlet.FilterChain;
+import jakarta.servlet.ServletException;
+import jakarta.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpServletRequestWrapper;
+import jakarta.servlet.http.HttpServletResponse;
 import jakarta.persistence.EntityManager;
+import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.time.Instant;
 import java.time.Duration;
+import java.util.Collections;
+import java.util.Enumeration;
+import java.util.LinkedHashSet;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.boot.test.context.TestConfiguration;
+import org.springframework.context.annotation.Bean;
 import org.springframework.http.MediaType;
 import org.springframework.mock.web.MockMultipartFile;
 import org.springframework.mock.web.MockHttpSession;
@@ -58,6 +69,7 @@ import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.request.RequestPostProcessor;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.filter.OncePerRequestFilter;
 import org.springframework.web.context.request.RequestContextHolder;
 
 @SpringBootTest
@@ -67,6 +79,7 @@ import org.springframework.web.context.request.RequestContextHolder;
 class MvpFlowIntegrationTest {
 
     private static final String TEST_PLATFORM_ADMIN_TOKEN = "test-only-platform-admin-token";
+    private static final String STARTER_TENANT = "STARTER-OPS";
 
     @Autowired
     private MockMvc mockMvc;
@@ -1049,7 +1062,7 @@ class MvpFlowIntegrationTest {
             .andExpect(jsonPath("$[1].type").value("PREVIEW"))
             .andExpect(jsonPath("$[1].warehouseCode").value("WH-NORTH"))
             .andExpect(jsonPath("$[1].loadable").value(true))
-            .andExpect(jsonPath("$[1].executable").value(true))
+            .andExpect(jsonPath("$[1].executable").value(false))
             .andExpect(jsonPath("$[1].approvalStatus").value("NOT_REQUIRED"))
             .andExpect(jsonPath("$[1].title").value(org.hamcrest.Matchers.containsString("WH-NORTH")))
             .andExpect(jsonPath("$[1].summary").exists())
@@ -1061,7 +1074,7 @@ class MvpFlowIntegrationTest {
             .andExpect(jsonPath("$.recentScenarios[0].recommendedOption").value("Balanced"))
             .andExpect(jsonPath("$.recentScenarios[1].type").value("PREVIEW"))
             .andExpect(jsonPath("$.recentScenarios[1].loadable").value(true))
-            .andExpect(jsonPath("$.recentScenarios[1].executable").value(true));
+            .andExpect(jsonPath("$.recentScenarios[1].executable").value(false));
 
         assertThat(businessEventRepository.findTop20ByOrderByCreatedAtDesc())
             .extracting(event -> event.getEventType())
@@ -1069,7 +1082,7 @@ class MvpFlowIntegrationTest {
     }
 
     @Test
-    void executableScenarioPreviewCanBePromotedIntoLiveOrderFlow() throws Exception {
+    void scenarioPreviewCannotBeExecutedDirectlyIntoLiveOrderFlow() throws Exception {
         Inventory inventoryBefore = loadInventory("SKU-FLX-100", "WH-NORTH");
         long startingQuantity = inventoryBefore.getQuantityAvailable();
         long startingOrders = customerOrderRepository.count();
@@ -1100,26 +1113,22 @@ class MvpFlowIntegrationTest {
 
         mockMvc.perform(post("/api/scenarios/" + scenarioRunId + "/execute")
                 .with(accessHeaders("Naledi Lead", "REVIEW_OWNER")))
-            .andExpect(status().isOk())
-            .andExpect(jsonPath("$.scenarioRunId").value(scenarioRunId))
-            .andExpect(jsonPath("$.scenarioTitle").value(org.hamcrest.Matchers.containsString("WH-NORTH")))
-            .andExpect(jsonPath("$.order.externalOrderId").exists())
-            .andExpect(jsonPath("$.order.warehouseCode").value("WH-NORTH"))
-            .andExpect(jsonPath("$.order.itemCount").value(4))
-            .andExpect(jsonPath("$.executedAt").exists());
+            .andExpect(status().isBadRequest())
+            .andExpect(jsonPath("$.message").value(org.hamcrest.Matchers.containsString("approved saved plans")));
 
         Inventory inventoryAfter = loadInventory("SKU-FLX-100", "WH-NORTH");
-        assertThat(inventoryAfter.getQuantityAvailable()).isEqualTo(startingQuantity - 4);
-        assertThat(customerOrderRepository.count()).isEqualTo(startingOrders + 1);
+        assertThat(inventoryAfter.getQuantityAvailable()).isEqualTo(startingQuantity);
+        assertThat(customerOrderRepository.count()).isEqualTo(startingOrders);
 
         mockMvc.perform(get("/api/scenarios/history"))
             .andExpect(status().isOk())
-            .andExpect(jsonPath("$[0].type").value("EXECUTION"))
-            .andExpect(jsonPath("$[0].recommendedOption").exists());
+            .andExpect(jsonPath("$[0].type").value("PREVIEW"))
+            .andExpect(jsonPath("$[0].executable").value(false));
 
         assertThat(businessEventRepository.findTop20ByOrderByCreatedAtDesc())
             .extracting(event -> event.getEventType())
-            .contains(BusinessEventType.SCENARIO_EXECUTED, BusinessEventType.ORDER_INGESTED);
+            .contains(BusinessEventType.SCENARIO_ANALYZED)
+            .doesNotContain(BusinessEventType.SCENARIO_EXECUTED);
     }
 
     @Test
@@ -1174,6 +1183,7 @@ class MvpFlowIntegrationTest {
             {
               "title": "North execution candidate",
               "requestedBy": "Lebo Planner",
+              "reviewOwner": "Naledi Lead",
               "request": {
                 "warehouseCode": "WH-NORTH",
                 "items": [
@@ -1254,6 +1264,7 @@ class MvpFlowIntegrationTest {
             {
               "title": "Coast safety hold",
               "requestedBy": "Ayo Planner",
+              "reviewOwner": "Naledi Lead",
               "revisionOfScenarioRunId": null,
               "request": {
                 "warehouseCode": "WH-COAST",
@@ -1348,6 +1359,7 @@ class MvpFlowIntegrationTest {
             {
               "title": "North review candidate",
               "requestedBy": "Ayo Planner",
+              "reviewOwner": "Naledi Lead",
               "revisionOfScenarioRunId": null,
               "request": {
                 "warehouseCode": "WH-NORTH",
@@ -4873,5 +4885,87 @@ class MvpFlowIntegrationTest {
             request.addHeader("X-Synapse-Roles", roles);
             return request;
         };
+    }
+
+    @TestConfiguration
+    static class LegacyMvpFlowAuthorityDefaults {
+
+        @Bean
+        OncePerRequestFilter legacyMvpFlowAuthorityDefaultsFilter() {
+            return new OncePerRequestFilter() {
+                @Override
+                protected void doFilterInternal(HttpServletRequest request,
+                                                HttpServletResponse response,
+                                                FilterChain filterChain) throws ServletException, IOException {
+                    TestAuthority authority = authorityFor(request);
+                    if (authority == null || request.getHeader("X-Synapse-Actor") != null) {
+                        filterChain.doFilter(request, response);
+                        return;
+                    }
+                    filterChain.doFilter(new AuthorityHeaderRequest(request, authority), response);
+                }
+            };
+        }
+
+        private static TestAuthority authorityFor(HttpServletRequest request) {
+            String method = request.getMethod();
+            String path = request.getRequestURI();
+            if ("POST".equalsIgnoreCase(method) && path.matches("/api/inventory/(update|receive|adjust|reconcile)")) {
+                return new TestAuthority("Operations Lead", "TENANT_ADMIN");
+            }
+            if ("POST".equalsIgnoreCase(method)
+                && ("/api/orders".equals(path)
+                    || "/api/fulfillment/updates".equals(path)
+                    || "/api/integrations/orders/webhook".equals(path)
+                    || "/api/integrations/orders/csv-import".equals(path))) {
+                return new TestAuthority("Integration Lead", "INTEGRATION_ADMIN");
+            }
+            return null;
+        }
+
+        private record TestAuthority(String actorName, String roles) {
+        }
+
+        private static class AuthorityHeaderRequest extends HttpServletRequestWrapper {
+
+            private final TestAuthority authority;
+
+            AuthorityHeaderRequest(HttpServletRequest request, TestAuthority authority) {
+                super(request);
+                this.authority = authority;
+            }
+
+            @Override
+            public String getHeader(String name) {
+                return switch (name) {
+                    case "X-Synapse-Actor" -> authority.actorName();
+                    case "X-Synapse-Roles" -> authority.roles();
+                    case "X-Synapse-Tenant" -> STARTER_TENANT;
+                    default -> super.getHeader(name);
+                };
+            }
+
+            @Override
+            public Enumeration<String> getHeaders(String name) {
+                String header = getHeader(name);
+                if (header == null) {
+                    return super.getHeaders(name);
+                }
+                return Collections.enumeration(java.util.List.of(header));
+            }
+
+            @Override
+            public Enumeration<String> getHeaderNames() {
+                LinkedHashSet<String> names = new LinkedHashSet<>();
+                Enumeration<String> existing = super.getHeaderNames();
+                while (existing.hasMoreElements()) {
+                    names.add(existing.nextElement());
+                }
+                names.add("X-Synapse-Actor");
+                names.add("X-Synapse-Roles");
+                names.add("X-Synapse-Tenant");
+                return Collections.enumeration(names);
+            }
+        }
     }
 }

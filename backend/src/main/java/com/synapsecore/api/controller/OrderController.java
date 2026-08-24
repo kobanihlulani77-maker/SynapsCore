@@ -31,7 +31,7 @@ public class OrderController {
     @PostMapping
     @ResponseStatus(HttpStatus.CREATED)
     public OrderResponse createOrder(@Valid @RequestBody OrderCreateRequest request) {
-        accessControlService.requireWorkspaceWarehouseAccess(request.warehouseCode(), "create live orders");
+        accessControlService.requireOperationalWrite(request.warehouseCode(), "create live orders");
         return orderService.createOrder(request);
     }
 
@@ -39,7 +39,7 @@ public class OrderController {
     @ResponseStatus(HttpStatus.OK)
     public OrderResponse transitionOrder(@PathVariable String externalOrderId,
                                          @Valid @RequestBody OrderLifecycleTransitionRequest request) {
-        accessControlService.requireWorkspaceWarehouseAccess(
+        accessControlService.requireOperationalWrite(
             orderService.getOrderWarehouseCode(externalOrderId),
             "transition order lifecycle"
         );

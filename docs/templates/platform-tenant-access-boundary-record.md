@@ -43,12 +43,12 @@ Completed live access-gate record. Do not include passwords, hashes, session coo
 
 | Role | Expected pages | Read checks | Write checks | Expected denials | Result |
 | --- | --- | --- | --- | --- | --- |
-| `TENANT_ADMIN` | General workspace, Users, Company Settings | Tenant-wide operational reads | Tenant administration and product/settings writes | Integrations/replay, governance-only actions, platform, scenario execution | PASS |
-| `REVIEW_OWNER` | General workspace, Approvals | Scoped operational/governance reads | Assigned review and eligible scenario execution | Integrations, Users, Escalations, platform | PASS |
-| `FINAL_APPROVER` | General workspace, Approvals | Scoped operational/governance reads | Assigned final approval and eligible scenario execution | Integrations, Users, Escalations, platform | PASS |
-| `ESCALATION_OWNER` | General workspace, Escalations | Scoped operational/escalation reads | Assigned escalation acknowledgement | Approvals, Integrations, Users, platform, scenario execution | PASS |
-| `INTEGRATION_ADMIN` | General workspace, Integrations, Replay Queue | Connector/import/replay reads | Connector policy and replay actions | Users, governance, platform, scenario execution | PASS |
-| `INTEGRATION_OPERATOR` | General workspace, Integrations, Replay Queue | Connector/import/replay reads | Eligible replay actions | Connector policy, Users, governance, platform, scenario execution | PASS |
+| `TENANT_ADMIN` | General workspace, Users, Company Settings | Tenant-wide operational reads | Tenant administration, product/settings writes, inventory maintenance writes | Platform, full integration/replay detail, governance-only actions, direct order/fulfillment writes, human-session ingestion, scenario execution | PASS |
+| `REVIEW_OWNER` | General workspace, Approvals | Scoped operational/governance reads | Assigned review approve/reject; approved saved-plan execution only | Integrations, Users, Escalations, platform, inventory/order/fulfillment/ingestion writes, preview execution | PASS |
+| `FINAL_APPROVER` | General workspace, Approvals | Scoped operational/governance reads | Assigned final approval/rejection; approved saved-plan execution only | Integrations, Users, Escalations, platform, inventory/order/fulfillment/ingestion writes, preview execution | PASS |
+| `ESCALATION_OWNER` | General workspace, Escalations | Scoped operational/escalation reads | Assigned escalation acknowledgement | Approvals, Integrations, Users, platform, scenario execution by this role alone, inventory/order/fulfillment/ingestion writes | PASS |
+| `INTEGRATION_ADMIN` | General workspace, Integrations, Replay Queue | Connector/import/replay reads | Connector policy, human-session ingestion, direct order/fulfillment writes, replay actions | Users, governance, platform, scenario execution, inventory maintenance writes | PASS |
+| `INTEGRATION_OPERATOR` | General workspace, Integrations, Replay Queue | Connector/import/replay reads | Human-session ingestion, direct order/fulfillment writes, eligible replay actions | Connector policy, Users, governance, platform, scenario execution, inventory maintenance writes | PASS |
 
 ## Integration And Replay Read Matrix
 
@@ -144,7 +144,7 @@ Completed live access-gate record. Do not include passwords, hashes, session coo
 
 | Gate | Command | Result |
 | --- | --- | --- |
-| Backend authorization | `cmd /c mvnw.cmd test` | PASS `149/149` |
+| Backend authorization | `cmd /c mvnw.cmd test` | PASS `152/152` |
 | Frontend lint | `npm.cmd run lint` | PASS |
 | Frontend build | `npm.cmd run build` | PASS |
 | Frontend verify | `npm.cmd run verify` | PASS |

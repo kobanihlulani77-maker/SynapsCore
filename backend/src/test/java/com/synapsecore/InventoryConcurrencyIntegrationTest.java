@@ -24,6 +24,7 @@ import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.test.annotation.DirtiesContext;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.test.web.servlet.request.RequestPostProcessor;
 import org.springframework.transaction.support.TransactionTemplate;
 
 @SpringBootTest
@@ -90,6 +91,7 @@ class InventoryConcurrencyIntegrationTest {
                     """.formatted(System.nanoTime(), attempt, productSku);
 
                 return mockMvc.perform(post("/api/orders")
+                        .with(accessHeaders("Integration Lead", "INTEGRATION_ADMIN"))
                         .header("X-Synapse-Tenant", "STARTER-OPS")
                         .contentType(APPLICATION_JSON)
                         .content(requestBody))
@@ -131,5 +133,13 @@ class InventoryConcurrencyIntegrationTest {
         assertThat(finalInventory.getQuantityOnHand()).isEqualTo(1L);
         assertThat(finalInventory.getQuantityReserved()).isEqualTo(1L);
         assertThat(finalInventory.getQuantityAvailable()).isEqualTo(0L);
+    }
+
+    private static RequestPostProcessor accessHeaders(String actorName, String roles) {
+        return request -> {
+            request.addHeader("X-Synapse-Actor", actorName);
+            request.addHeader("X-Synapse-Roles", roles);
+            return request;
+        };
     }
 }

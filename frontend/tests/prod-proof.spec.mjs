@@ -2833,13 +2833,14 @@ test('replay recovery, scenario approval, execution, and browser role gating wor
 
 test('alerts, recommendations, orders, inventory, integrations, users, profile, and settings surfaces stay connected to the live backend', async ({ page }, testInfo) => {
   const api = await createApiContext(users.operationsLead)
+  const integrationApi = await createApiContext(users.integrationLead)
   let restoreAlertCoverage = async () => {}
   ensurePageDiagnostics(page)
 
   try {
     const alertCoverage = await ensureAlertAndRecommendationCoverage(api)
     restoreAlertCoverage = alertCoverage.restore
-    const recentOrder = await ensureRecentOrder(api)
+    const recentOrder = await ensureRecentOrder(integrationApi)
     const workspace = await readJson(await api.get('/api/access/admin/workspace'))
     const operators = await readJson(await api.get('/api/access/admin/operators'))
     const accessUsers = await readJson(await api.get('/api/access/admin/users'))
@@ -2929,6 +2930,7 @@ test('alerts, recommendations, orders, inventory, integrations, users, profile, 
     await expectNoFatalUiErrors(page)
   } finally {
     await restoreAlertCoverage()
+    await integrationApi.dispose()
     await api.dispose()
   }
 })

@@ -146,6 +146,10 @@ Main routes:
 - `GET /api/inventory`
 - `POST /api/inventory/update`
 
+Authority:
+
+- inventory mutation requires `TENANT_ADMIN` plus tenant and warehouse scope
+
 Operational importance:
 
 - critical
@@ -165,6 +169,10 @@ Main routes:
 - `POST /api/orders`
 - `GET /api/orders/recent`
 
+Authority:
+
+- direct order mutation requires `INTEGRATION_ADMIN` or `INTEGRATION_OPERATOR` plus tenant and warehouse scope
+
 Operational importance:
 
 - critical
@@ -183,6 +191,10 @@ Main routes:
 
 - `GET /api/fulfillment`
 - `POST /api/fulfillment/updates`
+
+Authority:
+
+- fulfillment mutation requires `INTEGRATION_ADMIN` or `INTEGRATION_OPERATOR` plus tenant and warehouse scope
 
 Operational importance:
 
@@ -206,6 +218,13 @@ Main routes:
 - `GET /api/integrations/orders/imports/recent`
 - `GET /api/integrations/orders/replay-queue`
 - `POST /api/integrations/orders/replay/{replayRecordId}`
+
+Authority:
+
+- connector-token ingestion remains supported for trusted external sources
+- human-session webhook and CSV ingestion require `INTEGRATION_ADMIN` or `INTEGRATION_OPERATOR`
+- connector mutation requires `INTEGRATION_ADMIN`
+- replay read/action access requires `INTEGRATION_ADMIN` or `INTEGRATION_OPERATOR`
 
 Operational importance:
 
@@ -238,6 +257,14 @@ Main routes:
 - `POST /api/scenarios/{scenarioRunId}/reject`
 - `POST /api/scenarios/{scenarioRunId}/acknowledge-escalation`
 - `POST /api/scenarios/{scenarioRunId}/execute`
+
+Authority:
+
+- review approval/rejection requires the assigned `REVIEW_OWNER`
+- final approval/rejection requires the assigned `FINAL_APPROVER`
+- escalation acknowledgement requires the assigned `ESCALATION_OWNER`
+- execution requires an approved `SAVED_PLAN` with stored request payload and `REVIEW_OWNER` or `FINAL_APPROVER` authority
+- `PREVIEW` runs are loadable planning evidence, not executable live-order commands
 
 Operational importance:
 

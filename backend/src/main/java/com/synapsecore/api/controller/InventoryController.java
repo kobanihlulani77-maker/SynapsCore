@@ -31,7 +31,7 @@ public class InventoryController {
     @PostMapping("/update")
     @ResponseStatus(HttpStatus.OK)
     public InventoryStatusResponse updateInventory(@Valid @RequestBody InventoryUpdateRequest request) {
-        accessControlService.requireWorkspaceWarehouseAccess(
+        accessControlService.requireInventoryWrite(
             request.warehouseCode(),
             "update inventory levels"
         );
@@ -41,7 +41,7 @@ public class InventoryController {
     @PostMapping("/receive")
     @ResponseStatus(HttpStatus.OK)
     public InventoryStatusResponse receiveInventory(@Valid @RequestBody InventoryReceiptRequest request) {
-        accessControlService.requireWorkspaceWarehouseAccess(
+        accessControlService.requireInventoryWrite(
             request.warehouseCode(),
             "receive inbound inventory"
         );
@@ -51,7 +51,7 @@ public class InventoryController {
     @PostMapping("/adjust")
     @ResponseStatus(HttpStatus.OK)
     public InventoryStatusResponse adjustInventory(@Valid @RequestBody InventoryAdjustmentRequest request) {
-        accessControlService.requireWorkspaceWarehouseAccess(
+        accessControlService.requireInventoryWrite(
             request.warehouseCode(),
             "adjust inventory stock"
         );
@@ -61,7 +61,7 @@ public class InventoryController {
     @PostMapping("/reconcile")
     @ResponseStatus(HttpStatus.OK)
     public InventoryStatusResponse reconcileInventory(@Valid @RequestBody InventoryReconciliationRequest request) {
-        accessControlService.requireWorkspaceWarehouseAccess(
+        accessControlService.requireInventoryWrite(
             request.warehouseCode(),
             "reconcile inventory stock"
         );
