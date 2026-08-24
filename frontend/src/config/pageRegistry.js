@@ -113,9 +113,9 @@ export const appPages = [
     audience: 'app',
     group: 'core',
     label: 'Locations',
-    title: 'Warehouse and site health',
-    description: 'Monitor operational health across locations, from stock posture to backlog and local issues.',
-    focus: ['Location health', 'Pressure by site', 'Drill-down'],
+    title: 'Warehouse scope and operating pressure',
+    description: 'Understand warehouse scope, derived pressure, and local evidence without confusing it with runtime health.',
+    focus: ['Location scope', 'Pressure by site', 'Evidence'],
   },
   {
     key: 'fulfillment',

@@ -88,7 +88,7 @@ export default function useWorkspaceChrome({
     orders: isAuthenticated ? (resolvedRecentOrderCount ? `${resolvedRecentOrderCount} order${resolvedRecentOrderCount === 1 ? '' : 's'} moved recently` : 'Order flow is currently quiet') : 'Protected by workspace sign-in',
     inventory: isAuthenticated ? (resolvedLowStockCount ? `${resolvedLowStockCount} low-stock item${resolvedLowStockCount === 1 ? '' : 's'}` : 'Inventory posture is stable') : 'Protected by workspace sign-in',
     catalog: isAuthenticated ? `${catalogState.products.length} tenant product${catalogState.products.length === 1 ? '' : 's'} available` : 'Protected by workspace sign-in',
-    locations: isAuthenticated ? `${warehouseOptions.length} operational location${warehouseOptions.length === 1 ? '' : 's'} tracked` : 'Protected by workspace sign-in',
+    locations: isAuthenticated ? `${warehouseOptions.length} warehouse scope${warehouseOptions.length === 1 ? '' : 's'} visible` : 'Protected by workspace sign-in',
     fulfillment: isAuthenticated ? (fulfillmentOverview.backlogCount ? `${fulfillmentOverview.backlogCount} backlog item${fulfillmentOverview.backlogCount === 1 ? '' : 's'} active` : 'Fulfillment lanes are clear') : 'Protected by workspace sign-in',
     scenarios: isAuthenticated ? 'Model operational changes before they touch live flow' : 'Protected by workspace sign-in',
     'scenario-history': isAuthenticated ? `${scenarioHistoryItems.length} scenario run${scenarioHistoryItems.length === 1 ? '' : 's'} in view` : 'Protected by workspace sign-in',
