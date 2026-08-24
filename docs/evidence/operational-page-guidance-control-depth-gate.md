@@ -36,12 +36,12 @@ scope, loading, recovery, and supported boundaries.
 
 ## Deployment And Proof Evidence
 
-- Repository HEAD: `7d89d0e0b0d3b990ce166660598e85d960d0a8ec`
-- Served asset: `index-BbjEXF_9.js`
+- Repository HEAD: `800fcefb70454fdb57a7791a50e9483748655417`
+- Served asset: `index-2InG-0Wb.js`
 - Backend outage blocker: **CLEARED**
 - Live classification: `FRONTEND_UP=True`, `BACKEND_UP=True`, `DB_READY=True`,
   `AUTH_READY=True`, `WS_READY=True`, `PROOF_ALLOWED=True`
-- Hosted production proof: **6/6 PASS**
+- Hosted production proof after the final frontend fix: **6/6 PASS**
 - Existing deterministic proof state was reused without creating another tenant.
 - `prepare-hosted-proof.ps1` missing-token refusal is classified as a private
   operator-preparation condition, not a product defect, Render outage, or proof
@@ -93,6 +93,7 @@ tenant role.
 - Live connections: PASS
 - Hosted proof: PASS, 6/6
 - Visible Chrome route and layout review: PASS
+- Users loading-state correction: PASS; zero-valued loading summary removed
 - Console/page errors: none observed
 - Unexpected HTTP 4xx/5xx in final route sweep: none observed
 - Critical blockers: `0`

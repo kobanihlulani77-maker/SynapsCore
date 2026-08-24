@@ -19,8 +19,8 @@ work was started during this verification.
 
 ## Deployment And Proof Baseline
 
-- Repository HEAD: `7d89d0e0b0d3b990ce166660598e85d960d0a8ec`
-- Served frontend asset observed: `index-BbjEXF_9.js`
+- Repository HEAD: `800fcefb70454fdb57a7791a50e9483748655417`
+- Served frontend asset observed: `index-2InG-0Wb.js`
 - The served asset confirms a new frontend deployment, but the runtime does
   not expose an exact source commit, so the asset and repository revision are
   recorded separately.
@@ -59,6 +59,12 @@ The prepared operations-lead identity carried Tenant Admin plus additional
 tenant roles in its live session. A separate Integration Admin session was
 used as the non-admin rendered check. It did not receive Users or Company
 Settings access and direct route navigation returned it to Dashboard.
+
+The first rendered review found one real issue: the page summary displayed
+`0 tenant users managed` while the access readout was still loading. The fix
+now renders a loading/unavailable state until the access read completes. The
+updated deployed bundle was rechecked in visible Chrome; the old zero-loading
+state was absent and the loaded roster rendered correctly.
 
 ### Company Settings
 
@@ -192,7 +198,8 @@ These are not Wave 4 Critical or High blockers:
 - Frontend lint: PASS before this evidence-only closure
 - Frontend build: PASS before this evidence-only closure
 - Frontend verify: PASS before this evidence-only closure
-- Hosted proof: `6/6 PASS`
+- Frontend lint/build/verify after the loading-state fix: PASS
+- Hosted proof after the loading-state fix: `6/6 PASS`
 - Headed Chrome at `1366x768`: PASS for all public/auth and tenant route checks
 - Browser console/page errors: none observed
 - HTTP 4xx/5xx during final route sweep: none observed
