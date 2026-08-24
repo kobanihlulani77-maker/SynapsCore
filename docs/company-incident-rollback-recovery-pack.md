@@ -19,7 +19,20 @@ SynapseCore remains an operational coordination and recovery surface. Company so
 
 ## 2. Canonical Definitions
 
-### 2.1 Incident
+### 2.1 Incident, Rollback, Recovery, And Restore
+
+These terms are related but not interchangeable:
+
+| Term | Precise meaning | Does not imply |
+| --- | --- | --- |
+| Incident | An abnormal condition requiring investigation and control | That data is corrupted or that rollback is required |
+| Rollback | Returning a deployment, configuration, policy, or other controlled change to a known prior safe state | Recovering persisted data or repairing every consequence of the incident |
+| Recovery | Returning an affected operating workflow to trusted service after the cause is contained or corrected | That the deployment was rolled back or that a database restore occurred |
+| Restore | Recovering persisted data from an approved backup | That application, authority, replay, or reconciliation checks are complete |
+
+Not every incident requires rollback. Not every incident requires restore. Not every failed inbound item should be replayed.
+
+### 2.2 Incident
 
 An **incident** is any observed condition that materially reduces confidence in one or more of:
 
@@ -33,7 +46,7 @@ An **incident** is any observed condition that materially reduces confidence in 
 
 A near miss is recorded as an incident when the condition could have produced material harm even if no incorrect business state was ultimately created.
 
-### 2.2 Event, Alert, Degraded State, And Incident
+### 2.3 Event, Alert, Degraded State, And Incident
 
 | Term | Meaning | Required response |
 | --- | --- | --- |
@@ -43,7 +56,7 @@ A near miss is recorded as an incident when the condition could have produced ma
 | Incident | Trust, safety, recovery, or business continuity requires coordinated action | Assign owner and record response |
 | Near miss | A control caught a condition before material impact | Record and review; do not hide it |
 
-### 2.3 Trust Dimensions
+### 2.4 Trust Dimensions
 
 Every incident is assessed across five trust dimensions:
 
@@ -213,6 +226,24 @@ For a security, isolation, secret, or authority concern, notify the Pilot Owner 
 | Deployment/release | Wrong revision, startup failure, migration issue, or regression | `HOLD` release; rollback only through approved process | [Release Engineering](release-engineering.md) |
 | Security | Secret exposure, CORS/auth bypass, rate-limit bypass, suspicious access | `STOP` affected scope | [Security And Trust Model](security-and-trust-model.md) |
 | Support/noise | Client abort, broken pipe, slow telemetry without user impact | Usually `GO` with observation | [Failure Classification Matrix](failure-classification-matrix.md) |
+
+### 8.1 Quick Incident Playbook
+
+| Incident | Default severity range | Primary owner | Initial action | GO/HOLD/STOP expectation | Recovery path | Verification | Known limitation |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| Access/session | Medium-Critical | Tenant Admin / Platform Owner | Hold affected identity; preserve session evidence | `HOLD`; `STOP` for widened authority | Fresh session, supported access correction, revoke/disable if authorized | Identity, allowed/denied API, direct route, sign-out | Stale clients can require fresh-session verification |
+| Tenant isolation | Critical | Platform Owner / Security Owner | Stop affected tenant and preserve request evidence | `STOP` | Contain access, investigate backend boundary, reconcile exposure | Cross-tenant denial and security review | Platform support is metadata-first; no casual impersonation |
+| Warehouse/scope | High-Critical | Tenant Admin / Integration Owner | Hold user/workflow and confirm scope | `HOLD`; `STOP` after wrong-object mutation | Correct assignment through access control; reconcile business state | Allowed scope, wrong-warehouse denial, source reconciliation | Empty scope means tenant-wide authority |
+| Data mismatch | Medium-High | Customer Operations Owner / Engineering | Hold downstream action and compare source | `HOLD` affected lane | Supported correction or import path, then reconcile | Source, persisted state, audit/activity, duplicate check | Source system remains authoritative |
+| Connector failure | Medium-High | Integration Admin | Hold connector lane; inspect source and policy | `HOLD` connector lane | Correct source/mapping or disable through supported control | Connector, import, runtime, and source readback | Arbitrary connector framework is not claimed |
+| Failed inbound/replay | Medium-High | Integration Operator / Integration Admin | Do not retry; inspect eligibility and duplicate risk | `HOLD` replay lane | Proven CSV correction and one manual replay | Replay, one business result, source, activity/audit | Disabled-webhook replay readback is not deterministic on Render |
+| Governance/approval | High-Critical | Pilot Owner / Assigned Governance Owner | Stop approval or execution | `HOLD`; `STOP` for unauthorized execution | Recreate/verify governed assignment; no bypass | Assigned owner allowed, different owner/wrong warehouse denied, preview denied | Not a generic approval engine |
+| Realtime/runtime | Medium-High | Platform Owner | Mark degraded; stop freshness-dependent action | `HOLD` realtime-dependent work | Restore backend/Redis/socket or use bounded snapshot fallback | Readiness, auth, `/ws/info`, snapshot freshness, event evidence | Realtime scale and latency are bounded by Gate 3 evidence |
+| Database/Redis | High-Critical | Platform Owner / Deployment Owner | Stop backend-dependent work and proof | `HOLD` or `STOP` | Restore dependency, restart safely, reconcile | Startup, migrations, Hikari/JPA, readiness, auth, websocket | Provider-level Render restore is not drilled |
+| Backup/restore | High-Critical | Incident Owner / Platform Owner | Stop writes and preserve loss window | `STOP` affected scope | Approved backup restore and reconciliation | Readable backup, startup, schema, data and source reconciliation | Application-level restore is proven; managed restore is not |
+| Deployment/release | High-Critical | Deployment Owner / Engineering | Freeze deploys and capture revision | `HOLD`; `STOP` for security/integrity | Forward fix or approved compatible rollback | Revision, startup, focused proof or hosted proof | No automatic rollback or HA failover claim |
+| Security/privacy | High-Critical | Security Owner / Platform Owner | Stop affected scope; minimize evidence | `STOP` until boundary is verified | Revoke/rotate through approved process and investigate | Backend denial, leakage scan, access review, customer communication | SSO/MFA and broader enterprise controls remain future hardening |
+| Support noise | Low | Support Owner | Correlate with user impact before action | Usually `GO` | Document or tune support handling | No correlated failed workflow | Client abort/broken pipe can be benign |
 
 ## 9. Access, Tenant, And Warehouse Incidents
 
