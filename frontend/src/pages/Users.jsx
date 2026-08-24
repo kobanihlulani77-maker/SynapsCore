@@ -1,6 +1,17 @@
 import { MetricCard } from '../components/Card'
 import Panel from '../components/Panel'
 import EmptyState from '../components/EmptyState'
+import LoadingState from '../components/LoadingState'
+import OperationalGuidance from '../components/OperationalGuidance'
+
+const roleDefinitions = [
+  ['TENANT_ADMIN', 'Tenant workspace access, user, role, and scope administration.'],
+  ['REVIEW_OWNER', 'Reviews assigned operational decisions before final approval.'],
+  ['FINAL_APPROVER', 'Provides the final governance decision for an eligible plan.'],
+  ['ESCALATION_OWNER', 'Owns escalation acknowledgement and follow-up, not approval.'],
+  ['INTEGRATION_ADMIN', 'Manages supported connector and replay operations.'],
+  ['INTEGRATION_OPERATOR', 'Works supported integration and recovery tasks within assigned scope.'],
+]
 
 export default function UsersPage({ context }) {
   const {
@@ -8,12 +19,14 @@ export default function UsersPage({ context }) {
     isUsersPage,
     accessAdminOperators,
     accessAdminUsers,
+    accessAdminState,
     workspaceAdmin,
     selectedAccessSubject,
     setSelectedAccessSubjectKey,
     formatCodeLabel,
     navigateToPage,
     canManageTenantAccess,
+    pageError,
   } = context
 
   if (!isAuthenticated || !isUsersPage) return null
@@ -34,6 +47,8 @@ export default function UsersPage({ context }) {
       ? 'Operator lane'
       : 'User account'
     : 'Waiting'
+  const accessDataError = accessAdminState.error || pageError
+  const accessDataLoading = accessAdminState.loading
 
   return (
     <section className="content-grid">
@@ -45,6 +60,17 @@ export default function UsersPage({ context }) {
           </div>
           <span className="panel-badge integration-badge">{accessAdminOperators.length + accessAdminUsers.length}</span>
         </div>
+
+        <OperationalGuidance
+          stateLabel={accessDataLoading ? 'Loading' : accessDataError ? 'Unavailable' : 'Live roster'}
+          stateTone={accessDataLoading ? 'status-partial' : accessDataError ? 'status-failure' : 'status-success'}
+          stateDetail={accessDataLoading ? 'User accounts, operator lanes, and workspace scope are still being loaded.' : accessDataError ? 'The access administration read failed; the visible roster must not be treated as complete.' : 'The roster separates sign-in identities from the operator lanes that carry roles and warehouse scope.'}
+          attention={accessDataError ? accessDataError : accessReviewCount ? `${accessReviewCount} access condition${accessReviewCount === 1 ? '' : 's'} need Tenant Admin review.` : 'No disabled, inactive, password, or linked-lane review signal is currently reported.'}
+          nextAction={canManageTenantAccess ? 'Before a material role or scope change, record the intended state, save it, then verify the persisted role, scope, and fresh-session behavior.' : 'Use Profile for personal account actions and ask a Tenant Admin to change roles or warehouse scope.'}
+          evidence="Backend access administration remains authoritative. An empty warehouse-scope list means tenant-wide authority, not no access."
+          role="Tenant Admin controls this surface; other tenant roles must not use it as an administration path."
+          limitation="This page does not grant platform-owner authority, change tenant provisioning, or revoke a session unless the backend confirms that behavior."
+        />
 
         <div className="workflow-decision-hero admin-trust-hero">
           <div className="workflow-decision-copy">
@@ -93,7 +119,7 @@ export default function UsersPage({ context }) {
             <div className="stack-title-row"><strong>Operator lanes</strong><span className="scenario-type-tag">{accessAdminOperators.length}</span></div>
             <p className="muted-text">Operational identities, roles, and warehouse scope. These lanes explain who can act.</p>
             <div className="signal-list">
-              {accessAdminOperators.length ? accessAdminOperators.slice(0, 5).map((operator) => (
+              {accessDataLoading ? <LoadingState label="Loading operator lanes..." /> : accessDataError ? <p className="error-text">Operator lanes are unavailable because the access administration read failed.</p> : accessAdminOperators.length ? accessAdminOperators.slice(0, 5).map((operator) => (
                 <button key={operator.id} className={`signal-list-item selectable-card system-select-card admin-subject-card ${selectedAccessSubject?.subjectKey === `operator-${operator.id}` ? 'is-selected' : ''}`} onClick={() => setSelectedAccessSubjectKey(`operator-${operator.id}`)} type="button">
                   <div className="stack-title-row">
                     <strong>{operator.displayName}</strong>
@@ -115,7 +141,7 @@ export default function UsersPage({ context }) {
             <div className="stack-title-row"><strong>User roster</strong><span className="scenario-type-tag">{accessAdminUsers.length}</span></div>
             <p className="muted-text">Sign-in identities linked to operator lanes. These accounts explain who can authenticate.</p>
             <div className="signal-list">
-              {accessAdminUsers.length ? accessAdminUsers.slice(0, 5).map((user) => (
+              {accessDataLoading ? <LoadingState label="Loading user accounts..." /> : accessDataError ? <p className="error-text">User accounts are unavailable because the access administration read failed.</p> : accessAdminUsers.length ? accessAdminUsers.slice(0, 5).map((user) => (
                 <button key={user.id} className={`signal-list-item selectable-card system-select-card admin-subject-card ${selectedAccessSubject?.subjectKey === `user-${user.id}` ? 'is-selected' : ''}`} onClick={() => setSelectedAccessSubjectKey(`user-${user.id}`)} type="button">
                   <div className="stack-title-row">
                     <strong>{user.fullName}</strong>
@@ -145,6 +171,19 @@ export default function UsersPage({ context }) {
             <p className="muted-text">Make role boundaries obvious so operators understand whether access is tenant-wide, warehouse-specific, or limited to support and integration workflows.</p>
           </article>
         </div>
+
+        <article className="stack-card section-card">
+          <div className="stack-title-row"><strong>Role lanes</strong><span className="scenario-type-tag">Six tenant roles</span></div>
+          <p className="muted-text">A role describes the operational responsibility a person carries. It does not make that person a Platform Owner or bypass warehouse scope.</p>
+          <div className="signal-list">
+            {roleDefinitions.map(([role, description]) => (
+              <div key={role} className="signal-list-item">
+                <strong>{formatCodeLabel(role)}</strong>
+                <p>{description}</p>
+              </div>
+            ))}
+          </div>
+        </article>
 
         <div className="experience-grid experience-grid-split">
           <article className="stack-card section-card workflow-selected-panel admin-focus-panel">

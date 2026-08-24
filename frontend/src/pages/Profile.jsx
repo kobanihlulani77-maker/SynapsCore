@@ -1,5 +1,6 @@
 import { MetricCard } from '../components/Card'
 import Panel from '../components/Panel'
+import OperationalGuidance from '../components/OperationalGuidance'
 
 export default function ProfilePage({ context }) {
   const {
@@ -23,6 +24,8 @@ export default function ProfilePage({ context }) {
     signOutOperator,
     authSessionState,
     navigateToPage,
+    canManageTenantAccess,
+    pageError,
   } = context
 
   if (!isAuthenticated || !isProfilePage) return null
@@ -34,9 +37,10 @@ export default function ProfilePage({ context }) {
     : passwordRotationRequired
       ? 'Password rotation due'
       : 'No security action'
+  const canReviewApprovals = signedInRoles.includes('REVIEW_OWNER') || signedInRoles.includes('FINAL_APPROVER')
   const sessionQuickActions = [
     { title: 'Open alerts', note: `${activeAlerts.length} active alert${activeAlerts.length === 1 ? '' : 's'} in the workspace`, target: 'alerts' },
-    { title: 'Open approvals', note: `${pendingApprovalScenarios.length} decision${pendingApprovalScenarios.length === 1 ? '' : 's'} waiting on review`, target: 'approvals' },
+    ...(canReviewApprovals ? [{ title: 'Open approvals', note: `${pendingApprovalScenarios.length} decision${pendingApprovalScenarios.length === 1 ? '' : 's'} waiting on review`, target: 'approvals' }] : []),
     { title: 'Open runtime', note: `${systemIncidents.length} runtime incident${systemIncidents.length === 1 ? '' : 's'} visible`, target: 'runtime' },
   ]
 
@@ -50,6 +54,17 @@ export default function ProfilePage({ context }) {
           </div>
           <span className="panel-badge audit-badge">{signedInSession ? 'Active' : 'Signed Out'}</span>
         </div>
+
+        <OperationalGuidance
+          stateLabel={pageError ? 'Unavailable' : sessionHealthNeedsAction ? 'Attention' : 'Current session'}
+          stateTone={pageError ? 'status-failure' : sessionHealthNeedsAction ? 'status-partial' : 'status-success'}
+          stateDetail={pageError ? 'The supporting workspace read is unavailable; do not infer a complete identity or runtime picture from this page.' : 'This page describes the signed-in tenant identity, role posture, warehouse scope, password policy, and browser session.'}
+          attention={pageError || (sessionHealthNeedsAction ? sessionActionLabel : 'No password or session-policy action is currently required.')}
+          nextAction={sessionHealthNeedsAction ? 'Complete the password action shown below, then sign in again if the session policy requires it.' : 'Use the operational pages allowed by your role, and sign out when leaving the live console.'}
+          evidence="The authenticated session and backend role/warehouse claims remain authoritative. Profile does not grant new authority."
+          role={canManageTenantAccess ? 'Tenant Admin may use Users and Company Settings for tenant changes.' : 'Role, warehouse scope, governance assignment, and tenant changes require the appropriate administrator or governance path.'}
+          limitation="Profile cannot change roles, warehouse scope, tenant identity, operator authority, governance assignment, connector authority, MFA, or SSO."
+        />
 
         <div className="workflow-decision-hero admin-trust-hero">
           <div className="workflow-decision-copy">
@@ -76,9 +91,11 @@ export default function ProfilePage({ context }) {
               <p>{sessionHealthNeedsAction ? 'Resolve the security action before treating this as a clean operator session.' : 'Session posture is inside the current workspace policy.'}</p>
             </div>
             <div className="ops-command-actions">
-              <button className="secondary-button" onClick={() => navigateToPage('settings')} type="button">
-                Open company settings
-              </button>
+              {canManageTenantAccess ? (
+                <button className="secondary-button" onClick={() => navigateToPage('settings')} type="button">
+                  Open company settings
+                </button>
+              ) : <span className="muted-text">Tenant Admin manages company settings and access changes.</span>}
               <button className="ghost-button" onClick={signOutOperator} disabled={authSessionState.loading} type="button">
                 {authSessionState.action === 'signout' ? 'Signing Out...' : 'Sign Out'}
               </button>

@@ -3,14 +3,14 @@ import { useState } from 'react'
 const setupSteps = [
   { key: 'company', label: 'Company information' },
   { key: 'workspace', label: 'Workspace setup' },
-  { key: 'admin', label: 'First admin operator' },
+  { key: 'admin', label: 'Proposed first admin' },
   { key: 'profile', label: 'Operations profile' },
   { key: 'next', label: 'Guided next steps' },
 ]
 
 const setupBoundaries = [
-  'This frontend prepares a workspace setup brief.',
-  'Live tenant creation uses supported backend provisioning paths.',
+  'This frontend prepares a workspace setup brief; it does not create a tenant or account.',
+  'A Platform Owner provisions the tenant and workspace through supported backend paths.',
   'SynapseCore supports operations beside existing ERP, WMS, ecommerce, and source systems.',
 ]
 
@@ -189,7 +189,7 @@ export default function CreateWorkspacePage({ context }) {
           <p>{effectivePageMeta.description}</p>
           <div className="workspace-guidance-block workspace-entry-boundary">
             <strong>Controlled pilot setup</strong>
-            <p>Prepare company context, first administrator, and rollout lane before operators sign in. Provisioning is confirmed only by supported backend flows.</p>
+            <p>Prepare company context, a proposed first administrator, and a rollout lane before operators sign in. Provisioning is confirmed only by supported backend flows.</p>
           </div>
           <div className="workspace-wizard-steps">
             {setupSteps.map((step, index) => {
@@ -209,7 +209,7 @@ export default function CreateWorkspacePage({ context }) {
           </div>
           <div className="workspace-guidance-block">
             <strong>How this works</strong>
-            <p>Existing operators sign into a company workspace with workspace code, username, and password. The first admin sets up the company environment and guides catalog, users, inventory, and integrations afterward.</p>
+            <p>A Platform Owner confirms the company workspace first. Existing operators then sign in with workspace code, username, and password; the Tenant Admin guides catalog, users, inventory, and integrations afterward.</p>
           </div>
         </aside>
 
@@ -315,7 +315,7 @@ export default function CreateWorkspacePage({ context }) {
                   onChange={(event) => updateDraft('username', event.target.value)}
                   placeholder="amina.admin"
                 />
-                <span className="field-hint">This is the first company operator identity that will enter the workspace.</span>
+                <span className="field-hint">This is the proposed first operator identity for the pilot intake. Account creation is completed through supported provisioning.</span>
               </label>
               <label className="field">
                 <span>Initial password</span>
@@ -330,7 +330,7 @@ export default function CreateWorkspacePage({ context }) {
                     {showPassword ? 'Hide' : 'Show'}
                   </button>
                 </div>
-                <span className="field-hint">The first admin can later rotate credentials and invite more operators after sign-in.</span>
+                <span className="field-hint">This value is part of the local setup brief only; this page does not create an account or send the password to the backend.</span>
               </label>
             </div>
           ) : null}
@@ -372,8 +372,8 @@ export default function CreateWorkspacePage({ context }) {
                 </div>
                 <p className="muted-text">
                   {workspacePrepared
-                    ? 'The setup brief is prepared. This frontend flow can hand off to live workspace provisioning when onboarding APIs are connected, without changing the experience.'
-                    : 'Review the company setup brief, then continue into sign-in or pilot planning. Live provisioning can connect to this exact experience later.'}
+                    ? 'The setup brief is prepared for Platform Owner review and supported provisioning. This page has not created a tenant, workspace, or operator account.'
+                    : 'Review the company setup brief, then send it through the supported pilot onboarding path. This page does not provision live access.'}
                 </p>
               </article>
 
@@ -418,7 +418,7 @@ export default function CreateWorkspacePage({ context }) {
             ) : (
               <>
                 <button className="secondary-button" onClick={() => navigateToPage('product')} type="button">Review Product Surface</button>
-                <button className="primary-button" onClick={continueToSignIn} type="button">Continue to Sign In</button>
+                <button className="primary-button" onClick={continueToSignIn} type="button">Continue to Sign In After Provisioning</button>
               </>
             )}
           </div>

@@ -22,8 +22,8 @@ export const publicPages = [
     path: '/create-workspace',
     audience: 'public',
     label: 'Create Workspace',
-    title: 'Set up the company workspace that will run live operations.',
-    description: 'Prepare company identity, workspace code, first admin access, and rollout context before the operational team signs in.',
+    title: 'Prepare a company workspace for pilot onboarding.',
+    description: 'Capture company identity, proposed first-admin details, and rollout context for Platform Owner provisioning before the operational team signs in.',
     focus: ['Company setup', 'Workspace identity', 'Guided rollout'],
   },
   {

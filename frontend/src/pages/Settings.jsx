@@ -1,6 +1,8 @@
 import { MetricCard } from '../components/Card'
 import EmptyState from '../components/EmptyState'
 import Panel from '../components/Panel'
+import LoadingState from '../components/LoadingState'
+import OperationalGuidance from '../components/OperationalGuidance'
 
 export default function SettingsPage({ context }) {
   const {
@@ -30,6 +32,7 @@ export default function SettingsPage({ context }) {
     integrationValidationPolicies,
     integrationTransformationPolicies,
     signedInSession,
+    pageError,
   } = context
 
   if (!isAuthenticated || !isSettingsPage) return null
@@ -40,6 +43,8 @@ export default function SettingsPage({ context }) {
   const settingsReviewCount = (workspaceAdmin?.supportDiagnostics?.connectorsWithoutSupportOwner || 0)
     + (workspaceAdmin?.supportDiagnostics?.activeUsersRequiringPasswordChange || 0)
   const workspaceScopeLabel = signedInSession?.tenantName || signedInSession?.tenantCode || 'Workspace unavailable'
+  const settingsDataError = accessAdminState.error || pageError
+  const settingsDataLoading = accessAdminState.loading && !workspaceAdmin
 
   return (
     <section className="content-grid">
@@ -51,6 +56,17 @@ export default function SettingsPage({ context }) {
           </div>
           <span className="panel-badge scenario-badge">{workspaceAdmin?.warehouses?.length || 0}</span>
         </div>
+
+        <OperationalGuidance
+          stateLabel={settingsDataLoading ? 'Loading' : settingsDataError ? 'Unavailable' : 'Configured'}
+          stateTone={settingsDataLoading ? 'status-partial' : settingsDataError ? 'status-failure' : 'status-success'}
+          stateDetail={settingsDataLoading ? 'Tenant workspace settings, warehouse lanes, and connector policy are still being loaded.' : settingsDataError ? 'The tenant configuration read failed; visible values must not be treated as current persisted settings.' : 'This page exposes supported tenant configuration for workspace identity, security policy, warehouses, and connector support.'}
+          attention={settingsDataError ? settingsDataError : settingsReviewCount ? `${settingsReviewCount} configuration or access condition${settingsReviewCount === 1 ? '' : 's'} need review.` : 'No password-reset or connector-ownership review signal is currently reported.'}
+          nextAction={canManageTenantAccess ? 'For a material change, capture the before state, save one control, confirm the persisted readback, then verify the affected sign-in, warehouse, or connector behavior.' : 'This page is Tenant Admin controlled. Use Profile for personal actions and ask a Tenant Admin to change tenant configuration.'}
+          evidence="Successful save actions reload the supported workspace administration payload. This page does not prove external source-system reconciliation or deployment health."
+          role="Tenant Admin controls these changes; settings do not grant Platform Owner authority or change another tenant."
+          limitation="Platform infrastructure, PostgreSQL, Redis, MFA/SSO, tenant creation, and connector secrets are outside this tenant settings surface unless a supported control is shown here."
+        />
 
         <div className="workflow-decision-hero admin-trust-hero">
           <div className="workflow-decision-copy">
@@ -140,7 +156,7 @@ export default function SettingsPage({ context }) {
             <div className="stack-title-row"><strong>Warehouse focus</strong><span className="scenario-type-tag">{selectedWorkspaceWarehouse?.code || 'Waiting'}</span></div>
             <p className="muted-text">Operational site identity. Save only updates the selected warehouse lane.</p>
             <div className="signal-list">
-              {workspaceAdmin?.warehouses?.length ? workspaceAdmin.warehouses.map((warehouse) => (
+              {settingsDataLoading ? <LoadingState label="Loading warehouse lanes..." /> : settingsDataError ? <p className="error-text">Warehouse settings are unavailable because the tenant configuration read failed.</p> : workspaceAdmin?.warehouses?.length ? workspaceAdmin.warehouses.map((warehouse) => (
                   <button key={warehouse.id} className={`signal-list-item selectable-card system-select-card admin-subject-card ${selectedWorkspaceWarehouse?.id === warehouse.id ? 'is-selected' : ''}`} onClick={() => setSelectedWorkspaceWarehouseId(warehouse.id)} type="button">
                   <strong>{warehouse.name}</strong>
                   <p>{warehouse.code}</p>
@@ -171,7 +187,7 @@ export default function SettingsPage({ context }) {
             <div className="stack-title-row"><strong>Connector focus</strong><span className="scenario-type-tag">{selectedWorkspaceConnector ? formatCodeLabel(selectedWorkspaceConnector.syncMode) : 'Waiting'}</span></div>
             <p className="muted-text">High-impact integration settings. Changes can affect inbound data handling, validation, cadence, and recovery ownership.</p>
             <div className="signal-list">
-              {workspaceAdmin?.connectors?.length ? workspaceAdmin.connectors.map((connector) => (
+              {settingsDataLoading ? <LoadingState label="Loading connector policy..." /> : settingsDataError ? <p className="error-text">Connector policy is unavailable because the tenant configuration read failed.</p> : workspaceAdmin?.connectors?.length ? workspaceAdmin.connectors.map((connector) => (
                 <button key={connector.id} className={`signal-list-item selectable-card system-select-card admin-subject-card ${selectedWorkspaceConnector?.id === connector.id ? 'is-selected' : ''}`} onClick={() => setSelectedWorkspaceConnectorId(connector.id)} type="button">
                   <strong>{connector.displayName}</strong>
                   <p>{connector.sourceSystem} | {formatCodeLabel(connector.syncMode)}</p>
