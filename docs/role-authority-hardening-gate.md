@@ -99,7 +99,8 @@ The six-role rehearsal used generated synthetic identities and disabled those id
 | Six distinct role API/UI rehearsal | PASS, zero matrix failures |
 | Full hosted production proof | PASS, six tests |
 | Focused replay/governance proof | PASS |
-| Live governance evidence | Existing deployed assignment and executable-state evidence retained in `docs/platform-control-plane-access-boundary.md`; fresh supplemental fixture bootstrap returned `401` for the proof-admin account and created no fixture |
+| Fresh live governance rehearsal | PASS, synthetic tenant `HOSTED-PROOF-3`; temporary identities disabled after evidence; scenario records `141` and `142` retained as synthetic audit evidence |
+| Live revision evidence | Hardened backend commit `3fc927d8f1f3905013f057fc9ecc7a8f6596d2c6` was the deployed revision under verification; `/actuator/info` returns `404`, so Render does not expose a runtime commit identifier through the application |
 
 ### Six-role deployed matrix
 
@@ -125,10 +126,10 @@ The rehearsal used one identity per role: `TENANT_ADMIN`, `INTEGRATION_ADMIN`, `
 | --- | --- | --- |
 | High 1: unrestricted inventory/order/fulfillment writes | Six-role live matrix exercised allowed and denied inventory, order, fulfillment, and wrong-warehouse paths | PASS |
 | High 2: unrestricted session webhook/CSV ingestion | Six-role live matrix exercised enabled connector-backed webhook and CSV paths | PASS |
-| High 3: unassigned review owner could approve | Deployed assignment evidence is recorded in `docs/platform-control-plane-access-boundary.md`; local assignment regression remains `152/152` | PASS with proof-account refresh follow-up |
-| High 4: preview could execute | Full hosted proof and existing deployed live governance evidence cover preview/state gating; local regression remains `152/152` | PASS with proof-account refresh follow-up |
+| High 3: unassigned review owner could approve | Scenario `141` in `HOSTED-PROOF-3`: assigned Review Owner approval `200`; different Review Owner approval `400` with assigned-owner rejection; same assigned identity after temporary scope move to `WH-COAST` against `WH-NORTH` returned `403` | PASS, post-hardening live |
+| High 4: preview could execute | Scenario `142` in `HOSTED-PROOF-3`: `PREVIEW` execute returned `400` with approved-saved-plan state rejection; zero matching order side effects; history remained `PREVIEW` and non-executable. Scenario `141` completed review approval `200`, assigned final approval `200`, and governed execution `200` with an order response | PASS, post-hardening live |
 
-The supplemental governance runner received `401` while authenticating the existing proof-admin account after the six-role cleanup. It created no fixture and did not change the product verdict. Refreshing the ignored proof state is an operational evidence task before the next fresh governance rehearsal, not a role-authority bypass.
+The earlier supplemental runner received `401` while authenticating the stale proof-admin state and created no fixture. A fresh supported rehearsal subsequently authenticated the existing synthetic Tenant Admin, created four temporary governance identities, and completed the required live evidence without rotating production credentials. All four temporary users and operators were disabled during cleanup. The final approver regression also passed: a different final approver was denied with `400`, while the assigned final approver was allowed with `200`.
 
 ## Gate Verdict
 
