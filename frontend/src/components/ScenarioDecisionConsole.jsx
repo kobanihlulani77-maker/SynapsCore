@@ -51,8 +51,16 @@ export default function ScenarioDecisionConsole({ scenario, title, emptyMessage,
   const canExecuteScenario = scenario.type !== 'PREVIEW' && Boolean(scenario.executable)
     && (signedInRoles.includes('REVIEW_OWNER') || signedInRoles.includes('FINAL_APPROVER'))
   const canAcknowledgeEscalation = Boolean(scenario.slaEscalated && !scenario.slaAcknowledged)
+  const assignedApprovalOwner = scenario.approvalStage === 'PENDING_FINAL_APPROVAL'
+    ? scenario.finalApprovalOwner
+    : scenario.reviewOwner
+  const approvalAssignmentMatches = !assignedApprovalOwner
+    || !signedInSession?.actorName
+    || assignedApprovalOwner.toLowerCase() === signedInSession.actorName.toLowerCase()
   const actionStateSummary = canApproveScenario
-    ? `${approvalActionLabel} needs ${formatCodeLabel(approvalRole)} authority${approvalNoteRequired ? ' and a decision note' : ''}.`
+    ? !approvalAssignmentMatches
+      ? `Not assigned to this operator. ${formatCodeLabel(approvalRole)} work is assigned to ${assignedApprovalOwner}.`
+      : `${approvalActionLabel} needs ${formatCodeLabel(approvalRole)} authority${approvalNoteRequired ? ' and a decision note' : ''}.`
       : scenario.type === 'PREVIEW'
         ? 'PREVIEW is analysis only and cannot be executed. Save a governed plan if the proposed change should enter approval.'
         : canExecuteScenario
@@ -70,12 +78,14 @@ export default function ScenarioDecisionConsole({ scenario, title, emptyMessage,
     || scenarioActorRole !== approvalRole
     || !signedInRoles.includes(approvalRole)
     || !hasWarehouseScope(signedInWarehouseScopes, scenario.warehouseCode)
+    || !approvalAssignmentMatches
   const rejectionDisabled = scenarioRejectionState.loadingId === scenario.id
     || !signedInSession
     || !scenarioReviewNote.trim()
     || scenarioActorRole !== rejectionRole
     || !signedInRoles.includes(rejectionRole)
     || !hasWarehouseScope(signedInWarehouseScopes, scenario.warehouseCode)
+    || !approvalAssignmentMatches
   const escalationDisabled = scenarioEscalationAckState.loadingId === scenario.id
     || !signedInSession
     || !scenarioReviewNote.trim()
@@ -88,9 +98,11 @@ export default function ScenarioDecisionConsole({ scenario, title, emptyMessage,
       ? 'Sign in before approving.'
       : scenarioActorRole !== approvalRole || !signedInRoles.includes(approvalRole)
         ? `Switch to an operator with ${formatCodeLabel(approvalRole)} authority.`
-        : !hasWarehouseScope(signedInWarehouseScopes, scenario.warehouseCode)
-          ? 'This operator does not have the required warehouse scope.'
-          : approvalNoteRequired && !scenarioReviewNote.trim()
+      : !hasWarehouseScope(signedInWarehouseScopes, scenario.warehouseCode)
+        ? 'This operator does not have the required warehouse scope.'
+        : !approvalAssignmentMatches
+          ? `This decision is assigned to ${assignedApprovalOwner}. Do not act from this session.`
+        : approvalNoteRequired && !scenarioReviewNote.trim()
             ? 'Add a decision note before approval.'
             : 'Approval action is available.'
   const rejectionBlocker = !canRejectScenario
@@ -101,6 +113,8 @@ export default function ScenarioDecisionConsole({ scenario, title, emptyMessage,
         ? `Switch to an operator with ${formatCodeLabel(rejectionRole)} authority.`
         : !hasWarehouseScope(signedInWarehouseScopes, scenario.warehouseCode)
           ? 'This operator does not have the required warehouse scope.'
+          : !approvalAssignmentMatches
+            ? `This decision is assigned to ${assignedApprovalOwner}. Do not act from this session.`
           : !scenarioReviewNote.trim()
             ? 'Add a decision note before rejection.'
             : 'Rejection action is available.'
