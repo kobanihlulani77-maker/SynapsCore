@@ -108,7 +108,13 @@ export default function ReplayPage({ context }) {
     snapshot.integrationConnectors,
   ])
 
-  const selectedConnector = selectedConnectorOverride || snapshotSelectedConnector
+  // Prefer a confirmed enabled connector when a queue refresh races the detail refresh.
+  // A stale disabled response must not keep a re-enabled replay lane blocked.
+  const selectedConnector = selectedConnectorOverride?.enabled
+    ? selectedConnectorOverride
+    : snapshotSelectedConnector?.enabled
+      ? snapshotSelectedConnector
+      : selectedConnectorOverride || snapshotSelectedConnector
   const replayBlockedByEligibility = Boolean(
     selectedRecord?.nextEligibleAt
       && Number.isFinite(Date.parse(selectedRecord.nextEligibleAt))
