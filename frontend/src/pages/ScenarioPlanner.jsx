@@ -68,6 +68,9 @@ export default function ScenarioPlannerPage({ context }) {
     : scenarioState.result
       ? 'Review preview evidence, compare alternatives if needed, then save for governance.'
       : 'Preview Scenario A before the plan moves toward approval.'
+  const previewBoundary = scenarioState.result
+    ? 'PREVIEW ONLY — NOT EXECUTABLE. Review projected impact, then save the plan if it should enter governance.'
+    : 'PREVIEW is analysis only. It never grants execution authority or bypasses approval.'
   const saveBlockedReason = !primaryContext.inputValid
     ? 'Scenario A inputs are incomplete.'
     : !scenarioPlanName.trim()
@@ -98,6 +101,11 @@ export default function ScenarioPlannerPage({ context }) {
               <h2>{scenarioPlanName.trim() || 'Define the scenario before governance.'}</h2>
             </div>
             <p>{plannerNextStep}</p>
+            <div className="workflow-action-card scenario-preview-boundary">
+              <span>Execution boundary</span>
+              <strong>PREVIEW IS NOT EXECUTABLE</strong>
+              <p>{previewBoundary}</p>
+            </div>
             {scenarioRevisionSource ? (
               <div className="revision-banner">
                 <span>Revision mode: saving will create revision {scenarioRevisionSource.revisionNumber} of {scenarioRevisionSource.title}.</span>

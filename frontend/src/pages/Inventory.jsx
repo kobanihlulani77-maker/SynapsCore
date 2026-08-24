@@ -1,3 +1,4 @@
+import { useState } from 'react'
 import DataGrid from '../components/DataGrid'
 import EmptyState from '../components/EmptyState'
 import Panel from '../components/Panel'
@@ -14,6 +15,11 @@ export default function InventoryPage({ context }) {
     highRiskInventory,
     fastMovingInventory,
     warehouseOptions,
+    signedInRoles,
+    signedInWarehouseScopes,
+    hasWarehouseScope,
+    fetchJson,
+    fetchSnapshot,
     formatCodeLabel,
     formatRelativeHours,
   } = context
@@ -53,6 +59,47 @@ export default function InventoryPage({ context }) {
         : snapshot.inventory.length
           ? 'Inventory lanes look stable inside the current workspace view.'
           : 'Inventory coverage is not available yet. Add stock data before treating the workspace as operationally covered.'
+  const canMaintainSelectedInventory = Boolean(
+    selectedInventoryItem
+      && signedInRoles.includes('TENANT_ADMIN')
+      && hasWarehouseScope(signedInWarehouseScopes, selectedInventoryItem.warehouseCode),
+  )
+  const [adjustmentDelta, setAdjustmentDelta] = useState('')
+  const [adjustmentReason, setAdjustmentReason] = useState('')
+  const [inventoryActionState, setInventoryActionState] = useState({ loading: false, error: '', success: '' })
+
+  const submitInventoryAdjustment = async (event) => {
+    event.preventDefault()
+    if (!selectedInventoryItem || !canMaintainSelectedInventory || !fetchJson) {
+      return
+    }
+
+    const quantityDelta = Number(adjustmentDelta)
+    if (!Number.isInteger(quantityDelta) || quantityDelta === 0 || !adjustmentReason.trim()) {
+      setInventoryActionState({ loading: false, error: 'Enter a non-zero whole-unit adjustment and a reason before submitting.', success: '' })
+      return
+    }
+
+    setInventoryActionState({ loading: true, error: '', success: '' })
+    try {
+      await fetchJson('/api/inventory/adjust', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          productSku: selectedInventoryItem.productSku,
+          warehouseCode: selectedInventoryItem.warehouseCode,
+          quantityDelta,
+          reason: adjustmentReason.trim(),
+        }),
+      })
+      setAdjustmentDelta('')
+      setAdjustmentReason('')
+      setInventoryActionState({ loading: false, error: '', success: 'Inventory adjustment accepted. Refreshing the selected warehouse lane for readback.' })
+      await fetchSnapshot?.()
+    } catch (error) {
+      setInventoryActionState({ loading: false, error: error.message || 'Inventory adjustment was not accepted.', success: '' })
+    }
+  }
 
   return (
     <section className="content-grid inventory-intelligence-grid">
@@ -173,15 +220,41 @@ export default function InventoryPage({ context }) {
                   <div><span>Stockout</span><strong>{formatRelativeHours(selectedInventoryItem.hoursToStockout)}</strong></div>
                 </div>
                 <p className="muted-text">
-                  This lane shows the product, warehouse, available quantity, and forecasted risk window. Inventory adjustment remains in the company's source stock-control system during pilot use.
+                  This lane shows the product, warehouse, available quantity, and forecasted risk window. SynapseCore observations do not replace the source system as the authoritative stock record during the pilot.
                 </p>
                 <div className="workflow-action-band">
                   <div>
-                    <strong>{selectedInventoryItem.lowStock ? 'Review replenishment or source-system correction' : 'Monitor inventory posture'}</strong>
-                    <p>Use SynapseCore to identify risk and related operating pressure; do not treat this page as direct stock-adjustment authority.</p>
+                    <strong>{canMaintainSelectedInventory ? 'Controlled tenant-admin maintenance is available' : 'Review posture; maintenance is not available here'}</strong>
+                    <p>{canMaintainSelectedInventory
+                      ? 'Use a reasoned adjustment only for an approved warehouse-scoped correction. Verify the readback and reconcile with the source system afterward.'
+                      : 'This role can inspect inventory evidence, but only a warehouse-scoped TENANT_ADMIN may use the supported maintenance action.'}</p>
                   </div>
                   <button className="ghost-button" onClick={() => setSelectedInventoryId(selectedInventoryItem.id)} type="button">Keep Selected</button>
                 </div>
+                {canMaintainSelectedInventory ? (
+                  <form className="inventory-maintenance-panel" onSubmit={submitInventoryAdjustment}>
+                    <div className="stack-title-row">
+                      <strong>Controlled inventory maintenance</strong>
+                      <span className="scenario-type-tag">TENANT_ADMIN</span>
+                    </div>
+                    <p className="muted-text">Warehouse {selectedInventoryItem.warehouseCode} | Before {selectedInventoryItem.quantityAvailable}. This changes the SynapseCore inventory record; source reconciliation remains a separate responsibility.</p>
+                    <div className="session-control-row">
+                      <label className="field">
+                        <span>Quantity delta</span>
+                        <input type="number" step="1" value={adjustmentDelta} onChange={(event) => setAdjustmentDelta(event.target.value)} placeholder="e.g. -2" />
+                      </label>
+                      <label className="field">
+                        <span>Reason</span>
+                        <input type="text" maxLength="320" value={adjustmentReason} onChange={(event) => setAdjustmentReason(event.target.value)} placeholder="Cycle count correction" />
+                      </label>
+                    </div>
+                    {inventoryActionState.error ? <p className="error-text">{inventoryActionState.error}</p> : null}
+                    {inventoryActionState.success ? <p className="success-text">{inventoryActionState.success}</p> : null}
+                    <button className="secondary-button" type="submit" disabled={inventoryActionState.loading}>
+                      {inventoryActionState.loading ? 'Applying...' : 'Apply controlled adjustment'}
+                    </button>
+                  </form>
+                ) : null}
               </div>
             ) : (
               <EmptyState>

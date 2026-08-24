@@ -48,12 +48,14 @@ export default function ScenarioDecisionConsole({ scenario, title, emptyMessage,
   const canLoadScenario = Boolean(scenario.loadable)
   const canApproveScenario = scenario.type === 'SAVED_PLAN' && scenario.approvalStatus === 'PENDING_APPROVAL'
   const canRejectScenario = scenario.type === 'SAVED_PLAN' && scenario.approvalStatus === 'PENDING_APPROVAL'
-  const canExecuteScenario = Boolean(scenario.executable)
+  const canExecuteScenario = scenario.type !== 'PREVIEW' && Boolean(scenario.executable)
     && (signedInRoles.includes('REVIEW_OWNER') || signedInRoles.includes('FINAL_APPROVER'))
   const canAcknowledgeEscalation = Boolean(scenario.slaEscalated && !scenario.slaAcknowledged)
   const actionStateSummary = canApproveScenario
     ? `${approvalActionLabel} needs ${formatCodeLabel(approvalRole)} authority${approvalNoteRequired ? ' and a decision note' : ''}.`
-    : canExecuteScenario
+      : scenario.type === 'PREVIEW'
+        ? 'PREVIEW is analysis only and cannot be executed. Save a governed plan if the proposed change should enter approval.'
+        : canExecuteScenario
       ? 'Execute Scenario moves an approved plan into the supported live execution path.'
       : canRejectScenario
         ? `Reject Plan needs ${formatCodeLabel(rejectionRole)} authority and a decision note.`
@@ -146,7 +148,9 @@ export default function ScenarioDecisionConsole({ scenario, title, emptyMessage,
         <p>
           {scenario.approvalStatus === 'PENDING_APPROVAL'
             ? 'Approval moves the plan forward under its policy; rejection prevents this saved plan version from proceeding.'
-            : scenario.executable
+            : scenario.type === 'PREVIEW'
+              ? 'Preview output is evidence for analysis only. Execution requires a saved, approved governed state.'
+              : scenario.executable
               ? 'Execution is separate from approval and should be used only when the operator is ready to apply the approved plan.'
               : 'This surface keeps the decision evidence visible even when no action is currently available.'}
         </p>
@@ -212,7 +216,9 @@ export default function ScenarioDecisionConsole({ scenario, title, emptyMessage,
         {escalationBlocker ? <p className={escalationDisabled ? 'muted-text' : 'success-text'}>{escalationBlocker}</p> : null}
       </div>
       {!canLoadScenario && !canApproveScenario && !canRejectScenario && !canExecuteScenario && !canAcknowledgeEscalation ? (
-        <p className="muted-text">This scenario is visible for traceability and comparison, but it does not need another live action right now.</p>
+        <p className="muted-text">{scenario.type === 'PREVIEW'
+          ? 'This preview is visible for analysis only. It must be saved and governed before any execution path exists.'
+          : 'This scenario is visible for traceability and comparison, but it does not need another live action right now.'}</p>
       ) : null}
     </article>
   )

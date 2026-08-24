@@ -12,6 +12,7 @@ export default function OrdersPage({ context }) {
     setSelectedOrderId,
     summary,
     warehouseOptions,
+    signedInRoles,
     currency,
     formatCodeLabel,
     formatRelativeHours,
@@ -170,10 +171,11 @@ export default function OrdersPage({ context }) {
                     ? `Dispatch due ${formatRelativeHours(selectedOrder.relatedFulfillment.hoursUntilDispatchDue)} | Delivery due ${formatRelativeHours(selectedOrder.relatedFulfillment.hoursUntilDeliveryDue)}`
                     : 'This order is visible in the workspace and still waiting for downstream fulfillment linkage.'}
                 </p>
+                <p className="muted-text">Source relationship: SynapseCore observation only. Source-authoritative or reconciled state is not claimed unless the supporting evidence is reported.</p>
                 <div className="workflow-action-band">
                   <div>
                     <strong>{selectedOrder.relatedFulfillment?.fulfillmentStatus === 'DELAYED' ? 'Inspect delayed fulfillment evidence' : 'Inspect order context'}</strong>
-                    <p>SynapseCore does not edit or cancel orders here. Use this lane to understand status, timing, warehouse context, and whether related recovery evidence is needed.</p>
+                    <p>Use this lane to understand status, timing, warehouse context, and whether related recovery evidence is needed. Direct order/fulfillment mutations remain with the supported integration roles and backend authority.</p>
                   </div>
                   <button className="ghost-button" onClick={() => setSelectedOrderId(selectedOrder.id)} type="button">Keep Selected</button>
                 </div>
@@ -221,7 +223,7 @@ export default function OrdersPage({ context }) {
               </div>
               <div className="signal-list-item">
                 <strong>What this page should do</strong>
-                <p>Give operators one fast place to understand live order movement, warehouse concentration, and fulfillment risk without opening a separate admin tool.</p>
+                <p>Give operators one fast place to understand live order movement, warehouse concentration, and fulfillment risk without opening a separate admin tool. Current role: {signedInRoles.length ? signedInRoles.map((role) => formatCodeLabel(role)).join(', ') : 'Unknown'}.</p>
               </div>
             </div>
           </article>

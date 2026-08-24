@@ -358,8 +358,16 @@ export default function ReplayPage({ context }) {
                 </p>
               </div>
               <div className="signal-list-item">
+                <strong>Replay decision rule</strong>
+                <p>Inspect the failure, confirm the connector correction, check eligibility and warehouse attribution, then replay once. When cause or duplicate safety is unknown, do not replay.</p>
+              </div>
+              <div className="signal-list-item">
+                <strong>After a successful replay</strong>
+                <p>HTTP success is not the end of recovery. Verify the expected order effect, no duplicate, queue state, and the next available activity or source-system evidence.</p>
+              </div>
+              <div className="signal-list-item">
                 <strong>What this page should do</strong>
-                <p>Show why inbound work failed, whether it is safe to replay now, and how connector health affects recovery without pushing teams into hidden scripts.</p>
+                <p>Show why inbound work failed, whether it is safe to replay now, and how connector health affects recovery without pushing teams into hidden scripts. Warehouse attribution remains unknown when the backend cannot establish it.</p>
               </div>
             </div>
           </article>

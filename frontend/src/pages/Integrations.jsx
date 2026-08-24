@@ -89,6 +89,12 @@ export default function IntegrationsPage({ context }) {
     .sort((left, right) => getConnectorAttentionScore(right) - getConnectorAttentionScore(left))
     .slice(0, 6)
   const selectedConnector = connectorPortfolio.find((connector) => connector.id === selectedIntegrationConnectorId) || connectorSpotlights[0]
+  const connectorType = selectedConnector?.type?.toUpperCase() || ''
+  const selectedConnectorLimitation = selectedConnector?.healthStatus === 'OFFLINE' && connectorType.includes('WEBHOOK')
+    ? 'Disabled-webhook replay/readback is not fully proven. Do not assume a disabled webhook can be recovered through the same evidence lane as CSV failed-inbound recovery.'
+    : selectedConnector && (connectorType.includes('CSV') || connectorType.includes('FILE'))
+      ? 'CSV failed-inbound recovery is the proven pilot recovery lane. Confirm the source correction and duplicate safety before replay.'
+      : ''
 
   const formatReplayAge = (ageSeconds) => {
     if (ageSeconds == null) {
@@ -224,13 +230,14 @@ export default function IntegrationsPage({ context }) {
                   {selectedConnector.lastPullStatus ? ` | Pull ${formatCodeLabel(selectedConnector.lastPullStatus)}` : ''}
                 </p>
                 {selectedConnector.supportedSyncModes?.length ? <p className="muted-text">Supported sync modes {supportedModeLabel(selectedConnector)}</p> : null}
-                {selectedConnector.lastFailureMessage ? (
+                  {selectedConnector.lastFailureMessage ? (
                   <p className="muted-text">
                     Latest failure {selectedConnector.lastFailureCode ? formatCodeLabel(selectedConnector.lastFailureCode) : 'Unknown'}
                     {selectedConnector.lastFailureAt ? ` | ${formatTimestamp(selectedConnector.lastFailureAt)}` : ''}
                     {` | ${selectedConnector.lastFailureMessage}`}
                   </p>
-                ) : null}
+                  ) : null}
+                {selectedConnectorLimitation ? <p className="muted-text">Pilot recovery boundary: {selectedConnectorLimitation}</p> : null}
                 {selectedConnector.oldestPendingReplayAgeSeconds != null ? (
                   <p className="muted-text">
                     Oldest replay waiting {formatReplayAge(selectedConnector.oldestPendingReplayAgeSeconds)}
@@ -257,7 +264,8 @@ export default function IntegrationsPage({ context }) {
               <div><span>Fallback on</span><strong>{fallbackEnabledCount}</strong></div>
               <div><span>Support incidents</span><strong>{systemIncidents.length}</strong></div>
             </div>
-            <p className="muted-text">Connector operations should make it obvious which company system lanes are trusted, which ones are limited, and where recovery posture is currently fragile.</p>
+                <p className="muted-text">Connector operations should make it obvious which company system lanes are trusted, which ones are limited, and where recovery posture is currently fragile.</p>
+            {selectedConnectorLimitation ? <p className="muted-text">This limitation is shown because the selected connector state makes it operationally relevant; it does not change backend eligibility.</p> : null}
           </article>
         </div>
 

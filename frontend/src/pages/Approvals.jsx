@@ -16,6 +16,9 @@ export default function ApprovalsPage({ context }) {
     formatTimestamp,
     snapshot,
     scenarioDecisionContext,
+    signedInSession,
+    signedInWarehouseScopes,
+    hasWarehouseScope,
   } = context
 
   if (!isAuthenticated || !isApprovalsPage) return null
@@ -38,6 +41,21 @@ export default function ApprovalsPage({ context }) {
           : selectedApprovalScenario.approvalStatus === 'PENDING_APPROVAL'
             ? 'Approval can move this saved plan toward execution eligibility. Rejection prevents this version from proceeding.'
             : 'This item is visible for decision history and traceability.'
+  const selectedAssignment = selectedApprovalScenario
+    ? selectedApprovalScenario.approvalStage === 'PENDING_FINAL_APPROVAL'
+      ? selectedApprovalScenario.finalApprovalOwner
+      : selectedApprovalScenario.reviewOwner
+    : null
+  const assignmentLabel = !selectedApprovalScenario
+    ? 'Waiting'
+    : !selectedAssignment
+      ? 'Assignment not reported'
+      : signedInSession?.actorName && selectedAssignment.toLowerCase() === signedInSession.actorName.toLowerCase()
+        ? 'Assigned to you'
+        : 'Not assigned to you'
+  const selectedWarehouseScope = selectedApprovalScenario?.warehouseCode
+    ? (hasWarehouseScope(signedInWarehouseScopes, selectedApprovalScenario.warehouseCode) ? 'Warehouse scope available' : 'Warehouse scope not available')
+    : 'Tenant-wide scope'
 
   return (
     <section className="content-grid approvals-center-grid">
@@ -64,6 +82,7 @@ export default function ApprovalsPage({ context }) {
               <span className="workspace-meta-pill">Pending {pendingApprovalScenarios.length}</span>
               <span className="workspace-meta-pill">Overdue {overdueScenarios.length}</span>
               <span className="workspace-meta-pill">Selected {selectedDecisionState}</span>
+              <span className="workspace-meta-pill">{assignmentLabel}</span>
             </div>
           </div>
           <div className="workflow-action-console">
@@ -153,6 +172,7 @@ export default function ApprovalsPage({ context }) {
                   <p className="muted-text">Requester {selectedApprovalScenario.requestedBy || 'Unknown'}{selectedApprovalScenario.reviewOwner ? ` | Review owner ${selectedApprovalScenario.reviewOwner}` : ''}</p>
                   <p className="muted-text">Final approver {selectedApprovalScenario.finalApprovalOwner || 'Not assigned'}{selectedApprovalScenario.approvalDueAt ? ` | Due ${formatTimestamp(selectedApprovalScenario.approvalDueAt)}` : ''}</p>
                   <p className="muted-text">Approval {formatCodeLabel(selectedApprovalScenario.approvalStatus)}{selectedApprovalScenario.approvalPolicy ? ` | Policy ${formatCodeLabel(selectedApprovalScenario.approvalPolicy)}` : ''}{selectedApprovalScenario.reviewPriority ? ` | ${formatCodeLabel(selectedApprovalScenario.reviewPriority)} priority` : ''}</p>
+                  <p className="muted-text">Assignment {assignmentLabel} | {selectedWarehouseScope}</p>
                   {selectedApprovalScenario.overdue ? <p className="error-text">This approval lane has breached its expected decision timing.</p> : null}
                 </div>
               </div>
