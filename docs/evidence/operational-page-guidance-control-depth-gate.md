@@ -36,7 +36,7 @@ scope, loading, recovery, and supported boundaries.
 
 ## Deployment And Proof Evidence
 
-- Repository HEAD: `9e5de98e7f938ef5b762fc98f0da81929246aac7`
+- Frontend source revision deployed: `9e5de98e7f938ef5b762fc98f0da81929246aac7`
 - Served assets: `index-BwUmB85M.js` and `index-Cn-HwJCA.css`
 - Backend outage blocker: **CLEARED**
 - Live classification: `FRONTEND_UP=True`, `BACKEND_UP=True`, `DB_READY=True`,

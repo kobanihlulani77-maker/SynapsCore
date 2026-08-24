@@ -19,7 +19,7 @@ work was started during this verification.
 
 ## Deployment And Proof Baseline
 
-- Repository HEAD: `9e5de98e7f938ef5b762fc98f0da81929246aac7`
+- Frontend source revision deployed: `9e5de98e7f938ef5b762fc98f0da81929246aac7`
 - Served frontend assets observed: `index-BwUmB85M.js` and `index-Cn-HwJCA.css`
 - The served asset confirms a new frontend deployment, but the runtime does
   not expose an exact source commit, so the asset and repository revision are
