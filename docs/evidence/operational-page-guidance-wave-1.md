@@ -103,3 +103,10 @@ The remaining repository checks are recorded at closure time below rather than i
 ## Readiness
 
 Wave 1 is ready for its focused validation and review. Wave 2 is not started by this change. Final acceptance remains dependent on the complete check set and any required rendered/live verification being run and recorded truthfully.
+
+## Repository Closure
+
+- Implementation commit: `440579994f720397dc45aca43dda72df9f2f0a17`
+- Push result: pushed to `origin/main`
+- Local HEAD and `origin/main`: matched at the implementation commit before this evidence closure update
+- Final working tree after the focused commit: unrelated pre-existing `frontend/Dockerfile` modification and untracked `.gitattributes` remain unstaged; no Wave 1 files remain unstaged.
