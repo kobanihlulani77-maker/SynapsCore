@@ -118,11 +118,11 @@ export const createScenarioForm = (productSku = '') => ({
 export const buildWarehouseOptions = (inventory = [], configuredWarehouses = [], scopedWarehouseCodes = []) => {
   const options = new Map()
   inventory.forEach((item) => {
-    const code = item.warehouseCode?.trim()
+    const code = String(item.warehouseCode || '').trim()
     if (code) options.set(code.toUpperCase(), { code, name: item.warehouseName || code })
   })
   configuredWarehouses.forEach((warehouse) => {
-    const code = warehouse.code?.trim()
+    const code = String(warehouse.code || '').trim()
     if (code) options.set(code.toUpperCase(), { code, name: warehouse.name || code })
   })
   scopedWarehouseCodes.forEach((warehouseCode) => {
@@ -135,7 +135,7 @@ export const buildWarehouseOptions = (inventory = [], configuredWarehouses = [],
 export const buildProductOptions = (inventory, warehouseCode) => [
   ...new Map(
     inventory
-      .filter((item) => item.warehouseCode === warehouseCode)
+      .filter((item) => String(item.warehouseCode || '').trim().toUpperCase() === String(warehouseCode || '').trim().toUpperCase())
       .map((item) => [item.productSku, {
         sku: item.productSku,
         name: item.productName,

@@ -91,7 +91,10 @@ export default function useWorkspaceState({ initialPage }) {
   function normalizeScenarioForm(currentForm, inventory) {
     if (!inventory.length) return currentForm
     const warehouseOptions = buildWarehouseOptions(inventory)
-    const nextWarehouseCode = currentForm.warehouseCode || warehouseOptions[0]?.code || ''
+    const currentProductOptions = buildProductOptions(inventory, currentForm.warehouseCode)
+    const nextWarehouseCode = currentProductOptions.length
+      ? currentForm.warehouseCode
+      : warehouseOptions.find((warehouse) => buildProductOptions(inventory, warehouse.code).length)?.code || warehouseOptions[0]?.code || ''
     const productOptions = buildProductOptions(inventory, nextWarehouseCode)
     const fallbackSku = productOptions[0]?.sku || ''
     const currentItems = currentForm.items.length ? currentForm.items : [createScenarioLine(fallbackSku)]
