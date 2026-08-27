@@ -19,8 +19,10 @@ import {
   getScenarioApprovalRole,
   getScenarioRejectionRole,
   hasWarehouseScope,
+  hasExplicitWarehouseScope,
   integrationTransformationPolicies,
   integrationValidationPolicies,
+  isBootstrapTenantAdmin,
   summarizeImpact,
 } from '../config/workspaceModel'
 
@@ -214,7 +216,8 @@ export default function useWorkspacePageContexts({
   const reviewOwnerOperators = scenarioWarehouseCode
     ? operators.filter((operator) => operator.active !== false
       && operator.roles.includes('REVIEW_OWNER')
-      && hasWarehouseScope(operator.warehouseScopes, scenarioWarehouseCode)
+      && hasExplicitWarehouseScope(operator.warehouseScopes, scenarioWarehouseCode)
+      && !isBootstrapTenantAdmin(operator)
       && operator.actorName?.toLowerCase() !== signedInSession?.actorName?.toLowerCase())
     : []
 

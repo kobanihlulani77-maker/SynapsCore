@@ -40,7 +40,13 @@ export const currency = new Intl.NumberFormat('en-US', {
 })
 
 export const defaultScenarioRequester = 'Operations Planner'
-export const defaultScenarioReviewOwner = 'Operations Lead'
+export const defaultScenarioReviewOwner = ''
+
+export const isBootstrapTenantAdmin = (operator) => (
+  operator?.roles?.includes('TENANT_ADMIN')
+  && typeof operator.description === 'string'
+  && operator.description.toLowerCase().startsWith('bootstrap tenant admin for ')
+)
 
 export const defaultTenantOnboardingForm = {
   tenantCode: '',
@@ -221,6 +227,12 @@ export const hasWarehouseScope = (warehouseScopes, warehouseCode) => (
   !warehouseCode
   || !(warehouseScopes?.length)
   || warehouseScopes.some((scope) => String(scope).trim().toUpperCase() === warehouseCode.trim().toUpperCase())
+)
+
+export const hasExplicitWarehouseScope = (warehouseScopes, warehouseCode) => (
+  Boolean(warehouseCode)
+  && Boolean(warehouseScopes?.length)
+  && warehouseScopes.some((scope) => String(scope).trim().toUpperCase() === warehouseCode.trim().toUpperCase())
 )
 
 export const buildAccessOperatorsPath = (tenantCode) => (

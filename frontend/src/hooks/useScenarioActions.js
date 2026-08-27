@@ -114,7 +114,7 @@ export default function useScenarioActions({
         setScenarioRevisionSource(null)
         setScenarioPlanName(payload.scenarioTitle)
       }
-      setScenarioRequestedBy(sourceScenario?.requestedBy || defaultScenarioRequester)
+      setScenarioRequestedBy(authSessionState.session?.actorName || '')
       setScenarioReviewOwner(sourceScenario?.reviewOwner || defaultScenarioReviewOwner)
       setScenarioState(emptyRequestState)
       setScenarioLoadState({
@@ -135,7 +135,7 @@ export default function useScenarioActions({
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           title: scenarioPlanName.trim(),
-          requestedBy: authSessionState.session?.actorName || scenarioRequestedBy.trim(),
+          requestedBy: authSessionState.session?.actorName || null,
           reviewOwner: scenarioReviewOwner.trim(),
           revisionOfScenarioRunId: scenarioRevisionSource?.id ?? null,
           request: { warehouseCode: scenarioForm.warehouseCode, items: primaryContext.requestItems },

@@ -34,6 +34,8 @@ export default function useWorkspaceBootstrap({
   hasActiveScenarioHistoryFilters,
   resolvePreferredOperatorName,
   hasWarehouseScope,
+  hasExplicitWarehouseScope,
+  isBootstrapTenantAdmin,
   operatorDirectoryState,
   catalogStateSetter,
   selectedCatalogProductIdSetter,
@@ -441,6 +443,8 @@ export default function useWorkspaceBootstrap({
       : []
     const reviewOwnerOptions = availableOperators.filter((operator) => (
       operator.roles.includes('REVIEW_OWNER')
+      && hasExplicitWarehouseScope(operator.warehouseScopes, scenarioWarehouseCode)
+      && !isBootstrapTenantAdmin(operator)
       && operator.actorName?.toLowerCase() !== authSessionState.session?.actorName?.toLowerCase()
     ))
 

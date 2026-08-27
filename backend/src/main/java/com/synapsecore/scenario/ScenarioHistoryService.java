@@ -3,6 +3,7 @@ package com.synapsecore.scenario;
 import com.synapsecore.access.AccessControlService;
 import com.synapsecore.access.AccessDirectoryService;
 import com.synapsecore.access.SynapseAccessRole;
+import com.synapsecore.access.dto.AccessOperatorResponse;
 import com.synapsecore.domain.entity.ScenarioRun;
 import com.synapsecore.domain.entity.ScenarioRunType;
 import com.synapsecore.domain.entity.ScenarioApprovalStatus;
@@ -742,12 +743,19 @@ public class ScenarioHistoryService {
                 warehouseCode
             );
         }
-        return accessDirectoryService.requireOperatorWithRoleName(
+        String resolvedReviewOwner = accessDirectoryService.requireOperatorWithRoleName(
             reviewOwner.trim(),
             policy.getReviewOwnerRole(),
             "review owner",
             warehouseCode
         );
+        if (policy.getReviewOwnerRole() == SynapseAccessRole.REVIEW_OWNER
+            && (!hasExplicitWarehouseScope(resolvedReviewOwner, warehouseCode)
+                || isBootstrapTenantAdmin(resolvedReviewOwner))) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                "Review owner must be an explicitly assigned reviewer for the selected warehouse.");
+        }
+        return resolvedReviewOwner;
     }
 
     private String resolveFinalApprovalOwner(String warehouseCode, String reviewOwner) {
@@ -776,6 +784,12 @@ public class ScenarioHistoryService {
         String normalizedWarehouseCode = warehouseCode == null ? null : warehouseCode.trim().toUpperCase();
         List<com.synapsecore.access.dto.AccessOperatorResponse> availableOperators = accessDirectoryService.getActiveOperators(tenantCode).stream()
             .filter(operator -> requiredRole == null || operator.roles().contains(requiredRole))
+            .filter(operator -> requiredRole != SynapseAccessRole.REVIEW_OWNER
+                || (normalizedWarehouseCode != null
+                    && !normalizedWarehouseCode.isBlank()
+                    && !isBootstrapTenantAdmin(operator)
+                    && operator.warehouseScopes().stream()
+                        .anyMatch(scope -> scope.equalsIgnoreCase(normalizedWarehouseCode))))
             .filter(operator -> normalizedWarehouseCode == null || normalizedWarehouseCode.isBlank()
                 || operator.warehouseScopes().isEmpty()
                 || operator.warehouseScopes().stream()
@@ -810,6 +824,37 @@ public class ScenarioHistoryService {
                 HttpStatus.BAD_REQUEST,
                 "No active " + fieldLabel + " is available in tenant " + tenantCode + "."
             ));
+    }
+
+    private boolean isBootstrapTenantAdmin(String actorName) {
+        String tenantCode = tenantContextService.getCurrentTenantCodeOrDefault();
+        return accessDirectoryService.getActiveOperators(tenantCode).stream()
+            .filter(operator -> operator.actorName().equalsIgnoreCase(actorName))
+            .anyMatch(this::isBootstrapTenantAdmin);
+    }
+
+    private boolean hasExplicitWarehouseScope(String actorName, String warehouseCode) {
+        String normalizedWarehouseCode = warehouseCode == null ? "" : warehouseCode.trim();
+        if (normalizedWarehouseCode.isBlank()) {
+            return false;
+        }
+        String tenantCode = tenantContextService.getCurrentTenantCodeOrDefault();
+        return accessDirectoryService.getActiveOperators(tenantCode).stream()
+            .filter(operator -> operator.actorName().equalsIgnoreCase(actorName))
+            .anyMatch(operator -> operator.warehouseScopes().stream()
+                .anyMatch(scope -> scope.equalsIgnoreCase(normalizedWarehouseCode)));
+    }
+
+    private boolean isBootstrapTenantAdmin(AccessOperatorResponse operator) {
+        return operator.roles().contains(SynapseAccessRole.TENANT_ADMIN)
+            && operator.description() != null
+            && operator.description().regionMatches(
+                true,
+                0,
+                "Bootstrap tenant admin for ",
+                0,
+                "Bootstrap tenant admin for ".length()
+            );
     }
 
     private void requireWarehouseAccess(String actorName, String warehouseCode, String actionDescription) {

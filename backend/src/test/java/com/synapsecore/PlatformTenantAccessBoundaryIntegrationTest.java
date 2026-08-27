@@ -116,6 +116,8 @@ class PlatformTenantAccessBoundaryIntegrationTest {
         createRoleUser(admin, "boundary.tenant.admin", "TENANT_ADMIN", List.of());
         createRoleUser(admin, "boundary.review", "REVIEW_OWNER", List.of(warehouseA));
         createRoleUser(admin, "boundary.review.alt", "REVIEW_OWNER", List.of(warehouseA));
+        createRoleUser(admin, "boundary.review.global", "REVIEW_OWNER", List.of());
+        createRoleUser(admin, "boundary.review.b", "REVIEW_OWNER", List.of(warehouseB));
         createRoleUser(admin, "boundary.final", "FINAL_APPROVER", List.of(warehouseA));
         createRoleUser(admin, "boundary.final.alt", "FINAL_APPROVER", List.of(warehouseA));
         createRoleUser(admin, "boundary.escalation", "ESCALATION_OWNER", List.of(warehouseA));
@@ -783,8 +785,7 @@ class PlatformTenantAccessBoundaryIntegrationTest {
             .getId();
         mockMvc.perform(get("/api/scenarios/history").session(scopedOperator))
             .andExpect(status().isOk())
-            .andExpect(content().string(org.hamcrest.Matchers.not(
-                org.hamcrest.Matchers.containsString("\"id\":" + warehouseBScenarioId))));
+            .andExpect(jsonPath("$[?(@.id == " + warehouseBScenarioId + ")]").doesNotExist());
         mockMvc.perform(post("/api/scenarios/" + warehouseBScenarioId + "/execute")
                 .session(scopedOperator))
             .andExpect(status().isForbidden());
@@ -967,6 +968,76 @@ class PlatformTenantAccessBoundaryIntegrationTest {
         assertRequesterSpoofRejected(requester, "Wrong-warehouse requester spoof", "boundary.requester.b", warehouseA);
         assertRequesterSpoofRejected(requester, "Cross-tenant requester spoof", "isolation.admin", warehouseA);
         assertRequesterSpoofRejected(requester, "Inactive requester spoof", "boundary.inactive", warehouseA);
+    }
+
+    @Test
+    void scenarioReviewOwnerAssignmentUsesExplicitWarehouseEligibleReviewers() throws Exception {
+        MockHttpSession tenantAdmin = tenantLogin(REHEARSAL_TENANT, "boundary.tenant.admin", ROLE_PASSWORD);
+
+        mockMvc.perform(post("/api/scenarios/save")
+                .session(tenantAdmin)
+                .contentType(APPLICATION_JSON)
+                .content(scenarioSavePayload(
+                    "Bootstrap reviewer target must fail",
+                    "boundary.tenant.admin",
+                    "Operations Lead",
+                    warehouseA)))
+            .andExpect(status().isBadRequest())
+            .andExpect(jsonPath("$.message").value(org.hamcrest.Matchers.containsString(
+                "explicitly assigned reviewer")));
+
+        mockMvc.perform(post("/api/scenarios/save")
+                .session(tenantAdmin)
+                .contentType(APPLICATION_JSON)
+                .content(scenarioSavePayload(
+                    "Tenant-wide reviewer target must fail",
+                    "boundary.tenant.admin",
+                    "boundary.review.global",
+                    warehouseA)))
+            .andExpect(status().isBadRequest())
+            .andExpect(jsonPath("$.message").value(org.hamcrest.Matchers.containsString(
+                "explicitly assigned reviewer")));
+
+        mockMvc.perform(post("/api/scenarios/save")
+                .session(tenantAdmin)
+                .contentType(APPLICATION_JSON)
+                .content(scenarioSavePayload(
+                    "Wrong warehouse reviewer must fail",
+                    "boundary.tenant.admin",
+                    "boundary.review.b",
+                    warehouseA)))
+            .andExpect(status().isForbidden());
+
+        mockMvc.perform(post("/api/scenarios/save")
+                .session(tenantAdmin)
+                .contentType(APPLICATION_JSON)
+                .content(scenarioSavePayload(
+                    "North explicit reviewer accepted",
+                    "boundary.tenant.admin",
+                    "boundary.review",
+                    warehouseA)))
+            .andExpect(status().isCreated())
+            .andExpect(jsonPath("$.reviewOwner").value("boundary.review"));
+
+        mockMvc.perform(post("/api/scenarios/save")
+                .session(tenantAdmin)
+                .contentType(APPLICATION_JSON)
+                .content(scenarioSavePayload(
+                    "Coast explicit reviewer accepted",
+                    "boundary.tenant.admin",
+                    "boundary.review.b",
+                    warehouseB)))
+            .andExpect(status().isCreated())
+            .andExpect(jsonPath("$.reviewOwner").value("boundary.review.b"));
+
+        mockMvc.perform(post("/api/scenarios/save")
+                .session(tenantAdmin)
+                .contentType(APPLICATION_JSON)
+                .content("""
+                    {"title":"Coast automatic reviewer accepted","requestedBy":"boundary.tenant.admin","reviewOwner":"","request":{"warehouseCode":"%s","items":[{"productSku":"BOUNDARY-SKU","quantity":1,"unitPrice":10.00}]}}
+                    """.formatted(warehouseB)))
+            .andExpect(status().isCreated())
+            .andExpect(jsonPath("$.reviewOwner").value("boundary.review.b"));
     }
 
     private void assertRequesterSpoofRejected(MockHttpSession session,

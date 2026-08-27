@@ -87,7 +87,7 @@ public class AccessDirectoryService {
                 capitalize(fieldLabel) + " must be an active operator with role " + requiredRole + "."
             );
         }
-        requireWarehouseAccess(operator, warehouseCode, "act as " + fieldLabel);
+        requireWarehouseAccess(operator, warehouseCode, "be assigned as " + fieldLabel);
         return operator.getActorName();
     }
 

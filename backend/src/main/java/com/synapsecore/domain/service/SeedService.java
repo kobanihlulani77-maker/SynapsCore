@@ -142,24 +142,24 @@ public class SeedService {
             .build());
         var operators = accessOperatorRepository.saveAll(List.of(
             operator(tenant, "Operations Planner", "Operations Planner", "Default planning identity for scenario creation."),
-            operator(tenant, "Operations Lead", "Operations Lead", "Default owner reviewer for scenario approvals.",
-                SynapseAccessRole.TENANT_ADMIN, SynapseAccessRole.REVIEW_OWNER),
+            operator(tenant, "Operations Lead", "Operations Lead", "Bootstrap tenant admin for Starter Operations Workspace.",
+                SynapseAccessRole.TENANT_ADMIN),
             operator(tenant, "Operations Operator", "Operations Operator",
                 "General-purpose operator identity for local workspace walkthroughs."),
             operator(tenant, "Amina Planner", "Amina Planner", "Planning operator used in scenario exploration."),
             operator(tenant, "Lebo Planner", "Lebo Planner", "Planning operator used in scenario exploration."),
             operator(tenant, "Thando Planner", "Thando Planner", "Planning operator used in scenario exploration."),
             operator(tenant, "Ayo Planner", "Ayo Planner", "Cross-functional planner with owner-review capability.",
-                SynapseAccessRole.REVIEW_OWNER),
+                Set.of("WH-NORTH", "WH-COAST"), SynapseAccessRole.REVIEW_OWNER),
             operator(tenant, "Naledi Lead", "Naledi Lead",
-                "Senior operations reviewer who can also final-approve edge cases.",
-                SynapseAccessRole.REVIEW_OWNER, SynapseAccessRole.FINAL_APPROVER),
+                "Senior warehouse-scoped operations reviewer.",
+                Set.of("WH-NORTH", "WH-COAST"), SynapseAccessRole.REVIEW_OWNER),
             operator(tenant, "Jordan Lead", "Jordan Lead", "Operations lead for owner review routing.",
-                SynapseAccessRole.REVIEW_OWNER),
+                Set.of("WH-NORTH", "WH-COAST"), SynapseAccessRole.REVIEW_OWNER),
             operator(tenant, "Ops Director", "Ops Director", "Fallback owner reviewer for edge-case review.",
-                SynapseAccessRole.REVIEW_OWNER),
+                Set.of("WH-NORTH", "WH-COAST"), SynapseAccessRole.REVIEW_OWNER),
             operator(tenant, "Lebo Ops", "Lebo Ops", "Escalation handoff owner for urgent scenario queues.",
-                SynapseAccessRole.REVIEW_OWNER, SynapseAccessRole.ESCALATION_OWNER),
+                Set.of("WH-NORTH", "WH-COAST"), SynapseAccessRole.REVIEW_OWNER, SynapseAccessRole.ESCALATION_OWNER),
             operator(tenant, "North Operations Director", "North Operations Director",
                 "Final approver for north warehouse escalations.", Set.of("WH-NORTH"), SynapseAccessRole.FINAL_APPROVER),
             operator(tenant, "Coast Operations Director", "Coast Operations Director",
@@ -281,6 +281,34 @@ public class SeedService {
                 if (operator.getRoles() != null && operator.getRoles().add(SynapseAccessRole.TENANT_ADMIN)) {
                     changed = true;
                 }
+            }
+            if (defaultTenantOperator && "Operations Lead".equalsIgnoreCase(operator.getActorName())) {
+                if (operator.getRoles() != null && operator.getRoles().remove(SynapseAccessRole.REVIEW_OWNER)) {
+                    changed = true;
+                }
+                String bootstrapDescription = "Bootstrap tenant admin for " + tenant.getName() + ".";
+                if (!bootstrapDescription.equals(operator.getDescription())) {
+                    operator.setDescription(bootstrapDescription);
+                    changed = true;
+                }
+            }
+            if (defaultTenantOperator && "Naledi Lead".equalsIgnoreCase(operator.getActorName())
+                && operator.getRoles() != null) {
+                if (operator.getRoles().remove(SynapseAccessRole.FINAL_APPROVER)) {
+                    changed = true;
+                }
+                String reviewerDescription = "Senior warehouse-scoped operations reviewer.";
+                if (!reviewerDescription.equals(operator.getDescription())) {
+                    operator.setDescription(reviewerDescription);
+                    changed = true;
+                }
+            }
+            if (defaultTenantOperator
+                && Set.of("Ayo Planner", "Naledi Lead", "Jordan Lead", "Ops Director", "Lebo Ops")
+                    .stream().anyMatch(actorName -> actorName.equalsIgnoreCase(operator.getActorName()))
+                && (operator.getWarehouseScopes() == null || operator.getWarehouseScopes().isEmpty())) {
+                operator.setWarehouseScopes(Set.of("WH-NORTH", "WH-COAST"));
+                changed = true;
             }
             if (defaultTenantOperator
                 && "North Operations Director".equalsIgnoreCase(operator.getActorName())

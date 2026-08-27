@@ -1300,8 +1300,8 @@ class MvpFlowIntegrationTest {
                       "reason": "Hold until supplier ETA is confirmed."
                     }
                     """))
-            .andExpect(status().isBadRequest())
-            .andExpect(jsonPath("$.message").value(org.hamcrest.Matchers.containsString("requires actor role REVIEW_OWNER")));
+            .andExpect(status().isForbidden())
+            .andExpect(jsonPath("$.message").value(org.hamcrest.Matchers.containsString("cannot claim roles")));
 
         mockMvc.perform(post("/api/scenarios/" + savedPlanId + "/reject")
                 .with(accessHeaders("Naledi Lead", "REVIEW_OWNER"))
