@@ -173,7 +173,6 @@ export const getRuntimeStatusClassName = (status) => (['UP', 'CORRECT', 'ACCEPTI
 export const getIncidentStatusClassName = (severity) => (severity === 'CRITICAL' || severity === 'HIGH' ? 'status-failure' : 'status-partial')
 export const getFulfillmentStatusClassName = (status) => (status === 'DELIVERED' || status === 'DISPATCHED' ? 'status-success' : status === 'DELAYED' || status === 'EXCEPTION' ? 'status-failure' : 'status-partial')
 
-export const scenarioActorRoles = ['REVIEW_OWNER', 'FINAL_APPROVER', 'ESCALATION_OWNER']
 export const integrationActorRoles = ['INTEGRATION_ADMIN', 'INTEGRATION_OPERATOR']
 export const integrationValidationPolicies = ['STANDARD', 'STRICT', 'RELAXED']
 export const integrationTransformationPolicies = ['NONE', 'NORMALIZE_CODES']

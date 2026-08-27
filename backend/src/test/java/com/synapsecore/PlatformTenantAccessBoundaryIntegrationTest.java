@@ -922,6 +922,15 @@ class PlatformTenantAccessBoundaryIntegrationTest {
                     """))
             .andExpect(status().isBadRequest())
             .andExpect(jsonPath("$.message").value(org.hamcrest.Matchers.containsString("different from the requester")));
+
+        mockMvc.perform(post("/api/scenarios/" + historicalSelfReviewId + "/reject")
+                .session(reviewOwner)
+                .contentType(APPLICATION_JSON)
+                .content("""
+                    {"actorRole":"REVIEW_OWNER","reviewerName":"boundary.review","reason":"Self-review must fail"}
+                    """))
+            .andExpect(status().isBadRequest())
+            .andExpect(jsonPath("$.message").value(org.hamcrest.Matchers.containsString("different from the requester")));
     }
 
     private void createRoleUser(MockHttpSession admin,

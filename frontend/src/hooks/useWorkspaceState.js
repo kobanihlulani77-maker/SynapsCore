@@ -61,7 +61,6 @@ export default function useWorkspaceState({ initialPage }) {
   const [scenarioPlanName, setScenarioPlanName] = useState('')
   const [scenarioRequestedBy, setScenarioRequestedBy] = useState(defaultScenarioRequester)
   const [scenarioReviewOwner, setScenarioReviewOwner] = useState(defaultScenarioReviewOwner)
-  const [scenarioActorRole, setScenarioActorRole] = useState('REVIEW_OWNER')
   const [scenarioReviewNote, setScenarioReviewNote] = useState('')
   const [scenarioRevisionSource, setScenarioRevisionSource] = useState(null)
   const [scenarioState, setScenarioState] = useState(emptyRequestState)
@@ -240,8 +239,6 @@ export default function useWorkspaceState({ initialPage }) {
     setScenarioRequestedBy,
     scenarioReviewOwner,
     setScenarioReviewOwner,
-    scenarioActorRole,
-    setScenarioActorRole,
     scenarioReviewNote,
     setScenarioReviewNote,
     scenarioRevisionSource,

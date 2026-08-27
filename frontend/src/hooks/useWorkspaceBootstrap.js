@@ -57,9 +57,6 @@ export default function useWorkspaceBootstrap({
   scenarioRequestedBySetter,
   scenarioReviewOwner,
   scenarioReviewOwnerSetter,
-  scenarioActorRole,
-  scenarioActorRoleSetter,
-  scenarioActorRoles,
   integrationActorRole,
   integrationActorRoleSetter,
   integrationActorRoles,
@@ -467,19 +464,13 @@ export default function useWorkspaceBootstrap({
     const sessionRoles = authSessionState.session.roles ?? []
     scenarioRequestedBySetter(authSessionState.session.actorName)
 
-    if (!sessionRoles.includes(scenarioActorRole)) {
-      const fallbackScenarioRole = scenarioActorRoles.find((role) => sessionRoles.includes(role))
-      if (fallbackScenarioRole) {
-        scenarioActorRoleSetter(fallbackScenarioRole)
-      }
-    }
     if (!sessionRoles.includes(integrationActorRole)) {
       const fallbackIntegrationRole = integrationActorRoles.find((role) => sessionRoles.includes(role))
       if (fallbackIntegrationRole) {
         integrationActorRoleSetter(fallbackIntegrationRole)
       }
     }
-  }, [authSessionState.session, integrationActorRole, scenarioActorRole])
+  }, [authSessionState.session, integrationActorRole])
 
   useEffect(() => {
     let active = true

@@ -48,7 +48,6 @@ import {
   integrationActorRoles,
   parseCsvValues,
   resolvePreferredOperatorName,
-  scenarioActorRoles,
 } from '../config/workspaceModel'
 
 const readRememberedWorkspacePreference = () => readStoredJson(globalThis.localStorage, workspacePreferenceStorageKey, null)
@@ -123,8 +122,6 @@ export default function useWorkspaceAppModel() {
     setScenarioRequestedBy,
     scenarioReviewOwner,
     setScenarioReviewOwner,
-    scenarioActorRole,
-    setScenarioActorRole,
     scenarioRevisionSource,
     setScenarioRevisionSource,
     setScenarioState,
@@ -308,9 +305,6 @@ export default function useWorkspaceAppModel() {
     scenarioRequestedBySetter: setScenarioRequestedBy,
     scenarioReviewOwner,
     scenarioReviewOwnerSetter: setScenarioReviewOwner,
-    scenarioActorRole,
-    scenarioActorRoleSetter: setScenarioActorRole,
-    scenarioActorRoles,
     integrationActorRole,
     integrationActorRoleSetter: setIntegrationActorRole,
     integrationActorRoles,
@@ -416,7 +410,6 @@ export default function useWorkspaceAppModel() {
     primaryContext,
     refreshScenarioHistoryQuietly,
     refreshSnapshotQuietly,
-    scenarioActorRole,
     scenarioForm,
     scenarioHistoryItems,
     scenarioPlanName,
