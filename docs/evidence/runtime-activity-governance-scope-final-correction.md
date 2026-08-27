@@ -78,6 +78,7 @@ The browser must never be treated as the authority source. A hidden or disabled 
 ## Implemented Source Changes
 
 - Platform and tenant login paths are both treated as authentication boundaries by request tracing.
+- Failed platform login responses are not duplicated by the generic API rejection audit path; the platform session service remains the authoritative platform audit writer.
 - Tenant Activity filters platform sources, platform-session records, favicon/static-resource records, and scoped-operator 403 request denials.
 - Runtime excludes platform/static expected-denial noise from operational incident projection.
 - Incident responses carry additive warehouse attribution where the source has it.

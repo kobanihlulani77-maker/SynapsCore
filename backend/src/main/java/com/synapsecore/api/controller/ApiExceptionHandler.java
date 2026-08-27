@@ -274,7 +274,8 @@ public class ApiExceptionHandler {
         }
         return status == HttpStatus.UNAUTHORIZED
             && "POST".equalsIgnoreCase(request.getMethod())
-            && "/api/auth/session/login".equals(request.getRequestURI());
+            && ("/api/auth/session/login".equals(request.getRequestURI())
+                || "/api/platform/session/login".equals(request.getRequestURI()));
     }
 
     private boolean isClientAbort(Throwable exception) {
