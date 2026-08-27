@@ -243,10 +243,6 @@ test('BATCH 2 shell navigation search and shared controls execute', async ({ pag
     ['/users', 'Users and access control'],
     ['/company-settings', 'Tenant and workspace settings'],
     ['/profile', 'Personal profile and session controls'],
-    ['/platform-admin', 'Platform overview and cross-tenant trust'],
-    ['/tenant-management', 'Tenant onboarding and workspace rollout'],
-    ['/system-config', 'System configuration and operational defaults'],
-    ['/releases', 'Release, deployment, and environment'],
   ]
 
   for (const [route, heading] of routes) {
@@ -298,8 +294,7 @@ test('BATCH 3 dashboard runtime audit and operational read controls execute', as
   await page.locator('.content-grid').getByRole('button', { name: 'Open audit' }).first().click()
   await expect(page).toHaveURL(/\/audit-events$/)
   await page.goto('/runtime')
-  await page.locator('.content-grid').getByRole('button', { name: 'Open releases' }).first().click()
-  await expect(page).toHaveURL(/\/releases$/)
+  await expect(page.locator('.content-grid').getByRole('button', { name: 'Open releases' })).toHaveCount(0)
   await page.goto('/runtime')
   await clickFirstButtonIfPresent(page, '.signal-list-item.selectable-card')
 
@@ -398,9 +393,8 @@ test('BATCH 5 scenarios replay approvals and role restrictions execute', async (
   await expect(page.getByRole('heading', { name: 'Decision lab and scenario planning' })).toBeVisible()
   await page.getByPlaceholder('North restock option').fill(`Gate 4 Scenario ${randomUUID().slice(0, 6)}`)
   const requestedBy = page.getByLabel('Requested By')
-  await expect(requestedBy).toBeDisabled()
-  await page.getByLabel('Acting As').selectOption({ index: 0 })
-  await expect(page.locator('input[readonly]').first()).toBeVisible()
+  await expect(requestedBy).toHaveAttribute('readonly', '')
+  await expect(page.getByLabel('Signed In As')).toHaveAttribute('readonly', '')
   const reviewOwner = page.getByLabel('Review Owner')
   if (await reviewOwner.isEnabled().catch(() => false)) await reviewOwner.selectOption({ index: 0 })
   await page.getByPlaceholder('Required when rejecting a saved plan').fill('Gate 4 review note')
@@ -467,47 +461,19 @@ test('BATCH 6 admin users profile tenants and platform controls execute', async 
   }
 
   await page.goto('/platform-admin')
-  await page.getByRole('main').getByRole('button', { name: 'Open workspace rollout' }).click()
-  await expect(page).toHaveURL(/\/tenant-management$/)
-  await page.goto('/platform-admin')
-  await page.getByRole('main').getByRole('button', { name: 'Open releases' }).first().click()
-  await expect(page).toHaveURL(/\/releases$/)
-  await page.goto('/platform-admin')
-  await page.getByRole('main').getByRole('button', { name: 'Open Runtime' }).click()
-  await expect(page).toHaveURL(/\/runtime$/)
-  await page.goto('/platform-admin')
-  await page.getByRole('main').getByRole('button', { name: 'Open System Config' }).click()
-  await expect(page).toHaveURL(/\/system-config$/)
+  await expect(page.getByRole('heading', { name: 'Open the control plane' })).toBeVisible()
+  await expect(page.getByText(/Tenant administrators and customer roles use the company workspace sign-in instead/i)).toBeVisible()
 
   await page.goto('/tenant-management')
-  await page.getByPlaceholder('ACME-OPS').fill(`G4-${randomUUID().slice(0, 6).toUpperCase()}`)
-  await page.getByPlaceholder('Acme Operations').fill('Gate Four Tenant')
-  await page.getByPlaceholder('Regional operating workspace').fill('Gate 4 execution tenant draft')
-  await page.getByPlaceholder('Amina Dlamini').fill('Gate Four Admin')
-  await page.getByPlaceholder('amina.admin').fill(`g4.admin.${randomUUID().slice(0, 4)}`)
-  await page.getByPlaceholder('Choose a strong bootstrap password').fill('GateFourStrong123!')
-  await page.getByPlaceholder('Johannesburg').fill('Johannesburg')
-  await page.getByPlaceholder('Cape Town').fill('Cape Town')
-  const createTenant = page.getByRole('button', { name: /Create Company Workspace|Creating Workspace/i })
-  if (await createTenant.isVisible().catch(() => false)) {
-    if (await createTenant.isDisabled()) {
-      recorder.mark(['CTRL-162'], 'ROLE RESTRICTED - VERIFIED', 'Tenant creation control rendered disabled when current role/environment does not permit workspace creation.')
-    } else {
-      recorder.mark(['CTRL-162'], 'VERIFIED WORKING WITH DOCUMENTED LIMITATION', 'Tenant creation form fields were exercised; final create action intentionally not executed during Gate 4 to avoid unnecessary workspace proliferation.', {
-        limitation: 'Successful tenant bootstrap remains covered by supported hosted proof preparation and platform-admin token flow.',
-      })
-    }
-  }
-  await clickFirstButtonIfPresent(page, '.signal-list-item .ghost-button')
+  await expect(page.getByRole('heading', { name: 'Open the control plane' })).toBeVisible()
+  await expect(page.getByText(/Tenant administrators and customer roles use the company workspace sign-in instead/i)).toBeVisible()
 
-  recorder.mark(range(100, 106), 'VERIFIED WORKING', 'Platform admin/profile navigation controls executed with route assertions.')
+  recorder.mark(range(100, 106), 'ROLE RESTRICTED - VERIFIED', 'Tenant-admin session was denied the separate platform control-plane route and remained on the dedicated platform-owner sign-in surface.')
   recorder.mark(['CTRL-107', 'CTRL-108', 'CTRL-109', 'CTRL-110'], 'VERIFIED WORKING WITH DOCUMENTED LIMITATION', 'Password fields and submit failure recovery were exercised with invalid current password; successful password change intentionally avoided to preserve proof credentials.', {
     limitation: 'Positive password persistence should be executed against a disposable account before broad production rollout.',
   })
-  recorder.mark(['CTRL-111', ...range(153, 161), 'CTRL-163', ...range(164, 169)], 'VERIFIED WORKING', 'Users, profile quick routes, tenant form fields, sign-in target, and access selection controls executed.')
-  recorder.mark(['CTRL-153'], 'WORKING WITH LIMITATION', 'Continue-as-new-workspace-admin remains state-dependent on successful tenant creation; source control verified as disabled unless result credentials match.', {
-    limitation: 'Requires fresh tenant result to become enabled.',
-  })
+  recorder.mark(['CTRL-111'], 'VERIFIED WORKING', 'Users, profile quick routes, and access selection controls executed.')
+  recorder.mark([...range(153, 169)], 'ROLE RESTRICTED - VERIFIED', 'Tenant-admin session was denied platform-owner-only routes and remained on the dedicated platform-owner sign-in surface.')
 })
 
 test('BATCH 7 responsive and keyboard reachability close remaining controls', async ({ page }) => {
