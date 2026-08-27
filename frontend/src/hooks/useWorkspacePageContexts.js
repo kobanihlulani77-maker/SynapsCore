@@ -209,8 +209,8 @@ export default function useWorkspacePageContexts({
   const workspaceAdmin = accessAdminState.workspace
   const accessAdminOperators = accessAdminState.operators
   const accessAdminUsers = accessAdminState.users
-  const requesterOperators = operators.filter((operator) => hasWarehouseScope(operator.warehouseScopes, scenarioForm.warehouseCode))
-  const reviewOwnerOperators = operators.filter((operator) => operator.roles.includes('REVIEW_OWNER') && hasWarehouseScope(operator.warehouseScopes, scenarioForm.warehouseCode))
+  const requesterOperators = operators.filter((operator) => operator.active !== false && hasWarehouseScope(operator.warehouseScopes, scenarioForm.warehouseCode))
+  const reviewOwnerOperators = operators.filter((operator) => operator.active !== false && operator.roles.includes('REVIEW_OWNER') && hasWarehouseScope(operator.warehouseScopes, scenarioForm.warehouseCode))
   const primaryContext = buildScenarioContext(scenarioForm)
   const alternativeContext = buildScenarioContext(comparisonForm)
   const scenarioHistoryItems = scenarioHistoryState.items

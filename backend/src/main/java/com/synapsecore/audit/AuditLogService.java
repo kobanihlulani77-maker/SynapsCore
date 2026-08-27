@@ -1,5 +1,6 @@
 package com.synapsecore.audit;
 
+import com.synapsecore.access.AccessDirectoryService;
 import com.synapsecore.domain.dto.AuditLogResponse;
 import com.synapsecore.domain.entity.AuditLog;
 import com.synapsecore.domain.entity.AuditStatus;
@@ -7,6 +8,7 @@ import com.synapsecore.domain.repository.AuditLogRepository;
 import com.synapsecore.domain.service.CoreIdentityWriteIsolationService;
 import com.synapsecore.tenant.TenantContextService;
 import java.util.List;
+import java.util.Optional;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -20,6 +22,7 @@ public class AuditLogService {
     private final RequestTraceContext requestTraceContext;
     private final TenantContextService tenantContextService;
     private final CoreIdentityWriteIsolationService coreIdentityWriteIsolationService;
+    private final AccessDirectoryService accessDirectoryService;
 
     public void recordSuccess(String action,
                               String actor,
@@ -63,6 +66,7 @@ public class AuditLogService {
         return auditLogRepository.findTop20ByTenantCodeIgnoreCaseOrderByCreatedAtDesc(
                 tenantContextService.getCurrentTenantCodeOrDefault())
             .stream()
+            .filter(this::isVisibleTenantActivity)
             .map(log -> new AuditLogResponse(
                 log.getId(),
                 log.getAction(),
@@ -76,6 +80,25 @@ public class AuditLogService {
                 log.getCreatedAt()
             ))
             .toList();
+    }
+
+    private boolean isVisibleTenantActivity(AuditLog log) {
+        String source = log.getSource() == null ? "" : log.getSource().toLowerCase(java.util.Locale.ROOT);
+        if (source.contains("/api/platform/") || source.contains("platform-session")
+                || source.contains("/favicon") || source.contains("favicon.ico")) {
+            return false;
+        }
+        if (!"REQUEST_REJECTED".equalsIgnoreCase(log.getAction()) || !isForbidden(log.getDetails())) {
+            return true;
+        }
+        Optional<com.synapsecore.domain.entity.AccessOperator> currentOperator = accessDirectoryService.getCurrentOperator();
+        return currentOperator.isEmpty()
+            || currentOperator.get().getWarehouseScopes() == null
+            || currentOperator.get().getWarehouseScopes().isEmpty();
+    }
+
+    private boolean isForbidden(String details) {
+        return details != null && details.trim().matches("^403\\b.*");
     }
 
     private void record(String tenantCode,

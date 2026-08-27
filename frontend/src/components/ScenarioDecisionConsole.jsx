@@ -9,9 +9,6 @@ export default function ScenarioDecisionConsole({ scenario, title, emptyMessage,
     scenarioLoadState,
     signedInSession,
     scenarioReviewNote,
-    scenarioActorRole,
-    setScenarioActorRole,
-    scenarioActorRoles,
     signedInRoles,
     signedInWarehouseScopes,
     hasWarehouseScope,
@@ -75,29 +72,26 @@ export default function ScenarioDecisionConsole({ scenario, title, emptyMessage,
   const approvalDisabled = scenarioApprovalState.loadingId === scenario.id
     || !signedInSession
     || (approvalNoteRequired && !scenarioReviewNote.trim())
-    || scenarioActorRole !== approvalRole
     || !signedInRoles.includes(approvalRole)
     || !hasWarehouseScope(signedInWarehouseScopes, scenario.warehouseCode)
     || !approvalAssignmentMatches
   const rejectionDisabled = scenarioRejectionState.loadingId === scenario.id
     || !signedInSession
     || !scenarioReviewNote.trim()
-    || scenarioActorRole !== rejectionRole
     || !signedInRoles.includes(rejectionRole)
     || !hasWarehouseScope(signedInWarehouseScopes, scenario.warehouseCode)
     || !approvalAssignmentMatches
   const escalationDisabled = scenarioEscalationAckState.loadingId === scenario.id
     || !signedInSession
     || !scenarioReviewNote.trim()
-    || scenarioActorRole !== 'ESCALATION_OWNER'
     || !signedInRoles.includes('ESCALATION_OWNER')
     || !hasWarehouseScope(signedInWarehouseScopes, scenario.warehouseCode)
   const approvalBlocker = !canApproveScenario
     ? ''
     : !signedInSession
       ? 'Sign in before approving.'
-      : scenarioActorRole !== approvalRole || !signedInRoles.includes(approvalRole)
-        ? `Switch to an operator with ${formatCodeLabel(approvalRole)} authority.`
+      : !signedInRoles.includes(approvalRole)
+        ? `The signed-in operator does not have ${formatCodeLabel(approvalRole)} authority.`
       : !hasWarehouseScope(signedInWarehouseScopes, scenario.warehouseCode)
         ? 'This operator does not have the required warehouse scope.'
         : !approvalAssignmentMatches
@@ -109,8 +103,8 @@ export default function ScenarioDecisionConsole({ scenario, title, emptyMessage,
     ? ''
     : !signedInSession
       ? 'Sign in before rejecting.'
-      : scenarioActorRole !== rejectionRole || !signedInRoles.includes(rejectionRole)
-        ? `Switch to an operator with ${formatCodeLabel(rejectionRole)} authority.`
+      : !signedInRoles.includes(rejectionRole)
+        ? `The signed-in operator does not have ${formatCodeLabel(rejectionRole)} authority.`
         : !hasWarehouseScope(signedInWarehouseScopes, scenario.warehouseCode)
           ? 'This operator does not have the required warehouse scope.'
           : !approvalAssignmentMatches
@@ -122,8 +116,8 @@ export default function ScenarioDecisionConsole({ scenario, title, emptyMessage,
     ? ''
     : !signedInSession
       ? 'Sign in before acknowledging escalation.'
-      : scenarioActorRole !== 'ESCALATION_OWNER' || !signedInRoles.includes('ESCALATION_OWNER')
-        ? 'Switch to an escalation owner before acknowledging.'
+      : !signedInRoles.includes('ESCALATION_OWNER')
+        ? 'The signed-in operator does not have Escalation Owner authority.'
         : !hasWarehouseScope(signedInWarehouseScopes, scenario.warehouseCode)
           ? 'This operator does not have the required warehouse scope.'
           : !scenarioReviewNote.trim()
@@ -174,10 +168,8 @@ export default function ScenarioDecisionConsole({ scenario, title, emptyMessage,
       ) : null}
       <div className="session-control-row">
         <label className="field planner-name-field">
-          <span>Acting As</span>
-          <select value={scenarioActorRole} onChange={(event) => setScenarioActorRole(event.target.value)}>
-            {scenarioActorRoles.map((role) => <option key={role} value={role}>{formatCodeLabel(role)}</option>)}
-          </select>
+          <span>Signed In As</span>
+          <input type="text" value={signedInSession ? `${signedInSession.displayName} (${signedInRoles.map(formatCodeLabel).join(', ')})` : 'Sign in to use governed actions'} readOnly />
         </label>
         <label className="field planner-name-field">
           <span>Decision Note</span>
@@ -207,12 +199,12 @@ export default function ScenarioDecisionConsole({ scenario, title, emptyMessage,
           </button>
         ) : null}
         {canApproveScenario ? (
-          <button className="approve-button" onClick={() => approveScenarioPlan(scenario.id)} disabled={approvalDisabled} type="button">
+          <button className="approve-button" onClick={() => approveScenarioPlan(scenario.id, approvalRole)} disabled={approvalDisabled} type="button">
             {scenarioApprovalState.loadingId === scenario.id ? 'Approving...' : approvalActionLabel}
           </button>
         ) : null}
         {canRejectScenario ? (
-          <button className="reject-button" onClick={() => rejectScenarioPlan(scenario.id)} disabled={rejectionDisabled} type="button">
+          <button className="reject-button" onClick={() => rejectScenarioPlan(scenario.id, rejectionRole)} disabled={rejectionDisabled} type="button">
             {scenarioRejectionState.loadingId === scenario.id ? 'Rejecting...' : 'Reject Plan'}
           </button>
         ) : null}

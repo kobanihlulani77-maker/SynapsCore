@@ -136,7 +136,8 @@ public class RequestTraceFilter extends OncePerRequestFilter {
     private boolean isAuthLoginRequest(HttpServletRequest request) {
         return request != null
             && "POST".equalsIgnoreCase(request.getMethod())
-            && "/api/auth/session/login".equals(request.getRequestURI());
+            && ("/api/auth/session/login".equals(request.getRequestURI())
+                || "/api/platform/session/login".equals(request.getRequestURI()));
     }
 
     private jakarta.servlet.http.HttpSession resolveSessionSafely(HttpServletRequest request) {

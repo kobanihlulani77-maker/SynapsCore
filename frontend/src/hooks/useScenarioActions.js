@@ -13,7 +13,6 @@ export default function useScenarioActions({
   primaryContext,
   refreshScenarioHistoryQuietly,
   refreshSnapshotQuietly,
-  scenarioActorRole,
   scenarioForm,
   scenarioHistoryItems,
   scenarioPlanName,
@@ -156,13 +155,13 @@ export default function useScenarioActions({
     }
   }
 
-  async function approveScenarioPlan(scenarioId) {
+  async function approveScenarioPlan(scenarioId, actorRole) {
     setScenarioApprovalState({ loadingId: scenarioId, error: '', success: '' })
     try {
       const payload = await fetchJson(`/api/scenarios/${scenarioId}/approve`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ actorRole: scenarioActorRole, approverName: signedInActorName, approvalNote: scenarioReviewNote.trim() || null }),
+        body: JSON.stringify({ actorRole, approverName: signedInActorName, approvalNote: scenarioReviewNote.trim() || null }),
       })
       setScenarioApprovalState({
         loadingId: null,
@@ -177,13 +176,13 @@ export default function useScenarioActions({
     }
   }
 
-  async function rejectScenarioPlan(scenarioId) {
+  async function rejectScenarioPlan(scenarioId, actorRole) {
     setScenarioRejectionState({ loadingId: scenarioId, error: '', success: '' })
     try {
       const payload = await fetchJson(`/api/scenarios/${scenarioId}/reject`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ actorRole: scenarioActorRole, reviewerName: signedInActorName, reason: scenarioReviewNote.trim() }),
+        body: JSON.stringify({ actorRole, reviewerName: signedInActorName, reason: scenarioReviewNote.trim() }),
       })
       setScenarioRejectionState({
         loadingId: null,
@@ -202,7 +201,7 @@ export default function useScenarioActions({
       const payload = await fetchJson(`/api/scenarios/${scenarioId}/acknowledge-escalation`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ actorRole: scenarioActorRole, acknowledgedBy: signedInActorName, note: scenarioReviewNote.trim() }),
+        body: JSON.stringify({ actorRole: 'ESCALATION_OWNER', acknowledgedBy: signedInActorName, note: scenarioReviewNote.trim() }),
       })
       setScenarioEscalationAckState({
         loadingId: null,

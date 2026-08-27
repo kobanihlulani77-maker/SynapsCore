@@ -21,10 +21,6 @@ export default function ScenarioPlannerPage({ context }) {
     scenarioPlanName,
     setScenarioPlanName,
     requesterOperators,
-    setScenarioRequestedBy,
-    scenarioActorRole,
-    setScenarioActorRole,
-    scenarioActorRoles,
     reviewOwnerOperators,
     setScenarioReviewOwner,
     scenarioReviewNote,
@@ -217,17 +213,11 @@ export default function ScenarioPlannerPage({ context }) {
             </label>
             <label className="field planner-name-field">
               <span>Requested By</span>
-              <select value={scenarioRequestedBy} onChange={(event) => setScenarioRequestedBy(event.target.value)} disabled={!requesterOperators.length || Boolean(signedInSession)}>
-                {requesterOperators.length
-                  ? requesterOperators.map((operator) => <option key={operator.actorName} value={operator.actorName}>{operator.displayName}</option>)
-                  : <option value="">Loading operators...</option>}
-              </select>
-            </label>
-            <label className="field planner-name-field">
-              <span>Acting As</span>
-              <select value={scenarioActorRole} onChange={(event) => setScenarioActorRole(event.target.value)}>
-                {scenarioActorRoles.map((role) => <option key={role} value={role}>{formatCodeLabel(role)}</option>)}
-              </select>
+              <input
+                type="text"
+                value={signedInSession?.actorName || scenarioRequestedBy || (requesterOperators.length ? 'Sign in to identify requester' : 'Loading operators...')}
+                readOnly
+              />
             </label>
             <label className="field planner-name-field">
               <span>Signed In As</span>

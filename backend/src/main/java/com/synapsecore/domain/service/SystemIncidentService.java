@@ -201,7 +201,8 @@ public class SystemIncidentService {
             return true;
         }
         String source = log.source() == null ? "" : log.source().toLowerCase();
-        if (source.contains("/favicon") || source.contains("favicon.ico")) {
+        if (source.contains("/api/platform/") || source.contains("platform-session")
+                || source.contains("/favicon") || source.contains("favicon.ico")) {
             return false;
         }
         String details = log.details() == null ? "" : log.details().trim();
