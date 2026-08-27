@@ -9,6 +9,7 @@ Revision `99cf9b1f06396da9a5c54cc31434116579e68a7c` adds the final pre-CSV corre
 - Platform Activity remains metadata-only and now derives truthful scope, category, classification, impact, severity, interpretation, and next action fields. Platform authentication failures and expected 401/403 denials are represented as security evidence rather than tenant operational failure. Platform requests with intentionally absent tenant context are identified as having no tenant context expected; tenant-required requests without context remain unknown and actionable.
 - Tenant Runtime now uses tenant-appropriate operational wording and does not present platform-only release actions.
 - Review Owner candidates are withheld until a scenario warehouse is selected, then filtered to active REVIEW_OWNER operators eligible for that selected warehouse. Empty warehouse scopes remain tenant-wide. Warehouse matching is normalized for case and surrounding whitespace.
+- Revision `89b12d7` closes the remaining empty-selector seam. The live admin workspace could hydrate configured warehouses before the dashboard inventory snapshot; the scenario form preserved the first configured warehouse even when it had no inventory-backed product options, leaving `Add Line` disabled and making reviewer eligibility appear empty. Scenario initialization now prefers an inventory-backed warehouse when one is available, and product warehouse matching is normalized consistently. This preserves user-selected warehouses after initialization and does not broaden reviewer visibility.
 - Backend scenario assignment remains authoritative and unchanged in its enforcement: cross-warehouse Review Owner assignment is rejected, while a valid warehouse-eligible assignment is accepted. Existing backend authority tests remain in place.
 
 Local correction evidence:
@@ -18,8 +19,9 @@ Local correction evidence:
 - Secret scan: PASS with 0 critical findings; existing committed fixture literals remain classified as fixture findings.
 - `git diff --check`: PASS.
 - Live connection check after push: `FRONTEND_UP=True`, `BACKEND_UP=True`, `DB_READY=True`, `AUTH_READY=True`, `WS_READY=True`, `PROOF_ALLOWED=True`.
+- Live Review Owner matrix: the prepared tenant-admin session returned the active tenant-wide `Operations Lead` reviewer from both `/api/access/operators` and `/api/access/admin/operators`; the Scenario Planner displayed that reviewer for both `WH-NORTH` and `WH-COAST`. A cross-tenant operator-directory request returned HTTP 403.
 
-The corrected frontend revision is now served by Render as bundle `index-I-bP43su.js`; the bundle contains the Operational depth and Platform Activity interpretation markers and no longer contains the retired Platform depth or Acting As markers. Live owner verification of the Platform Activity interpretation and North/Coast Review Owner candidate lists remains a separate control-plane/tenant-owner exercise. CSV testing, fulfillment, tariff/calculation testing, and full governance acceptance remain paused.
+The corrected frontend revision is now served by Render as bundle `index-CKOQfI8A.js`; the bundle contains the current scenario initialization and reviewer-filtering correction. Live owner verification of the Platform Activity interpretation and a fresh restricted North/Coast Review Owner matrix remain a separate control-plane/tenant-owner exercise. CSV testing, fulfillment, tariff/calculation testing, and full governance acceptance remain paused.
 
 ## Scope
 
@@ -95,6 +97,7 @@ Completed locally after implementation:
 - `cd frontend; npm.cmd run lint`: PASS
 - `cd frontend; npm.cmd run build`: PASS
 - `cd frontend; npm.cmd run verify`: PASS
+- `cd backend; cmd /c mvnw.cmd test`: PASS; 152 tests, 0 failures.
 - `cd frontend; npm.cmd run test:controls:inventory -- --outputDir "$env:TEMP\\synapsecore-wave2-control-inventory"`: PASS; 222 controls inventoried, no repository artifact created
 - `git diff --check`: PASS
 
@@ -105,10 +108,11 @@ Focused source review confirmed the inventory authority in `InventoryController`
 The corrected deployed bundle was verified through the fresh deterministic proof tenant:
 
 - Tenant: `HOSTED-PROOF-WAVE2-20260824`
-- Deployed frontend bundle: `index-I-bP43su.js`
+- Deployed frontend bundle: `index-CKOQfI8A.js`
 - Backend readiness, liveness, auth session, and SockJS checks: PASS
-- Full hosted proof: 6/6 PASS in 3.8 minutes
-- Focused controls proof: 7/7 batches PASS; 201/201 controls classified; 0 unexpected 5xx responses
+- Full hosted proof after the selector correction: 6/6 PASS in 3.1 minutes
+- Focused controls proof after the selector correction: 7/7 batches PASS; 201/201 controls classified; 0 unexpected 5xx responses
+- The controls report recorded two expected browser error events for deliberate 401/400 authorization or validation checks; no unexpected network failures were recorded.
 - The focused controls proof was aligned to the current authority boundary; no product flow or backend contract was changed.
 
 The dedicated authenticated 1366x768 sweep also passed for all eight Wave 2 routes. Each route retained the authenticated tenant session, rendered the expected page heading, had document/body width equal to the viewport, and produced no visible overflow candidates:
@@ -125,6 +129,8 @@ The dedicated authenticated 1366x768 sweep also passed for all eight Wave 2 rout
 | `/runtime` | PASS; no overflow or clipping candidate |
 
 The first automated sweep contained one one-off inventory sign-in-shell observation caused by standalone harness navigation timing. An isolated rerun and the final per-route sweep both confirmed an authenticated inventory render with 200 session responses and no console errors. It is classified as a harness timing artifact, not a product defect.
+
+The post-correction isolated BATCH 5 run reached the Scenario Planner and completed its workflow in 13.9 seconds; its aggregate unverified-control assertion was expected because the isolated run intentionally omitted the other six batches. The complete 7-batch rerun passed.
 
 ## Final Headed Chrome Walkthrough
 
@@ -199,13 +205,14 @@ After the green run, the browser sweep reported no console errors. The only requ
 ## Open Gate Findings
 
 - Medium: a restricted-warehouse identity was not provisioned in the fresh proof fixture, so wrong-warehouse denial was not a distinct live browser/API case. The tested fixture is tenant-wide and the backend warehouse boundary remains authoritative.
+- Medium: the final North/Coast owner acceptance still requires the owner’s own restricted-role rehearsal. The live prepared fixture proved the tenant-wide Review Owner path in both warehouse selections and did not include distinct North-only and Coast-only Review Owner identities.
 - Low: natural empty and injected error states remain only partially exercised live. No destructive data manipulation or fault injection was used to manufacture them.
 
 ## Current Verdict
 
-`OPERATIONAL PAGE GUIDANCE WAVE 2 ACCEPTED WITH DOCUMENTED MEDIUM/LOW LIMITATIONS`
+`FINAL REVIEWER / EVIDENCE SCOPE CLOSURE READY FOR OWNER VERIFICATION`
 
 Critical blockers: 0
 High blockers: 0
 
-Wave 2 is accepted. Wave 3 and Phase 14 remain out of scope for this closure and must not start from this record.
+The technical closure is ready for the owner’s final North/Coast and Platform Activity verification. Wave 3, CSV acceptance, and Phase 14 remain out of scope for this closure and must not start from this record.
