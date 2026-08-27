@@ -4,9 +4,15 @@ import LoadingState from '../components/LoadingState'
 import StatusBadge from '../components/StatusBadge'
 
 const formatTimestamp = (value) => (value ? new Date(value).toLocaleString() : 'Time not reported')
-const statusTone = (value) => ['RECORDED', 'SUCCESS', 'COMPLETED'].includes(String(value).toUpperCase())
-  ? 'healthy'
-  : ['FAILURE', 'FAILED', 'ERROR'].includes(String(value).toUpperCase()) ? 'critical' : 'warning'
+const statusTone = (value, classification) => {
+  const normalizedClassification = String(classification || '').toUpperCase()
+  if (['SUCCESS', 'RECORDED', 'COMPLETED'].includes(normalizedClassification)) return 'healthy'
+  if (normalizedClassification === 'EXPECTED DENIAL') return 'warning'
+  if (['OPERATIONAL FAILURE', 'SERVICE DEGRADATION', 'SECURITY CONCERN'].includes(normalizedClassification)) return 'critical'
+  return ['RECORDED', 'SUCCESS', 'COMPLETED'].includes(String(value).toUpperCase())
+    ? 'healthy'
+    : ['FAILURE', 'FAILED', 'ERROR'].includes(String(value).toUpperCase()) ? 'critical' : 'warning'
+}
 
 export default function PlatformActivityPage({ activity = [], loading = false, error = '', navigateToPage }) {
   return (
@@ -45,8 +51,15 @@ export default function PlatformActivityPage({ activity = [], loading = false, e
               <div className="signal-list">
                 {activity.map((item, index) => (
                   <div className="signal-list-item" key={`${item.tenantCode}-${item.observedAt}-${index}`}>
-                    <div className="stack-title-row"><strong>{item.tenantCode || 'PLATFORM'}</strong><StatusBadge tone={statusTone(item.status)}>{item.status || 'UNKNOWN'}</StatusBadge></div>
+                    <div className="stack-title-row"><strong>{item.tenantCode || 'PLATFORM'}</strong><StatusBadge tone={statusTone(item.status, item.classification)}>{item.classification || item.status || 'UNKNOWN'}</StatusBadge></div>
                     <p>{item.category || 'Activity'}: {item.condition || 'Condition not reported'}</p>
+                    <div className="signal-list-item-meta">
+                      <span><strong>Scope</strong> {item.scope || 'Unknown / unattributed'}</span>
+                      <span><strong>Impact</strong> {item.impact || 'Unknown'}</span>
+                      <span><strong>Severity</strong> {item.severity || 'Unknown'}</span>
+                    </div>
+                    <p><strong>Interpretation:</strong> {item.interpretation || 'No interpretation is available for this metadata signal.'}</p>
+                    <p><strong>Next action:</strong> {item.nextAction || 'Investigate'}</p>
                     <p className="muted-text">Observed {formatTimestamp(item.observedAt)}</p>
                   </div>
                 ))}
@@ -57,7 +70,7 @@ export default function PlatformActivityPage({ activity = [], loading = false, e
           <article className="stack-card section-card" id="platform-activity-boundary">
             <div className="stack-title-row"><strong>Privacy and authority boundary</strong><span className="status-tag status-success">Enforced by API</span></div>
             <div className="signal-list">
-              <div className="signal-list-item"><strong>Visible</strong><p>Tenant code, activity category, condition, status, and observed time.</p></div>
+              <div className="signal-list-item"><strong>Visible</strong><p>Tenant code, activity category, condition, status, interpreted scope, classification, impact, severity, next action, and observed time.</p></div>
               <div className="signal-list-item"><strong>Not visible</strong><p>Customer orders, products, inventory, inbound bodies, replay payloads, connector secrets, and credentials.</p></div>
               <div className="signal-list-item"><strong>Access rule</strong><p>Platform Owner session required. Tenant users must be denied by the backend even when this route is entered directly.</p></div>
             </div>

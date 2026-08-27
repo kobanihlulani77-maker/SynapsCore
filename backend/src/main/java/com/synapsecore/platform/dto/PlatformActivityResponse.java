@@ -7,6 +7,12 @@ public record PlatformActivityResponse(
     String category,
     String condition,
     String status,
-    Instant observedAt
+    Instant observedAt,
+    String scope,
+    String classification,
+    String impact,
+    String severity,
+    String interpretation,
+    String nextAction
 ) {
 }

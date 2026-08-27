@@ -438,7 +438,10 @@ export default function useWorkspaceBootstrap({
   useEffect(() => {
     if (!operatorDirectoryState.items.length) return
 
-    const availableOperators = operatorDirectoryState.items.filter((operator) => hasWarehouseScope(operator.warehouseScopes, scenarioForm.warehouseCode))
+    const scenarioWarehouseCode = scenarioForm.warehouseCode?.trim() || ''
+    const availableOperators = scenarioWarehouseCode
+      ? operatorDirectoryState.items.filter((operator) => hasWarehouseScope(operator.warehouseScopes, scenarioWarehouseCode))
+      : []
     const reviewOwnerOptions = availableOperators.filter((operator) => operator.roles.includes('REVIEW_OWNER'))
 
     if (!availableOperators.some((operator) => operator.actorName === scenarioRequestedBy)) {

@@ -816,6 +816,12 @@ class PlatformTenantAccessBoundaryIntegrationTest {
         MockHttpSession platformSession = platformLogin();
         mockMvc.perform(get("/api/platform/activity").session(platformSession))
             .andExpect(status().isOk())
+            .andExpect(jsonPath("$[0].scope").exists())
+            .andExpect(jsonPath("$[0].classification").exists())
+            .andExpect(jsonPath("$[0].impact").exists())
+            .andExpect(jsonPath("$[0].severity").exists())
+            .andExpect(jsonPath("$[0].interpretation").exists())
+            .andExpect(jsonPath("$[0].nextAction").exists())
             .andExpect(content().string(org.hamcrest.Matchers.not(org.hamcrest.Matchers.containsString("payloadSummary"))))
             .andExpect(content().string(org.hamcrest.Matchers.not(org.hamcrest.Matchers.containsString("details"))))
             .andExpect(content().string(org.hamcrest.Matchers.not(org.hamcrest.Matchers.containsString("targetRef"))));

@@ -171,7 +171,7 @@ export default function RuntimePage({ context }) {
           <article className="stack-card section-card">
             <div className="stack-title-row">
               <strong>Queue and telemetry</strong>
-              <span className="scenario-type-tag">Platform depth</span>
+              <span className="scenario-type-tag">Operational depth</span>
             </div>
             {runtime ? (
               <div className="signal-list">
@@ -267,7 +267,7 @@ export default function RuntimePage({ context }) {
                 <div className="signal-list-item">
                   <strong>Operational interpretation</strong>
                   <p>No degraded connector telemetry is active right now.</p>
-                  <p className="muted-text">Use this page to separate operational noise from genuine platform trust issues.</p>
+                  <p className="muted-text">Use this page to separate operational noise from genuine tenant service or runtime trust issues.</p>
                 </div>
               )}
             </div>

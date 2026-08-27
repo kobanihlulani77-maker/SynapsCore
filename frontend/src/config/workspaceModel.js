@@ -208,7 +208,7 @@ export const resolvePreferredOperatorName = (operators, preferredName) => (
 export const hasWarehouseScope = (warehouseScopes, warehouseCode) => (
   !warehouseCode
   || !(warehouseScopes?.length)
-  || warehouseScopes.some((scope) => scope === warehouseCode.toUpperCase())
+  || warehouseScopes.some((scope) => String(scope).trim().toUpperCase() === warehouseCode.trim().toUpperCase())
 )
 
 export const buildAccessOperatorsPath = (tenantCode) => (
