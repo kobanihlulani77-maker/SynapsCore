@@ -19,7 +19,7 @@ Local correction evidence:
 - `git diff --check`: PASS.
 - Live connection check after push: `FRONTEND_UP=True`, `BACKEND_UP=True`, `DB_READY=True`, `AUTH_READY=True`, `WS_READY=True`, `PROOF_ALLOWED=True`.
 
-Live behavioral owner verification is still pending the Render deployment of this revision. The connection check observed the previously served frontend bundle, so this correction must not yet be described as live-proven. CSV testing, fulfillment, tariff/calculation testing, and full governance acceptance remain paused until the owner confirms the deployed Platform Activity interpretation and North/Coast Review Owner candidate lists.
+The corrected frontend revision is now served by Render as bundle `index-I-bP43su.js`; the bundle contains the Operational depth and Platform Activity interpretation markers and no longer contains the retired Platform depth or Acting As markers. Live owner verification of the Platform Activity interpretation and North/Coast Review Owner candidate lists remains a separate control-plane/tenant-owner exercise. CSV testing, fulfillment, tariff/calculation testing, and full governance acceptance remain paused.
 
 ## Scope
 
@@ -105,10 +105,11 @@ Focused source review confirmed the inventory authority in `InventoryController`
 The corrected deployed bundle was verified through the fresh deterministic proof tenant:
 
 - Tenant: `HOSTED-PROOF-WAVE2-20260824`
-- Deployed frontend bundle: `index-Bgy2DQh-.js`
+- Deployed frontend bundle: `index-I-bP43su.js`
 - Backend readiness, liveness, auth session, and SockJS checks: PASS
 - Full hosted proof: 6/6 PASS in 3.8 minutes
-- No proof test was modified and no backend contract was changed.
+- Focused controls proof: 7/7 batches PASS; 201/201 controls classified; 0 unexpected 5xx responses
+- The focused controls proof was aligned to the current authority boundary; no product flow or backend contract was changed.
 
 The dedicated authenticated 1366x768 sweep also passed for all eight Wave 2 routes. Each route retained the authenticated tenant session, rendered the expected page heading, had document/body width equal to the viewport, and produced no visible overflow candidates:
 
