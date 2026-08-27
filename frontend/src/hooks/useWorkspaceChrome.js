@@ -248,7 +248,7 @@ export default function useWorkspaceChrome({
       case 'approvals':
         return [{ label: 'Open escalations', target: 'escalations' }, { label: 'Open scenario history', target: 'scenario-history' }]
       case 'runtime':
-        return [{ label: 'Open audit', target: 'audit' }, { label: 'Open releases', target: 'releases' }]
+        return [{ label: 'Open audit', target: 'audit' }, { label: 'Open integrations', target: 'integrations' }]
       case 'audit':
         return [{ label: 'Open replay', target: 'replay' }, { label: 'Open runtime', target: 'runtime' }]
       case 'users':

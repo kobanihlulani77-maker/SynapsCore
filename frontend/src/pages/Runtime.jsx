@@ -137,8 +137,8 @@ export default function RuntimePage({ context }) {
               <button className="secondary-button" onClick={() => navigateToPage('audit')} type="button">
                 Open audit
               </button>
-              <button className="ghost-button" onClick={() => navigateToPage('releases')} type="button">
-                Open releases
+              <button className="ghost-button" onClick={() => navigateToPage('integrations')} type="button">
+                Open integrations
               </button>
             </div>
           </div>

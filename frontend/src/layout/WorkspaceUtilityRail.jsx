@@ -143,7 +143,7 @@ export default function WorkspaceUtilityRail({ context }) {
             { label: 'Failed', value: runtime?.backbone?.failedDispatchCount ?? 0 },
             { label: 'Metrics', value: formatMetricValue(runtime?.metrics?.dispatchProcessed) },
           ],
-          actions: [{ title: 'Open releases', note: 'Check deployment fingerprint beside runtime trust.', target: 'releases' }],
+          actions: [{ title: 'Open integrations', note: 'Review tenant connector posture beside runtime trust.', target: 'integrations' }],
         }
       case 'audit':
         return {

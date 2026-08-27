@@ -83,6 +83,19 @@ The Dashboard consumes the incident projection used by the authenticated tenant 
 
 No Dashboard copy or route was changed to hide a real failure.
 
+## Tenant Release Guidance
+
+The tenant Runtime previously exposed `Open releases` and described deployment
+fingerprints beside tenant runtime trust. `/releases` is registered as a
+platform-audience page and is not a usable tenant destination. That was a
+misleading tenant action, not a backend authorization defect.
+
+The smallest correction routes tenant Runtime guidance to `Integrations`, where
+operators can inspect tenant connector posture. Release Trust remains reachable
+from Platform Overview and Platform Activity for the Platform Owner. Tenant
+Runtime no longer directs tenant operators toward platform release
+administration.
+
 ## Governance Rules Confirmed by Source Review
 
 - Scenario creators may plan and save through the existing policy; creation does not itself grant downstream approval authority.
@@ -100,6 +113,7 @@ No Dashboard copy or route was changed to hide a real failure.
 - Removed expected 403 request denials and favicon request failures from operational incident projection.
 - Suppressed the generic operational alert hook for favicon static-resource failures while retaining a warning and audit trace.
 - Applied warehouse filtering to frontend realtime incident context.
+- Replaced the tenant Runtime `Open releases` action with tenant-relevant `Open integrations` guidance; platform Release Trust navigation remains unchanged.
 
 No routes, scenario authority checks, product APIs, authentication behavior, or proof selectors were intentionally changed.
 
@@ -129,6 +143,10 @@ Completed locally on this correction:
 - Frontend build: PASS.
 - Existing realtime DTO tests: PASS through the compatibility constructor.
 
+After the tenant guidance correction:
+
+- Frontend lint/build/verify: pending rerun before the next focused push.
+
 The backend test output contains intentional test-controller error logs for the CORS/unexpected-failure test; the test suite passed. They are not evidence of a production regression.
 
 Required after deployment:
@@ -147,6 +165,7 @@ Required after deployment:
 - Tenant Runtime still contains tenant-level metrics that are not warehouse dimensions. They must be read as tenant posture, not site-specific counts.
 - Platform Activity and Platform Runtime remain separate control-plane surfaces; this correction does not add a platform incident API.
 - Live evidence must be refreshed after deployment. Local tests do not substitute for the requested rendered acceptance walkthrough.
+- The live tenant Runtime and Platform Owner rendered surfaces must be rechecked after the latest guidance correction.
 
 ## Gate Status
 
