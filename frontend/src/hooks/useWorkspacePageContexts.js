@@ -215,7 +215,10 @@ export default function useWorkspacePageContexts({
     ? operators.filter((operator) => operator.active !== false && hasWarehouseScope(operator.warehouseScopes, scenarioWarehouseCode))
     : []
   const reviewOwnerOperators = scenarioWarehouseCode
-    ? operators.filter((operator) => operator.active !== false && operator.roles.includes('REVIEW_OWNER') && hasWarehouseScope(operator.warehouseScopes, scenarioWarehouseCode))
+    ? operators.filter((operator) => operator.active !== false
+      && operator.roles.includes('REVIEW_OWNER')
+      && hasWarehouseScope(operator.warehouseScopes, scenarioWarehouseCode)
+      && operator.actorName?.toLowerCase() !== signedInSession?.actorName?.toLowerCase())
     : []
 
   useEffect(() => {

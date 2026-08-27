@@ -890,6 +890,40 @@ class PlatformTenantAccessBoundaryIntegrationTest {
             .andExpect(status().isOk());
     }
 
+    @Test
+    void scenarioGovernanceRejectsRequesterSelfReviewAtSaveAndDecision() throws Exception {
+        MockHttpSession tenantAdmin = tenantLogin(REHEARSAL_TENANT, "boundary.tenant.admin", ROLE_PASSWORD);
+
+        mockMvc.perform(post("/api/scenarios/save")
+                .session(tenantAdmin)
+                .contentType(APPLICATION_JSON)
+                .content("""
+                    {"title":"Boundary requester self-review save","requestedBy":"boundary.review","reviewOwner":"boundary.review","request":{"warehouseCode":"%s","items":[{"productSku":"BOUNDARY-SKU","quantity":1,"unitPrice":10.00}]}}
+                    """.formatted(warehouseA)))
+            .andExpect(status().isBadRequest())
+            .andExpect(jsonPath("$.message").value(org.hamcrest.Matchers.containsString("different from the requester")));
+
+        long historicalSelfReviewId = saveStandardScenarioPlan(
+            tenantAdmin,
+            "Boundary historical requester self-review",
+            "boundary.review",
+            warehouseA
+        );
+        var historicalSelfReview = scenarioRunRepository.findById(historicalSelfReviewId).orElseThrow();
+        historicalSelfReview.setRequestedBy("boundary.review");
+        scenarioRunRepository.save(historicalSelfReview);
+
+        MockHttpSession reviewOwner = tenantLogin(REHEARSAL_TENANT, "boundary.review", ROLE_PASSWORD);
+        mockMvc.perform(post("/api/scenarios/" + historicalSelfReviewId + "/approve")
+                .session(reviewOwner)
+                .contentType(APPLICATION_JSON)
+                .content("""
+                    {"actorRole":"REVIEW_OWNER","approverName":"boundary.review","approvalNote":"Self-review must fail"}
+                    """))
+            .andExpect(status().isBadRequest())
+            .andExpect(jsonPath("$.message").value(org.hamcrest.Matchers.containsString("different from the requester")));
+    }
+
     private void createRoleUser(MockHttpSession admin,
                                 String identity,
                                 String role,

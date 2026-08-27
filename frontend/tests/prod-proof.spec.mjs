@@ -1835,7 +1835,7 @@ async function createScenarioFixture() {
   }
   const scenarioPayload = {
     title,
-    requestedBy: 'Operations Lead',
+    requestedBy: 'Operations Planner',
     request: {
       warehouseCode,
       items: [

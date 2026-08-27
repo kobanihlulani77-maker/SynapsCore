@@ -442,7 +442,10 @@ export default function useWorkspaceBootstrap({
     const availableOperators = scenarioWarehouseCode
       ? operatorDirectoryState.items.filter((operator) => hasWarehouseScope(operator.warehouseScopes, scenarioWarehouseCode))
       : []
-    const reviewOwnerOptions = availableOperators.filter((operator) => operator.roles.includes('REVIEW_OWNER'))
+    const reviewOwnerOptions = availableOperators.filter((operator) => (
+      operator.roles.includes('REVIEW_OWNER')
+      && operator.actorName?.toLowerCase() !== authSessionState.session?.actorName?.toLowerCase()
+    ))
 
     if (!availableOperators.some((operator) => operator.actorName === scenarioRequestedBy)) {
       scenarioRequestedBySetter(resolvePreferredOperatorName(availableOperators, defaultScenarioRequester))
@@ -455,6 +458,7 @@ export default function useWorkspaceBootstrap({
     scenarioForm.warehouseCode,
     scenarioRequestedBy,
     scenarioReviewOwner,
+    authSessionState.session?.actorName,
   ])
 
   useEffect(() => {

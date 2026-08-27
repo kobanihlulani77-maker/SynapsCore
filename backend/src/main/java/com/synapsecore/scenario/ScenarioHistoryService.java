@@ -71,7 +71,9 @@ public class ScenarioHistoryService {
         ScenarioRiskAssessment riskAssessment = scenarioRiskPolicyService.assess(projectedImpact);
         ScenarioApprovalPolicy approvalPolicy = determineApprovalPolicy(riskAssessment.reviewPriority());
         String warehouseCode = request.request().warehouseCode().trim();
-        String reviewOwner = resolveReviewOwner(request.reviewOwner(), warehouseCode);
+        String requestedBy = resolveRequestedBy(request.requestedBy(), warehouseCode);
+        String reviewOwner = resolveReviewOwner(request.reviewOwner(), warehouseCode, requestedBy);
+        requireDistinctRequesterAndReviewer(requestedBy, reviewOwner, "save");
         ScenarioRun scenarioRun = scenarioRunRepository.save(ScenarioRun.builder()
             .tenant(tenant)
             .type(ScenarioRunType.SAVED_PLAN)
@@ -85,7 +87,7 @@ public class ScenarioHistoryService {
             .approvalStage(ScenarioApprovalStage.PENDING_REVIEW)
             .reviewPriority(riskAssessment.reviewPriority())
             .riskScore(riskAssessment.score())
-            .requestedBy(resolveRequestedBy(request.requestedBy(), warehouseCode))
+            .requestedBy(requestedBy)
             .reviewOwner(reviewOwner)
             .finalApprovalOwner(resolveFinalApprovalOwner(warehouseCode, reviewOwner))
             .approvalDueAt(resolveApprovalDueAt(approvalPolicy, ScenarioApprovalStage.PENDING_REVIEW, riskAssessment.reviewPriority()))
@@ -244,6 +246,7 @@ public class ScenarioHistoryService {
             if (run.getApprovalPolicy() == ScenarioApprovalPolicy.ESCALATED) {
                 run = processEscalatedApproval(run, trimmedApproverName, approvalNote);
             } else {
+                requireDistinctRequesterAndReviewer(run.getRequestedBy(), trimmedApproverName, "approve");
                 requireAssignedReviewOwner(run, trimmedApproverName, "approve");
                 run.setApprovalStatus(ScenarioApprovalStatus.APPROVED);
                 run.setApprovalStage(ScenarioApprovalStage.APPROVED);
@@ -299,6 +302,7 @@ public class ScenarioHistoryService {
             accessControlService.requireScenarioActor(request.actorRole(), reviewerName, "reject scenario plans");
             requireActorRole(run.getId(), "reject this scenario", request.actorRole(), requiredRole);
             requireWarehouseAccess(reviewerName, run.getWarehouseCode(), "reject scenario plans");
+            requireDistinctRequesterAndReviewer(run.getRequestedBy(), reviewerName, "reject");
             if (requiredRole == ScenarioActorRole.REVIEW_OWNER) {
                 requireAssignedReviewOwner(run, reviewerName, "reject");
             }
@@ -714,14 +718,14 @@ public class ScenarioHistoryService {
         return requester;
     }
 
-    private String resolveReviewOwner(String reviewOwner, String warehouseCode) {
+    private String resolveReviewOwner(String reviewOwner, String warehouseCode, String requestedBy) {
         var policy = tenantOperationalPolicyService.getCurrentPolicy();
         if (reviewOwner == null || reviewOwner.isBlank()) {
             return resolvePreferredOperatorName(
                 List.of(),
                 policy.getReviewOwnerRole(),
                 "review owner",
-                null,
+                requestedBy,
                 warehouseCode
             );
         }
@@ -885,6 +889,15 @@ public class ScenarioHistoryService {
             && !run.getReviewOwner().equalsIgnoreCase(actorName)) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
                 "Scenario " + run.getId() + " requires the assigned review owner to " + actionLabel + " this plan.");
+        }
+    }
+
+    private void requireDistinctRequesterAndReviewer(String requesterName, String reviewerName, String actionLabel) {
+        if (requesterName != null && !requesterName.isBlank()
+            && reviewerName != null && !reviewerName.isBlank()
+            && requesterName.equalsIgnoreCase(reviewerName)) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                "Scenario requires a review owner who is different from the requester to " + actionLabel + " this plan.");
         }
     }
 
