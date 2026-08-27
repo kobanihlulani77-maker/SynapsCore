@@ -1,6 +1,7 @@
 package com.synapsecore.domain.service;
 
 import com.synapsecore.audit.AuditLogService;
+import com.synapsecore.access.AccessDirectoryService;
 import com.synapsecore.domain.dto.AuditLogResponse;
 import com.synapsecore.domain.dto.SystemIncidentResponse;
 import com.synapsecore.domain.dto.SystemIncidentSeverity;
@@ -20,6 +21,7 @@ import com.synapsecore.scenario.dto.ScenarioNotificationType;
 import com.synapsecore.tenant.TenantContextService;
 import java.util.Comparator;
 import java.util.List;
+import java.util.Optional;
 import java.util.stream.Stream;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -38,32 +40,40 @@ public class SystemIncidentService {
     private final ScenarioHistoryService scenarioHistoryService;
     private final OperationalDispatchWorkItemRepository operationalDispatchWorkItemRepository;
     private final TenantContextService tenantContextService;
+    private final AccessDirectoryService accessDirectoryService;
 
     @Transactional(readOnly = true)
     public List<SystemIncidentResponse> getActiveIncidents() {
         return Stream.of(
                 auditLogService.getRecentAuditLogs().stream()
                     .filter(log -> "FAILURE".equals(log.status().name()))
+                    .filter(this::isOperationalAuditFailure)
+                    .filter(log -> isVisibleToCurrentOperator(null))
                     .map(this::toAuditIncident),
                 integrationInboundRecordRepository.findTop8ByTenantCodeIgnoreCaseAndStatusInOrderByUpdatedAtDesc(
                         tenantContextService.getCurrentTenantCodeOrDefault(),
                         List.of(IntegrationInboundStatus.REJECTED, IntegrationInboundStatus.REPLAY_QUEUED)
                     )
                     .stream()
+                    .filter(record -> isVisibleToCurrentOperator(record.getWarehouseCode()))
                     .map(this::toInboundIncident),
                 integrationReplayService.getReplayQueue().stream()
+                    .filter(record -> isVisibleToCurrentOperator(record.warehouseCode()))
                     .map(this::toReplayIncident),
                 integrationConnectorService.getConnectors().stream()
                     .filter(connector -> connector.healthStatus() != IntegrationConnectorHealthStatus.LIVE)
+                    .filter(connector -> isVisibleToCurrentOperator(connector.defaultWarehouseCode()))
                     .map(this::toConnectorIncident),
                 operationalDispatchWorkItemRepository.findTop8ByTenantCodeIgnoreCaseAndStatusOrderByUpdatedAtDesc(
                         tenantContextService.getCurrentTenantCodeOrDefault(),
                         OperationalDispatchStatus.FAILED
                     )
                     .stream()
+                    .filter(workItem -> isVisibleToCurrentOperator(null))
                     .map(this::toDispatchIncident),
                 scenarioHistoryService.getScenarioNotifications().stream()
                     .filter(ScenarioNotificationResponse::actionRequired)
+                    .filter(notification -> isVisibleToCurrentOperator(notification.warehouseCode()))
                     .map(this::toScenarioIncident)
             )
             .flatMap(stream -> stream)
@@ -81,7 +91,8 @@ public class SystemIncidentService {
             log.details(),
             log.source() + " | " + log.actor(),
             true,
-            log.createdAt()
+            log.createdAt(),
+            null
         );
     }
 
@@ -99,7 +110,8 @@ public class SystemIncidentService {
             record.failureMessage(),
             record.sourceSystem() + " | " + formatCodeLabel(record.connectorType().name()),
             true,
-            record.createdAt()
+            record.createdAt(),
+            record.warehouseCode()
         );
     }
 
@@ -115,7 +127,8 @@ public class SystemIncidentService {
                 : record.getFailureMessage(),
             record.getSourceSystem() + " | " + formatCodeLabel(record.getConnectorType().name()),
             true,
-            record.getUpdatedAt()
+            record.getUpdatedAt(),
+            record.getWarehouseCode()
         );
     }
 
@@ -143,7 +156,8 @@ public class SystemIncidentService {
                 ? connector.lastFailureAt()
                 : connector.lastActivityAt() != null
                 ? connector.lastActivityAt()
-                : connector.updatedAt() == null ? connector.createdAt() : connector.updatedAt()
+                : connector.updatedAt() == null ? connector.createdAt() : connector.updatedAt(),
+            connector.defaultWarehouseCode()
         );
     }
 
@@ -158,7 +172,8 @@ public class SystemIncidentService {
                 : workItem.getLastError(),
             workItem.getSource() + " | request " + workItem.getRequestId(),
             true,
-            workItem.getUpdatedAt()
+            workItem.getUpdatedAt(),
+            null
         );
     }
 
@@ -176,8 +191,32 @@ public class SystemIncidentService {
                 + " | "
                 + (notification.actor() == null ? "Assigned operator" : notification.actor()),
             notification.actionRequired(),
-            notification.createdAt()
+            notification.createdAt(),
+            notification.warehouseCode()
         );
+    }
+
+    private boolean isOperationalAuditFailure(AuditLogResponse log) {
+        if (!"REQUEST_REJECTED".equalsIgnoreCase(log.action())) {
+            return true;
+        }
+        String source = log.source() == null ? "" : log.source().toLowerCase();
+        if (source.contains("/favicon") || source.contains("favicon.ico")) {
+            return false;
+        }
+        String details = log.details() == null ? "" : log.details().trim();
+        return !details.matches("^403\\b.*");
+    }
+
+    private boolean isVisibleToCurrentOperator(String warehouseCode) {
+        Optional<com.synapsecore.domain.entity.AccessOperator> currentOperator = accessDirectoryService.getCurrentOperator();
+        if (currentOperator.isEmpty()) {
+            return true;
+        }
+        if (currentOperator.get().getWarehouseScopes() == null || currentOperator.get().getWarehouseScopes().isEmpty()) {
+            return true;
+        }
+        return warehouseCode != null && accessDirectoryService.hasWarehouseAccess(currentOperator.get(), warehouseCode);
     }
 
     private String formatCodeLabel(String value) {

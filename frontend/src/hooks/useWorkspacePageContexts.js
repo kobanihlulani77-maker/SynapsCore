@@ -219,7 +219,10 @@ export default function useWorkspacePageContexts({
   const pendingReviewCount = scenarioHistoryItems.filter((scenario) => scenario.approvalStatus === 'PENDING_APPROVAL').length
   const activeDecisionCount = Math.max(summary?.activeAlerts ?? 0, snapshot.alerts.activeAlerts.length)
     + Math.max(summary?.recommendationsCount ?? 0, snapshot.recommendations.length)
-  const systemIncidents = snapshot.systemIncidents
+  const systemIncidents = snapshot.systemIncidents.filter((incident) => (
+    signedInWarehouseScopes.length === 0
+      || (incident.warehouseCode && signedInWarehouseScopes.some((scope) => scope.toLowerCase() === incident.warehouseCode.toLowerCase()))
+  ))
   const fulfillmentOverview = snapshot.fulfillment || emptySnapshot.fulfillment
   const recentAuditEntries = snapshot.auditLogs.slice(0, 6)
   const recentBusinessEvents = snapshot.recentEvents.slice(0, 6)

@@ -10,6 +10,18 @@ public record SystemIncidentResponse(
     String detail,
     String context,
     boolean actionRequired,
-    Instant createdAt
+    Instant createdAt,
+    String warehouseCode
 ) {
+
+    public SystemIncidentResponse(String incidentKey,
+                                  SystemIncidentType type,
+                                  SystemIncidentSeverity severity,
+                                  String title,
+                                  String detail,
+                                  String context,
+                                  boolean actionRequired,
+                                  Instant createdAt) {
+        this(incidentKey, type, severity, title, detail, context, actionRequired, createdAt, null);
+    }
 }

@@ -203,18 +203,26 @@ public class ApiExceptionHandler {
             ? catalogWriteConflictResolver.describe(exception, null)
             : "The request failed due to an unexpected SynapseCore server error.";
         String requestId = requestTraceContext.getRequiredRequestId();
-        log.error("Unhandled API failure for {} {} [{}]: {}",
-            request.getMethod(),
-            request.getRequestURI(),
-            requestId,
-            exception.getMessage(),
-            exception);
-        operationalAlertHookService.emit(
-            "API_UNEXPECTED_FAILURE",
-            "HIGH",
-            request.getMethod() + " " + request.getRequestURI() + " failed unexpectedly.",
-            message + " requestId=" + requestId
-        );
+        if (isStaticResourceRequest(request)) {
+            log.warn("Static resource request failed for {} {} [{}]: {}",
+                request.getMethod(),
+                request.getRequestURI(),
+                requestId,
+                exception.getMessage());
+        } else {
+            log.error("Unhandled API failure for {} {} [{}]: {}",
+                request.getMethod(),
+                request.getRequestURI(),
+                requestId,
+                exception.getMessage(),
+                exception);
+            operationalAlertHookService.emit(
+                "API_UNEXPECTED_FAILURE",
+                "HIGH",
+                request.getMethod() + " " + request.getRequestURI() + " failed unexpectedly.",
+                message + " requestId=" + requestId
+            );
+        }
         auditFailureSafely(request, status, message);
         return ResponseEntity.status(status).body(new ApiErrorResponse(
             Instant.now(),
@@ -228,6 +236,15 @@ public class ApiExceptionHandler {
     private boolean isProductCatalogRequest(HttpServletRequest request) {
         String requestUri = request == null ? null : request.getRequestURI();
         return requestUri != null && requestUri.startsWith("/api/products");
+    }
+
+    private boolean isStaticResourceRequest(HttpServletRequest request) {
+        String requestUri = request == null ? null : request.getRequestURI();
+        if (requestUri == null) {
+            return false;
+        }
+        String normalized = requestUri.toLowerCase(java.util.Locale.ROOT);
+        return normalized.endsWith("/favicon.ico") || normalized.endsWith("/favicon.svg");
     }
 
     private void auditFailureSafely(HttpServletRequest request, HttpStatus status, String message) {
