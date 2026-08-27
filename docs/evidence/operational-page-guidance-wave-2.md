@@ -2,6 +2,25 @@
 
 Status: Wave 2 rendered and hosted closure complete; accepted with documented medium/low limitations.
 
+## Follow-Up Observability And Scope Correction
+
+Revision `99cf9b1f06396da9a5c54cc31434116579e68a7c` adds the final pre-CSV correction requested after the Wave 2 closure:
+
+- Platform Activity remains metadata-only and now derives truthful scope, category, classification, impact, severity, interpretation, and next action fields. Platform authentication failures and expected 401/403 denials are represented as security evidence rather than tenant operational failure. Platform requests with intentionally absent tenant context are identified as having no tenant context expected; tenant-required requests without context remain unknown and actionable.
+- Tenant Runtime now uses tenant-appropriate operational wording and does not present platform-only release actions.
+- Review Owner candidates are withheld until a scenario warehouse is selected, then filtered to active REVIEW_OWNER operators eligible for that selected warehouse. Empty warehouse scopes remain tenant-wide. Warehouse matching is normalized for case and surrounding whitespace.
+- Backend scenario assignment remains authoritative and unchanged in its enforcement: cross-warehouse Review Owner assignment is rejected, while a valid warehouse-eligible assignment is accepted. Existing backend authority tests remain in place.
+
+Local correction evidence:
+
+- Backend suite: 152 tests, 0 failures.
+- Frontend lint, build, and verify: PASS.
+- Secret scan: PASS with 0 critical findings; existing committed fixture literals remain classified as fixture findings.
+- `git diff --check`: PASS.
+- Live connection check after push: `FRONTEND_UP=True`, `BACKEND_UP=True`, `DB_READY=True`, `AUTH_READY=True`, `WS_READY=True`, `PROOF_ALLOWED=True`.
+
+Live behavioral owner verification is still pending the Render deployment of this revision. The connection check observed the previously served frontend bundle, so this correction must not yet be described as live-proven. CSV testing, fulfillment, tariff/calculation testing, and full governance acceptance remain paused until the owner confirms the deployed Platform Activity interpretation and North/Coast Review Owner candidate lists.
+
 ## Scope
 
 Wave 2 covers the core tenant operational loop:
