@@ -1,3 +1,4 @@
+import { useEffect } from 'react'
 import useWorkspaceChrome from './useWorkspaceChrome'
 import { buildRoleAwareNavGroups, pageLookup, publicPages } from '../config/pageRegistry'
 import {
@@ -194,7 +195,6 @@ export default function useWorkspacePageContexts({
 
   const summary = snapshot.summary
   const runtime = systemRuntimeState.runtime
-  const warehouseOptions = buildWarehouseOptions(snapshot.inventory)
   const operators = operatorDirectoryState.items
   const signedInSession = authSessionState.session
   const signedInRoles = signedInSession?.roles || []
@@ -209,6 +209,7 @@ export default function useWorkspacePageContexts({
   const workspaceAdmin = accessAdminState.workspace
   const accessAdminOperators = accessAdminState.operators
   const accessAdminUsers = accessAdminState.users
+  const warehouseOptions = buildWarehouseOptions(snapshot.inventory, workspaceAdmin?.warehouses, signedInWarehouseScopes)
   const scenarioWarehouseCode = scenarioForm.warehouseCode?.trim() || ''
   const requesterOperators = scenarioWarehouseCode
     ? operators.filter((operator) => operator.active !== false && hasWarehouseScope(operator.warehouseScopes, scenarioWarehouseCode))
@@ -216,6 +217,14 @@ export default function useWorkspacePageContexts({
   const reviewOwnerOperators = scenarioWarehouseCode
     ? operators.filter((operator) => operator.active !== false && operator.roles.includes('REVIEW_OWNER') && hasWarehouseScope(operator.warehouseScopes, scenarioWarehouseCode))
     : []
+
+  useEffect(() => {
+    if (!warehouseOptions.length) return
+    const firstWarehouseCode = warehouseOptions[0].code
+    const hasWarehouse = (warehouseCode) => warehouseOptions.some((warehouse) => warehouse.code.trim().toUpperCase() === warehouseCode?.trim().toUpperCase())
+    setScenarioForm((current) => hasWarehouse(current.warehouseCode) ? current : { ...current, warehouseCode: firstWarehouseCode })
+    setComparisonForm((current) => hasWarehouse(current.warehouseCode) ? current : { ...current, warehouseCode: firstWarehouseCode })
+  }, [warehouseOptions, setScenarioForm, setComparisonForm])
   const primaryContext = buildScenarioContext(scenarioForm)
   const alternativeContext = buildScenarioContext(comparisonForm)
   const scenarioHistoryItems = scenarioHistoryState.items

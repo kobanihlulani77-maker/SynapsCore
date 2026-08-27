@@ -115,9 +115,22 @@ export const createScenarioForm = (productSku = '') => ({
   items: [createScenarioLine(productSku)],
 })
 
-export const buildWarehouseOptions = (inventory) => [
-  ...new Map(inventory.map((item) => [item.warehouseCode, { code: item.warehouseCode, name: item.warehouseName }])).values(),
-]
+export const buildWarehouseOptions = (inventory = [], configuredWarehouses = [], scopedWarehouseCodes = []) => {
+  const options = new Map()
+  inventory.forEach((item) => {
+    const code = item.warehouseCode?.trim()
+    if (code) options.set(code.toUpperCase(), { code, name: item.warehouseName || code })
+  })
+  configuredWarehouses.forEach((warehouse) => {
+    const code = warehouse.code?.trim()
+    if (code) options.set(code.toUpperCase(), { code, name: warehouse.name || code })
+  })
+  scopedWarehouseCodes.forEach((warehouseCode) => {
+    const code = String(warehouseCode).trim()
+    if (code && !options.has(code.toUpperCase())) options.set(code.toUpperCase(), { code, name: code })
+  })
+  return [...options.values()]
+}
 
 export const buildProductOptions = (inventory, warehouseCode) => [
   ...new Map(
