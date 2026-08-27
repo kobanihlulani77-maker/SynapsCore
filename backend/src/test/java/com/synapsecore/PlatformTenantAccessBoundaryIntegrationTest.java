@@ -1,5 +1,6 @@
 package com.synapsecore;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.http.MediaType.APPLICATION_JSON;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.multipart;
@@ -122,6 +123,13 @@ class PlatformTenantAccessBoundaryIntegrationTest {
         createRoleUser(admin, "boundary.integration.admin", "INTEGRATION_ADMIN", List.of(warehouseA));
         createRoleUser(admin, "boundary.integration.admin.all", "INTEGRATION_ADMIN", List.of());
         createRoleUser(admin, "boundary.integration.operator", "INTEGRATION_OPERATOR", List.of(warehouseA));
+        createRoleUser(admin, "boundary.requester.b", "INTEGRATION_OPERATOR", List.of(warehouseB));
+        createRoleUser(admin, "boundary.inactive", "INTEGRATION_OPERATOR", List.of(warehouseA));
+        var inactiveOperator = accessOperatorRepository
+            .findByTenant_CodeIgnoreCaseAndActorNameIgnoreCase(REHEARSAL_TENANT, "boundary.inactive")
+            .orElseThrow();
+        inactiveOperator.setActive(false);
+        accessOperatorRepository.save(inactiveOperator);
 
         mockMvc.perform(post("/api/products")
                 .session(admin)
@@ -893,9 +901,10 @@ class PlatformTenantAccessBoundaryIntegrationTest {
     @Test
     void scenarioGovernanceRejectsRequesterSelfReviewAtSaveAndDecision() throws Exception {
         MockHttpSession tenantAdmin = tenantLogin(REHEARSAL_TENANT, "boundary.tenant.admin", ROLE_PASSWORD);
+        MockHttpSession reviewOwner = tenantLogin(REHEARSAL_TENANT, "boundary.review", ROLE_PASSWORD);
 
         mockMvc.perform(post("/api/scenarios/save")
-                .session(tenantAdmin)
+                .session(reviewOwner)
                 .contentType(APPLICATION_JSON)
                 .content("""
                     {"title":"Boundary requester self-review save","requestedBy":"boundary.review","reviewOwner":"boundary.review","request":{"warehouseCode":"%s","items":[{"productSku":"BOUNDARY-SKU","quantity":1,"unitPrice":10.00}]}}
@@ -913,7 +922,6 @@ class PlatformTenantAccessBoundaryIntegrationTest {
         historicalSelfReview.setRequestedBy("boundary.review");
         scenarioRunRepository.save(historicalSelfReview);
 
-        MockHttpSession reviewOwner = tenantLogin(REHEARSAL_TENANT, "boundary.review", ROLE_PASSWORD);
         mockMvc.perform(post("/api/scenarios/" + historicalSelfReviewId + "/approve")
                 .session(reviewOwner)
                 .contentType(APPLICATION_JSON)
@@ -929,8 +937,58 @@ class PlatformTenantAccessBoundaryIntegrationTest {
                 .content("""
                     {"actorRole":"REVIEW_OWNER","reviewerName":"boundary.review","reason":"Self-review must fail"}
                     """))
-            .andExpect(status().isBadRequest())
-            .andExpect(jsonPath("$.message").value(org.hamcrest.Matchers.containsString("different from the requester")));
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.message").value(org.hamcrest.Matchers.containsString("different from the requester")));
+    }
+
+    @Test
+    void scenarioSaveBindsRequesterToAuthenticatedSessionActor() throws Exception {
+        MockHttpSession requester = tenantLogin(REHEARSAL_TENANT, "boundary.integration.operator", ROLE_PASSWORD);
+
+        mockMvc.perform(post("/api/scenarios/save")
+                .session(requester)
+                .contentType(APPLICATION_JSON)
+                .content(scenarioSavePayload(
+                    "Session-bound requester",
+                    "boundary.integration.operator",
+                    "boundary.review",
+                    warehouseA)))
+            .andExpect(status().isCreated())
+            .andExpect(jsonPath("$.requestedBy").value("boundary.integration.operator"));
+
+        var saved = scenarioRunRepository.findTop12ByOrderByCreatedAtDesc().stream()
+            .filter(run -> "Session-bound requester".equals(run.getTitle()))
+            .findFirst()
+            .orElseThrow();
+        assertThat(saved.getRequestedBy()).isEqualTo("boundary.integration.operator");
+
+        assertRequesterSpoofRejected(requester, "Same-tenant requester spoof", "boundary.review", warehouseA);
+        assertRequesterSpoofRejected(requester, "Tenant-wide requester spoof", "Operations Lead", warehouseA);
+        assertRequesterSpoofRejected(requester, "Wrong-warehouse requester spoof", "boundary.requester.b", warehouseA);
+        assertRequesterSpoofRejected(requester, "Cross-tenant requester spoof", "isolation.admin", warehouseA);
+        assertRequesterSpoofRejected(requester, "Inactive requester spoof", "boundary.inactive", warehouseA);
+    }
+
+    private void assertRequesterSpoofRejected(MockHttpSession session,
+                                              String title,
+                                              String requestedBy,
+                                              String warehouseCode) throws Exception {
+        mockMvc.perform(post("/api/scenarios/save")
+                .session(session)
+                .contentType(APPLICATION_JSON)
+                .content(scenarioSavePayload(title, requestedBy, "boundary.review", warehouseCode)))
+            .andExpect(status().isForbidden())
+            .andExpect(jsonPath("$.message").value(org.hamcrest.Matchers.containsString(
+                "authenticated session actor")));
+    }
+
+    private String scenarioSavePayload(String title,
+                                       String requestedBy,
+                                       String reviewOwner,
+                                       String warehouseCode) {
+        return """
+            {"title":"%s","requestedBy":"%s","reviewOwner":"%s","request":{"warehouseCode":"%s","items":[{"productSku":"BOUNDARY-SKU","quantity":1,"unitPrice":10.00}]}}
+            """.formatted(title, requestedBy, reviewOwner, warehouseCode);
     }
 
     private void createRoleUser(MockHttpSession admin,

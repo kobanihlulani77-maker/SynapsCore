@@ -72,11 +72,11 @@ public class ScenarioController {
     @PostMapping("/save")
     @ResponseStatus(HttpStatus.CREATED)
     public ScenarioSaveResponse saveScenarioPlan(@Valid @RequestBody ScenarioSaveRequest request) {
-        accessControlService.requireWorkspaceWarehouseAccess(
+        var authenticatedActor = accessControlService.requireWorkspaceWarehouseAccess(
             request.request().warehouseCode(),
             "save scenario plans"
         );
-        return scenarioHistoryService.savePlan(request);
+        return scenarioHistoryService.savePlan(request, authenticatedActor.actorName());
     }
 
     @PostMapping("/{scenarioRunId}/approve")

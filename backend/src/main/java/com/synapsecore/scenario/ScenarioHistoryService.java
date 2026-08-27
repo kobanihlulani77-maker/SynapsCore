@@ -64,14 +64,14 @@ public class ScenarioHistoryService {
     private static final ScenarioHistoryFilter DEFAULT_HISTORY_FILTER =
         new ScenarioHistoryFilter(null, null, null, null, null, null, null, null, null, null, null, null, null);
 
-    public ScenarioSaveResponse savePlan(ScenarioSaveRequest request) {
+    public ScenarioSaveResponse savePlan(ScenarioSaveRequest request, String authenticatedActorName) {
         var tenant = tenantContextService.getCurrentTenantOrDefault();
         ScenarioRun revisionSource = resolveRevisionSource(request.revisionOfScenarioRunId());
         ScenarioOrderImpactResponse projectedImpact = scenarioProjectionService.projectOrderImpact(request.request());
         ScenarioRiskAssessment riskAssessment = scenarioRiskPolicyService.assess(projectedImpact);
         ScenarioApprovalPolicy approvalPolicy = determineApprovalPolicy(riskAssessment.reviewPriority());
         String warehouseCode = request.request().warehouseCode().trim();
-        String requestedBy = resolveRequestedBy(request.requestedBy(), warehouseCode);
+        String requestedBy = resolveRequestedBy(request.requestedBy(), warehouseCode, authenticatedActorName);
         String reviewOwner = resolveReviewOwner(request.reviewOwner(), warehouseCode, requestedBy);
         requireDistinctRequesterAndReviewer(requestedBy, reviewOwner, "save");
         ScenarioRun scenarioRun = scenarioRunRepository.save(ScenarioRun.builder()
@@ -703,7 +703,20 @@ public class ScenarioHistoryService {
         return projectedImpact.projectedRecommendations().get(0).title();
     }
 
-    private String resolveRequestedBy(String requestedBy, String warehouseCode) {
+    private String resolveRequestedBy(String requestedBy, String warehouseCode, String authenticatedActorName) {
+        if (authenticatedActorName != null
+            && !authenticatedActorName.isBlank()
+            && !authenticatedActorName.equalsIgnoreCase("dev-anonymous")) {
+            String sessionActor = authenticatedActorName.trim();
+            if (requestedBy != null && !requestedBy.isBlank()
+                && !sessionActor.equalsIgnoreCase(requestedBy.trim())) {
+                throw new ResponseStatusException(HttpStatus.FORBIDDEN,
+                    "Scenario requester must match the authenticated session actor.");
+            }
+            requireWarehouseAccess(sessionActor, warehouseCode, "request scenarios for warehouse " + warehouseCode);
+            return sessionActor;
+        }
+
         if (requestedBy == null || requestedBy.isBlank()) {
             return resolvePreferredOperatorName(
                 List.of(),
