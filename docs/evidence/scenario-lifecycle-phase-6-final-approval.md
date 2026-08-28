@@ -315,6 +315,20 @@ Playwright proof is not required for this backend-only governance correction
 unless live deployment evidence identifies a browser regression. The Phase 6
 boundary remains governance-only and does not invoke Scenario execution.
 
+Post-push deployment verification:
+
+- Deployed revision: `162667d5f5424fb72d5afa302b93de9278039626`.
+- `scripts\check-live-connections.ps1`: passed after network-enabled retry.
+- `FRONTEND_UP=True`.
+- `BACKEND_UP=True`.
+- `DB_READY=True`.
+- `AUTH_READY=True`.
+- `WS_READY=True`.
+- `PROOF_ALLOWED=True`.
+- Hosted Playwright proof was not rerun because this Phase 6 correction is
+  backend governance enforcement only, with no browser contract change, and
+  the phase explicitly forbids Scenario execution.
+
 ## Manual Owner Walkthrough
 
 `OWNER-ACCEPT-02` remains a workspace/role acceptance fixture without meaningful
