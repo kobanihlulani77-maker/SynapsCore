@@ -252,3 +252,34 @@ None identified for the tested Catalog Phase 2 scope.
 **PHASE 2 PASSED — CSV TRANSACTION TRUTH, SIDE-EFFECT BOUNDARIES, AND CONCURRENCY VERIFIED — READY FOR CATALOG PHASE 3.**
 
 The key correction is that a final catalog evidence failure now rolls back the complete catalog write path instead of allowing independently committed event or dispatch evidence to survive a failed Product transaction.
+
+## Closure Addendum
+
+The Catalog Phase 1/2 implementation and evidence were committed and pushed after the local proof completed.
+
+- Closure commit: `b98e74d6347164e4dd5f6db40c1fab389351f128`
+- Commit message: `Verify Catalog transaction and concurrency boundaries`
+- Push result: `main -> origin/main` succeeded.
+- Unrelated local worktree items remained unstaged and untouched.
+
+Render deployment was allowed to complete normally without changing deployment configuration. The post-deployment live connection check returned HTTP `200 OK` for the frontend shell, backend health, readiness, liveness, auth session, and SockJS information endpoints, with this classification:
+
+```text
+FRONTEND_UP=True
+BACKEND_UP=True
+DB_READY=True
+AUTH_READY=True
+WS_READY=True
+PROOF_ALLOWED=True
+```
+
+The existing hosted Catalog onboarding proof was then run without creating a new browser suite or manufacturing `OWNER-ACCEPT-02` data:
+
+```powershell
+cd C:\Users\asus\Downloads\synapsecore_starter\synapsecore\frontend
+npm.cmd run test:e2e:prod -- tests/prod-proof.spec.mjs -g "product catalog onboarding"
+```
+
+Result: `1` test passed in `59.2s`. The proof exercised tenant-scoped Product API and browser catalog onboarding against the deployed services. The proof state was present locally and its secret values were not printed or committed.
+
+This closure addendum does not change the technical conclusions or the remaining H2, single-process concurrency, optimistic-locking, orphan-race, and deployed-realtime limitations recorded above. Catalog Phase 3 remains the next phase and was not started.
