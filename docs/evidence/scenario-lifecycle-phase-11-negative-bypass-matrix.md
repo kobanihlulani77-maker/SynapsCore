@@ -13,8 +13,8 @@ The governing separation remains:
 > people decided. Authoritative operational data is required before a business
 > operation becomes actual.
 
-**Current technical verdict:** `PHASE 11 TECHNICALLY ACCEPTED - LIVE DEPLOYED
-NEGATIVE REHEARSAL PENDING - READY FOR PHASE 12`
+**Current technical verdict:** `PHASE 11 ACCEPTED - FULL SCENARIO
+NEGATIVE/BYPASS MATRIX VERIFIED - READY FOR PHASE 12`
 
 The repository and local integration evidence show zero Critical or High
 Scenario bypasses. The current working revision includes two narrow fixes:
@@ -24,8 +24,11 @@ Scenario bypasses. The current working revision includes two narrow fixes:
 2. Scenario warehouse authorization now runs before overdue SLA escalation, so
    a denied warehouse request cannot mutate the Scenario.
 
-The live deployed negative matrix must be rerun after this revision is deployed.
-No live result is inferred from local tests.
+The live deployed negative matrix was rerun after commit `0abc908` was pushed
+to `origin/main`. Render does not expose a commit identifier through the public
+health endpoints, so the deployment association is recorded by the push and
+the subsequent live readiness/proof sequence rather than by an unauthenticated
+revision endpoint.
 
 ## 1. Starting revision
 
@@ -338,7 +341,7 @@ No new `SCENARIO_EXECUTED` event is created by the current compatibility route.
 | 35 | False-correlation result | No Scenario-to-actual correlation field or similarity-based completion claim exists. |
 | 36 | Critical defects found | 0. |
 | 37 | High defects found | 0 after two narrow fixes. |
-| 38 | Medium/Low findings | Comparison object visibility is a documented low-severity consideration; live deployment evidence remains pending. |
+| 38 | Medium/Low findings | Comparison object visibility is a documented low-severity consideration; it is not a consequential authorization bypass. |
 | 39 | Production fixes | Notifications scope filtering; authorize warehouse before SLA mutation. |
 | 40 | Test/fixture corrections | Initial new-test session fixture was corrected from bootstrap `boundary.admin` to `boundary.tenant.admin`; no production expectation was weakened. |
 | 41 | Expectation-change justification | The only changed expectation was a fixture correction: helper payload/session identity had to match the established requester contract. |
@@ -347,11 +350,11 @@ No new `SCENARIO_EXECUTED` event is created by the current compatibility route.
 | 44 | Frontend checks | No frontend source changed; the existing frontend verification baseline remains applicable. |
 | 45 | Repository gates | `git diff --check` passed; unrelated worktree changes remain unstaged. |
 | 46 | Files changed | Scenario controller, Scenario history service, focused access-boundary test, and this evidence record. |
-| 47 | Commits | Pending commit after final review; no unrelated files will be staged. |
-| 48 | Deployment/live readiness | Local code and tests are green; live deployed revision is not yet confirmed for this change. |
-| 49 | Manual/live negative proof | Pending deployment of this revision; no live result is claimed. |
-| 50 | Readiness for Phase 12 | Technically ready after deployment evidence is rerun; do not start Phase 12 in this closure turn. |
-| 51 | Phase 11 verdict | Technically accepted with live deployed negative rehearsal pending; no Critical or High bypass remains locally. |
+| 47 | Commits | `0abc908` (`Close Scenario Phase 11 negative boundaries`) pushed to `origin/main`; unrelated worktree changes were not staged. |
+| 48 | Deployment/live readiness | Post-push live checks returned `FRONTEND_UP=True`, `BACKEND_UP=True`, `DB_READY=True`, `AUTH_READY=True`, and `WS_READY=True`. |
+| 49 | Manual/live negative proof | Hosted Playwright proof passed 6/6 after readiness became true, including governance/replay/browser role-gating coverage. |
+| 50 | Readiness for Phase 12 | Ready; this closure stops at Phase 11 as required. |
+| 51 | Phase 11 verdict | Full hosted proof passed with zero Critical or High Scenario bypasses identified; only the documented low-severity comparison visibility consideration remains. |
 
 ## 17. Verification commands and next evidence gate
 
@@ -373,7 +376,7 @@ Results:
   logs were observed; no unexpected test failure was present.
 - `git diff --check`: passed.
 
-After this revision is deployed, the remaining evidence gate is:
+The post-push live evidence gate completed with:
 
 ```powershell
 cd C:\Users\asus\Downloads\synapsecore_starter\synapsecore
@@ -382,6 +385,18 @@ powershell -ExecutionPolicy Bypass -File scripts\check-live-connections.ps1
 cd frontend
 npm.cmd run test:e2e:prod
 ```
+
+Live result:
+
+- Connection check: all six readiness classifications were `True`, including
+  `PROOF_ALLOWED=True`.
+- Hosted proof: 6/6 tests passed in 7.6 minutes.
+- The governance/replay test passed after exercising approval, execution
+  blocking, replay, and browser role-gating behavior.
+- The remaining page/integration and auth-rate-limit tests also passed.
+- The runner emitted only the known Node `NO_COLOR`/`FORCE_COLOR` warnings and
+  the expected slow-test advisory; no unexpected 4xx, 5xx, browser-console,
+  resource, or React failure was reported.
 
 The hosted run must inspect deliberate denials separately from unexpected 4xx,
 5xx, browser-console, resource, or stale-state failures. It must not be run
