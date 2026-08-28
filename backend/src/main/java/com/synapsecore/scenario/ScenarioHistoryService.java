@@ -325,41 +325,62 @@ public class ScenarioHistoryService {
                 "Scenario " + run.getId() + " has already been approved and cannot be rejected.");
         }
 
-        if (run.getApprovalStatus() != ScenarioApprovalStatus.REJECTED) {
-            String reviewerName = request.reviewerName().trim();
-            ScenarioActorRole requiredRole = requiredRejectionRole(run);
-            accessControlService.requireScenarioActor(request.actorRole(), reviewerName, "reject scenario plans");
-            requireActorRole(run.getId(), "reject this scenario", request.actorRole(), requiredRole);
-            requireWarehouseAccess(reviewerName, run.getWarehouseCode(), "reject scenario plans");
-            requireDistinctRequesterAndReviewer(run.getRequestedBy(), reviewerName, "reject");
-            if (requiredRole == ScenarioActorRole.REVIEW_OWNER) {
-                requireAssignedReviewOwner(run, reviewerName, "reject");
-            }
-            if (requiredRole == ScenarioActorRole.FINAL_APPROVER) {
-                requireAssignedFinalApprover(run, reviewerName, "reject");
-            }
+        if (run.getApprovalStatus() == ScenarioApprovalStatus.REJECTED) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                "Scenario " + run.getId() + " has already been rejected and cannot be rejected again.");
+        }
 
-            run.setApprovalStatus(ScenarioApprovalStatus.REJECTED);
-            run.setApprovalStage(ScenarioApprovalStage.REJECTED);
-            run.setRejectedBy(reviewerName);
-            run.setRejectedAt(Instant.now());
-            run.setRejectionReason(request.reason().trim());
-            run.setApprovedBy(null);
-            run.setApprovedAt(null);
-            run.setApprovalNote(null);
-            run.setApprovalDueAt(null);
+        if (run.getApprovalStatus() != ScenarioApprovalStatus.PENDING_APPROVAL) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                "Scenario " + run.getId() + " cannot be rejected from its current workflow state.");
+        }
+        if (run.getApprovalPolicy() == ScenarioApprovalPolicy.STANDARD
+            && run.getApprovalStage() != ScenarioApprovalStage.PENDING_REVIEW) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                "Scenario " + run.getId() + " requires the pending review stage before rejection.");
+        }
+        if (run.getApprovalPolicy() == ScenarioApprovalPolicy.ESCALATED
+            && run.getApprovalStage() != ScenarioApprovalStage.PENDING_REVIEW
+            && run.getApprovalStage() != ScenarioApprovalStage.PENDING_FINAL_APPROVAL) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                "Scenario " + run.getId() + " cannot be rejected from its current workflow stage.");
+        }
+
+        String reviewerName = request.reviewerName().trim();
+        ScenarioActorRole requiredRole = requiredRejectionRole(run);
+        accessControlService.requireScenarioActor(request.actorRole(), reviewerName, "reject scenario plans");
+        requireActorRole(run.getId(), "reject this scenario", request.actorRole(), requiredRole);
+        requireWarehouseAccess(reviewerName, run.getWarehouseCode(), "reject scenario plans");
+        requireDistinctRequesterAndReviewer(run.getRequestedBy(), reviewerName, "reject");
+        if (requiredRole == ScenarioActorRole.REVIEW_OWNER) {
+            requireAssignedReviewOwner(run, reviewerName, "reject");
+        }
+        if (requiredRole == ScenarioActorRole.FINAL_APPROVER) {
+            requireAssignedFinalApprover(run, reviewerName, "reject");
+        }
+
+        run.setApprovalStatus(ScenarioApprovalStatus.REJECTED);
+        run.setApprovalStage(ScenarioApprovalStage.REJECTED);
+        run.setRejectedBy(reviewerName);
+        run.setRejectedAt(Instant.now());
+        run.setRejectionReason(request.reason().trim());
+        run.setApprovedBy(null);
+        run.setApprovedAt(null);
+        run.setApprovalNote(null);
+        run.setApprovalDueAt(null);
+        if (requiredRole == ScenarioActorRole.REVIEW_OWNER) {
             run.setReviewApprovedBy(null);
             run.setReviewApprovedAt(null);
             run.setReviewApprovalNote(null);
-            run = scenarioRunRepository.save(run);
-
-            businessEventService.record(
-                BusinessEventType.SCENARIO_REJECTED,
-                "scenario-planner",
-                "Rejected saved plan " + run.getTitle() + " for warehouse " + run.getWarehouseCode()
-                    + " by " + run.getRejectedBy() + ". Reason: " + run.getRejectionReason()
-            );
         }
+        run = scenarioRunRepository.save(run);
+
+        businessEventService.record(
+            BusinessEventType.SCENARIO_REJECTED,
+            "scenario-planner",
+            "Rejected saved plan " + run.getTitle() + " for warehouse " + run.getWarehouseCode()
+                + " by " + run.getRejectedBy() + ". Reason: " + run.getRejectionReason()
+        );
 
         return new ScenarioRejectionResponse(
             run.getId(),

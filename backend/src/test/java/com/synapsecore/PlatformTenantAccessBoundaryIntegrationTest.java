@@ -2449,6 +2449,218 @@ class PlatformTenantAccessBoundaryIntegrationTest {
             .isTrue();
     }
 
+    @Test
+    void scenarioPhaseEightRejectionRevisionPreservesGovernanceHistoryAndOperationalTruth() throws Exception {
+        MockHttpSession tenantAdmin = tenantLogin(REHEARSAL_TENANT, "boundary.tenant.admin", ROLE_PASSWORD);
+        MockHttpSession northReviewer = tenantLogin(REHEARSAL_TENANT, "boundary.review", ROLE_PASSWORD);
+        MockHttpSession alternateNorthReviewer = tenantLogin(REHEARSAL_TENANT, "boundary.review.alt", ROLE_PASSWORD);
+        MockHttpSession coastReviewer = tenantLogin(REHEARSAL_TENANT, "boundary.review.b", ROLE_PASSWORD);
+        MockHttpSession northFinalApprover = tenantLogin(REHEARSAL_TENANT, "boundary.final", ROLE_PASSWORD);
+        MockHttpSession integrationAdmin = tenantLogin(REHEARSAL_TENANT, "boundary.integration.admin", ROLE_PASSWORD);
+        MockHttpSession integrationOperator = tenantLogin(REHEARSAL_TENANT, "boundary.integration.operator", ROLE_PASSWORD);
+        MockHttpSession escalationOwner = tenantLogin(REHEARSAL_TENANT, "boundary.escalation", ROLE_PASSWORD);
+        MockHttpSession crossTenant = tenantLogin(ISOLATION_TENANT, "isolation.admin", "Isolation-Admin-2026!");
+
+        long startingOrders = customerOrderRepository.countByTenant_CodeIgnoreCase(REHEARSAL_TENANT);
+        long startingInventory = inventoryRepository.countByTenantCode(REHEARSAL_TENANT);
+        long startingFulfillment = fulfillmentTaskRepository.count();
+        long startingDispatch = operationalDispatchWorkItemRepository.count();
+        long startingAlerts = alertRepository.count();
+        long startingRecommendations = recommendationRepository.count();
+
+        long northPlanId = saveStandardScenarioPlan(
+            tenantAdmin,
+            "Phase 8 North rejection revision",
+            "boundary.review",
+            warehouseA
+        );
+        ScenarioRun northBeforeRejection = scenarioRunRepository.findById(northPlanId).orElseThrow();
+        String northOriginalPayload = northBeforeRejection.getRequestPayload();
+        Instant northOriginalCreatedAt = northBeforeRejection.getCreatedAt();
+
+        mockMvc.perform(post("/api/scenarios/" + northPlanId + "/reject")
+                .session(alternateNorthReviewer)
+                .contentType(APPLICATION_JSON)
+                .content("{\"actorRole\":\"REVIEW_OWNER\",\"reviewerName\":\"boundary.review.alt\",\"reason\":\"Wrong owner\"}"))
+            .andExpect(status().isBadRequest())
+            .andExpect(jsonPath("$.message").value(org.hamcrest.Matchers.containsString("assigned review owner")));
+        mockMvc.perform(post("/api/scenarios/" + northPlanId + "/reject")
+                .session(coastReviewer)
+                .contentType(APPLICATION_JSON)
+                .content("{\"actorRole\":\"REVIEW_OWNER\",\"reviewerName\":\"boundary.review.b\",\"reason\":\"Wrong warehouse\"}"))
+            .andExpect(status().isForbidden());
+        mockMvc.perform(post("/api/scenarios/" + northPlanId + "/reject")
+                .session(crossTenant)
+                .contentType(APPLICATION_JSON)
+                .content("{\"actorRole\":\"REVIEW_OWNER\",\"reviewerName\":\"boundary.review\",\"reason\":\"Cross tenant\"}"))
+            .andExpect(status().isNotFound());
+        mockMvc.perform(post("/api/scenarios/" + northPlanId + "/reject")
+                .session(tenantAdmin)
+                .contentType(APPLICATION_JSON)
+                .content("{\"actorRole\":\"REVIEW_OWNER\",\"reviewerName\":\"boundary.tenant.admin\",\"reason\":\"Wrong role\"}"))
+            .andExpect(status().isForbidden());
+        for (String actorRoleAndUsername : List.of(
+            "boundary.integration.admin",
+            "boundary.integration.operator",
+            "boundary.escalation",
+            "boundary.final"
+        )) {
+            MockHttpSession session = switch (actorRoleAndUsername) {
+                case "boundary.integration.admin" -> integrationAdmin;
+                case "boundary.integration.operator" -> integrationOperator;
+                case "boundary.escalation" -> escalationOwner;
+                default -> northFinalApprover;
+            };
+            mockMvc.perform(post("/api/scenarios/" + northPlanId + "/reject")
+                    .session(session)
+                    .contentType(APPLICATION_JSON)
+                    .content("{\"actorRole\":\"REVIEW_OWNER\",\"reviewerName\":\"%s\",\"reason\":\"Wrong role\"}"
+                        .formatted(actorRoleAndUsername)))
+                .andExpect(status().isForbidden());
+        }
+        mockMvc.perform(post("/api/scenarios/" + northPlanId + "/reject")
+                .session(northReviewer)
+                .contentType(APPLICATION_JSON)
+                .content("{\"actorRole\":\"REVIEW_OWNER\",\"reviewerName\":\"boundary.review.alt\",\"reason\":\"Actor spoof\"}"))
+            .andExpect(status().isForbidden());
+        mockMvc.perform(post("/api/scenarios/" + northPlanId + "/reject")
+                .session(northReviewer)
+                .contentType(APPLICATION_JSON)
+                .content("{\"actorRole\":\"REVIEW_OWNER\",\"reviewerName\":\"boundary.review\",\"reason\":\"   \"}"))
+            .andExpect(status().isBadRequest());
+
+        mockMvc.perform(post("/api/scenarios/" + northPlanId + "/reject")
+                .session(northReviewer)
+                .contentType(APPLICATION_JSON)
+                .content("{\"actorRole\":\"REVIEW_OWNER\",\"reviewerName\":\"boundary.review\",\"reason\":\"North proposal rejected for safety review.\"}"))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.approvalStatus").value("REJECTED"))
+            .andExpect(jsonPath("$.rejectedBy").value("boundary.review"))
+            .andExpect(jsonPath("$.rejectionReason").value("North proposal rejected for safety review."));
+        long eventsAfterNorthRejection = businessEventRepository.count();
+        mockMvc.perform(post("/api/scenarios/" + northPlanId + "/reject")
+                .session(alternateNorthReviewer)
+                .contentType(APPLICATION_JSON)
+                .content("{\"actorRole\":\"REVIEW_OWNER\",\"reviewerName\":\"boundary.review.alt\",\"reason\":\"Duplicate rejection\"}"))
+            .andExpect(status().isBadRequest())
+            .andExpect(jsonPath("$.message").value(org.hamcrest.Matchers.containsString("already been rejected")));
+        assertThat(businessEventRepository.count()).isEqualTo(eventsAfterNorthRejection);
+
+        ScenarioRun rejectedNorth = scenarioRunRepository.findById(northPlanId).orElseThrow();
+        assertThat(rejectedNorth.getApprovalStatus()).isEqualTo(ScenarioApprovalStatus.REJECTED);
+        assertThat(rejectedNorth.getApprovalStage()).isEqualTo(ScenarioApprovalStage.REJECTED);
+        assertThat(rejectedNorth.getRequestPayload()).isEqualTo(northOriginalPayload);
+        assertThat(rejectedNorth.getCreatedAt()).isEqualTo(northOriginalCreatedAt);
+
+        mockMvc.perform(post("/api/scenarios/" + northPlanId + "/approve")
+                .session(northReviewer)
+                .contentType(APPLICATION_JSON)
+                .content("{\"actorRole\":\"REVIEW_OWNER\",\"approverName\":\"boundary.review\",\"approvalNote\":\"Reopen rejected plan\"}"))
+            .andExpect(status().isBadRequest())
+            .andExpect(jsonPath("$.message").value(org.hamcrest.Matchers.containsString("already been rejected")));
+        mockMvc.perform(post("/api/scenarios/" + northPlanId + "/execute").session(northReviewer))
+            .andExpect(status().isBadRequest())
+            .andExpect(jsonPath("$.message").value(org.hamcrest.Matchers.containsString("approved saved plans")));
+
+        mockMvc.perform(post("/api/scenarios/save")
+                .session(tenantAdmin)
+                .contentType(APPLICATION_JSON)
+                .content("""
+                    {"title":"Phase 8 North revision","requestedBy":"boundary.tenant.admin","reviewOwner":"boundary.review.alt","revisionOfScenarioRunId":%d,"request":{"warehouseCode":"%s","items":[{"productSku":"BOUNDARY-SKU","quantity":2,"unitPrice":10.00}]}}
+                    """.formatted(northPlanId, warehouseA)))
+            .andExpect(status().isCreated())
+            .andExpect(jsonPath("$.revisionOfScenarioRunId").value(northPlanId))
+            .andExpect(jsonPath("$.revisionNumber").value(2))
+            .andExpect(jsonPath("$.requestedBy").value("boundary.tenant.admin"))
+            .andExpect(jsonPath("$.reviewOwner").value("boundary.review.alt"))
+            .andExpect(jsonPath("$.approvalStatus").value("PENDING_APPROVAL"));
+        ScenarioRun northRevision = scenarioRunRepository.findTop12ByOrderByCreatedAtDesc().stream()
+            .filter(run -> "Phase 8 North revision".equals(run.getTitle()))
+            .findFirst()
+            .orElseThrow();
+        assertThat(northRevision.getId()).isNotEqualTo(northPlanId);
+        assertThat(northRevision.getRequestPayload()).contains("\"quantity\":2");
+        assertThat(rejectedNorth.getRequestPayload()).contains("\"quantity\":1");
+        assertThat(rejectedNorth.getRejectionReason()).isEqualTo("North proposal rejected for safety review.");
+        assertThat(rejectedNorth.getRejectedBy()).isEqualTo("boundary.review");
+
+        long coastPlanId = saveStandardScenarioPlan(
+            tenantAdmin,
+            "Phase 8 Coast rejection",
+            "boundary.review.b",
+            warehouseB
+        );
+        mockMvc.perform(post("/api/scenarios/" + coastPlanId + "/reject")
+                .session(coastReviewer)
+                .contentType(APPLICATION_JSON)
+                .content("{\"actorRole\":\"REVIEW_OWNER\",\"reviewerName\":\"boundary.review.b\",\"reason\":\"Coast proposal rejected for capacity.\"}"))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.approvalStatus").value("REJECTED"))
+            .andExpect(jsonPath("$.rejectedBy").value("boundary.review.b"));
+
+        long finalRejectPlanId = saveEscalatedScenarioPlan(
+            tenantAdmin,
+            "Phase 8 final rejection",
+            "boundary.review",
+            "boundary.final",
+            warehouseA
+        );
+        mockMvc.perform(post("/api/scenarios/" + finalRejectPlanId + "/approve")
+                .session(northReviewer)
+                .contentType(APPLICATION_JSON)
+                .content("{\"actorRole\":\"REVIEW_OWNER\",\"approverName\":\"boundary.review\",\"approvalNote\":\"Review evidence preserved\"}"))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.approvalStage").value("PENDING_FINAL_APPROVAL"));
+        ScenarioRun beforeFinalRejection = scenarioRunRepository.findById(finalRejectPlanId).orElseThrow();
+        assertThat(beforeFinalRejection.getReviewApprovedBy()).isEqualTo("boundary.review");
+        assertThat(beforeFinalRejection.getReviewApprovalNote()).isEqualTo("Review evidence preserved");
+        mockMvc.perform(post("/api/scenarios/" + finalRejectPlanId + "/reject")
+                .session(northFinalApprover)
+                .contentType(APPLICATION_JSON)
+                .content("{\"actorRole\":\"FINAL_APPROVER\",\"reviewerName\":\"boundary.final\",\"reason\":\"Final approval rejected after review.\"}"))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.approvalStatus").value("REJECTED"))
+            .andExpect(jsonPath("$.rejectedBy").value("boundary.final"))
+            .andExpect(jsonPath("$.rejectionReason").value("Final approval rejected after review."));
+        ScenarioRun finalRejected = scenarioRunRepository.findById(finalRejectPlanId).orElseThrow();
+        assertThat(finalRejected.getApprovalStage()).isEqualTo(ScenarioApprovalStage.REJECTED);
+        assertThat(finalRejected.getReviewApprovedBy()).isEqualTo("boundary.review");
+        assertThat(finalRejected.getReviewApprovalNote()).isEqualTo("Review evidence preserved");
+
+        long approvedPlanId = saveStandardScenarioPlan(
+            tenantAdmin,
+            "Phase 8 approved contradiction",
+            "boundary.review",
+            warehouseA
+        );
+        mockMvc.perform(post("/api/scenarios/" + approvedPlanId + "/approve")
+                .session(northReviewer)
+                .contentType(APPLICATION_JSON)
+                .content("{\"actorRole\":\"REVIEW_OWNER\",\"approverName\":\"boundary.review\"}"))
+            .andExpect(status().isOk());
+        mockMvc.perform(post("/api/scenarios/" + approvedPlanId + "/reject")
+                .session(northReviewer)
+                .contentType(APPLICATION_JSON)
+                .content("{\"actorRole\":\"REVIEW_OWNER\",\"reviewerName\":\"boundary.review\",\"reason\":\"Contradiction\"}"))
+            .andExpect(status().isBadRequest())
+            .andExpect(jsonPath("$.message").value(org.hamcrest.Matchers.containsString("already been approved")));
+
+        long previewPlanId = createPreviewScenario(tenantAdmin, warehouseA);
+        mockMvc.perform(post("/api/scenarios/" + previewPlanId + "/reject")
+                .session(northReviewer)
+                .contentType(APPLICATION_JSON)
+                .content("{\"actorRole\":\"REVIEW_OWNER\",\"reviewerName\":\"boundary.review\",\"reason\":\"Preview denial\"}"))
+            .andExpect(status().isBadRequest())
+            .andExpect(jsonPath("$.message").value(org.hamcrest.Matchers.containsString("Only saved plans")));
+
+        assertThat(customerOrderRepository.countByTenant_CodeIgnoreCase(REHEARSAL_TENANT)).isEqualTo(startingOrders);
+        assertThat(inventoryRepository.countByTenantCode(REHEARSAL_TENANT)).isEqualTo(startingInventory);
+        assertThat(fulfillmentTaskRepository.count()).isEqualTo(startingFulfillment);
+        assertThat(operationalDispatchWorkItemRepository.count()).isEqualTo(startingDispatch);
+        assertThat(alertRepository.count()).isEqualTo(startingAlerts);
+        assertThat(recommendationRepository.count()).isEqualTo(startingRecommendations);
+    }
+
     private void assertEscalationAcknowledgementDenied(MockHttpSession session,
                                                        long scenarioId,
                                                        String actorRole,
