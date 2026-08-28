@@ -244,7 +244,24 @@ public class ScenarioHistoryService {
                 "Scenario " + run.getId() + " has already been rejected. Reload it into the planner and save a new plan before requesting approval again.");
         }
 
-        if (run.getApprovalStatus() != ScenarioApprovalStatus.APPROVED) {
+        if (run.getApprovalStatus() == ScenarioApprovalStatus.APPROVED) {
+            requireApprovedApprovalRetryAuthority(run, request);
+        } else {
+            if (run.getApprovalStatus() != ScenarioApprovalStatus.PENDING_APPROVAL) {
+                throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                    "Scenario " + run.getId() + " cannot be approved from its current workflow state.");
+            }
+            if (run.getApprovalPolicy() == ScenarioApprovalPolicy.STANDARD
+                && run.getApprovalStage() != ScenarioApprovalStage.PENDING_REVIEW) {
+                throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                    "Scenario " + run.getId() + " requires the pending review stage before approval.");
+            }
+            if (run.getApprovalPolicy() == ScenarioApprovalPolicy.ESCALATED
+                && run.getApprovalStage() != ScenarioApprovalStage.PENDING_REVIEW
+                && run.getApprovalStage() != ScenarioApprovalStage.PENDING_FINAL_APPROVAL) {
+                throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                    "Scenario " + run.getId() + " cannot be approved from its current workflow stage.");
+            }
             String trimmedApproverName = request.approverName().trim();
             String approvalNote = request.approvalNote() == null ? "" : request.approvalNote().trim();
             accessControlService.requireScenarioActor(request.actorRole(), trimmedApproverName, "approve scenario plans");
@@ -971,10 +988,29 @@ public class ScenarioHistoryService {
     }
 
     private void requireAssignedFinalApprover(ScenarioRun run, String actorName, String actionLabel) {
-        if (run.getFinalApprovalOwner() != null && !run.getFinalApprovalOwner().isBlank()
-            && !run.getFinalApprovalOwner().equalsIgnoreCase(actorName)) {
+        if (run.getFinalApprovalOwner() == null || run.getFinalApprovalOwner().isBlank()
+            || !run.getFinalApprovalOwner().equalsIgnoreCase(actorName)) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
                 "Scenario " + run.getId() + " requires the assigned final approval owner to " + actionLabel + " this plan.");
+        }
+    }
+
+    private void requireApprovedApprovalRetryAuthority(ScenarioRun run, ScenarioApprovalRequest request) {
+        String actorName = request.approverName().trim();
+        accessControlService.requireScenarioActor(request.actorRole(), actorName, "retry scenario approval");
+        ScenarioActorRole requiredRole = run.getApprovalPolicy() == ScenarioApprovalPolicy.ESCALATED
+            ? ScenarioActorRole.FINAL_APPROVER
+            : ScenarioActorRole.REVIEW_OWNER;
+        requireActorRole(run.getId(), "retry scenario approval", request.actorRole(), requiredRole);
+        requireWarehouseAccess(actorName, run.getWarehouseCode(), "retry scenario approval");
+        if (requiredRole == ScenarioActorRole.FINAL_APPROVER) {
+            requireAssignedFinalApprover(run, actorName, "retry approval");
+        } else {
+            requireAssignedReviewOwner(run, actorName, "retry approval");
+        }
+        if (run.getApprovedBy() == null || !run.getApprovedBy().equalsIgnoreCase(actorName)) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                "Scenario " + run.getId() + " has already been approved by another authorized actor.");
         }
     }
 

@@ -1737,6 +1737,337 @@ class PlatformTenantAccessBoundaryIntegrationTest {
             .isTrue();
     }
 
+    @Test
+    void scenarioPhaseSixFinalApprovalRequiresAssignedIndependentApproverAndPreservesOperationalTruth() throws Exception {
+        Instant phaseStart = Instant.now();
+        MockHttpSession tenantAdmin = tenantLogin(REHEARSAL_TENANT, "boundary.tenant.admin", ROLE_PASSWORD);
+        MockHttpSession northReviewer = tenantLogin(REHEARSAL_TENANT, "boundary.review", ROLE_PASSWORD);
+        MockHttpSession coastReviewer = tenantLogin(REHEARSAL_TENANT, "boundary.review.b", ROLE_PASSWORD);
+        MockHttpSession northFinalApprover = tenantLogin(REHEARSAL_TENANT, "boundary.final", ROLE_PASSWORD);
+        MockHttpSession alternateNorthFinalApprover = tenantLogin(REHEARSAL_TENANT, "boundary.final.alt", ROLE_PASSWORD);
+        MockHttpSession coastFinalApprover = tenantLogin(REHEARSAL_TENANT, "boundary.final.b", ROLE_PASSWORD);
+        MockHttpSession crossTenantAdmin = tenantLogin(ISOLATION_TENANT, "isolation.admin", "Isolation-Admin-2026!");
+
+        long startingOrders = customerOrderRepository.countByTenant_CodeIgnoreCase(REHEARSAL_TENANT);
+        long startingInventory = inventoryRepository.countByTenantCode(REHEARSAL_TENANT);
+        long startingFulfillment = fulfillmentTaskRepository.count();
+        long startingDispatch = operationalDispatchWorkItemRepository.count();
+        long startingAlerts = alertRepository.count();
+        long startingRecommendations = recommendationRepository.count();
+
+        long northPlanId = saveEscalatedScenarioPlan(
+            tenantAdmin,
+            "Phase 6 escalated North approval",
+            "boundary.review",
+            "boundary.final",
+            warehouseA
+        );
+        ScenarioRun northBeforeReview = scenarioRunRepository.findById(northPlanId).orElseThrow();
+        assertThat(northBeforeReview.getApprovalPolicy()).isEqualTo(ScenarioApprovalPolicy.ESCALATED);
+        assertThat(northBeforeReview.getApprovalStage()).isEqualTo(ScenarioApprovalStage.PENDING_REVIEW);
+        assertThat(northBeforeReview.getApprovalStatus()).isEqualTo(ScenarioApprovalStatus.PENDING_APPROVAL);
+        assertThat(northBeforeReview.getFinalApprovalOwner()).isEqualTo("boundary.final");
+
+        mockMvc.perform(post("/api/scenarios/" + northPlanId + "/approve")
+                .session(northFinalApprover)
+                .contentType(APPLICATION_JSON)
+                .content("{\"actorRole\":\"FINAL_APPROVER\",\"approverName\":\"boundary.final\",\"approvalNote\":\"Too early\"}"))
+            .andExpect(status().isBadRequest())
+            .andExpect(jsonPath("$.message").value(org.hamcrest.Matchers.containsString("requires actor role REVIEW_OWNER")));
+
+        mockMvc.perform(post("/api/scenarios/" + northPlanId + "/approve")
+                .session(northReviewer)
+                .contentType(APPLICATION_JSON)
+                .content("{\"actorRole\":\"REVIEW_OWNER\",\"approverName\":\"boundary.review\",\"approvalNote\":\"North review complete\"}"))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.approvalPolicy").value("ESCALATED"))
+            .andExpect(jsonPath("$.approvalStage").value("PENDING_FINAL_APPROVAL"))
+            .andExpect(jsonPath("$.approvalStatus").value("PENDING_APPROVAL"))
+            .andExpect(jsonPath("$.reviewApprovedBy").value("boundary.review"))
+            .andExpect(jsonPath("$.approvedBy").doesNotExist())
+            .andExpect(jsonPath("$.executionReady").value(false));
+
+        for (String username : List.of("boundary.tenant.admin", "boundary.integration.admin",
+            "boundary.integration.operator", "boundary.escalation")) {
+            MockHttpSession session = tenantLogin(REHEARSAL_TENANT, username, ROLE_PASSWORD);
+            mockMvc.perform(post("/api/scenarios/" + northPlanId + "/approve")
+                    .session(session)
+                    .contentType(APPLICATION_JSON)
+                    .content("{\"actorRole\":\"FINAL_APPROVER\",\"approverName\":\"" + username
+                        + "\",\"approvalNote\":\"Wrong role\"}"))
+                .andExpect(status().isForbidden());
+        }
+
+        mockMvc.perform(post("/api/scenarios/" + northPlanId + "/approve")
+                .session(northReviewer)
+                .contentType(APPLICATION_JSON)
+                .content("{\"actorRole\":\"REVIEW_OWNER\",\"approverName\":\"boundary.review\",\"approvalNote\":\"Review owner cannot final approve\"}"))
+            .andExpect(status().isBadRequest())
+            .andExpect(jsonPath("$.message").value(org.hamcrest.Matchers.containsString("requires actor role FINAL_APPROVER")));
+
+        mockMvc.perform(post("/api/scenarios/" + northPlanId + "/approve")
+                .session(alternateNorthFinalApprover)
+                .contentType(APPLICATION_JSON)
+                .content("{\"actorRole\":\"FINAL_APPROVER\",\"approverName\":\"boundary.final.alt\",\"approvalNote\":\"Unassigned final owner\"}"))
+            .andExpect(status().isBadRequest())
+            .andExpect(jsonPath("$.message").value(org.hamcrest.Matchers.containsString("assigned final approval owner")));
+
+        MockHttpSession wrongWarehouseFinalApprover = tenantLogin(REHEARSAL_TENANT, "boundary.final.b", ROLE_PASSWORD);
+        mockMvc.perform(post("/api/scenarios/" + northPlanId + "/approve")
+                .session(wrongWarehouseFinalApprover)
+                .contentType(APPLICATION_JSON)
+                .content("{\"actorRole\":\"FINAL_APPROVER\",\"approverName\":\"boundary.final.b\",\"approvalNote\":\"Wrong warehouse\"}"))
+            .andExpect(status().isForbidden());
+
+        mockMvc.perform(post("/api/scenarios/" + northPlanId + "/approve")
+                .session(crossTenantAdmin)
+                .contentType(APPLICATION_JSON)
+                .content("{\"actorRole\":\"FINAL_APPROVER\",\"approverName\":\"boundary.final\",\"approvalNote\":\"Cross tenant\"}"))
+            .andExpect(status().isNotFound());
+
+        mockMvc.perform(post("/api/scenarios/" + northPlanId + "/approve")
+                .session(northFinalApprover)
+                .contentType(APPLICATION_JSON)
+                .content("{\"actorRole\":\"FINAL_APPROVER\",\"approverName\":\"boundary.final.alt\",\"approvalNote\":\"Actor spoof\"}"))
+            .andExpect(status().isForbidden());
+
+        mockMvc.perform(post("/api/scenarios/" + northPlanId + "/approve")
+                .session(northFinalApprover)
+                .contentType(APPLICATION_JSON)
+                .content("{\"actorRole\":\"FINAL_APPROVER\",\"approverName\":\"boundary.final\",\"approvalNote\":\"North final approval\"}"))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.approvalPolicy").value("ESCALATED"))
+            .andExpect(jsonPath("$.approvalStage").value("APPROVED"))
+            .andExpect(jsonPath("$.approvalStatus").value("APPROVED"))
+            .andExpect(jsonPath("$.approvedBy").value("boundary.final"))
+            .andExpect(jsonPath("$.executionReady").value(true));
+
+        long eventsAfterNorthFinalApproval = businessEventRepository.count();
+        mockMvc.perform(post("/api/scenarios/" + northPlanId + "/approve")
+                .session(northFinalApprover)
+                .contentType(APPLICATION_JSON)
+                .content("{\"actorRole\":\"FINAL_APPROVER\",\"approverName\":\"boundary.final\",\"approvalNote\":\"Duplicate final approval\"}"))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.approvedBy").value("boundary.final"));
+        assertThat(businessEventRepository.count()).isEqualTo(eventsAfterNorthFinalApproval);
+
+        mockMvc.perform(post("/api/scenarios/" + northPlanId + "/reject")
+                .session(northFinalApprover)
+                .contentType(APPLICATION_JSON)
+                .content("{\"actorRole\":\"FINAL_APPROVER\",\"reviewerName\":\"boundary.final\",\"reason\":\"Contradictory final decision\"}"))
+            .andExpect(status().isBadRequest())
+            .andExpect(jsonPath("$.message").value(org.hamcrest.Matchers.containsString("already been approved")));
+
+        ScenarioRun northAfter = scenarioRunRepository.findById(northPlanId).orElseThrow();
+        assertThat(northAfter.getReviewApprovedBy()).isEqualTo("boundary.review");
+        assertThat(northAfter.getApprovedBy()).isEqualTo("boundary.final");
+        assertThat(northAfter.getApprovalStage()).isEqualTo(ScenarioApprovalStage.APPROVED);
+
+        long coastPlanId = saveEscalatedScenarioPlan(
+            tenantAdmin,
+            "Phase 6 escalated Coast approval",
+            "boundary.review.b",
+            "boundary.final.b",
+            warehouseB
+        );
+        mockMvc.perform(post("/api/scenarios/" + coastPlanId + "/approve")
+                .session(coastReviewer)
+                .contentType(APPLICATION_JSON)
+                .content("{\"actorRole\":\"REVIEW_OWNER\",\"approverName\":\"boundary.review.b\",\"approvalNote\":\"Coast review complete\"}"))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.approvalStage").value("PENDING_FINAL_APPROVAL"));
+        mockMvc.perform(post("/api/scenarios/" + coastPlanId + "/approve")
+                .session(northFinalApprover)
+                .contentType(APPLICATION_JSON)
+                .content("{\"actorRole\":\"FINAL_APPROVER\",\"approverName\":\"boundary.final\",\"approvalNote\":\"Wrong Coast final owner\"}"))
+            .andExpect(status().isForbidden());
+        mockMvc.perform(post("/api/scenarios/" + coastPlanId + "/approve")
+                .session(coastFinalApprover)
+                .contentType(APPLICATION_JSON)
+                .content("{\"actorRole\":\"FINAL_APPROVER\",\"approverName\":\"boundary.final.b\",\"approvalNote\":\"Coast final approval\"}"))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.approvalStage").value("APPROVED"))
+            .andExpect(jsonPath("$.approvedBy").value("boundary.final.b"));
+
+        long standardPlanId = saveStandardScenarioPlan(
+            tenantAdmin,
+            "Phase 6 standard already approved boundary",
+            "boundary.review",
+            warehouseA
+        );
+        mockMvc.perform(post("/api/scenarios/" + standardPlanId + "/approve")
+                .session(northReviewer)
+                .contentType(APPLICATION_JSON)
+                .content("{\"actorRole\":\"REVIEW_OWNER\",\"approverName\":\"boundary.review\",\"approvalNote\":\"Standard approval\"}"))
+            .andExpect(status().isOk());
+        mockMvc.perform(post("/api/scenarios/" + standardPlanId + "/approve")
+                .session(northFinalApprover)
+                .contentType(APPLICATION_JSON)
+                .content("{\"actorRole\":\"FINAL_APPROVER\",\"approverName\":\"boundary.final\",\"approvalNote\":\"Must not approve standard\"}"))
+            .andExpect(status().isBadRequest());
+
+        long rejectedPlanId = saveEscalatedScenarioPlan(
+            tenantAdmin,
+            "Phase 6 rejected final boundary",
+            "boundary.review",
+            "boundary.final",
+            warehouseA
+        );
+        mockMvc.perform(post("/api/scenarios/" + rejectedPlanId + "/reject")
+                .session(northReviewer)
+                .contentType(APPLICATION_JSON)
+                .content("{\"actorRole\":\"REVIEW_OWNER\",\"reviewerName\":\"boundary.review\",\"reason\":\"Rejected before final review\"}"))
+            .andExpect(status().isOk());
+        mockMvc.perform(post("/api/scenarios/" + rejectedPlanId + "/approve")
+                .session(northFinalApprover)
+                .contentType(APPLICATION_JSON)
+                .content("{\"actorRole\":\"FINAL_APPROVER\",\"approverName\":\"boundary.final\",\"approvalNote\":\"Rejected plan\"}"))
+            .andExpect(status().isBadRequest())
+            .andExpect(jsonPath("$.message").value(org.hamcrest.Matchers.containsString("already been rejected")));
+
+        long previewPlanId = createPreviewScenario(tenantAdmin, warehouseA);
+        mockMvc.perform(post("/api/scenarios/" + previewPlanId + "/approve")
+                .session(northFinalApprover)
+                .contentType(APPLICATION_JSON)
+                .content("{\"actorRole\":\"FINAL_APPROVER\",\"approverName\":\"boundary.final\",\"approvalNote\":\"Preview\"}"))
+            .andExpect(status().isBadRequest())
+            .andExpect(jsonPath("$.message").value(org.hamcrest.Matchers.containsString("Only saved plans")));
+
+        long missingAssignmentPlanId = saveEscalatedScenarioPlan(
+            tenantAdmin,
+            "Phase 6 missing final assignment",
+            "boundary.review",
+            "boundary.final",
+            warehouseA
+        );
+        ScenarioRun missingAssignment = scenarioRunRepository.findById(missingAssignmentPlanId).orElseThrow();
+        missingAssignment.setApprovalStage(ScenarioApprovalStage.PENDING_FINAL_APPROVAL);
+        missingAssignment.setFinalApprovalOwner(null);
+        missingAssignment.setReviewApprovedBy("boundary.review");
+        missingAssignment.setReviewApprovedAt(Instant.now());
+        scenarioRunRepository.save(missingAssignment);
+        mockMvc.perform(post("/api/scenarios/" + missingAssignmentPlanId + "/approve")
+                .session(northFinalApprover)
+                .contentType(APPLICATION_JSON)
+                .content("{\"actorRole\":\"FINAL_APPROVER\",\"approverName\":\"boundary.final\",\"approvalNote\":\"Missing assignment\"}"))
+            .andExpect(status().isBadRequest())
+            .andExpect(jsonPath("$.message").value(org.hamcrest.Matchers.containsString("assigned final approval owner")));
+
+        long missingNotePlanId = saveEscalatedScenarioPlan(
+            tenantAdmin,
+            "Phase 6 missing final note",
+            "boundary.review",
+            "boundary.final",
+            warehouseA
+        );
+        ScenarioRun missingNote = scenarioRunRepository.findById(missingNotePlanId).orElseThrow();
+        missingNote.setApprovalStage(ScenarioApprovalStage.PENDING_FINAL_APPROVAL);
+        missingNote.setReviewApprovedBy("boundary.review");
+        missingNote.setReviewApprovedAt(Instant.now());
+        scenarioRunRepository.save(missingNote);
+        mockMvc.perform(post("/api/scenarios/" + missingNotePlanId + "/approve")
+                .session(northFinalApprover)
+                .contentType(APPLICATION_JSON)
+                .content("{\"actorRole\":\"FINAL_APPROVER\",\"approverName\":\"boundary.final\",\"approvalNote\":\"   \"}"))
+            .andExpect(status().isBadRequest())
+            .andExpect(jsonPath("$.message").value(org.hamcrest.Matchers.containsString("requires an approval note")));
+
+        MockHttpSession inactiveFinalApprover = null;
+        createRoleUser(tenantAdmin, "boundary.final.inactive", "FINAL_APPROVER", List.of(warehouseA));
+        inactiveFinalApprover = tenantLogin(REHEARSAL_TENANT, "boundary.final.inactive", ROLE_PASSWORD);
+        long inactiveFinalPlanId = saveEscalatedScenarioPlan(
+            tenantAdmin,
+            "Phase 6 inactive final approver",
+            "boundary.review",
+            "boundary.final.inactive",
+            warehouseA
+        );
+        ScenarioRun inactiveFinalPlan = scenarioRunRepository.findById(inactiveFinalPlanId).orElseThrow();
+        inactiveFinalPlan.setApprovalStage(ScenarioApprovalStage.PENDING_FINAL_APPROVAL);
+        inactiveFinalPlan.setReviewApprovedBy("boundary.review");
+        inactiveFinalPlan.setReviewApprovedAt(Instant.now());
+        scenarioRunRepository.save(inactiveFinalPlan);
+        var inactiveFinalOperator = accessOperatorRepository
+            .findByTenant_CodeIgnoreCaseAndActorNameIgnoreCase(REHEARSAL_TENANT, "boundary.final.inactive")
+            .orElseThrow();
+        inactiveFinalOperator.setActive(false);
+        accessOperatorRepository.save(inactiveFinalOperator);
+        try {
+            mockMvc.perform(post("/api/scenarios/" + inactiveFinalPlanId + "/approve")
+                    .session(inactiveFinalApprover)
+                    .contentType(APPLICATION_JSON)
+                    .content("{\"actorRole\":\"FINAL_APPROVER\",\"approverName\":\"boundary.final.inactive\",\"approvalNote\":\"Inactive final owner\"}"))
+                .andExpect(status().isForbidden());
+        } finally {
+            inactiveFinalOperator.setActive(true);
+            accessOperatorRepository.save(inactiveFinalOperator);
+        }
+
+        long requesterSeparationPlanId = saveEscalatedScenarioPlan(
+            tenantAdmin,
+            "Phase 6 requester final separation",
+            "boundary.review",
+            "boundary.final",
+            warehouseA
+        );
+        ScenarioRun requesterSeparationPlan = scenarioRunRepository.findById(requesterSeparationPlanId).orElseThrow();
+        requesterSeparationPlan.setRequestedBy("boundary.final");
+        requesterSeparationPlan.setApprovalStage(ScenarioApprovalStage.PENDING_FINAL_APPROVAL);
+        requesterSeparationPlan.setReviewApprovedBy("boundary.review");
+        requesterSeparationPlan.setReviewApprovedAt(Instant.now());
+        scenarioRunRepository.save(requesterSeparationPlan);
+        mockMvc.perform(post("/api/scenarios/" + requesterSeparationPlanId + "/approve")
+                .session(northFinalApprover)
+                .contentType(APPLICATION_JSON)
+                .content("{\"actorRole\":\"FINAL_APPROVER\",\"approverName\":\"boundary.final\",\"approvalNote\":\"Requester separation\"}"))
+            .andExpect(status().isBadRequest())
+            .andExpect(jsonPath("$.message").value(org.hamcrest.Matchers.containsString("different from the requester")));
+
+        long reviewerSeparationPlanId = saveEscalatedScenarioPlan(
+            tenantAdmin,
+            "Phase 6 reviewer final separation",
+            "boundary.review",
+            "boundary.final",
+            warehouseA
+        );
+        ScenarioRun reviewerSeparationPlan = scenarioRunRepository.findById(reviewerSeparationPlanId).orElseThrow();
+        reviewerSeparationPlan.setApprovalStage(ScenarioApprovalStage.PENDING_FINAL_APPROVAL);
+        reviewerSeparationPlan.setReviewApprovedBy("boundary.final");
+        reviewerSeparationPlan.setReviewApprovedAt(Instant.now());
+        scenarioRunRepository.save(reviewerSeparationPlan);
+        mockMvc.perform(post("/api/scenarios/" + reviewerSeparationPlanId + "/approve")
+                .session(northFinalApprover)
+                .contentType(APPLICATION_JSON)
+                .content("{\"actorRole\":\"FINAL_APPROVER\",\"approverName\":\"boundary.final\",\"approvalNote\":\"Reviewer separation\"}"))
+            .andExpect(status().isBadRequest())
+            .andExpect(jsonPath("$.message").value(org.hamcrest.Matchers.containsString("different from the owner reviewer")));
+
+        mockMvc.perform(post("/api/scenarios/" + northPlanId + "/approve")
+                .session(new MockHttpSession())
+                .contentType(APPLICATION_JSON)
+                .content("{\"actorRole\":\"FINAL_APPROVER\",\"approverName\":\"boundary.final\",\"approvalNote\":\"Anonymous\"}"))
+            .andExpect(status().isForbidden());
+
+        var phaseEvents = businessEventRepository.findTop20ByTenantCodeIgnoreCaseOrderByCreatedAtDesc(REHEARSAL_TENANT).stream()
+            .filter(event -> event.getCreatedAt().isAfter(phaseStart))
+            .toList();
+        assertThat(phaseEvents).extracting(event -> event.getEventType())
+            .contains(BusinessEventType.SCENARIO_ESCALATION_ADVANCED, BusinessEventType.SCENARIO_APPROVED)
+            .doesNotContain(BusinessEventType.SCENARIO_EXECUTED);
+        assertThat(phaseEvents.stream()
+            .filter(event -> event.getEventType() == BusinessEventType.SCENARIO_APPROVED)
+            .map(event -> event.getPayloadSummary())
+            .anyMatch(summary -> summary.contains("boundary.final") && summary.contains("boundary.review")))
+            .isTrue();
+
+        assertThat(customerOrderRepository.countByTenant_CodeIgnoreCase(REHEARSAL_TENANT)).isEqualTo(startingOrders);
+        assertThat(inventoryRepository.countByTenantCode(REHEARSAL_TENANT)).isEqualTo(startingInventory);
+        assertThat(fulfillmentTaskRepository.count()).isEqualTo(startingFulfillment);
+        assertThat(operationalDispatchWorkItemRepository.count()).isEqualTo(startingDispatch);
+        assertThat(alertRepository.count()).isEqualTo(startingAlerts);
+        assertThat(recommendationRepository.count()).isEqualTo(startingRecommendations);
+    }
+
     private void assertRequesterSpoofRejected(MockHttpSession session,
                                               String title,
                                               String requestedBy,
@@ -1847,6 +2178,37 @@ class PlatformTenantAccessBoundaryIntegrationTest {
         return scenarioRunRepository.findTop12ByOrderByCreatedAtDesc().stream()
             .filter(run -> run.getType() == ScenarioRunType.SAVED_PLAN)
             .filter(run -> title.equals(run.getTitle()))
+            .findFirst()
+            .orElseThrow()
+            .getId();
+    }
+
+    private long saveEscalatedScenarioPlan(MockHttpSession session,
+                                           String title,
+                                           String reviewOwner,
+                                           String finalApprovalOwner,
+                                           String warehouseCode) throws Exception {
+        long planId = saveStandardScenarioPlan(session, title, reviewOwner, warehouseCode);
+        ScenarioRun plan = scenarioRunRepository.findById(planId).orElseThrow();
+        plan.setApprovalPolicy(ScenarioApprovalPolicy.ESCALATED);
+        plan.setReviewPriority(ScenarioReviewPriority.HIGH);
+        plan.setApprovalStage(ScenarioApprovalStage.PENDING_REVIEW);
+        plan.setApprovalStatus(ScenarioApprovalStatus.PENDING_APPROVAL);
+        plan.setFinalApprovalOwner(finalApprovalOwner);
+        plan.setApprovalDueAt(Instant.now().plusSeconds(3600));
+        scenarioRunRepository.save(plan);
+        return planId;
+    }
+
+    private long createPreviewScenario(MockHttpSession session, String warehouseCode) throws Exception {
+        mockMvc.perform(post("/api/scenarios/order-impact")
+                .session(session)
+                .contentType(APPLICATION_JSON)
+                .content(orderPayload(null, warehouseCode)))
+            .andExpect(status().isOk());
+        return scenarioRunRepository.findTop12ByOrderByCreatedAtDesc().stream()
+            .filter(run -> run.getType() == ScenarioRunType.PREVIEW)
+            .filter(run -> warehouseCode.equalsIgnoreCase(run.getWarehouseCode()))
             .findFirst()
             .orElseThrow()
             .getId();
