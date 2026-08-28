@@ -918,6 +918,25 @@ class MvpFlowIntegrationTest {
 
     @Test
     void scenarioPhaseTwoRiskBoundariesMatchPolicyAndProjectedRecommendations() throws Exception {
+        var dashboardSummaryBefore = objectMapper.readTree(
+            mockMvc.perform(get("/api/dashboard/summary"))
+                .andExpect(status().isOk())
+                .andReturn()
+                .getResponse()
+                .getContentAsString()
+        );
+        var dashboardSnapshotBefore = objectMapper.readTree(
+            mockMvc.perform(get("/api/dashboard/snapshot"))
+                .andExpect(status().isOk())
+                .andReturn()
+                .getResponse()
+                .getContentAsString()
+        );
+        long startingQuantity = loadInventory("SKU-FLX-100", "WH-NORTH").getQuantityAvailable();
+        long startingOrders = customerOrderRepository.count();
+        long startingAlerts = alertRepository.count();
+        long startingRecommendations = recommendationRepository.count();
+
         mockMvc.perform(post("/api/scenarios/order-impact")
                 .contentType(APPLICATION_JSON)
                 .content(orderPayload("WH-NORTH", "SKU-FLX-100", 2, "95.00")))
@@ -954,6 +973,35 @@ class MvpFlowIntegrationTest {
             .andExpect(jsonPath("$.projectedRecommendations[0].type").value("REORDER_URGENTLY"));
         assertThat(latestPreviewRun().getRiskScore()).isEqualTo(135);
         assertThat(latestPreviewRun().getReviewPriority().name()).isEqualTo("CRITICAL");
+
+        var dashboardSummaryAfter = objectMapper.readTree(
+            mockMvc.perform(get("/api/dashboard/summary"))
+                .andExpect(status().isOk())
+                .andReturn()
+                .getResponse()
+                .getContentAsString()
+        );
+        var dashboardSnapshotAfter = objectMapper.readTree(
+            mockMvc.perform(get("/api/dashboard/snapshot"))
+                .andExpect(status().isOk())
+                .andReturn()
+                .getResponse()
+                .getContentAsString()
+        );
+        assertThat(loadInventory("SKU-FLX-100", "WH-NORTH").getQuantityAvailable()).isEqualTo(startingQuantity);
+        assertThat(customerOrderRepository.count()).isEqualTo(startingOrders);
+        assertThat(alertRepository.count()).isEqualTo(startingAlerts);
+        assertThat(recommendationRepository.count()).isEqualTo(startingRecommendations);
+        assertThat(dashboardSummaryAfter.path("activeAlerts").asLong())
+            .isEqualTo(dashboardSummaryBefore.path("activeAlerts").asLong());
+        assertThat(dashboardSummaryAfter.path("lowStockItems").asLong())
+            .isEqualTo(dashboardSummaryBefore.path("lowStockItems").asLong());
+        assertThat(dashboardSummaryAfter.path("recommendationsCount").asLong())
+            .isEqualTo(dashboardSummaryBefore.path("recommendationsCount").asLong());
+        assertThat(dashboardSummaryAfter.path("totalOrders").asLong())
+            .isEqualTo(dashboardSummaryBefore.path("totalOrders").asLong());
+        assertThat(dashboardSnapshotAfter.path("systemIncidents").size())
+            .isEqualTo(dashboardSnapshotBefore.path("systemIncidents").size());
     }
 
     @Test

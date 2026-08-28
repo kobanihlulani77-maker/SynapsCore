@@ -211,6 +211,24 @@ history row and one `SCENARIO_ANALYZED` business event are added. That is the
 precise meaning of no live side effects: planning memory and evidence are
 allowed, operational execution state is not mutated.
 
+The risk-boundary test also captures the dashboard summary and snapshot before
+and after low-stock and critical PREVIEW requests. Live active-alert counts,
+live low-stock counts, live recommendation counts, total orders, inventory
+quantity, and runtime incident count remain unchanged even when the Scenario
+response contains projected alerts and recommendations. The only allowed
+activity change is the planning evidence event for the Scenario analysis.
+
+The implementation boundary is explicit:
+
+- `RecommendationService.previewForInventory` returns a Scenario DTO; it does
+  not call `recommendationRepository.save`.
+- `AlertService.previewInventoryAlerts` returns Scenario DTOs; it does not call
+  `alertRepository.save` or record a live alert event.
+- live persistence is isolated in `createForInventory` and `syncInventoryAlerts`,
+  which PREVIEW does not invoke.
+- PREVIEW does not call the realtime publisher. Its `SCENARIO_ANALYZED` event is
+  persisted as planning history, not published as a live alert or recommendation.
+
 ## 12. Direct PREVIEW Attacks
 
 Existing test: `scenarioPreviewCannotBeExecutedDirectlyIntoLiveOrderFlow`.
@@ -253,7 +271,10 @@ plans, not PREVIEW. Backend validation, scope, governance, and execution
 eligibility remain authoritative.
 
 PREVIEW records `SCENARIO_ANALYZED` planning evidence and history. It does not
-claim to create an operational alert or order realtime update. The existing
+claim to create an operational alert or order realtime update. The Scenario UI
+uses `Projected inventory`, `Projected Alerts`, `Projected Actions`, and
+`Scenario A alerts and actions` wording, so hypothetical outputs remain
+distinguishable from the live Alerts and Recommendations surfaces. The existing
 dashboard/realtime system remains a separate operational-event concern. No new
 frontend or realtime behavior was introduced in this phase.
 
