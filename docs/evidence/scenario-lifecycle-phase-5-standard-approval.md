@@ -11,6 +11,7 @@ source of operational truth.
 ## Evidence Status
 
 - Starting repository revision: `4b3da53` (Phase 4 accepted baseline)
+- Phase 5 implementation/evidence revision: `c197c99` (`Prove standard Scenario approval governance`)
 - Test fixture: `ACCESS-BOUNDARY-REHEARSAL`, with two persisted warehouses
   selected by the fixture's deterministic name ordering. The test refers to
   them as `warehouseA` and `warehouseB` so it does not make a North/Coast
@@ -226,11 +227,24 @@ cmd /c mvnw.cmd -Dtest=PlatformTenantAccessBoundaryIntegrationTest test
 
 Result: `23` tests, `0` failures, `0` errors, `BUILD SUCCESS`.
 
-The full backend suite, frontend lint/build/verify, secret scan, docs-link
-check, diff check, and post-push live readiness check are the remaining Phase 5
-closure gates. Hosted Playwright proof is not required for this narrow service
-guard unless the final live readiness/evidence review identifies a deployment
-regression; no hosted proof is run while readiness is unhealthy.
+Final verification results:
+
+- Full backend suite: `164/164` passing; `BUILD SUCCESS`.
+- Frontend lint: pass.
+- Frontend build: pass.
+- Frontend verify: pass.
+- Secret scan: pass; `0` critical findings and only the repository's known
+  fixture credential findings.
+- Documentation link check: pass; `767` local links checked.
+- `git diff --check`: pass.
+- Post-push live connection check: pass; `FRONTEND_UP=True`,
+  `BACKEND_UP=True`, `DB_READY=True`, `AUTH_READY=True`, `WS_READY=True`, and
+  `PROOF_ALLOWED=True`.
+
+Hosted Playwright proof was not rerun: this Phase changed one backend terminal
+state guard and its focused backend evidence, not a browser contract, and the
+required live readiness check is green. No hosted proof is run while readiness
+is unhealthy.
 
 ## Manual Owner Walkthrough
 
