@@ -36,7 +36,7 @@ non-blank exact persisted escalation owner.
 20. **Non-overdue plan:** A future-due plan was not escalated and acknowledgement was rejected as not SLA escalated.
 21. **Wrong workflow state:** PREVIEW, approved, and rejected plans were denied; acknowledgement is not a general Scenario action.
 22. **Duplicate acknowledgement:** A second acknowledgement by the same assigned owner is idempotent and returns the existing state.
-23. **Review-stage SLA:** An overdue `PENDING_REVIEW` plan remained review-owned and did not receive SLA escalation.
+23. **Review-stage SLA:** An overdue `PENDING_REVIEW` plan remained review-owned and did not receive SLA escalation. The review deadline supports overdue visibility, but the current product contract does not give an Escalation Owner an acknowledgement path at this stage.
 24. **Final-stage SLA:** An overdue `PENDING_FINAL_APPROVAL` plan escalated automatically and persisted its escalation owner.
 25. **Review bypass:** An Escalation Owner could not call the approval path as a Review Owner; the service required `FINAL_APPROVER` for the final stage.
 26. **Final-approval bypass:** Acknowledgement did not approve the plan and did not bypass the final approver.
@@ -66,6 +66,30 @@ non-blank exact persisted escalation owner.
 50. **Manual walkthrough:** Deferred. This phase is backend authority and SLA evidence; no browser Scenario execution was performed.
 51. **Phase 8 readiness:** Phase 8 must not begin until the post-push live readiness check is green and this Phase 7 evidence is committed. No Phase 8 work is started by this document.
 52. **Phase 7 verdict:** `PHASE 7 TECHNICALLY ACCEPTED — OPERATIONAL OWNER WALKTHROUGH DEFERRED — READY FOR PHASE 8`.
+
+## Review-stage SLA Scope
+
+The accepted SLA model is **Model B**: only an overdue `PENDING_FINAL_APPROVAL`
+plan is automatically rerouted to an Escalation Owner for SLA acknowledgement.
+The Review Owner remains the sole decision authority while a plan is in
+`PENDING_REVIEW`.
+
+Both pending stages have an `approvalDueAt` deadline and may therefore be
+identified as overdue. That deadline is not, by itself, an escalation grant.
+Review-stage overdue status supports visibility and follow-up by the assigned
+Review Owner; it does not populate `slaEscalatedTo`, create a review-stage SLA
+acknowledgement, or transfer review authority. The escalation fields, trigger
+query, notification wording, and acknowledgement contract are intentionally
+final-approval-specific. This preserves the distinction between:
+
+```text
+Review Owner       = decides the review stage
+Escalation Owner   = acknowledges an overdue final-approval SLA only
+Final Approver     = decides the final-approval stage
+```
+
+Introducing Escalation Owner handling for overdue `PENDING_REVIEW` plans would
+be a new product contract and data-model decision, not a missing Phase 7 fix.
 
 ## Exact Runtime Boundary
 
