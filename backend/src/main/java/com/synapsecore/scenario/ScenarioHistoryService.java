@@ -374,7 +374,10 @@ public class ScenarioHistoryService {
     public ScenarioRunResponse acknowledgeSlaEscalation(long scenarioRunId,
                                                         ScenarioEscalationAcknowledgementRequest request) {
         ScenarioRun run = getScenarioRun(scenarioRunId);
-        if (run.getType() != ScenarioRunType.SAVED_PLAN || run.getApprovalStatus() != ScenarioApprovalStatus.PENDING_APPROVAL) {
+        if (run.getType() != ScenarioRunType.SAVED_PLAN
+            || run.getApprovalStatus() != ScenarioApprovalStatus.PENDING_APPROVAL
+            || run.getApprovalPolicy() != ScenarioApprovalPolicy.ESCALATED
+            || run.getApprovalStage() != ScenarioApprovalStage.PENDING_FINAL_APPROVAL) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
                 "Scenario " + run.getId() + " cannot acknowledge SLA escalation outside a pending saved-plan review.");
         }
@@ -1015,8 +1018,8 @@ public class ScenarioHistoryService {
     }
 
     private void requireAssignedEscalationOwner(ScenarioRun run, String actorName, String actionLabel) {
-        if (run.getSlaEscalatedTo() != null && !run.getSlaEscalatedTo().isBlank()
-            && !run.getSlaEscalatedTo().equalsIgnoreCase(actorName)) {
+        if (run.getSlaEscalatedTo() == null || run.getSlaEscalatedTo().isBlank()
+            || !run.getSlaEscalatedTo().equalsIgnoreCase(actorName)) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
                 "Scenario " + run.getId() + " requires the assigned escalation owner to " + actionLabel + " this escalation.");
         }

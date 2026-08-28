@@ -2068,6 +2068,425 @@ class PlatformTenantAccessBoundaryIntegrationTest {
         assertThat(recommendationRepository.count()).isEqualTo(startingRecommendations);
     }
 
+    @Test
+    void scenarioPhaseSevenSlaEscalationRequiresAssignedOwnerAndPreservesOperationalTruth() throws Exception {
+        Instant phaseStart = Instant.now();
+        String primaryWarehouse = warehouseA;
+        long startingOrders = customerOrderRepository.countByTenant_CodeIgnoreCase(REHEARSAL_TENANT);
+        long startingInventory = inventoryRepository.countByTenantCode(REHEARSAL_TENANT);
+        long startingFulfillment = fulfillmentTaskRepository.count();
+        long startingDispatch = operationalDispatchWorkItemRepository.count();
+        long startingAlerts = alertRepository.count();
+        long startingRecommendations = recommendationRepository.count();
+
+        MockHttpSession tenantAdmin = tenantLogin(REHEARSAL_TENANT, "boundary.tenant.admin", ROLE_PASSWORD);
+        long planId = savePendingFinalSlaPlan(
+            tenantAdmin,
+            "Phase 7 North overdue final approval",
+            "boundary.review",
+            "boundary.final",
+            primaryWarehouse,
+            Instant.now().minusMillis(1)
+        );
+
+        mockMvc.perform(get("/api/scenarios/history")
+                .session(tenantAdmin)
+                .param("approvalStage", "PENDING_FINAL_APPROVAL")
+                .param("limit", "40"))
+            .andExpect(status().isOk());
+
+        ScenarioRun escalated = scenarioRunRepository.findById(planId).orElseThrow();
+        assertThat(escalated.getApprovalPolicy()).isEqualTo(ScenarioApprovalPolicy.ESCALATED);
+        assertThat(escalated.getApprovalStage()).isEqualTo(ScenarioApprovalStage.PENDING_FINAL_APPROVAL);
+        assertThat(escalated.getApprovalStatus()).isEqualTo(ScenarioApprovalStatus.PENDING_APPROVAL);
+        assertThat(escalated.getSlaEscalatedAt()).isNotNull();
+        assertThat(escalated.getSlaEscalatedTo()).isEqualTo("boundary.escalation");
+        assertThat(escalated.getFinalApprovalOwner()).isNotBlank();
+        assertThat(escalated.getApprovedBy()).isNull();
+
+        MockHttpSession alternateEscalationOwner = tenantLogin(REHEARSAL_TENANT, "boundary.escalation.alt", ROLE_PASSWORD);
+        mockMvc.perform(post("/api/scenarios/" + planId + "/acknowledge-escalation")
+                .session(alternateEscalationOwner)
+                .contentType(APPLICATION_JSON)
+                .content(acknowledgementPayload("ESCALATION_OWNER", "boundary.escalation.alt", "Alternate owner")))
+            .andExpect(status().isBadRequest())
+            .andExpect(jsonPath("$.message").value(org.hamcrest.Matchers.containsString("assigned escalation owner")));
+
+        MockHttpSession wrongWarehouseOwner = tenantLogin(REHEARSAL_TENANT, "boundary.escalation.b", ROLE_PASSWORD);
+        mockMvc.perform(post("/api/scenarios/" + planId + "/acknowledge-escalation")
+                .session(wrongWarehouseOwner)
+                .contentType(APPLICATION_JSON)
+                .content(acknowledgementPayload("ESCALATION_OWNER", "boundary.escalation.b", "Wrong warehouse")))
+            .andExpect(status().isForbidden());
+
+        assertEscalationAcknowledgementDenied(tenantAdmin, planId, "TENANT_ADMIN", "boundary.tenant.admin");
+        assertEscalationAcknowledgementDenied(
+            tenantLogin(REHEARSAL_TENANT, "boundary.review", ROLE_PASSWORD),
+            planId,
+            "REVIEW_OWNER",
+            "boundary.review"
+        );
+        assertEscalationAcknowledgementDenied(
+            tenantLogin(REHEARSAL_TENANT, "boundary.final", ROLE_PASSWORD),
+            planId,
+            "FINAL_APPROVER",
+            "boundary.final"
+        );
+        assertEscalationAcknowledgementDenied(
+            tenantLogin(REHEARSAL_TENANT, "boundary.integration.admin", ROLE_PASSWORD),
+            planId,
+            "INTEGRATION_ADMIN",
+            "boundary.integration.admin"
+        );
+        assertEscalationAcknowledgementDenied(
+            tenantLogin(REHEARSAL_TENANT, "boundary.integration.operator", ROLE_PASSWORD),
+            planId,
+            "INTEGRATION_OPERATOR",
+            "boundary.integration.operator"
+        );
+        mockMvc.perform(post("/api/scenarios/" + planId + "/acknowledge-escalation")
+                .session(tenantLogin(REHEARSAL_TENANT, "boundary.escalation", ROLE_PASSWORD))
+                .contentType(APPLICATION_JSON)
+                .content(acknowledgementPayload("ESCALATION_OWNER", "boundary.escalation.alt", "Actor spoof")))
+            .andExpect(status().isForbidden());
+        mockMvc.perform(post("/api/scenarios/" + planId + "/acknowledge-escalation")
+                .session(new MockHttpSession())
+                .contentType(APPLICATION_JSON)
+                .content(acknowledgementPayload("ESCALATION_OWNER", "boundary.escalation", "Anonymous")))
+            .andExpect(status().isForbidden());
+
+        mockMvc.perform(post("/api/scenarios/" + planId + "/approve")
+                .session(tenantLogin(REHEARSAL_TENANT, "boundary.escalation", ROLE_PASSWORD))
+                .contentType(APPLICATION_JSON)
+                .content("{\"actorRole\":\"ESCALATION_OWNER\",\"approverName\":\"boundary.escalation\",\"approvalNote\":\"Must not review or approve\"}"))
+            .andExpect(status().isBadRequest())
+            .andExpect(jsonPath("$.message").value(org.hamcrest.Matchers.containsString("requires actor role FINAL_APPROVER")));
+
+        long escalationEventsBeforeAcknowledgement = businessEventRepository
+            .findTop20ByTenantCodeIgnoreCaseOrderByCreatedAtDesc(REHEARSAL_TENANT).stream()
+            .filter(event -> event.getCreatedAt().isAfter(phaseStart))
+            .filter(event -> event.getEventType() == BusinessEventType.SCENARIO_SLA_ESCALATED)
+            .filter(event -> event.getPayloadSummary().contains("Phase 7 North overdue final approval"))
+            .count();
+        assertThat(escalationEventsBeforeAcknowledgement).isEqualTo(1);
+
+        MockHttpSession assignedEscalationOwner = tenantLogin(REHEARSAL_TENANT, "boundary.escalation", ROLE_PASSWORD);
+        mockMvc.perform(post("/api/scenarios/" + planId + "/acknowledge-escalation")
+                .session(assignedEscalationOwner)
+                .contentType(APPLICATION_JSON)
+                .content(acknowledgementPayload("ESCALATION_OWNER", "boundary.escalation", "Assigned owner took follow-up.")))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.approvalPolicy").value("ESCALATED"))
+            .andExpect(jsonPath("$.approvalStage").value("PENDING_FINAL_APPROVAL"))
+            .andExpect(jsonPath("$.approvalStatus").value("PENDING_APPROVAL"))
+            .andExpect(jsonPath("$.slaAcknowledged").value(true))
+            .andExpect(jsonPath("$.slaAcknowledgedBy").value("boundary.escalation"))
+            .andExpect(jsonPath("$.slaAcknowledgementNote").value("Assigned owner took follow-up."))
+            .andExpect(jsonPath("$.approvedBy").value(org.hamcrest.Matchers.nullValue()));
+
+        mockMvc.perform(post("/api/scenarios/" + planId + "/acknowledge-escalation")
+                .session(assignedEscalationOwner)
+                .contentType(APPLICATION_JSON)
+                .content(acknowledgementPayload("ESCALATION_OWNER", "boundary.escalation", "A safe duplicate retry.")))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.slaAcknowledgedBy").value("boundary.escalation"));
+
+        long acknowledgementEventsAfterRetry = businessEventRepository
+            .findTop20ByTenantCodeIgnoreCaseOrderByCreatedAtDesc(REHEARSAL_TENANT).stream()
+            .filter(event -> event.getCreatedAt().isAfter(phaseStart))
+            .filter(event -> event.getEventType() == BusinessEventType.SCENARIO_SLA_ACKNOWLEDGED)
+            .filter(event -> event.getPayloadSummary().contains("Phase 7 North overdue final approval"))
+            .count();
+        assertThat(acknowledgementEventsAfterRetry).isEqualTo(1);
+
+        ScenarioRun acknowledged = scenarioRunRepository.findById(planId).orElseThrow();
+        assertThat(acknowledged.getApprovalStage()).isEqualTo(ScenarioApprovalStage.PENDING_FINAL_APPROVAL);
+        assertThat(acknowledged.getApprovalStatus()).isEqualTo(ScenarioApprovalStatus.PENDING_APPROVAL);
+        assertThat(acknowledged.getApprovedBy()).isNull();
+        assertThat(customerOrderRepository.countByTenant_CodeIgnoreCase(REHEARSAL_TENANT)).isEqualTo(startingOrders);
+        assertThat(inventoryRepository.countByTenantCode(REHEARSAL_TENANT)).isEqualTo(startingInventory);
+        assertThat(fulfillmentTaskRepository.count()).isEqualTo(startingFulfillment);
+        assertThat(operationalDispatchWorkItemRepository.count()).isEqualTo(startingDispatch);
+        assertThat(alertRepository.count()).isEqualTo(startingAlerts);
+        assertThat(recommendationRepository.count()).isEqualTo(startingRecommendations);
+    }
+
+    @Test
+    void scenarioPhaseSevenSlaEscalationSeparatesCoastTenantAndWorkflowBoundaries() throws Exception {
+        MockHttpSession tenantAdmin = tenantLogin(REHEARSAL_TENANT, "boundary.tenant.admin", ROLE_PASSWORD);
+        long coastPlanId = savePendingFinalSlaPlan(
+            tenantAdmin,
+            "Phase 7 secondary warehouse overdue final approval",
+            "boundary.review.b",
+            "boundary.final.b",
+            warehouseB,
+            Instant.now().minusSeconds(1)
+        );
+        mockMvc.perform(get("/api/scenarios/history").session(tenantAdmin).param("limit", "40"))
+            .andExpect(status().isOk());
+
+        ScenarioRun coastEscalated = scenarioRunRepository.findById(coastPlanId).orElseThrow();
+        assertThat(coastEscalated.getSlaEscalatedAt()).isNotNull();
+        assertThat(coastEscalated.getSlaEscalatedTo()).isEqualTo("boundary.escalation.b");
+        assertThat(coastEscalated.getApprovalStage()).isEqualTo(ScenarioApprovalStage.PENDING_FINAL_APPROVAL);
+
+        mockMvc.perform(post("/api/scenarios/" + coastPlanId + "/acknowledge-escalation")
+                .session(tenantLogin(REHEARSAL_TENANT, "boundary.escalation", ROLE_PASSWORD))
+                .contentType(APPLICATION_JSON)
+                .content(acknowledgementPayload("ESCALATION_OWNER", "boundary.escalation", "North owner on Coast")))
+            .andExpect(status().isForbidden());
+
+        assertEscalationAcknowledgementDenied(
+            tenantLogin(REHEARSAL_TENANT, "boundary.tenant.admin", ROLE_PASSWORD),
+            coastPlanId,
+            "TENANT_ADMIN",
+            "boundary.tenant.admin"
+        );
+        assertEscalationAcknowledgementDenied(
+            tenantLogin(REHEARSAL_TENANT, "boundary.review.b", ROLE_PASSWORD),
+            coastPlanId,
+            "REVIEW_OWNER",
+            "boundary.review.b"
+        );
+        assertEscalationAcknowledgementDenied(
+            tenantLogin(REHEARSAL_TENANT, "boundary.final.b", ROLE_PASSWORD),
+            coastPlanId,
+            "FINAL_APPROVER",
+            "boundary.final.b"
+        );
+        assertEscalationAcknowledgementDenied(
+            tenantLogin(REHEARSAL_TENANT, "boundary.integration.admin.b", ROLE_PASSWORD),
+            coastPlanId,
+            "INTEGRATION_ADMIN",
+            "boundary.integration.admin.b"
+        );
+        assertEscalationAcknowledgementDenied(
+            tenantLogin(REHEARSAL_TENANT, "boundary.requester.b", ROLE_PASSWORD),
+            coastPlanId,
+            "INTEGRATION_OPERATOR",
+            "boundary.requester.b"
+        );
+
+        mockMvc.perform(post("/api/scenarios/" + coastPlanId + "/acknowledge-escalation")
+                .session(new MockHttpSession())
+                .contentType(APPLICATION_JSON)
+                .content(acknowledgementPayload("ESCALATION_OWNER", "boundary.escalation.b", "Anonymous Coast")))
+            .andExpect(status().isForbidden());
+
+        MockHttpSession spoofSession = tenantLogin(REHEARSAL_TENANT, "boundary.escalation.b", ROLE_PASSWORD);
+        mockMvc.perform(post("/api/scenarios/" + coastPlanId + "/acknowledge-escalation")
+                .session(spoofSession)
+                .contentType(APPLICATION_JSON)
+                .content(acknowledgementPayload("ESCALATION_OWNER", "boundary.escalation", "Spoofed actor")))
+            .andExpect(status().isForbidden());
+
+        mockMvc.perform(post("/api/scenarios/" + coastPlanId + "/acknowledge-escalation")
+                .session(tenantLogin(REHEARSAL_TENANT, "boundary.escalation.b", ROLE_PASSWORD))
+                .contentType(APPLICATION_JSON)
+                .content(acknowledgementPayload("ESCALATION_OWNER", "boundary.escalation.b", "Coast owner took follow-up.")))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.slaAcknowledgedBy").value("boundary.escalation.b"))
+            .andExpect(jsonPath("$.approvalStatus").value("PENDING_APPROVAL"));
+
+        long crossTenantScenarioId = coastPlanId;
+        mockMvc.perform(post("/api/scenarios/" + crossTenantScenarioId + "/acknowledge-escalation")
+                .session(tenantLogin(ISOLATION_TENANT, "isolation.admin", "Isolation-Admin-2026!"))
+                .contentType(APPLICATION_JSON)
+                .content(acknowledgementPayload("ESCALATION_OWNER", "boundary.escalation.b", "Cross tenant")))
+            .andExpect(status().isNotFound());
+
+        long nonOverduePlanId = savePendingFinalSlaPlan(
+            tenantAdmin,
+            "Phase 7 non-overdue plan",
+            "boundary.review.b",
+            "boundary.final.b",
+            warehouseB,
+            Instant.now().plusSeconds(3600)
+        );
+        mockMvc.perform(post("/api/scenarios/" + nonOverduePlanId + "/acknowledge-escalation")
+                .session(tenantLogin(REHEARSAL_TENANT, "boundary.escalation.b", ROLE_PASSWORD))
+                .contentType(APPLICATION_JSON)
+                .content(acknowledgementPayload("ESCALATION_OWNER", "boundary.escalation.b", "Not overdue")))
+            .andExpect(status().isBadRequest())
+            .andExpect(jsonPath("$.message").value(org.hamcrest.Matchers.containsString("not been SLA escalated")));
+
+        long previewId = createPreviewScenario(tenantAdmin, warehouseB);
+        mockMvc.perform(post("/api/scenarios/" + previewId + "/acknowledge-escalation")
+                .session(tenantLogin(REHEARSAL_TENANT, "boundary.escalation.b", ROLE_PASSWORD))
+                .contentType(APPLICATION_JSON)
+                .content(acknowledgementPayload("ESCALATION_OWNER", "boundary.escalation.b", "Preview")))
+            .andExpect(status().isBadRequest());
+
+        long approvedPlanId = saveStandardScenarioPlan(tenantAdmin, "Phase 7 approved state", "boundary.review.b", warehouseB);
+        ScenarioRun approvedPlan = scenarioRunRepository.findById(approvedPlanId).orElseThrow();
+        approvedPlan.setApprovalStatus(ScenarioApprovalStatus.APPROVED);
+        approvedPlan.setApprovalStage(ScenarioApprovalStage.APPROVED);
+        approvedPlan.setApprovalDueAt(null);
+        scenarioRunRepository.saveAndFlush(approvedPlan);
+        mockMvc.perform(post("/api/scenarios/" + approvedPlanId + "/acknowledge-escalation")
+                .session(tenantLogin(REHEARSAL_TENANT, "boundary.escalation.b", ROLE_PASSWORD))
+                .contentType(APPLICATION_JSON)
+                .content(acknowledgementPayload("ESCALATION_OWNER", "boundary.escalation.b", "Approved state")))
+            .andExpect(status().isBadRequest());
+
+        long rejectedPlanId = savePendingFinalSlaPlan(
+            tenantAdmin,
+            "Phase 7 rejected state",
+            "boundary.review.b",
+            "boundary.final.b",
+            warehouseB,
+            Instant.now().minusSeconds(1)
+        );
+        ScenarioRun rejectedPlan = scenarioRunRepository.findById(rejectedPlanId).orElseThrow();
+        rejectedPlan.setApprovalStatus(ScenarioApprovalStatus.REJECTED);
+        rejectedPlan.setApprovalStage(ScenarioApprovalStage.REJECTED);
+        rejectedPlan.setSlaEscalatedAt(Instant.now());
+        rejectedPlan.setSlaEscalatedTo("boundary.escalation.b");
+        scenarioRunRepository.saveAndFlush(rejectedPlan);
+        mockMvc.perform(post("/api/scenarios/" + rejectedPlanId + "/acknowledge-escalation")
+                .session(tenantLogin(REHEARSAL_TENANT, "boundary.escalation.b", ROLE_PASSWORD))
+                .contentType(APPLICATION_JSON)
+                .content(acknowledgementPayload("ESCALATION_OWNER", "boundary.escalation.b", "Rejected state")))
+            .andExpect(status().isBadRequest());
+
+        long missingOwnerPlanId = savePendingFinalSlaPlan(
+            tenantAdmin,
+            "Phase 7 missing escalation owner",
+            "boundary.review.b",
+            "boundary.final.b",
+            warehouseB,
+            Instant.now().minusSeconds(1)
+        );
+        ScenarioRun missingOwnerPlan = scenarioRunRepository.findById(missingOwnerPlanId).orElseThrow();
+        missingOwnerPlan.setSlaEscalatedAt(Instant.now());
+        missingOwnerPlan.setSlaEscalatedTo(null);
+        scenarioRunRepository.saveAndFlush(missingOwnerPlan);
+        mockMvc.perform(post("/api/scenarios/" + missingOwnerPlanId + "/acknowledge-escalation")
+                .session(tenantLogin(REHEARSAL_TENANT, "boundary.escalation.b", ROLE_PASSWORD))
+                .contentType(APPLICATION_JSON)
+                .content(acknowledgementPayload("ESCALATION_OWNER", "boundary.escalation.b", "Missing assignment")))
+            .andExpect(status().isBadRequest())
+            .andExpect(jsonPath("$.message").value(org.hamcrest.Matchers.containsString("assigned escalation owner")));
+
+        long missingNotePlanId = savePendingFinalSlaPlan(
+            tenantAdmin,
+            "Phase 7 missing acknowledgement note",
+            "boundary.review.b",
+            "boundary.final.b",
+            warehouseB,
+            Instant.now().minusSeconds(1)
+        );
+        ScenarioRun missingNotePlan = scenarioRunRepository.findById(missingNotePlanId).orElseThrow();
+        missingNotePlan.setSlaEscalatedAt(Instant.now());
+        missingNotePlan.setSlaEscalatedTo("boundary.escalation.b");
+        scenarioRunRepository.saveAndFlush(missingNotePlan);
+        mockMvc.perform(post("/api/scenarios/" + missingNotePlanId + "/acknowledge-escalation")
+                .session(tenantLogin(REHEARSAL_TENANT, "boundary.escalation.b", ROLE_PASSWORD))
+                .contentType(APPLICATION_JSON)
+                .content(acknowledgementPayload("ESCALATION_OWNER", "boundary.escalation.b", "   ")))
+            .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    void scenarioPhaseSevenSlaDeadlineSeparatesReviewStageAndKeepsHistoryTruthful() throws Exception {
+        MockHttpSession tenantAdmin = tenantLogin(REHEARSAL_TENANT, "boundary.tenant.admin", ROLE_PASSWORD);
+        long reviewStagePlanId = saveEscalatedScenarioPlan(
+            tenantAdmin,
+            "Phase 7 overdue review stage remains review-owned",
+            "boundary.review",
+            "boundary.final",
+            warehouseA
+        );
+        ScenarioRun reviewStagePlan = scenarioRunRepository.findById(reviewStagePlanId).orElseThrow();
+        reviewStagePlan.setApprovalStage(ScenarioApprovalStage.PENDING_REVIEW);
+        reviewStagePlan.setApprovalStatus(ScenarioApprovalStatus.PENDING_APPROVAL);
+        reviewStagePlan.setApprovalDueAt(Instant.now().minusMillis(1));
+        reviewStagePlan.setSlaEscalatedAt(null);
+        reviewStagePlan.setSlaEscalatedTo(null);
+        scenarioRunRepository.saveAndFlush(reviewStagePlan);
+
+        mockMvc.perform(get("/api/scenarios/history")
+                .session(tenantAdmin)
+                .param("approvalStage", "PENDING_REVIEW")
+                .param("overdueOnly", "true")
+                .param("limit", "40"))
+            .andExpect(status().isOk());
+
+        ScenarioRun reviewStageReadback = scenarioRunRepository.findById(reviewStagePlanId).orElseThrow();
+        assertThat(reviewStageReadback.getApprovalStage()).isEqualTo(ScenarioApprovalStage.PENDING_REVIEW);
+        assertThat(reviewStageReadback.getApprovalStatus()).isEqualTo(ScenarioApprovalStatus.PENDING_APPROVAL);
+        assertThat(reviewStageReadback.getSlaEscalatedAt()).isNull();
+        assertThat(reviewStageReadback.getSlaEscalatedTo()).isNull();
+        assertThat(reviewStageReadback.getApprovalDueAt()).isBefore(Instant.now());
+
+        long exactDeadlinePlanId = savePendingFinalSlaPlan(
+            tenantAdmin,
+            "Phase 7 exact deadline boundary",
+            "boundary.review",
+            "boundary.final",
+            warehouseA,
+            Instant.now()
+        );
+        mockMvc.perform(get("/api/scenarios/history")
+                .session(tenantAdmin)
+                .param("approvalStage", "PENDING_FINAL_APPROVAL")
+                .param("overdueOnly", "true")
+                .param("limit", "40"))
+            .andExpect(status().isOk());
+        ScenarioRun exactDeadlineReadback = scenarioRunRepository.findById(exactDeadlinePlanId).orElseThrow();
+        assertThat(exactDeadlineReadback.getSlaEscalatedAt()).isNotNull();
+        assertThat(exactDeadlineReadback.getSlaEscalatedTo()).isEqualTo("boundary.escalation");
+        assertThat(exactDeadlineReadback.getApprovalStage()).isEqualTo(ScenarioApprovalStage.PENDING_FINAL_APPROVAL);
+        assertThat(exactDeadlineReadback.getApprovalStatus()).isEqualTo(ScenarioApprovalStatus.PENDING_APPROVAL);
+
+        var historyEvents = businessEventRepository.findTop20ByTenantCodeIgnoreCaseOrderByCreatedAtDesc(REHEARSAL_TENANT);
+        assertThat(historyEvents).extracting(event -> event.getEventType())
+            .contains(BusinessEventType.SCENARIO_SLA_ESCALATED);
+        assertThat(historyEvents.stream()
+            .filter(event -> event.getEventType() == BusinessEventType.SCENARIO_SLA_ESCALATED)
+            .map(event -> event.getPayloadSummary())
+            .anyMatch(summary -> summary.contains("Phase 7 exact deadline boundary") && summary.contains("boundary.escalation")))
+            .isTrue();
+    }
+
+    private void assertEscalationAcknowledgementDenied(MockHttpSession session,
+                                                       long scenarioId,
+                                                       String actorRole,
+                                                       String acknowledgedBy) throws Exception {
+        mockMvc.perform(post("/api/scenarios/" + scenarioId + "/acknowledge-escalation")
+                .session(session)
+                .contentType(APPLICATION_JSON)
+                .content(acknowledgementPayload(actorRole, acknowledgedBy, "Expected denial")))
+            .andExpect(status().isBadRequest());
+    }
+
+    private String acknowledgementPayload(String actorRole, String acknowledgedBy, String note) {
+        return "{\"actorRole\":\"%s\",\"acknowledgedBy\":\"%s\",\"note\":\"%s\"}"
+            .formatted(actorRole, acknowledgedBy, note);
+    }
+
+    private long savePendingFinalSlaPlan(MockHttpSession session,
+                                         String title,
+                                         String reviewOwner,
+                                         String finalApprovalOwner,
+                                         String warehouseCode,
+                                         Instant dueAt) throws Exception {
+        long planId = saveEscalatedScenarioPlan(session, title, reviewOwner, finalApprovalOwner, warehouseCode);
+        ScenarioRun plan = scenarioRunRepository.findById(planId).orElseThrow();
+        plan.setApprovalStage(ScenarioApprovalStage.PENDING_FINAL_APPROVAL);
+        plan.setApprovalStatus(ScenarioApprovalStatus.PENDING_APPROVAL);
+        plan.setReviewApprovedBy(reviewOwner);
+        plan.setReviewApprovedAt(Instant.now().minusSeconds(30));
+        plan.setApprovalDueAt(dueAt);
+        plan.setSlaEscalatedTo(null);
+        plan.setSlaEscalatedAt(null);
+        plan.setSlaAcknowledgedBy(null);
+        plan.setSlaAcknowledgedAt(null);
+        plan.setSlaAcknowledgementNote(null);
+        scenarioRunRepository.saveAndFlush(plan);
+        return planId;
+    }
+
     private void assertRequesterSpoofRejected(MockHttpSession session,
                                               String title,
                                               String requestedBy,

@@ -177,6 +177,7 @@ This index links the main product, architecture, runbook, proof, and operator do
 - [scenario-lifecycle-phase-4-review-owner-handoff.md](evidence/scenario-lifecycle-phase-4-review-owner-handoff.md)
 - [scenario-lifecycle-phase-5-standard-approval.md](evidence/scenario-lifecycle-phase-5-standard-approval.md)
 - [scenario-lifecycle-phase-6-final-approval.md](evidence/scenario-lifecycle-phase-6-final-approval.md)
+- [scenario-lifecycle-phase-7-escalation-owner-sla.md](evidence/scenario-lifecycle-phase-7-escalation-owner-sla.md)
 - [replay-recovery.md](replay-recovery.md)
 - [integration-operations.md](integration-operations.md)
 - [hosted-proof.md](hosted-proof.md)
