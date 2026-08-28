@@ -24,7 +24,9 @@ import com.synapsecore.domain.repository.AccessUserRepository;
 import com.synapsecore.domain.repository.AlertRepository;
 import com.synapsecore.domain.repository.BusinessEventRepository;
 import com.synapsecore.domain.repository.CustomerOrderRepository;
+import com.synapsecore.domain.repository.FulfillmentTaskRepository;
 import com.synapsecore.domain.repository.InventoryRepository;
+import com.synapsecore.domain.repository.OperationalDispatchWorkItemRepository;
 import com.synapsecore.domain.repository.RecommendationRepository;
 import com.synapsecore.domain.repository.WarehouseRepository;
 import com.synapsecore.domain.repository.ScenarioRunRepository;
@@ -99,6 +101,12 @@ class PlatformTenantAccessBoundaryIntegrationTest {
 
     @Autowired
     private CustomerOrderRepository customerOrderRepository;
+
+    @Autowired
+    private FulfillmentTaskRepository fulfillmentTaskRepository;
+
+    @Autowired
+    private OperationalDispatchWorkItemRepository operationalDispatchWorkItemRepository;
 
     @Autowired
     private InventoryRepository inventoryRepository;
@@ -1208,6 +1216,7 @@ class PlatformTenantAccessBoundaryIntegrationTest {
 
     @Test
     void scenarioPhaseThreeSavedPlansPreserveGovernedProposalWithoutOperationalSideEffects() throws Exception {
+        Instant phaseStart = Instant.now();
         MockHttpSession northRequester = tenantLogin(
             REHEARSAL_TENANT,
             "boundary.integration.operator",
@@ -1344,7 +1353,9 @@ class PlatformTenantAccessBoundaryIntegrationTest {
         assertThat(recommendationRepository.count()).isEqualTo(startingRecommendations);
         assertThat(scenarioRunRepository.count()).isEqualTo(startingScenarioRuns + 2);
         assertThat(businessEventRepository.count()).isEqualTo(startingBusinessEvents + 2);
-        assertThat(businessEventRepository.findTop20ByOrderByCreatedAtDesc())
+        assertThat(businessEventRepository.findTop20ByTenantCodeIgnoreCaseOrderByCreatedAtDesc(REHEARSAL_TENANT).stream()
+            .filter(event -> event.getCreatedAt().isAfter(phaseStart))
+            .toList())
             .extracting(event -> event.getEventType())
             .contains(BusinessEventType.SCENARIO_SAVED)
             .doesNotContain(BusinessEventType.SCENARIO_APPROVED, BusinessEventType.SCENARIO_EXECUTED);
@@ -1598,6 +1609,132 @@ class PlatformTenantAccessBoundaryIntegrationTest {
             .extracting(event -> event.getEventType())
             .doesNotContain(BusinessEventType.SCENARIO_APPROVED, BusinessEventType.SCENARIO_REJECTED,
                 BusinessEventType.SCENARIO_EXECUTED);
+    }
+
+    @Test
+    void scenarioPhaseFiveStandardApprovalIsAssignedGovernanceOnlyAndCannotBypassEscalation() throws Exception {
+        MockHttpSession tenantAdmin = tenantLogin(REHEARSAL_TENANT, "boundary.tenant.admin", ROLE_PASSWORD);
+        MockHttpSession northReviewer = tenantLogin(REHEARSAL_TENANT, "boundary.review", ROLE_PASSWORD);
+        MockHttpSession coastReviewer = tenantLogin(REHEARSAL_TENANT, "boundary.review.b", ROLE_PASSWORD);
+
+        long startingOrders = customerOrderRepository.countByTenant_CodeIgnoreCase(REHEARSAL_TENANT);
+        long startingInventory = inventoryRepository.countByTenantCode(REHEARSAL_TENANT);
+        long startingFulfillment = fulfillmentTaskRepository.count();
+        long startingDispatch = operationalDispatchWorkItemRepository.count();
+        long startingAlerts = alertRepository.count();
+        long startingRecommendations = recommendationRepository.count();
+
+        long northPlanId = saveStandardScenarioPlan(
+            tenantAdmin,
+            "Phase 5 standard North approval",
+            "boundary.review",
+            warehouseA
+        );
+        ScenarioRun northBefore = scenarioRunRepository.findById(northPlanId).orElseThrow();
+        assertThat(northBefore.getApprovalPolicy()).isEqualTo(ScenarioApprovalPolicy.STANDARD);
+        assertThat(northBefore.getApprovalStage()).isEqualTo(ScenarioApprovalStage.PENDING_REVIEW);
+        assertThat(northBefore.getApprovalStatus()).isEqualTo(ScenarioApprovalStatus.PENDING_APPROVAL);
+
+        mockMvc.perform(post("/api/scenarios/" + northPlanId + "/approve")
+                .session(northReviewer)
+                .contentType(APPLICATION_JSON)
+                .content("{\"actorRole\":\"REVIEW_OWNER\",\"approverName\":\"boundary.review\",\"approvalNote\":\"North standard review accepted\"}"))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.approvalStatus").value("APPROVED"))
+            .andExpect(jsonPath("$.approvalPolicy").value("STANDARD"))
+            .andExpect(jsonPath("$.approvalStage").value("APPROVED"))
+            .andExpect(jsonPath("$.approvedBy").value("boundary.review"))
+            .andExpect(jsonPath("$.approvalNote").value("North standard review accepted"))
+            .andExpect(jsonPath("$.executionReady").value(true));
+
+        ScenarioRun northAfter = scenarioRunRepository.findById(northPlanId).orElseThrow();
+        assertThat(northAfter.getApprovedBy()).isEqualTo("boundary.review");
+        assertThat(northAfter.getApprovalStage()).isEqualTo(ScenarioApprovalStage.APPROVED);
+        assertThat(northAfter.getApprovalStatus()).isEqualTo(ScenarioApprovalStatus.APPROVED);
+        assertThat(northAfter.getReviewApprovedBy()).isNull();
+        assertThat(northAfter.getApprovalNote()).isEqualTo("North standard review accepted");
+
+        long eventsAfterNorthApproval = businessEventRepository.count();
+        mockMvc.perform(post("/api/scenarios/" + northPlanId + "/approve")
+                .session(northReviewer)
+                .contentType(APPLICATION_JSON)
+                .content("{\"actorRole\":\"REVIEW_OWNER\",\"approverName\":\"boundary.review\",\"approvalNote\":\"Duplicate approval must be safe\"}"))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.approvalStatus").value("APPROVED"))
+            .andExpect(jsonPath("$.approvedBy").value("boundary.review"));
+        assertThat(businessEventRepository.count()).isEqualTo(eventsAfterNorthApproval);
+
+        mockMvc.perform(post("/api/scenarios/" + northPlanId + "/reject")
+                .session(northReviewer)
+                .contentType(APPLICATION_JSON)
+                .content("{\"actorRole\":\"REVIEW_OWNER\",\"reviewerName\":\"boundary.review\",\"reason\":\"Contradictory terminal decision\"}"))
+            .andExpect(status().isBadRequest())
+            .andExpect(jsonPath("$.message").value(org.hamcrest.Matchers.containsString("already been approved")));
+
+        long coastPlanId = saveStandardScenarioPlan(
+            tenantAdmin,
+            "Phase 5 standard Coast approval",
+            "boundary.review.b",
+            warehouseB
+        );
+        mockMvc.perform(post("/api/scenarios/" + coastPlanId + "/approve")
+                .session(coastReviewer)
+                .contentType(APPLICATION_JSON)
+                .content("{\"actorRole\":\"REVIEW_OWNER\",\"approverName\":\"boundary.review.b\"}"))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.approvalStatus").value("APPROVED"))
+            .andExpect(jsonPath("$.approvalPolicy").value("STANDARD"))
+            .andExpect(jsonPath("$.approvalStage").value("APPROVED"))
+            .andExpect(jsonPath("$.approvedBy").value("boundary.review.b"));
+        assertThat(scenarioRunRepository.findById(coastPlanId).orElseThrow().getApprovalNote()).isNull();
+
+        long escalatedPlanId = saveStandardScenarioPlan(
+            tenantAdmin,
+            "Phase 5 escalated review boundary",
+            "boundary.review",
+            warehouseA
+        );
+        ScenarioRun escalatedPlan = scenarioRunRepository.findById(escalatedPlanId).orElseThrow();
+        escalatedPlan.setApprovalPolicy(ScenarioApprovalPolicy.ESCALATED);
+        escalatedPlan.setReviewPriority(ScenarioReviewPriority.HIGH);
+        escalatedPlan.setApprovalStage(ScenarioApprovalStage.PENDING_REVIEW);
+        escalatedPlan.setApprovalStatus(ScenarioApprovalStatus.PENDING_APPROVAL);
+        escalatedPlan.setFinalApprovalOwner("boundary.final");
+        escalatedPlan.setApprovalDueAt(Instant.now().plusSeconds(3600));
+        scenarioRunRepository.save(escalatedPlan);
+
+        mockMvc.perform(post("/api/scenarios/" + escalatedPlanId + "/approve")
+                .session(northReviewer)
+                .contentType(APPLICATION_JSON)
+                .content("{\"actorRole\":\"REVIEW_OWNER\",\"approverName\":\"boundary.review\",\"approvalNote\":\"North owner review complete\"}"))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.approvalStatus").value("PENDING_APPROVAL"))
+            .andExpect(jsonPath("$.approvalPolicy").value("ESCALATED"))
+            .andExpect(jsonPath("$.approvalStage").value("PENDING_FINAL_APPROVAL"))
+            .andExpect(jsonPath("$.reviewApprovedBy").value("boundary.review"))
+            .andExpect(jsonPath("$.finalApprovalOwner").value("boundary.final"))
+            .andExpect(jsonPath("$.executionReady").value(false));
+        ScenarioRun escalatedAfter = scenarioRunRepository.findById(escalatedPlanId).orElseThrow();
+        assertThat(escalatedAfter.getApprovalStatus()).isEqualTo(ScenarioApprovalStatus.PENDING_APPROVAL);
+        assertThat(escalatedAfter.getApprovalStage()).isEqualTo(ScenarioApprovalStage.PENDING_FINAL_APPROVAL);
+        assertThat(escalatedAfter.getApprovedBy()).isNull();
+
+        assertThat(customerOrderRepository.countByTenant_CodeIgnoreCase(REHEARSAL_TENANT)).isEqualTo(startingOrders);
+        assertThat(inventoryRepository.countByTenantCode(REHEARSAL_TENANT)).isEqualTo(startingInventory);
+        assertThat(fulfillmentTaskRepository.count()).isEqualTo(startingFulfillment);
+        assertThat(operationalDispatchWorkItemRepository.count()).isEqualTo(startingDispatch);
+        assertThat(alertRepository.count()).isEqualTo(startingAlerts);
+        assertThat(recommendationRepository.count()).isEqualTo(startingRecommendations);
+
+        var recentEvents = businessEventRepository.findTop20ByTenantCodeIgnoreCaseOrderByCreatedAtDesc(REHEARSAL_TENANT);
+        assertThat(recentEvents).extracting(event -> event.getEventType())
+            .contains(BusinessEventType.SCENARIO_APPROVED, BusinessEventType.SCENARIO_ESCALATION_ADVANCED)
+            .doesNotContain(BusinessEventType.SCENARIO_EXECUTED);
+        assertThat(recentEvents.stream()
+            .filter(event -> event.getEventType() == BusinessEventType.SCENARIO_APPROVED)
+            .map(event -> event.getPayloadSummary())
+            .anyMatch(summary -> summary.contains("boundary.review")))
+            .isTrue();
     }
 
     private void assertRequesterSpoofRejected(MockHttpSession session,

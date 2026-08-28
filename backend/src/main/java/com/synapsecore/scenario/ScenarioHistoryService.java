@@ -303,6 +303,11 @@ public class ScenarioHistoryService {
                 "Scenario " + run.getId() + " cannot be rejected. Only saved plans go through review.");
         }
 
+        if (run.getApprovalStatus() == ScenarioApprovalStatus.APPROVED) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                "Scenario " + run.getId() + " has already been approved and cannot be rejected.");
+        }
+
         if (run.getApprovalStatus() != ScenarioApprovalStatus.REJECTED) {
             String reviewerName = request.reviewerName().trim();
             ScenarioActorRole requiredRole = requiredRejectionRole(run);
