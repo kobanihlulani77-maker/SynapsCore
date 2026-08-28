@@ -118,11 +118,15 @@ class PlatformTenantAccessBoundaryIntegrationTest {
         createRoleUser(admin, "boundary.review.alt", "REVIEW_OWNER", List.of(warehouseA));
         createRoleUser(admin, "boundary.review.global", "REVIEW_OWNER", List.of());
         createRoleUser(admin, "boundary.review.b", "REVIEW_OWNER", List.of(warehouseB));
+        createRoleUser(admin, "boundary.review.b.alt", "REVIEW_OWNER", List.of(warehouseB));
         createRoleUser(admin, "boundary.final", "FINAL_APPROVER", List.of(warehouseA));
         createRoleUser(admin, "boundary.final.alt", "FINAL_APPROVER", List.of(warehouseA));
+        createRoleUser(admin, "boundary.final.b", "FINAL_APPROVER", List.of(warehouseB));
         createRoleUser(admin, "boundary.escalation", "ESCALATION_OWNER", List.of(warehouseA));
         createRoleUser(admin, "boundary.escalation.alt", "ESCALATION_OWNER", List.of(warehouseA));
+        createRoleUser(admin, "boundary.escalation.b", "ESCALATION_OWNER", List.of(warehouseB));
         createRoleUser(admin, "boundary.integration.admin", "INTEGRATION_ADMIN", List.of(warehouseA));
+        createRoleUser(admin, "boundary.integration.admin.b", "INTEGRATION_ADMIN", List.of(warehouseB));
         createRoleUser(admin, "boundary.integration.admin.all", "INTEGRATION_ADMIN", List.of());
         createRoleUser(admin, "boundary.integration.operator", "INTEGRATION_OPERATOR", List.of(warehouseA));
         createRoleUser(admin, "boundary.requester.b", "INTEGRATION_OPERATOR", List.of(warehouseB));
@@ -777,6 +781,17 @@ class PlatformTenantAccessBoundaryIntegrationTest {
                 .content("{\"externalOrderId\":\"BOUNDARY-WH-B-ORDER\",\"status\":\"PICKING\"}"))
             .andExpect(status().isForbidden());
 
+        MockHttpSession scenarioTenantAdmin = tenantLogin(
+            REHEARSAL_TENANT,
+            TENANT_ADMIN_USERNAME,
+            TENANT_ADMIN_PASSWORD
+        );
+        mockMvc.perform(post("/api/scenarios/order-impact")
+                .session(scenarioTenantAdmin)
+                .contentType(APPLICATION_JSON)
+                .content(orderPayload(null, warehouseB)))
+            .andExpect(status().isOk());
+
         long warehouseBScenarioId = scenarioRunRepository.findTop12ByOrderByCreatedAtDesc().stream()
             .filter(run -> run.getType() == ScenarioRunType.PREVIEW)
             .filter(run -> warehouseB.equalsIgnoreCase(run.getWarehouseCode()))
@@ -971,6 +986,130 @@ class PlatformTenantAccessBoundaryIntegrationTest {
     }
 
     @Test
+    void scenarioCreationAuthorityAllowsAllRolesWithinWarehouseScope() throws Exception {
+        List<ScenarioCreationExpectation> expectations = List.of(
+            new ScenarioCreationExpectation("boundary.tenant.admin", "boundary.review", warehouseA),
+            new ScenarioCreationExpectation("boundary.tenant.admin", "boundary.review.b", warehouseB),
+            new ScenarioCreationExpectation("boundary.integration.admin", "boundary.review", warehouseA),
+            new ScenarioCreationExpectation("boundary.integration.admin.b", "boundary.review.b", warehouseB),
+            new ScenarioCreationExpectation("boundary.integration.operator", "boundary.review", warehouseA),
+            new ScenarioCreationExpectation("boundary.requester.b", "boundary.review.b", warehouseB),
+            new ScenarioCreationExpectation("boundary.review", "boundary.review.alt", warehouseA),
+            new ScenarioCreationExpectation("boundary.review.b", "boundary.review.b.alt", warehouseB),
+            new ScenarioCreationExpectation("boundary.final", "boundary.review", warehouseA),
+            new ScenarioCreationExpectation("boundary.final.b", "boundary.review.b", warehouseB),
+            new ScenarioCreationExpectation("boundary.escalation", "boundary.review", warehouseA),
+            new ScenarioCreationExpectation("boundary.escalation.b", "boundary.review.b", warehouseB)
+        );
+
+        for (ScenarioCreationExpectation expectation : expectations) {
+            MockHttpSession session = tenantLogin(REHEARSAL_TENANT, expectation.username(), ROLE_PASSWORD);
+            String title = "Phase 1 creation " + expectation.username() + " " + expectation.warehouseCode();
+
+            mockMvc.perform(post("/api/scenarios/order-impact")
+                    .session(session)
+                    .contentType(APPLICATION_JSON)
+                    .content(orderPayload(null, expectation.warehouseCode())))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.warehouseCode").value(expectation.warehouseCode()));
+
+            mockMvc.perform(post("/api/scenarios/order-impact/compare")
+                    .session(session)
+                    .contentType(APPLICATION_JSON)
+                    .content(scenarioComparePayload(expectation.warehouseCode())))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.primary.warehouseCode").value(expectation.warehouseCode()))
+                .andExpect(jsonPath("$.alternative.warehouseCode").value(expectation.warehouseCode()));
+
+            mockMvc.perform(post("/api/scenarios/save")
+                    .session(session)
+                    .contentType(APPLICATION_JSON)
+                    .content(scenarioSavePayload(
+                        title,
+                        expectation.username(),
+                        expectation.reviewOwner(),
+                        expectation.warehouseCode())))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.requestedBy").value(expectation.username()))
+                .andExpect(jsonPath("$.warehouseCode").value(expectation.warehouseCode()))
+                .andExpect(jsonPath("$.reviewOwner").value(expectation.reviewOwner()));
+        }
+    }
+
+    @Test
+    void scenarioCreationRejectsAnonymousInvalidAndWrongWarehouseRequests() throws Exception {
+        mockMvc.perform(post("/api/scenarios/order-impact")
+                .contentType(APPLICATION_JSON)
+                .content(orderPayload(null, warehouseA)))
+            .andExpect(status().isForbidden());
+
+        mockMvc.perform(post("/api/scenarios/order-impact/compare")
+                .contentType(APPLICATION_JSON)
+                .content(scenarioComparePayload(warehouseA)))
+            .andExpect(status().isForbidden());
+
+        mockMvc.perform(post("/api/scenarios/save")
+                .contentType(APPLICATION_JSON)
+                .content(scenarioSavePayload(
+                    "Phase 1 anonymous save",
+                    "boundary.integration.operator",
+                    "boundary.review",
+                    warehouseA)))
+            .andExpect(status().isForbidden());
+
+        MockHttpSession northOperator = tenantLogin(
+            REHEARSAL_TENANT,
+            "boundary.integration.operator",
+            ROLE_PASSWORD
+        );
+        mockMvc.perform(post("/api/scenarios/order-impact")
+                .session(northOperator)
+                .contentType(APPLICATION_JSON)
+                .content(orderPayload(null, warehouseB)))
+            .andExpect(status().isForbidden());
+
+        mockMvc.perform(post("/api/scenarios/order-impact/compare")
+                .session(northOperator)
+                .contentType(APPLICATION_JSON)
+                .content(scenarioComparePayload(warehouseA, warehouseB)))
+            .andExpect(status().isForbidden());
+
+        mockMvc.perform(post("/api/scenarios/save")
+                .session(northOperator)
+                .contentType(APPLICATION_JSON)
+                .content(scenarioSavePayload(
+                    "Phase 1 wrong warehouse save",
+                    "boundary.integration.operator",
+                    "boundary.review.b",
+                    warehouseB)))
+            .andExpect(status().isForbidden());
+
+        mockMvc.perform(post("/api/scenarios/order-impact")
+                .session(northOperator)
+                .contentType(APPLICATION_JSON)
+                .content("""
+                    {"warehouseCode":"","items":[{"productSku":"BOUNDARY-SKU","quantity":1,"unitPrice":10.00}]}
+                    """))
+            .andExpect(status().isBadRequest());
+
+        mockMvc.perform(post("/api/scenarios/order-impact")
+                .session(northOperator)
+                .contentType(APPLICATION_JSON)
+                .content("""
+                    {"warehouseCode":"%s","items":[{"productSku":"MISSING-PHASE-1-SKU","quantity":1,"unitPrice":10.00}]}
+                    """.formatted(warehouseA)))
+            .andExpect(status().is4xxClientError());
+
+        mockMvc.perform(post("/api/scenarios/order-impact")
+                .session(northOperator)
+                .contentType(APPLICATION_JSON)
+                .content("""
+                    {"warehouseCode":"%s","items":[{"productSku":"BOUNDARY-SKU","quantity":0,"unitPrice":10.00}]}
+                    """.formatted(warehouseA)))
+            .andExpect(status().isBadRequest());
+    }
+
+    @Test
     void scenarioReviewOwnerAssignmentUsesExplicitWarehouseEligibleReviewers() throws Exception {
         MockHttpSession tenantAdmin = tenantLogin(REHEARSAL_TENANT, "boundary.tenant.admin", ROLE_PASSWORD);
 
@@ -1060,6 +1199,21 @@ class PlatformTenantAccessBoundaryIntegrationTest {
         return """
             {"title":"%s","requestedBy":"%s","reviewOwner":"%s","request":{"warehouseCode":"%s","items":[{"productSku":"BOUNDARY-SKU","quantity":1,"unitPrice":10.00}]}}
             """.formatted(title, requestedBy, reviewOwner, warehouseCode);
+    }
+
+    private String scenarioComparePayload(String warehouseCode) {
+        return scenarioComparePayload(warehouseCode, warehouseCode);
+    }
+
+    private String scenarioComparePayload(String primaryWarehouseCode, String alternativeWarehouseCode) {
+        return """
+            {
+              "primaryLabel":"Phase 1 Primary",
+              "primary":{"warehouseCode":"%s","items":[{"productSku":"BOUNDARY-SKU","quantity":1,"unitPrice":10.00}]},
+              "alternativeLabel":"Phase 1 Alternative",
+              "alternative":{"warehouseCode":"%s","items":[{"productSku":"BOUNDARY-SKU","quantity":2,"unitPrice":10.00}]}
+            }
+            """.formatted(primaryWarehouseCode, alternativeWarehouseCode);
     }
 
     private void createRoleUser(MockHttpSession admin,
@@ -1214,5 +1368,8 @@ class PlatformTenantAccessBoundaryIntegrationTest {
     }
 
     private record RoleExpectation(String username, String role, boolean tenantWide) {
+    }
+
+    private record ScenarioCreationExpectation(String username, String reviewOwner, String warehouseCode) {
     }
 }
