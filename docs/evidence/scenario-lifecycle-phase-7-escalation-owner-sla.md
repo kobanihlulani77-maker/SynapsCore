@@ -59,13 +59,13 @@ non-blank exact persisted escalation owner.
 43. **Frontend checks:** Frontend source was not changed in Phase 7; frontend lint/build/verify remain the prior green baseline and are rerun as a repository gate below.
 44. **Repository gates:** `git diff --check`, secret scan, and documentation-link check are required before commit; ignored proof state and local environment files remain untracked and unstaged.
 45. **Files changed for Phase 7:** `ScenarioHistoryService.java`, `PlatformTenantAccessBoundaryIntegrationTest.java`, this evidence document, and `docs/INDEX.md`. Unrelated `frontend/Dockerfile`, `.gitattributes`, and Phase 0 census changes are not part of this closure.
-46. **Deployment/live readiness:** Because production service code changed, the post-push live connection check must confirm `FRONTEND_UP=True`, `BACKEND_UP=True`, `DB_READY=True`, `AUTH_READY=True`, `WS_READY=True`, and `PROOF_ALLOWED=True`. Hosted proof is not required for this backend-only change and Scenario execution remains out of scope.
+46. **Deployment/live readiness:** Commit `0cc1723` was pushed to `origin/main`. After Render warm-up, the live check confirmed `FRONTEND_UP=True`, `BACKEND_UP=True`, `DB_READY=True`, `AUTH_READY=True`, `WS_READY=True`, and `PROOF_ALLOWED=True`; readiness, liveness, auth session, and SockJS returned `200`. The aggregate `/actuator/health` probe timed out during the check while its direct readiness/liveness probes were healthy, so that transient probe behavior remains an operational limitation. Hosted proof is not required for this backend-only change and Scenario execution remains out of scope.
 47. **Critical blockers:** None identified by the Phase 7 focused or full backend suites.
 48. **High blockers:** None identified by the Phase 7 focused or full backend suites.
-49. **Medium/Low limitations:** The fixture uses a simple in-process policy/owner resolver and existing realtime broker; broader production scale, managed operational alerting, and a manual owner walkthrough remain outside this phase.
+49. **Medium/Low limitations:** The fixture uses a simple in-process policy/owner resolver and existing realtime broker; broader production scale, managed operational alerting, and a manual owner walkthrough remain outside this phase. The aggregate health endpoint timed out during the post-push probe even though direct readiness/liveness were healthy and the final connection classification allowed proof.
 50. **Manual walkthrough:** Deferred. This phase is backend authority and SLA evidence; no browser Scenario execution was performed.
 51. **Phase 8 readiness:** Phase 8 must not begin until the post-push live readiness check is green and this Phase 7 evidence is committed. No Phase 8 work is started by this document.
-52. **Phase 7 verdict:** Pending post-push live readiness confirmation: `PHASE 7 TECHNICALLY ACCEPTED — OPERATIONAL OWNER WALKTHROUGH DEFERRED — READY FOR PHASE 8`.
+52. **Phase 7 verdict:** `PHASE 7 TECHNICALLY ACCEPTED — OPERATIONAL OWNER WALKTHROUGH DEFERRED — READY FOR PHASE 8`.
 
 ## Exact Runtime Boundary
 
@@ -84,4 +84,3 @@ saved plan
 Acknowledgement is not approval, execution, inventory movement, order creation,
 alert creation, or recommendation publication. The existing tenant-scoped
 session and warehouse checks remain authoritative.
-
