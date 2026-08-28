@@ -157,6 +157,7 @@ class PlatformTenantAccessBoundaryIntegrationTest {
         createRoleUser(admin, "boundary.integration.operator", "INTEGRATION_OPERATOR", List.of(warehouseA));
         createRoleUser(admin, "boundary.requester.b", "INTEGRATION_OPERATOR", List.of(warehouseB));
         createRoleUser(admin, "boundary.inactive", "INTEGRATION_OPERATOR", List.of(warehouseA));
+        createRoleUser(admin, "boundary.review.inactive", "REVIEW_OWNER", List.of(warehouseA));
         var inactiveOperator = accessOperatorRepository
             .findByTenant_CodeIgnoreCaseAndActorNameIgnoreCase(REHEARSAL_TENANT, "boundary.inactive")
             .orElseThrow();
@@ -1396,6 +1397,207 @@ class PlatformTenantAccessBoundaryIntegrationTest {
                     warehouseA
                 )))
             .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    void scenarioPhaseFourReviewHandoffRequiresPersistedAssignmentAndPreservesOperationalTruth() throws Exception {
+        MockHttpSession tenantAdmin = tenantLogin(REHEARSAL_TENANT, "boundary.tenant.admin", ROLE_PASSWORD);
+        MockHttpSession assignedReviewer = tenantLogin(REHEARSAL_TENANT, "boundary.review", ROLE_PASSWORD);
+        MockHttpSession alternateReviewer = tenantLogin(REHEARSAL_TENANT, "boundary.review.alt", ROLE_PASSWORD);
+        MockHttpSession wrongWarehouseReviewer = tenantLogin(REHEARSAL_TENANT, "boundary.review.b", ROLE_PASSWORD);
+        MockHttpSession crossTenantReviewer = tenantLogin(ISOLATION_TENANT, "isolation.admin", "Isolation-Admin-2026!");
+
+        long startingOrders = customerOrderRepository.countByTenant_CodeIgnoreCase(REHEARSAL_TENANT);
+        long startingInventory = inventoryRepository.countByTenantCode(REHEARSAL_TENANT);
+        long startingAlerts = alertRepository.count();
+        long startingRecommendations = recommendationRepository.count();
+        long startingBusinessEvents = businessEventRepository.count();
+
+        String title = "Phase 4 review handoff North";
+        long planId = saveStandardScenarioPlan(
+            tenantAdmin,
+            title,
+            "boundary.review",
+            warehouseA
+        );
+
+        ScenarioRun persistedPlan = scenarioRunRepository.findById(planId).orElseThrow();
+        assertThat(persistedPlan.getType()).isEqualTo(ScenarioRunType.SAVED_PLAN);
+        assertThat(persistedPlan.getRequestedBy()).isEqualTo("boundary.tenant.admin");
+        assertThat(persistedPlan.getWarehouseCode()).isEqualTo(warehouseA);
+        assertThat(persistedPlan.getReviewOwner()).isEqualTo("boundary.review");
+        assertThat(persistedPlan.getApprovalStatus()).isEqualTo(ScenarioApprovalStatus.PENDING_APPROVAL);
+        assertThat(persistedPlan.getApprovalStage()).isEqualTo(ScenarioApprovalStage.PENDING_REVIEW);
+
+        mockMvc.perform(get("/api/scenarios/history")
+                .session(assignedReviewer)
+                .param("reviewOwner", "boundary.review"))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$[?(@.id == " + planId + ")].title").value(org.hamcrest.Matchers.hasItem(title)))
+            .andExpect(jsonPath("$[?(@.id == " + planId + ")].requestedBy").value(org.hamcrest.Matchers.hasItem("boundary.tenant.admin")))
+            .andExpect(jsonPath("$[?(@.id == " + planId + ")].warehouseCode").value(org.hamcrest.Matchers.hasItem(warehouseA)))
+            .andExpect(jsonPath("$[?(@.id == " + planId + ")].reviewOwner").value(org.hamcrest.Matchers.hasItem("boundary.review")))
+            .andExpect(jsonPath("$[?(@.id == " + planId + ")].approvalStage").value(org.hamcrest.Matchers.hasItem("PENDING_REVIEW")))
+            .andExpect(jsonPath("$[?(@.id == " + planId + ")].executable").value(org.hamcrest.Matchers.hasItem(false)));
+
+        mockMvc.perform(get("/api/scenarios/" + planId + "/request").session(assignedReviewer))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.scenarioRunId").value(planId))
+            .andExpect(jsonPath("$.request.warehouseCode").value(warehouseA))
+            .andExpect(jsonPath("$.request.items[0].productSku").value("BOUNDARY-SKU"));
+
+        mockMvc.perform(get("/api/scenarios/" + planId + "/request").session(alternateReviewer))
+            .andExpect(status().isOk());
+
+        String coastTitle = "Phase 4 review handoff Coast";
+        long coastPlanId = saveStandardScenarioPlan(
+            tenantAdmin,
+            coastTitle,
+            "boundary.review.b",
+            warehouseB
+        );
+        MockHttpSession assignedCoastReviewer = tenantLogin(REHEARSAL_TENANT, "boundary.review.b", ROLE_PASSWORD);
+        mockMvc.perform(get("/api/scenarios/history")
+                .session(assignedCoastReviewer)
+                .param("reviewOwner", "boundary.review.b"))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$[?(@.id == " + coastPlanId + ")].title").value(org.hamcrest.Matchers.hasItem(coastTitle)))
+            .andExpect(jsonPath("$[?(@.id == " + coastPlanId + ")].warehouseCode").value(org.hamcrest.Matchers.hasItem(warehouseB)))
+            .andExpect(jsonPath("$[?(@.id == " + coastPlanId + ")].reviewOwner").value(org.hamcrest.Matchers.hasItem("boundary.review.b")))
+            .andExpect(jsonPath("$[?(@.id == " + coastPlanId + ")].approvalStage").value(org.hamcrest.Matchers.hasItem("PENDING_REVIEW")));
+
+        mockMvc.perform(get("/api/scenarios/" + coastPlanId + "/request").session(assignedCoastReviewer))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.scenarioRunId").value(coastPlanId))
+            .andExpect(jsonPath("$.request.warehouseCode").value(warehouseB))
+            .andExpect(jsonPath("$.request.items[0].productSku").value("BOUNDARY-SKU"));
+
+        mockMvc.perform(get("/api/scenarios/" + coastPlanId + "/request").session(assignedReviewer))
+            .andExpect(status().isForbidden());
+
+        mockMvc.perform(post("/api/scenarios/" + coastPlanId + "/approve")
+                .session(assignedReviewer)
+                .contentType(APPLICATION_JSON)
+                .content("{\"actorRole\":\"REVIEW_OWNER\",\"approverName\":\"boundary.review\",\"approvalNote\":\"Wrong warehouse must fail\"}"))
+            .andExpect(status().isForbidden());
+
+        mockMvc.perform(post("/api/scenarios/" + planId + "/approve")
+                .session(alternateReviewer)
+                .contentType(APPLICATION_JSON)
+                .content("{\"actorRole\":\"REVIEW_OWNER\",\"approverName\":\"boundary.review.alt\",\"approvalNote\":\"Unassigned reviewer must fail\"}"))
+            .andExpect(status().isBadRequest())
+            .andExpect(jsonPath("$.message").value(org.hamcrest.Matchers.containsString("assigned review owner")));
+
+        mockMvc.perform(get("/api/scenarios/" + planId + "/request").session(wrongWarehouseReviewer))
+            .andExpect(status().isForbidden());
+
+        mockMvc.perform(post("/api/scenarios/" + planId + "/approve")
+                .session(wrongWarehouseReviewer)
+                .contentType(APPLICATION_JSON)
+                .content("{\"actorRole\":\"REVIEW_OWNER\",\"approverName\":\"boundary.review.b\",\"approvalNote\":\"Wrong warehouse must fail\"}"))
+            .andExpect(status().isForbidden());
+
+        mockMvc.perform(get("/api/scenarios/" + planId + "/request").session(crossTenantReviewer))
+            .andExpect(status().isNotFound());
+
+        mockMvc.perform(post("/api/scenarios/" + planId + "/approve")
+                .session(crossTenantReviewer)
+                .contentType(APPLICATION_JSON)
+                .content("{\"actorRole\":\"REVIEW_OWNER\",\"approverName\":\"boundary.review\",\"approvalNote\":\"Cross tenant must fail\"}"))
+            .andExpect(status().isNotFound());
+
+        for (String username : List.of(
+            "boundary.tenant.admin",
+            "boundary.integration.admin",
+            "boundary.integration.operator",
+            "boundary.final",
+            "boundary.escalation"
+        )) {
+            MockHttpSession session = tenantLogin(REHEARSAL_TENANT, username, ROLE_PASSWORD);
+            mockMvc.perform(post("/api/scenarios/" + planId + "/approve")
+                    .session(session)
+                    .contentType(APPLICATION_JSON)
+                    .content("{\"actorRole\":\"REVIEW_OWNER\",\"approverName\":\"" + username + "\",\"approvalNote\":\"Wrong role must fail\"}"))
+                .andExpect(status().isForbidden());
+        }
+
+        MockHttpSession anonymousRequest = new MockHttpSession();
+        mockMvc.perform(post("/api/scenarios/" + planId + "/approve")
+                .session(anonymousRequest)
+                .contentType(APPLICATION_JSON)
+                .content("{\"actorRole\":\"REVIEW_OWNER\",\"approverName\":\"boundary.review\",\"approvalNote\":\"Anonymous must fail\"}"))
+            .andExpect(status().isForbidden());
+
+        MockHttpSession inactiveReviewer = tenantLogin(REHEARSAL_TENANT, "boundary.review.inactive", ROLE_PASSWORD);
+        var inactiveReviewOperator = accessOperatorRepository
+            .findByTenant_CodeIgnoreCaseAndActorNameIgnoreCase(REHEARSAL_TENANT, "boundary.review.inactive")
+            .orElseThrow();
+        long inactivePlanId = saveStandardScenarioPlan(
+            tenantAdmin,
+            "Phase 4 inactive assigned reviewer",
+            "boundary.review.inactive",
+            warehouseA
+        );
+        inactiveReviewOperator.setActive(false);
+        accessOperatorRepository.save(inactiveReviewOperator);
+        try {
+            mockMvc.perform(post("/api/scenarios/" + inactivePlanId + "/approve")
+                    .session(inactiveReviewer)
+                    .contentType(APPLICATION_JSON)
+                    .content("{\"actorRole\":\"REVIEW_OWNER\",\"approverName\":\"boundary.review.inactive\",\"approvalNote\":\"Inactive reviewer must fail\"}"))
+                .andExpect(status().isForbidden());
+        } finally {
+            inactiveReviewOperator.setActive(true);
+            accessOperatorRepository.save(inactiveReviewOperator);
+        }
+
+        mockMvc.perform(post("/api/scenarios/order-impact")
+                .session(tenantAdmin)
+                .contentType(APPLICATION_JSON)
+                .content(orderPayload(null, warehouseA)))
+            .andExpect(status().isOk());
+        long previewId = scenarioRunRepository.findTop12ByOrderByCreatedAtDesc().stream()
+            .filter(run -> run.getType() == ScenarioRunType.PREVIEW)
+            .filter(run -> warehouseA.equalsIgnoreCase(run.getWarehouseCode()))
+            .findFirst()
+            .orElseThrow()
+            .getId();
+        mockMvc.perform(post("/api/scenarios/" + previewId + "/approve")
+                .session(assignedReviewer)
+                .contentType(APPLICATION_JSON)
+                .content("{\"actorRole\":\"REVIEW_OWNER\",\"approverName\":\"boundary.review\",\"approvalNote\":\"Preview must not be reviewable\"}"))
+            .andExpect(status().isBadRequest())
+            .andExpect(jsonPath("$.message").value(org.hamcrest.Matchers.containsString("Only saved plans")));
+
+        long missingAssignmentPlanId = saveStandardScenarioPlan(
+            tenantAdmin,
+            "Phase 4 missing persisted reviewer",
+            "boundary.review",
+            warehouseA
+        );
+        ScenarioRun missingAssignmentPlan = scenarioRunRepository.findById(missingAssignmentPlanId).orElseThrow();
+        missingAssignmentPlan.setReviewOwner(null);
+        scenarioRunRepository.save(missingAssignmentPlan);
+        mockMvc.perform(post("/api/scenarios/" + missingAssignmentPlanId + "/approve")
+                .session(assignedReviewer)
+                .contentType(APPLICATION_JSON)
+                .content("{\"actorRole\":\"REVIEW_OWNER\",\"approverName\":\"boundary.review\",\"approvalNote\":\"Missing assignment must fail\"}"))
+            .andExpect(status().isBadRequest())
+            .andExpect(jsonPath("$.message").value(org.hamcrest.Matchers.containsString("assigned review owner")));
+
+        assertThat(scenarioRunRepository.findById(planId).orElseThrow().getApprovalStage())
+            .isEqualTo(ScenarioApprovalStage.PENDING_REVIEW);
+        assertThat(scenarioRunRepository.findById(planId).orElseThrow().getApprovalStatus())
+            .isEqualTo(ScenarioApprovalStatus.PENDING_APPROVAL);
+        assertThat(customerOrderRepository.countByTenant_CodeIgnoreCase(REHEARSAL_TENANT)).isEqualTo(startingOrders);
+        assertThat(inventoryRepository.countByTenantCode(REHEARSAL_TENANT)).isEqualTo(startingInventory);
+        assertThat(alertRepository.count()).isEqualTo(startingAlerts);
+        assertThat(recommendationRepository.count()).isEqualTo(startingRecommendations);
+        assertThat(businessEventRepository.count()).isEqualTo(startingBusinessEvents + 5);
+        assertThat(businessEventRepository.findTop20ByOrderByCreatedAtDesc())
+            .extracting(event -> event.getEventType())
+            .doesNotContain(BusinessEventType.SCENARIO_APPROVED, BusinessEventType.SCENARIO_REJECTED,
+                BusinessEventType.SCENARIO_EXECUTED);
     }
 
     private void assertRequesterSpoofRejected(MockHttpSession session,

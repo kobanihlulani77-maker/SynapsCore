@@ -4,6 +4,7 @@ import com.synapsecore.access.AccessControlService;
 import com.synapsecore.access.AccessDirectoryService;
 import com.synapsecore.access.SynapseAccessRole;
 import com.synapsecore.access.dto.AccessOperatorResponse;
+import com.synapsecore.config.SynapseStarterProperties;
 import com.synapsecore.domain.entity.ScenarioRun;
 import com.synapsecore.domain.entity.ScenarioRunType;
 import com.synapsecore.domain.entity.ScenarioApprovalStatus;
@@ -61,6 +62,7 @@ public class ScenarioHistoryService {
     private final AccessDirectoryService accessDirectoryService;
     private final TenantContextService tenantContextService;
     private final TenantOperationalPolicyService tenantOperationalPolicyService;
+    private final SynapseStarterProperties starterProperties;
 
     private static final ScenarioHistoryFilter DEFAULT_HISTORY_FILTER =
         new ScenarioHistoryFilter(null, null, null, null, null, null, null, null, null, null, null, null, null);
@@ -195,13 +197,17 @@ public class ScenarioHistoryService {
     }
 
     public ScenarioRun getScenarioRun(long scenarioRunId) {
+        var currentOperator = accessDirectoryService.getCurrentOperator();
+        if (currentOperator.isEmpty() && !starterProperties.isAllowDefaultTenantFallback()) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN,
+                "A signed-in user session is required to access scenario " + scenarioRunId + ".");
+        }
         ScenarioRun run = scenarioRunRepository.findByTenant_CodeIgnoreCaseAndId(
-                tenantContextService.getCurrentTenantCodeOrDefault(),
-                scenarioRunId)
+            tenantContextService.getCurrentTenantCodeOrDefault(),
+            scenarioRunId)
             .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND,
                 "Scenario not found: " + scenarioRunId));
         run = applySlaEscalationIfNeeded(run);
-        var currentOperator = accessDirectoryService.getCurrentOperator();
         if (currentOperator.isPresent()) {
             accessDirectoryService.requireWarehouseAccess(
                 currentOperator.get(),
@@ -943,8 +949,8 @@ public class ScenarioHistoryService {
     }
 
     private void requireAssignedReviewOwner(ScenarioRun run, String actorName, String actionLabel) {
-        if (run.getReviewOwner() != null && !run.getReviewOwner().isBlank()
-            && !run.getReviewOwner().equalsIgnoreCase(actorName)) {
+        if (run.getReviewOwner() == null || run.getReviewOwner().isBlank()
+            || !run.getReviewOwner().equalsIgnoreCase(actorName)) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
                 "Scenario " + run.getId() + " requires the assigned review owner to " + actionLabel + " this plan.");
         }
