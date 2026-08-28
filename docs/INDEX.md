@@ -173,6 +173,7 @@ This index links the main product, architecture, runbook, proof, and operator do
 
 - [data-flow-playbook.md](data-flow-playbook.md)
 - [system-flow.md](system-flow.md)
+- [scenario-lifecycle-phase-3-saved-plan-assignment.md](evidence/scenario-lifecycle-phase-3-saved-plan-assignment.md)
 - [replay-recovery.md](replay-recovery.md)
 - [integration-operations.md](integration-operations.md)
 - [hosted-proof.md](hosted-proof.md)

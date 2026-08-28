@@ -10,14 +10,22 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.synapsecore.access.BootstrapAccessService;
 import com.synapsecore.access.PlatformAdministrationAccessService;
+import com.synapsecore.domain.entity.BusinessEventType;
 import com.synapsecore.domain.entity.ScenarioApprovalPolicy;
 import com.synapsecore.domain.entity.ScenarioApprovalStage;
 import com.synapsecore.domain.entity.ScenarioApprovalStatus;
 import com.synapsecore.domain.entity.ScenarioReviewPriority;
+import com.synapsecore.domain.entity.ScenarioRun;
 import com.synapsecore.domain.repository.AccessOperatorRepository;
 import com.synapsecore.domain.repository.AccessUserRepository;
+import com.synapsecore.domain.repository.AlertRepository;
+import com.synapsecore.domain.repository.BusinessEventRepository;
+import com.synapsecore.domain.repository.CustomerOrderRepository;
+import com.synapsecore.domain.repository.InventoryRepository;
+import com.synapsecore.domain.repository.RecommendationRepository;
 import com.synapsecore.domain.repository.WarehouseRepository;
 import com.synapsecore.domain.repository.ScenarioRunRepository;
 import com.synapsecore.domain.entity.ScenarioRunType;
@@ -85,6 +93,24 @@ class PlatformTenantAccessBoundaryIntegrationTest {
 
     @Autowired
     private ScenarioRunRepository scenarioRunRepository;
+
+    @Autowired
+    private ObjectMapper objectMapper;
+
+    @Autowired
+    private CustomerOrderRepository customerOrderRepository;
+
+    @Autowired
+    private InventoryRepository inventoryRepository;
+
+    @Autowired
+    private AlertRepository alertRepository;
+
+    @Autowired
+    private RecommendationRepository recommendationRepository;
+
+    @Autowired
+    private BusinessEventRepository businessEventRepository;
 
     @Autowired
     private PasswordEncoder passwordEncoder;
@@ -1179,6 +1205,199 @@ class PlatformTenantAccessBoundaryIntegrationTest {
             .andExpect(jsonPath("$.reviewOwner").value("boundary.review.b"));
     }
 
+    @Test
+    void scenarioPhaseThreeSavedPlansPreserveGovernedProposalWithoutOperationalSideEffects() throws Exception {
+        MockHttpSession northRequester = tenantLogin(
+            REHEARSAL_TENANT,
+            "boundary.integration.operator",
+            ROLE_PASSWORD
+        );
+        MockHttpSession coastRequester = tenantLogin(
+            REHEARSAL_TENANT,
+            "boundary.requester.b",
+            ROLE_PASSWORD
+        );
+
+        long startingOrders = customerOrderRepository.countByTenant_CodeIgnoreCase(REHEARSAL_TENANT);
+        long startingInventory = inventoryRepository.countByTenantCode(REHEARSAL_TENANT);
+        long startingAlerts = alertRepository.count();
+        long startingRecommendations = recommendationRepository.count();
+        long startingScenarioRuns = scenarioRunRepository.count();
+        long startingBusinessEvents = businessEventRepository.count();
+        long northQuantityBefore = inventoryRepository.findAllWithProductAndWarehouseByTenantCode(REHEARSAL_TENANT)
+            .stream()
+            .filter(inventory -> inventory.getWarehouse().getCode().equalsIgnoreCase(warehouseA))
+            .filter(inventory -> inventory.getProduct().resolveCatalogSku().equalsIgnoreCase("BOUNDARY-SKU"))
+            .findFirst()
+            .orElseThrow()
+            .getQuantityAvailable();
+        long coastQuantityBefore = inventoryRepository.findAllWithProductAndWarehouseByTenantCode(REHEARSAL_TENANT)
+            .stream()
+            .filter(inventory -> inventory.getWarehouse().getCode().equalsIgnoreCase(warehouseB))
+            .filter(inventory -> inventory.getProduct().resolveCatalogSku().equalsIgnoreCase("BOUNDARY-SKU"))
+            .findFirst()
+            .orElseThrow()
+            .getQuantityAvailable();
+
+        String northTitle = "Phase 3 North governed proposal";
+        MvcResult northResult = mockMvc.perform(post("/api/scenarios/save")
+                .session(northRequester)
+                .contentType(APPLICATION_JSON)
+                .content(scenarioSavePayload(
+                    northTitle,
+                    "boundary.integration.operator",
+                    "boundary.review",
+                    warehouseA,
+                    8
+                )))
+            .andExpect(status().isCreated())
+            .andExpect(jsonPath("$.type").value("SAVED_PLAN"))
+            .andExpect(jsonPath("$.warehouseCode").value(warehouseA))
+            .andExpect(jsonPath("$.requestedBy").value("boundary.integration.operator"))
+            .andExpect(jsonPath("$.reviewOwner").value("boundary.review"))
+            .andExpect(jsonPath("$.approvalStatus").value("PENDING_APPROVAL"))
+            .andExpect(jsonPath("$.approvalStage").value("PENDING_REVIEW"))
+            .andExpect(jsonPath("$.executable").value(false))
+            .andExpect(jsonPath("$.reviewPriority").value("MEDIUM"))
+            .andReturn();
+
+        long northPlanId = objectMapper.readTree(northResult.getResponse().getContentAsString())
+            .path("scenarioRunId")
+            .asLong();
+        ScenarioRun northPlan = scenarioRunRepository.findById(northPlanId).orElseThrow();
+        assertThat(northPlan.getType()).isEqualTo(ScenarioRunType.SAVED_PLAN);
+        assertThat(northPlan.getWarehouseCode()).isEqualTo(warehouseA);
+        assertThat(northPlan.getRequestedBy()).isEqualTo("boundary.integration.operator");
+        assertThat(northPlan.getReviewOwner()).isEqualTo("boundary.review");
+        assertThat(northPlan.getApprovalStatus()).isEqualTo(ScenarioApprovalStatus.PENDING_APPROVAL);
+        assertThat(northPlan.getApprovalStage()).isEqualTo(ScenarioApprovalStage.PENDING_REVIEW);
+        assertThat(northPlan.getRequestPayload()).contains(warehouseA, "BOUNDARY-SKU", "8");
+        assertThat(northPlan.getSummary()).contains("projected units", "MEDIUM");
+
+        mockMvc.perform(get("/api/scenarios/" + northPlanId + "/request")
+                .session(northRequester))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.scenarioRunId").value(northPlanId))
+            .andExpect(jsonPath("$.request.warehouseCode").value(warehouseA))
+            .andExpect(jsonPath("$.request.items[0].productSku").value("BOUNDARY-SKU"))
+            .andExpect(jsonPath("$.request.items[0].quantity").value(8));
+
+        String coastTitle = "Phase 3 Coast governed proposal";
+        MvcResult coastResult = mockMvc.perform(post("/api/scenarios/save")
+                .session(coastRequester)
+                .contentType(APPLICATION_JSON)
+                .content(scenarioSavePayload(
+                    coastTitle,
+                    "boundary.requester.b",
+                    "boundary.review.b",
+                    warehouseB,
+                    3
+                )))
+            .andExpect(status().isCreated())
+            .andExpect(jsonPath("$.type").value("SAVED_PLAN"))
+            .andExpect(jsonPath("$.warehouseCode").value(warehouseB))
+            .andExpect(jsonPath("$.requestedBy").value("boundary.requester.b"))
+            .andExpect(jsonPath("$.reviewOwner").value("boundary.review.b"))
+            .andExpect(jsonPath("$.approvalStatus").value("PENDING_APPROVAL"))
+            .andExpect(jsonPath("$.approvalStage").value("PENDING_REVIEW"))
+            .andExpect(jsonPath("$.executable").value(false))
+            .andReturn();
+
+        long coastPlanId = objectMapper.readTree(coastResult.getResponse().getContentAsString())
+            .path("scenarioRunId")
+            .asLong();
+        ScenarioRun coastPlan = scenarioRunRepository.findById(coastPlanId).orElseThrow();
+        assertThat(coastPlan.getWarehouseCode()).isEqualTo(warehouseB);
+        assertThat(coastPlan.getRequestedBy()).isEqualTo("boundary.requester.b");
+        assertThat(coastPlan.getReviewOwner()).isEqualTo("boundary.review.b");
+        assertThat(coastPlan.getRequestPayload()).contains(warehouseB, "BOUNDARY-SKU", "3");
+
+        mockMvc.perform(get("/api/scenarios/history")
+                .session(northRequester)
+                .param("reviewOwner", "boundary.review"))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$[0].title").value(northTitle))
+            .andExpect(jsonPath("$[0].requestedBy").value("boundary.integration.operator"))
+            .andExpect(jsonPath("$[0].warehouseCode").value(warehouseA))
+            .andExpect(jsonPath("$[0].reviewOwner").value("boundary.review"))
+            .andExpect(jsonPath("$[0].approvalStatus").value("PENDING_APPROVAL"))
+            .andExpect(jsonPath("$[0].executable").value(false));
+
+        assertThat(customerOrderRepository.countByTenant_CodeIgnoreCase(REHEARSAL_TENANT)).isEqualTo(startingOrders);
+        assertThat(inventoryRepository.countByTenantCode(REHEARSAL_TENANT)).isEqualTo(startingInventory);
+        assertThat(inventoryRepository.findAllWithProductAndWarehouseByTenantCode(REHEARSAL_TENANT)
+            .stream()
+            .filter(inventory -> inventory.getWarehouse().getCode().equalsIgnoreCase(warehouseA))
+            .filter(inventory -> inventory.getProduct().resolveCatalogSku().equalsIgnoreCase("BOUNDARY-SKU"))
+            .findFirst()
+            .orElseThrow()
+            .getQuantityAvailable()).isEqualTo(northQuantityBefore);
+        assertThat(inventoryRepository.findAllWithProductAndWarehouseByTenantCode(REHEARSAL_TENANT)
+            .stream()
+            .filter(inventory -> inventory.getWarehouse().getCode().equalsIgnoreCase(warehouseB))
+            .filter(inventory -> inventory.getProduct().resolveCatalogSku().equalsIgnoreCase("BOUNDARY-SKU"))
+            .findFirst()
+            .orElseThrow()
+            .getQuantityAvailable()).isEqualTo(coastQuantityBefore);
+        assertThat(alertRepository.count()).isEqualTo(startingAlerts);
+        assertThat(recommendationRepository.count()).isEqualTo(startingRecommendations);
+        assertThat(scenarioRunRepository.count()).isEqualTo(startingScenarioRuns + 2);
+        assertThat(businessEventRepository.count()).isEqualTo(startingBusinessEvents + 2);
+        assertThat(businessEventRepository.findTop20ByOrderByCreatedAtDesc())
+            .extracting(event -> event.getEventType())
+            .contains(BusinessEventType.SCENARIO_SAVED)
+            .doesNotContain(BusinessEventType.SCENARIO_APPROVED, BusinessEventType.SCENARIO_EXECUTED);
+    }
+
+    @Test
+    void scenarioPhaseThreeRejectsCrossTenantInactiveAndWrongRoleReviewers() throws Exception {
+        MockHttpSession tenantAdmin = tenantLogin(REHEARSAL_TENANT, "boundary.tenant.admin", ROLE_PASSWORD);
+
+        mockMvc.perform(post("/api/scenarios/save")
+                .session(tenantAdmin)
+                .contentType(APPLICATION_JSON)
+                .content(scenarioSavePayload(
+                    "Cross tenant reviewer must fail",
+                    "boundary.tenant.admin",
+                    "isolation.admin",
+                    warehouseA
+                )))
+            .andExpect(status().isBadRequest());
+
+        mockMvc.perform(post("/api/scenarios/save")
+                .session(tenantAdmin)
+                .contentType(APPLICATION_JSON)
+                .content(scenarioSavePayload(
+                    "Missing warehouse must fail",
+                    "boundary.tenant.admin",
+                    "boundary.review",
+                    ""
+                )))
+            .andExpect(status().isBadRequest());
+
+        mockMvc.perform(post("/api/scenarios/save")
+                .session(tenantAdmin)
+                .contentType(APPLICATION_JSON)
+                .content(scenarioSavePayload(
+                    "Inactive reviewer must fail",
+                    "boundary.tenant.admin",
+                    "boundary.inactive",
+                    warehouseA
+                )))
+            .andExpect(status().isBadRequest());
+
+        mockMvc.perform(post("/api/scenarios/save")
+                .session(tenantAdmin)
+                .contentType(APPLICATION_JSON)
+                .content(scenarioSavePayload(
+                    "Wrong role reviewer must fail",
+                    "boundary.tenant.admin",
+                    "boundary.final",
+                    warehouseA
+                )))
+            .andExpect(status().isBadRequest());
+    }
+
     private void assertRequesterSpoofRejected(MockHttpSession session,
                                               String title,
                                               String requestedBy,
@@ -1196,9 +1415,17 @@ class PlatformTenantAccessBoundaryIntegrationTest {
                                        String requestedBy,
                                        String reviewOwner,
                                        String warehouseCode) {
+        return scenarioSavePayload(title, requestedBy, reviewOwner, warehouseCode, 1);
+    }
+
+    private String scenarioSavePayload(String title,
+                                       String requestedBy,
+                                       String reviewOwner,
+                                       String warehouseCode,
+                                       int quantity) {
         return """
-            {"title":"%s","requestedBy":"%s","reviewOwner":"%s","request":{"warehouseCode":"%s","items":[{"productSku":"BOUNDARY-SKU","quantity":1,"unitPrice":10.00}]}}
-            """.formatted(title, requestedBy, reviewOwner, warehouseCode);
+            {"title":"%s","requestedBy":"%s","reviewOwner":"%s","request":{"warehouseCode":"%s","items":[{"productSku":"BOUNDARY-SKU","quantity":%d,"unitPrice":10.00}]}}
+            """.formatted(title, requestedBy, reviewOwner, warehouseCode, quantity);
     }
 
     private String scenarioComparePayload(String warehouseCode) {
