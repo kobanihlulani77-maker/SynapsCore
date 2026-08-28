@@ -2440,6 +2440,67 @@ class PlatformTenantAccessBoundaryIntegrationTest {
     }
 
     @Test
+    void scenarioNotificationsRespectWarehouseScopeOnDirectEndpoint() throws Exception {
+        MockHttpSession tenantAdmin = tenantLogin(REHEARSAL_TENANT, "boundary.tenant.admin", ROLE_PASSWORD);
+        String northTitle = "Phase 11 North notification visibility";
+        String coastTitle = "Phase 11 Coast notification visibility";
+
+        savePendingFinalSlaPlan(
+            tenantAdmin,
+            northTitle,
+            "boundary.review",
+            "boundary.final",
+            warehouseA,
+            Instant.now().minusSeconds(2)
+        );
+        savePendingFinalSlaPlan(
+            tenantAdmin,
+            coastTitle,
+            "boundary.review.b",
+            "boundary.final.b",
+            warehouseB,
+            Instant.now().minusSeconds(1)
+        );
+
+        mockMvc.perform(get("/api/scenarios/history").session(tenantAdmin).param("limit", "40"))
+            .andExpect(status().isOk());
+
+        mockMvc.perform(get("/api/scenarios/notifications")
+                .session(tenantLogin(REHEARSAL_TENANT, "boundary.review", ROLE_PASSWORD)))
+            .andExpect(status().isOk())
+            .andExpect(content().string(org.hamcrest.Matchers.containsString(northTitle)))
+            .andExpect(content().string(org.hamcrest.Matchers.not(org.hamcrest.Matchers.containsString(coastTitle))));
+
+        mockMvc.perform(get("/api/scenarios/notifications")
+                .session(tenantLogin(REHEARSAL_TENANT, "boundary.review.b", ROLE_PASSWORD)))
+            .andExpect(status().isOk())
+            .andExpect(content().string(org.hamcrest.Matchers.containsString(coastTitle)))
+            .andExpect(content().string(org.hamcrest.Matchers.not(org.hamcrest.Matchers.containsString(northTitle))));
+    }
+
+    @Test
+    void deniedWarehouseScenarioAccessCannotTriggerSlaMutation() throws Exception {
+        MockHttpSession tenantAdmin = tenantLogin(REHEARSAL_TENANT, "boundary.tenant.admin", ROLE_PASSWORD);
+        long coastPlanId = savePendingFinalSlaPlan(
+            tenantAdmin,
+            "Phase 11 denied warehouse SLA mutation",
+            "boundary.review.b",
+            "boundary.final.b",
+            warehouseB,
+            Instant.now().minusSeconds(2)
+        );
+
+        mockMvc.perform(get("/api/scenarios/" + coastPlanId + "/request")
+                .session(tenantLogin(REHEARSAL_TENANT, "boundary.review", ROLE_PASSWORD)))
+            .andExpect(status().isForbidden());
+
+        ScenarioRun deniedPlan = scenarioRunRepository.findById(coastPlanId).orElseThrow();
+        assertThat(deniedPlan.getSlaEscalatedAt()).isNull();
+        assertThat(deniedPlan.getSlaEscalatedTo()).isNull();
+        assertThat(deniedPlan.getSlaAcknowledgedAt()).isNull();
+    }
+
+    @Test
     void scenarioPhaseSevenSlaDeadlineSeparatesReviewStageAndKeepsHistoryTruthful() throws Exception {
         MockHttpSession tenantAdmin = tenantLogin(REHEARSAL_TENANT, "boundary.tenant.admin", ROLE_PASSWORD);
         long reviewStagePlanId = saveEscalatedScenarioPlan(

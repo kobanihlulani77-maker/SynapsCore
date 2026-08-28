@@ -189,14 +189,13 @@ public class ScenarioHistoryService {
             scenarioRunId)
             .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND,
                 "Scenario not found: " + scenarioRunId));
-        run = applySlaEscalationIfNeeded(run);
         if (currentOperator.isPresent()) {
             accessDirectoryService.requireWarehouseAccess(
                 currentOperator.get(),
                 run.getWarehouseCode(),
                 "access scenario " + run.getId());
         }
-        return run;
+        return applySlaEscalationIfNeeded(run);
     }
 
     public ScenarioRequestResponse getScenarioRequest(long scenarioRunId) {
@@ -439,6 +438,10 @@ public class ScenarioHistoryService {
     }
 
     public List<ScenarioNotificationResponse> getScenarioNotifications(int limit) {
+        return getScenarioNotifications(limit, null);
+    }
+
+    public List<ScenarioNotificationResponse> getScenarioNotifications(int limit, List<String> warehouseScopes) {
         applyPendingSlaEscalations();
         int effectiveLimit = limit <= 0 ? DEFAULT_NOTIFICATION_LIMIT : Math.min(limit, 12);
 
@@ -461,8 +464,17 @@ public class ScenarioHistoryService {
 
         return java.util.stream.Stream.concat(activeEscalations.stream(), acknowledgedEscalations.stream())
             .sorted(Comparator.comparing(ScenarioNotificationResponse::createdAt).reversed())
+            .filter(notification -> isVisibleToWarehouseScopes(notification.warehouseCode(), warehouseScopes))
             .limit(effectiveLimit)
             .toList();
+    }
+
+    private boolean isVisibleToWarehouseScopes(String warehouseCode, List<String> warehouseScopes) {
+        if (warehouseScopes == null || warehouseScopes.isEmpty()) {
+            return true;
+        }
+        return warehouseCode != null && warehouseScopes.stream()
+            .anyMatch(scope -> scope != null && scope.equalsIgnoreCase(warehouseCode));
     }
 
     public List<ScenarioRunResponse> getScenarioRunsForInbox(boolean slaEscalatedOnly, int limit) {

@@ -135,7 +135,7 @@ public class ScenarioController {
 
     @GetMapping("/notifications")
     public List<ScenarioNotificationResponse> getScenarioNotifications(@RequestParam(required = false) Integer limit) {
-        accessControlService.requireWorkspaceAccess("view scenario notifications");
-        return scenarioHistoryService.getScenarioNotifications(limit == null ? 8 : limit);
+        var actor = accessControlService.requireWorkspaceAccess("view scenario notifications");
+        return scenarioHistoryService.getScenarioNotifications(limit == null ? 8 : limit, actor.warehouseScopes());
     }
 }
