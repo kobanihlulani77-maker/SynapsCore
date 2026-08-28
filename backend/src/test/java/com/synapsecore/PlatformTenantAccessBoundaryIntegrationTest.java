@@ -490,8 +490,19 @@ class PlatformTenantAccessBoundaryIntegrationTest {
     }
 
     @Test
-    void scenarioGovernanceEnforcesAssignmentsAndApprovedSavedPlanExecution() throws Exception {
+    void scenarioGovernanceEnforcesAssignmentsAndApprovedSavedPlanExternalHandoff() throws Exception {
         MockHttpSession tenantAdmin = tenantLogin(REHEARSAL_TENANT, "boundary.tenant.admin", ROLE_PASSWORD);
+        MockHttpSession coastReviewer = tenantLogin(REHEARSAL_TENANT, "boundary.review.b", ROLE_PASSWORD);
+        MockHttpSession crossTenant = tenantLogin(ISOLATION_TENANT, "isolation.admin", "Isolation-Admin-2026!");
+        long startingOrders = customerOrderRepository.countByTenant_CodeIgnoreCase(REHEARSAL_TENANT);
+        long startingInventory = inventoryRepository.countByTenantCode(REHEARSAL_TENANT);
+        long startingFulfillment = fulfillmentTaskRepository.count();
+        long startingDispatch = operationalDispatchWorkItemRepository.count();
+        long startingAlerts = alertRepository.count();
+        long startingRecommendations = recommendationRepository.count();
+        long startingExecutionRuns = scenarioRunRepository.findAll().stream()
+            .filter(run -> run.getType() == ScenarioRunType.EXECUTION)
+            .count();
         mockMvc.perform(post("/api/scenarios/order-impact")
                 .session(tenantAdmin)
                 .contentType(APPLICATION_JSON)
@@ -513,18 +524,19 @@ class PlatformTenantAccessBoundaryIntegrationTest {
         )) {
             MockHttpSession session = tenantLogin(REHEARSAL_TENANT, username, ROLE_PASSWORD);
             mockMvc.perform(post("/api/scenarios/" + reviewScenarioId + "/execute").session(session))
-                .andExpect(status().isForbidden());
+                .andExpect(status().isGone())
+                .andExpect(jsonPath("$.message").value(org.hamcrest.Matchers.containsString("handed off for external action")));
         }
 
         MockHttpSession reviewOwner = tenantLogin(REHEARSAL_TENANT, "boundary.review", ROLE_PASSWORD);
         mockMvc.perform(post("/api/scenarios/" + reviewScenarioId + "/execute").session(reviewOwner))
-            .andExpect(status().isBadRequest())
-            .andExpect(jsonPath("$.message").value(org.hamcrest.Matchers.containsString("Only approved saved plans")));
+            .andExpect(status().isGone())
+            .andExpect(jsonPath("$.message").value(org.hamcrest.Matchers.containsString("handed off for external action")));
 
         MockHttpSession finalApprover = tenantLogin(REHEARSAL_TENANT, "boundary.final", ROLE_PASSWORD);
         mockMvc.perform(post("/api/scenarios/" + reviewScenarioId + "/execute").session(finalApprover))
-            .andExpect(status().isBadRequest())
-            .andExpect(jsonPath("$.message").value(org.hamcrest.Matchers.containsString("Only approved saved plans")));
+            .andExpect(status().isGone())
+            .andExpect(jsonPath("$.message").value(org.hamcrest.Matchers.containsString("handed off for external action")));
 
         long assignedStandardPlanId = saveStandardScenarioPlan(
             tenantAdmin,
@@ -544,9 +556,24 @@ class PlatformTenantAccessBoundaryIntegrationTest {
                 .contentType(APPLICATION_JSON)
                 .content("{\"actorRole\":\"REVIEW_OWNER\",\"approverName\":\"boundary.review\",\"approvalNote\":\"Assigned owner approves\"}"))
             .andExpect(status().isOk());
-        mockMvc.perform(post("/api/scenarios/" + assignedStandardPlanId + "/execute").session(reviewOwner))
-            .andExpect(status().isOk())
-            .andExpect(jsonPath("$.order.warehouseCode").value(warehouseA));
+        for (MockHttpSession session : List.of(
+            tenantAdmin,
+            tenantLogin(REHEARSAL_TENANT, "boundary.review", ROLE_PASSWORD),
+            tenantLogin(REHEARSAL_TENANT, "boundary.final", ROLE_PASSWORD),
+            tenantLogin(REHEARSAL_TENANT, "boundary.integration.admin", ROLE_PASSWORD),
+            tenantLogin(REHEARSAL_TENANT, "boundary.integration.operator", ROLE_PASSWORD),
+            tenantLogin(REHEARSAL_TENANT, "boundary.escalation", ROLE_PASSWORD)
+        )) {
+            mockMvc.perform(post("/api/scenarios/" + assignedStandardPlanId + "/execute").session(session))
+                .andExpect(status().isGone())
+                .andExpect(jsonPath("$.message").value(org.hamcrest.Matchers.containsString("handed off for external action")));
+        }
+        mockMvc.perform(post("/api/scenarios/" + assignedStandardPlanId + "/execute").session(coastReviewer))
+            .andExpect(status().isForbidden());
+        mockMvc.perform(post("/api/scenarios/" + assignedStandardPlanId + "/execute").session(crossTenant))
+            .andExpect(status().isNotFound());
+        mockMvc.perform(post("/api/scenarios/" + assignedStandardPlanId + "/execute"))
+            .andExpect(status().isForbidden());
 
         long rejectedPlanId = saveStandardScenarioPlan(
             tenantAdmin,
@@ -594,9 +621,34 @@ class PlatformTenantAccessBoundaryIntegrationTest {
                 .contentType(APPLICATION_JSON)
                 .content("{\"actorRole\":\"FINAL_APPROVER\",\"approverName\":\"boundary.final\",\"approvalNote\":\"Assigned final owner approves\"}"))
             .andExpect(status().isOk());
-        mockMvc.perform(post("/api/scenarios/" + escalatedPlanId + "/execute").session(finalApprover))
-            .andExpect(status().isOk())
-            .andExpect(jsonPath("$.order.warehouseCode").value(warehouseA));
+        for (MockHttpSession session : List.of(
+            tenantAdmin,
+            reviewOwner,
+            finalApprover,
+            tenantLogin(REHEARSAL_TENANT, "boundary.integration.admin", ROLE_PASSWORD),
+            tenantLogin(REHEARSAL_TENANT, "boundary.integration.operator", ROLE_PASSWORD),
+            tenantLogin(REHEARSAL_TENANT, "boundary.escalation", ROLE_PASSWORD)
+        )) {
+            mockMvc.perform(post("/api/scenarios/" + escalatedPlanId + "/execute").session(session))
+                .andExpect(status().isGone())
+                .andExpect(jsonPath("$.message").value(org.hamcrest.Matchers.containsString("handed off for external action")));
+        }
+        mockMvc.perform(post("/api/scenarios/" + escalatedPlanId + "/execute").session(coastReviewer))
+            .andExpect(status().isForbidden());
+        mockMvc.perform(post("/api/scenarios/" + escalatedPlanId + "/execute").session(crossTenant))
+            .andExpect(status().isNotFound());
+        mockMvc.perform(post("/api/scenarios/" + escalatedPlanId + "/execute"))
+            .andExpect(status().isForbidden());
+
+        assertThat(customerOrderRepository.countByTenant_CodeIgnoreCase(REHEARSAL_TENANT)).isEqualTo(startingOrders);
+        assertThat(inventoryRepository.countByTenantCode(REHEARSAL_TENANT)).isEqualTo(startingInventory);
+        assertThat(fulfillmentTaskRepository.count()).isEqualTo(startingFulfillment);
+        assertThat(operationalDispatchWorkItemRepository.count()).isEqualTo(startingDispatch);
+        assertThat(alertRepository.count()).isEqualTo(startingAlerts);
+        assertThat(recommendationRepository.count()).isEqualTo(startingRecommendations);
+        assertThat(scenarioRunRepository.findAll().stream()
+            .filter(run -> run.getType() == ScenarioRunType.EXECUTION)
+            .count()).isEqualTo(startingExecutionRuns);
     }
 
     @Test
@@ -1645,7 +1697,7 @@ class PlatformTenantAccessBoundaryIntegrationTest {
             .andExpect(jsonPath("$.approvalStage").value("APPROVED"))
             .andExpect(jsonPath("$.approvedBy").value("boundary.review"))
             .andExpect(jsonPath("$.approvalNote").value("North standard review accepted"))
-            .andExpect(jsonPath("$.executionReady").value(true));
+            .andExpect(jsonPath("$.executionReady").value(false));
 
         ScenarioRun northAfter = scenarioRunRepository.findById(northPlanId).orElseThrow();
         assertThat(northAfter.getApprovedBy()).isEqualTo("boundary.review");
@@ -1840,7 +1892,7 @@ class PlatformTenantAccessBoundaryIntegrationTest {
             .andExpect(jsonPath("$.approvalStage").value("APPROVED"))
             .andExpect(jsonPath("$.approvalStatus").value("APPROVED"))
             .andExpect(jsonPath("$.approvedBy").value("boundary.final"))
-            .andExpect(jsonPath("$.executionReady").value(true));
+            .andExpect(jsonPath("$.executionReady").value(false));
 
         long eventsAfterNorthFinalApproval = businessEventRepository.count();
         mockMvc.perform(post("/api/scenarios/" + northPlanId + "/approve")
@@ -2559,8 +2611,8 @@ class PlatformTenantAccessBoundaryIntegrationTest {
             .andExpect(status().isBadRequest())
             .andExpect(jsonPath("$.message").value(org.hamcrest.Matchers.containsString("already been rejected")));
         mockMvc.perform(post("/api/scenarios/" + northPlanId + "/execute").session(northReviewer))
-            .andExpect(status().isBadRequest())
-            .andExpect(jsonPath("$.message").value(org.hamcrest.Matchers.containsString("approved saved plans")));
+            .andExpect(status().isGone())
+            .andExpect(jsonPath("$.message").value(org.hamcrest.Matchers.containsString("handed off for external action")));
 
         mockMvc.perform(post("/api/scenarios/save")
                 .session(tenantAdmin)

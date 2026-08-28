@@ -14,7 +14,7 @@ export const publicPages = [
     audience: 'public',
     label: 'Product',
     title: 'One operating system across orders, stock, fulfillment, recovery, and control.',
-    description: 'See how SynapseCore turns live business activity into an enterprise command surface for decisions, operational recovery, and execution.',
+    description: 'See how SynapseCore turns live business activity into an enterprise command surface for decisions, operational recovery, and external handoff.',
     focus: ['Operational awareness', 'Action guidance', 'Trust layer'],
   },
   {
@@ -383,7 +383,7 @@ export const pageSectionMap = {
     { label: 'Delivery support', targetId: 'workspace-page-focus' },
   ],
   'scenario-history': [
-    { label: 'Execution memory', targetId: 'scenario-history-evidence' },
+    { label: 'Decision memory', targetId: 'scenario-history-evidence' },
     { label: 'Scenario records', targetId: 'scenario-history-evidence' },
     { label: 'Action console', targetId: 'workspace-page-focus' },
   ],

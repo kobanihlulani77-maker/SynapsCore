@@ -242,7 +242,7 @@ export default function WorkspaceUtilityRail({ context }) {
           metrics: [
             { label: 'History', value: scenarioHistoryItems.length },
             { label: 'Revisions', value: scenarioHistoryItems.filter((scenario) => scenario.revisionNumber).length },
-            { label: 'Executable', value: scenarioHistoryItems.filter((scenario) => scenario.executable).length },
+            { label: 'Approved', value: scenarioHistoryItems.filter((scenario) => scenario.approvalStatus === 'APPROVED').length },
             { label: 'Escalated', value: scenarioHistoryItems.filter((scenario) => scenario.slaEscalated).length },
           ],
           actions: [{ title: 'Open planner', note: 'Shift from saved memory back into the decision lab.', target: 'scenarios' }],

@@ -1270,8 +1270,8 @@ class MvpFlowIntegrationTest {
 
         mockMvc.perform(post("/api/scenarios/" + scenarioRunId + "/execute")
                 .with(accessHeaders("Naledi Lead", "REVIEW_OWNER")))
-            .andExpect(status().isBadRequest())
-            .andExpect(jsonPath("$.message").value(org.hamcrest.Matchers.containsString("approved saved plans")));
+            .andExpect(status().isGone())
+            .andExpect(jsonPath("$.message").value(org.hamcrest.Matchers.containsString("handed off for external action")));
 
         mockMvc.perform(post("/api/scenarios/" + scenarioRunId + "/approve")
                 .with(accessHeaders("Naledi Lead", "REVIEW_OWNER"))
@@ -1301,7 +1301,7 @@ class MvpFlowIntegrationTest {
     }
 
     @Test
-    void executableScenarioPreviewCanBeLoadedBackIntoPlanner() throws Exception {
+    void scenarioPreviewCanBeLoadedBackIntoPlanner() throws Exception {
         String previewBody = """
             {
               "warehouseCode": "WH-NORTH",
@@ -1343,14 +1343,14 @@ class MvpFlowIntegrationTest {
     }
 
     @Test
-    void savedScenarioPlanRequiresApprovalBeforeExecution() throws Exception {
+    void savedScenarioPlanRequiresApprovalBeforeExternalHandoff() throws Exception {
         Inventory inventoryBefore = loadInventory("SKU-FLX-100", "WH-NORTH");
         long startingQuantity = inventoryBefore.getQuantityAvailable();
         long startingOrders = customerOrderRepository.count();
 
         String saveBody = """
             {
-              "title": "North execution candidate",
+              "title": "North replenishment candidate",
               "requestedBy": "Lebo Planner",
               "reviewOwner": "Naledi Lead",
               "request": {
@@ -1380,14 +1380,14 @@ class MvpFlowIntegrationTest {
         mockMvc.perform(get("/api/scenarios/" + savedPlanId + "/request"))
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.scenarioRunId").value(savedPlanId))
-            .andExpect(jsonPath("$.scenarioTitle").value("North execution candidate"))
+            .andExpect(jsonPath("$.scenarioTitle").value("North replenishment candidate"))
             .andExpect(jsonPath("$.request.warehouseCode").value("WH-NORTH"))
             .andExpect(jsonPath("$.request.items[0].quantity").value(3));
 
         mockMvc.perform(post("/api/scenarios/" + savedPlanId + "/execute")
                 .with(accessHeaders("Naledi Lead", "REVIEW_OWNER")))
-            .andExpect(status().isBadRequest())
-            .andExpect(jsonPath("$.message").value(org.hamcrest.Matchers.containsString("approved saved plans")));
+            .andExpect(status().isGone())
+            .andExpect(jsonPath("$.message").value(org.hamcrest.Matchers.containsString("handed off for external action")));
 
         mockMvc.perform(post("/api/scenarios/" + savedPlanId + "/approve")
                 .with(accessHeaders("Naledi Lead", "REVIEW_OWNER"))
@@ -1409,22 +1409,21 @@ class MvpFlowIntegrationTest {
             .andExpect(jsonPath("$[0].type").value("SAVED_PLAN"))
             .andExpect(jsonPath("$[0].approvalStatus").value("APPROVED"))
             .andExpect(jsonPath("$[0].approvedBy").value("Naledi Lead"))
-            .andExpect(jsonPath("$[0].executable").value(true));
+            .andExpect(jsonPath("$[0].executable").value(false));
 
         mockMvc.perform(post("/api/scenarios/" + savedPlanId + "/execute")
                 .with(accessHeaders("Naledi Lead", "REVIEW_OWNER")))
-            .andExpect(status().isOk())
-            .andExpect(jsonPath("$.scenarioRunId").value(savedPlanId))
-            .andExpect(jsonPath("$.order.warehouseCode").value("WH-NORTH"))
-            .andExpect(jsonPath("$.order.itemCount").value(3));
+            .andExpect(status().isGone())
+            .andExpect(jsonPath("$.message").value(org.hamcrest.Matchers.containsString("handed off for external action")));
 
         Inventory inventoryAfter = loadInventory("SKU-FLX-100", "WH-NORTH");
-        assertThat(inventoryAfter.getQuantityAvailable()).isEqualTo(startingQuantity - 3);
-        assertThat(customerOrderRepository.count()).isEqualTo(startingOrders + 1);
+        assertThat(inventoryAfter.getQuantityAvailable()).isEqualTo(startingQuantity);
+        assertThat(customerOrderRepository.count()).isEqualTo(startingOrders);
 
         assertThat(businessEventRepository.findTop20ByOrderByCreatedAtDesc())
             .extracting(event -> event.getEventType())
-            .contains(BusinessEventType.SCENARIO_SAVED, BusinessEventType.SCENARIO_APPROVED, BusinessEventType.SCENARIO_EXECUTED);
+            .contains(BusinessEventType.SCENARIO_SAVED, BusinessEventType.SCENARIO_APPROVED)
+            .doesNotContain(BusinessEventType.SCENARIO_EXECUTED);
     }
 
     @Test
@@ -1514,8 +1513,8 @@ class MvpFlowIntegrationTest {
 
         mockMvc.perform(post("/api/scenarios/" + savedPlanId + "/execute")
                 .with(accessHeaders("Naledi Lead", "REVIEW_OWNER")))
-            .andExpect(status().isBadRequest())
-            .andExpect(jsonPath("$.message").value(org.hamcrest.Matchers.containsString("approved saved plans")));
+            .andExpect(status().isGone())
+            .andExpect(jsonPath("$.message").value(org.hamcrest.Matchers.containsString("handed off for external action")));
 
         assertThat(businessEventRepository.findTop20ByOrderByCreatedAtDesc())
             .extracting(event -> event.getEventType())
@@ -1688,7 +1687,7 @@ class MvpFlowIntegrationTest {
             .andExpect(jsonPath("$[0].requestedBy").value("Thando Planner"))
             .andExpect(jsonPath("$[0].reviewOwner").value("Naledi Lead"))
             .andExpect(jsonPath("$[0].approvalStatus").value("APPROVED"))
-            .andExpect(jsonPath("$[0].executable").value(true));
+            .andExpect(jsonPath("$[0].executable").value(false));
     }
 
     @Test
@@ -1909,8 +1908,8 @@ class MvpFlowIntegrationTest {
 
         mockMvc.perform(post("/api/scenarios/" + scenarioId + "/execute")
                 .with(accessHeaders("Naledi Lead", "REVIEW_OWNER")))
-            .andExpect(status().isBadRequest())
-            .andExpect(jsonPath("$.message").value(org.hamcrest.Matchers.containsString("cannot be executed")));
+            .andExpect(status().isGone())
+            .andExpect(jsonPath("$.message").value(org.hamcrest.Matchers.containsString("handed off for external action")));
 
         mockMvc.perform(get("/api/scenarios/history")
                 .param("approvalPolicy", "ESCALATED")
@@ -2079,7 +2078,7 @@ class MvpFlowIntegrationTest {
             .andExpect(jsonPath("$.slaEscalated").value(true))
             .andExpect(jsonPath("$.slaEscalatedTo").value("Lebo Ops"))
             .andExpect(jsonPath("$.overdue").value(false))
-            .andExpect(jsonPath("$.executionReady").value(true));
+            .andExpect(jsonPath("$.executionReady").value(false));
 
         assertThat(businessEventRepository.findTop20ByOrderByCreatedAtDesc())
             .extracting(event -> event.getEventType())
@@ -2263,8 +2262,8 @@ class MvpFlowIntegrationTest {
 
         mockMvc.perform(post("/api/scenarios/" + comparisonScenarioId + "/execute")
                 .with(accessHeaders("Naledi Lead", "REVIEW_OWNER")))
-            .andExpect(status().isBadRequest())
-            .andExpect(jsonPath("$.message").value(org.hamcrest.Matchers.containsString("cannot be executed")));
+            .andExpect(status().isGone())
+            .andExpect(jsonPath("$.message").value(org.hamcrest.Matchers.containsString("handed off for external action")));
     }
 
     @Test

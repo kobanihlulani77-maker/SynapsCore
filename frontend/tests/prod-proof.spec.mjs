@@ -2240,65 +2240,6 @@ async function pageWait(timeoutMs) {
   await new Promise((resolve) => setTimeout(resolve, timeoutMs))
 }
 
-async function executeScenarioAndWaitForOrder(page, api, scenarioFixture, scenarioActionConsole, testInfo) {
-  const pageDiagnostics = ensurePageDiagnostics(page)
-  const executeButton = scenarioActionConsole.getByRole('button', { name: 'Execute Scenario' })
-  const executeResponsePromise = page.waitForResponse((response) => (
-    response.request().method() === 'POST'
-      && new RegExp(`/api/scenarios/${scenarioFixture.scenarioId}/execute$`, 'i').test(response.url())
-  ), { timeout: 30_000 })
-
-  await expect(executeButton).toBeVisible()
-  await executeButton.click()
-
-  const executeResponse = await executeResponsePromise
-  const executeResponseText = await executeResponse.text()
-  let executePayload = null
-  try {
-    executePayload = executeResponseText ? JSON.parse(executeResponseText) : null
-  } catch {
-    executePayload = null
-  }
-
-  const executeResponseDetails = {
-    status: executeResponse.status(),
-    requestId: executeResponse.headers()['x-request-id'] || executePayload?.requestId || null,
-    responseBody: executePayload ?? executeResponseText,
-    scenarioId: scenarioFixture.scenarioId,
-    scenarioTitle: scenarioFixture.title,
-  }
-
-  if (!executeResponse.ok()) {
-    throw new Error(`Scenario execution request failed. Diagnostics: ${JSON.stringify(executeResponseDetails)}`)
-  }
-
-  const executedOrder = executePayload?.order || null
-  if (!executedOrder?.externalOrderId) {
-    throw new Error(`Scenario execution response did not include a live order. Diagnostics: ${JSON.stringify(executeResponseDetails)}`)
-  }
-
-  const durableOrderCoverage = await waitForOrderReadModelCoverage(
-    api,
-    executedOrder.externalOrderId,
-    `Expected executed scenario order ${executedOrder.externalOrderId} to appear in /api/orders/recent before the orders UI assertion.`,
-  )
-
-  await expect(page.locator('.success-text').filter({
-    hasText: new RegExp(`^Executed ${escapeRegExp(scenarioFixture.title)} as live order ${escapeRegExp(executedOrder.externalOrderId)}\\.$`, 'i'),
-  }).first()).toBeVisible({ timeout: 2_500 }).catch(() => {})
-
-  await navigateWithinApp(page, '/orders')
-  await expect(page.getByRole('heading', { level: 1, name: 'Live order operations' })).toBeVisible()
-  await waitForOrdersPageOrderVisible(page, durableOrderCoverage.order, testInfo, api)
-
-  return {
-    executeResponseDetails,
-    executedOrder,
-    durableOrderCoverage,
-    lastApiResponse: pageDiagnostics.lastApiResponse,
-  }
-}
-
 async function waitForApprovedScenarioCoverage(api, scenarioFixture, message) {
   const startedAt = Date.now()
   let latestCoverage = null
@@ -2334,7 +2275,7 @@ async function waitForApprovedScenarioCoverage(api, scenarioFixture, message) {
         : [],
     }
 
-    if (scenarioRun?.approvalStatus === 'APPROVED' && scenarioRun?.executable) {
+    if (scenarioRun?.approvalStatus === 'APPROVED' && scenarioRun?.executable === false) {
       return scenarioRun
     }
 
@@ -2344,8 +2285,7 @@ async function waitForApprovedScenarioCoverage(api, scenarioFixture, message) {
   throw new Error(`${message} Diagnostics: ${JSON.stringify(latestCoverage)}`)
 }
 
-async function approveScenarioAndWaitForExecutionReadiness(page, api, scenarioFixture, scenarioActionConsole) {
-  const pageDiagnostics = ensurePageDiagnostics(page)
+async function approveScenarioAndWaitForExternalHandoff(page, api, scenarioFixture, scenarioActionConsole) {
   const approveButton = scenarioActionConsole.getByRole('button', { name: 'Approve Plan' })
 
   await expect(approveButton).toBeVisible()
@@ -2354,16 +2294,15 @@ async function approveScenarioAndWaitForExecutionReadiness(page, api, scenarioFi
   const approvedScenario = await waitForApprovedScenarioCoverage(
     api,
     scenarioFixture,
-    `Expected scenario ${scenarioFixture.title} to become approved and execution-ready in scenario history after approval.`,
+    `Expected scenario ${scenarioFixture.title} to become governed and ready for external action after approval.`,
   )
 
   await expect(page.locator('.success-text').filter({
-    hasText: new RegExp(`^Approved ${escapeRegExp(scenarioFixture.title)} for execution under Standard approval\\.$`, 'i'),
+    hasText: new RegExp(`^Approved decision ${escapeRegExp(scenarioFixture.title)} is governed and ready for external action under Standard approval\\.$`, 'i'),
   }).first()).toBeVisible({ timeout: 2_500 }).catch(() => {})
 
   return {
     approvedScenario,
-    lastApiResponse: pageDiagnostics.lastApiResponse,
   }
 }
 
@@ -2811,20 +2750,19 @@ test('replay recovery, scenario approval, execution, and browser role gating wor
       has: page.getByText(scenarioFixture.title),
     }).first()
     await expect(scenarioActionConsole).toBeVisible()
-    await approveScenarioAndWaitForExecutionReadiness(page, scenarioFixture.api, scenarioFixture, scenarioActionConsole)
+    await approveScenarioAndWaitForExternalHandoff(page, scenarioFixture.api, scenarioFixture, scenarioActionConsole)
 
     await refreshWorkspace(page)
-    const executableScenarioCard = await waitForScenarioHistoryCard(page, scenarioFixture.title)
-    await activateSelectableButton(executableScenarioCard)
+    const approvedScenarioCard = await waitForScenarioHistoryCard(page, scenarioFixture.title)
+    await activateSelectableButton(approvedScenarioCard)
 
-    const executableScenarioActionConsole = page.locator('.section-card').filter({
+    const approvedScenarioActionConsole = page.locator('.section-card').filter({
       hasText: 'Scenario action console',
       has: page.getByText(scenarioFixture.title),
     }).first()
-    await expect(executableScenarioActionConsole).toBeVisible()
-    await expect(executableScenarioActionConsole.getByRole('button', { name: 'Execute Scenario' })).toBeVisible()
-
-    await executeScenarioAndWaitForOrder(page, scenarioFixture.api, scenarioFixture, executableScenarioActionConsole, testInfo)
+    await expect(approvedScenarioActionConsole).toBeVisible()
+    await expect(approvedScenarioActionConsole.getByRole('button', { name: 'Execute Scenario' })).toHaveCount(0)
+    await expect(approvedScenarioActionConsole).toContainText('ready for external operational follow-through')
   } finally {
     await scenarioFixture.api.dispose()
   }

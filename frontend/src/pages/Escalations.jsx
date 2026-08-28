@@ -34,10 +34,10 @@ export default function EscalationsPage({ context }) {
           stateTone={pageError ? 'status-failure' : pageLoading ? 'status-partial' : snapshot.slaEscalations.length || systemIncidents.length ? 'status-partial' : 'status-success'}
           stateDetail={pageLoading ? 'Escalation and incident records are still loading.' : pageError ? 'The escalation read is unavailable; do not interpret the visible count as zero.' : `${snapshot.slaEscalations.length + systemIncidents.length} escalation or runtime incident record${snapshot.slaEscalations.length + systemIncidents.length === 1 ? '' : 's'} are visible.`}
           attention={selectedEscalationScenario ? `${selectedEscalationScenario.title} is waiting on explicit ownership and governance follow-through.` : systemIncidents.length ? 'Review runtime incident evidence before treating the inbox as clear.' : 'No active escalation record is currently returned.'}
-          nextAction={selectedEscalationScenario ? 'Acknowledge ownership only when assigned; use Approvals or the current scenario surface for approval and execution.' : 'Monitor this inbox and inspect Runtime when a system incident appears.'}
+          nextAction={selectedEscalationScenario ? 'Acknowledge ownership only when assigned; use Approvals or the current scenario surface for governance decisions.' : 'Monitor this inbox and inspect Runtime when a system incident appears.'}
           evidence="Escalation records expose timing, owner, stage, and related workflow evidence where available; they do not establish an SLA breach unless the backend state says so."
-          role="Acknowledge Escalation is separate from Approve Plan and Execute Scenario; each action keeps its own backend authority boundary."
-          limitation="Do not use escalation acknowledgment as a substitute for scenario approval or execution."
+          role="Acknowledge Escalation is separate from Approve Plan and Reject Plan; each action keeps its own backend authority boundary."
+          limitation="Do not use escalation acknowledgment as a substitute for scenario governance or external operational follow-through."
         />
         <div className="approval-board">
           {escalatedScenarios.map((scenario) => (

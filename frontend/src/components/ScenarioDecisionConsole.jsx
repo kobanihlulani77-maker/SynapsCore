@@ -4,7 +4,6 @@ export default function ScenarioDecisionConsole({ scenario, title, emptyMessage,
     getScenarioRejectionRole,
     scenarioApprovalState,
     scenarioRejectionState,
-    scenarioExecutionState,
     scenarioEscalationAckState,
     scenarioLoadState,
     signedInSession,
@@ -16,7 +15,6 @@ export default function ScenarioDecisionConsole({ scenario, title, emptyMessage,
     formatTimestamp,
     approveScenarioPlan,
     rejectScenarioPlan,
-    executeScenario,
     acknowledgeScenarioEscalation,
     loadScenarioIntoPlanner,
     setScenarioReviewNote,
@@ -45,8 +43,6 @@ export default function ScenarioDecisionConsole({ scenario, title, emptyMessage,
   const canLoadScenario = Boolean(scenario.loadable)
   const canApproveScenario = scenario.type === 'SAVED_PLAN' && scenario.approvalStatus === 'PENDING_APPROVAL'
   const canRejectScenario = scenario.type === 'SAVED_PLAN' && scenario.approvalStatus === 'PENDING_APPROVAL'
-  const canExecuteScenario = scenario.type !== 'PREVIEW' && Boolean(scenario.executable)
-    && (signedInRoles.includes('REVIEW_OWNER') || signedInRoles.includes('FINAL_APPROVER'))
   const canAcknowledgeEscalation = Boolean(scenario.slaEscalated && !scenario.slaAcknowledged)
   const assignedApprovalOwner = scenario.approvalStage === 'PENDING_FINAL_APPROVAL'
     ? scenario.finalApprovalOwner
@@ -60,8 +56,6 @@ export default function ScenarioDecisionConsole({ scenario, title, emptyMessage,
       : `${approvalActionLabel} needs ${formatCodeLabel(approvalRole)} authority${approvalNoteRequired ? ' and a decision note' : ''}.`
       : scenario.type === 'PREVIEW'
         ? 'PREVIEW is analysis only and cannot be executed. Save a governed plan if the proposed change should enter approval.'
-        : canExecuteScenario
-      ? 'Execute Scenario moves an approved plan into the supported live execution path.'
       : canRejectScenario
         ? `Reject Plan needs ${formatCodeLabel(rejectionRole)} authority and a decision note.`
         : canLoadScenario
@@ -157,14 +151,14 @@ export default function ScenarioDecisionConsole({ scenario, title, emptyMessage,
           {scenario.approvalStatus === 'PENDING_APPROVAL'
             ? 'Approval moves the plan forward under its policy; rejection prevents this saved plan version from proceeding.'
             : scenario.type === 'PREVIEW'
-              ? 'Preview output is evidence for analysis only. Execution requires a saved, approved governed state.'
-              : scenario.executable
-              ? 'Execution is separate from approval and should be used only when the operator is ready to apply the approved plan.'
-              : 'This surface keeps the decision evidence visible even when no action is currently available.'}
+              ? 'Preview output is evidence for analysis only. It does not represent an operational change.'
+              : scenario.approvalStatus === 'APPROVED'
+                ? 'Governance is complete. The approved decision is ready for external operational follow-through.'
+                : 'This surface keeps the decision evidence visible even when no action is currently available.'}
         </p>
       </div>
       {surface === 'escalation' ? (
-        <p className="muted-text">Escalation acknowledgment records ownership of the escalation only. Approval, rejection, and execution remain separate governed actions and are available only when the current scenario state and role permit them.</p>
+        <p className="muted-text">Escalation acknowledgment records ownership of the escalation only. Approval and rejection remain governed decisions; external operational action stays outside SynapseCore.</p>
       ) : null}
       <div className="session-control-row">
         <label className="field planner-name-field">
@@ -188,8 +182,6 @@ export default function ScenarioDecisionConsole({ scenario, title, emptyMessage,
       {scenarioApprovalState.success ? <p className="success-text">{scenarioApprovalState.success}</p> : null}
       {scenarioRejectionState.error ? <p className="error-text">{scenarioRejectionState.error}</p> : null}
       {scenarioRejectionState.success ? <p className="success-text">{scenarioRejectionState.success}</p> : null}
-      {scenarioExecutionState.error ? <p className="error-text">{scenarioExecutionState.error}</p> : null}
-      {scenarioExecutionState.success ? <p className="success-text">{scenarioExecutionState.success}</p> : null}
       {scenarioEscalationAckState.error ? <p className="error-text">{scenarioEscalationAckState.error}</p> : null}
       {scenarioEscalationAckState.success ? <p className="success-text">{scenarioEscalationAckState.success}</p> : null}
       <div className="history-action-row scenario-action-row" aria-label="Scenario action controls">
@@ -208,11 +200,6 @@ export default function ScenarioDecisionConsole({ scenario, title, emptyMessage,
             {scenarioRejectionState.loadingId === scenario.id ? 'Rejecting...' : 'Reject Plan'}
           </button>
         ) : null}
-        {canExecuteScenario ? (
-          <button className="secondary-button" onClick={() => executeScenario(scenario.id)} disabled={scenarioExecutionState.loadingId === scenario.id} type="button">
-            {scenarioExecutionState.loadingId === scenario.id ? 'Executing...' : 'Execute Scenario'}
-          </button>
-        ) : null}
         {canAcknowledgeEscalation ? (
           <button className="approve-button" onClick={() => acknowledgeScenarioEscalation(scenario.id)} disabled={escalationDisabled} type="button">
             {scenarioEscalationAckState.loadingId === scenario.id ? 'Acknowledging...' : 'Acknowledge Escalation'}
@@ -224,10 +211,12 @@ export default function ScenarioDecisionConsole({ scenario, title, emptyMessage,
         {rejectionBlocker ? <p className={rejectionDisabled ? 'muted-text' : 'success-text'}>{rejectionBlocker}</p> : null}
         {escalationBlocker ? <p className={escalationDisabled ? 'muted-text' : 'success-text'}>{escalationBlocker}</p> : null}
       </div>
-      {!canLoadScenario && !canApproveScenario && !canRejectScenario && !canExecuteScenario && !canAcknowledgeEscalation ? (
+      {!canLoadScenario && !canApproveScenario && !canRejectScenario && !canAcknowledgeEscalation ? (
         <p className="muted-text">{scenario.type === 'PREVIEW'
-          ? 'This preview is visible for analysis only. It must be saved and governed before any execution path exists.'
-          : 'This scenario is visible for traceability and comparison, but it does not need another live action right now.'}</p>
+          ? 'This preview is visible for analysis only. Save it for governance if the decision needs review.'
+          : scenario.approvalStatus === 'APPROVED'
+            ? 'Governance is complete. The approved decision is ready for external operational follow-through.'
+            : 'This scenario is visible for traceability and comparison, but it does not need another governance action right now.'}</p>
       ) : null}
     </article>
   )

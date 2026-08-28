@@ -27,7 +27,12 @@ foreach ($file in $docFiles) {
             continue
         }
 
-        $resolved = [System.IO.Path]::GetFullPath((Join-Path (Split-Path -Parent $file) $relativeTarget))
+        if ($relativeTarget -match '^/[A-Za-z]:[\\/]') {
+            $resolved = [System.IO.Path]::GetFullPath($relativeTarget.Substring(1).Replace('/', '\\'))
+        }
+        else {
+            $resolved = [System.IO.Path]::GetFullPath((Join-Path (Split-Path -Parent $file) $relativeTarget))
+        }
         $checkedLinks++
         if (-not (Test-Path -LiteralPath $resolved)) {
             $missingLinks += [pscustomobject]@{

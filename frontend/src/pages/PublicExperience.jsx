@@ -135,7 +135,7 @@ const commandLanes = [
   },
   {
     title: 'Approvals and runtime',
-    lines: ['Scenario execution path', 'Operational escalations', 'Incident and release trust'],
+    lines: ['Scenario decision path', 'Operational escalations', 'Incident and release trust'],
   },
 ]
 

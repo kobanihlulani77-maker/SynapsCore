@@ -65,7 +65,6 @@ export default function useWorkspaceState({ initialPage }) {
   const [scenarioRevisionSource, setScenarioRevisionSource] = useState(null)
   const [scenarioState, setScenarioState] = useState(emptyRequestState)
   const [comparisonState, setComparisonState] = useState(emptyRequestState)
-  const [scenarioExecutionState, setScenarioExecutionState] = useState({ loadingId: null, error: '', success: '' })
   const [scenarioLoadState, setScenarioLoadState] = useState({ loadingId: null, error: '', success: '' })
   const [scenarioSaveState, setScenarioSaveState] = useState({ loading: false, error: '', success: '' })
   const [scenarioApprovalState, setScenarioApprovalState] = useState({ loadingId: null, error: '', success: '' })
@@ -247,8 +246,6 @@ export default function useWorkspaceState({ initialPage }) {
     setScenarioState,
     comparisonState,
     setComparisonState,
-    scenarioExecutionState,
-    setScenarioExecutionState,
     scenarioLoadState,
     setScenarioLoadState,
     scenarioSaveState,

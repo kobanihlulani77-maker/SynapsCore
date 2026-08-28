@@ -23,7 +23,6 @@ export default function useScenarioActions({
   setComparisonState,
   setScenarioApprovalState,
   setScenarioEscalationAckState,
-  setScenarioExecutionState,
   setScenarioForm,
   setScenarioLoadState,
   setScenarioPlanName,
@@ -70,21 +69,6 @@ export default function useScenarioActions({
       await Promise.all([refreshSnapshotQuietly(), refreshScenarioHistoryQuietly()])
     } catch (error) {
       setComparisonState({ loading: false, error: error.message, result: null })
-    }
-  }
-
-  async function executeScenario(scenarioId) {
-    setScenarioExecutionState({ loadingId: scenarioId, error: '', success: '' })
-    try {
-      const payload = await fetchJson(`/api/scenarios/${scenarioId}/execute`, { method: 'POST' })
-      setScenarioExecutionState({
-        loadingId: null,
-        error: '',
-        success: `Executed ${payload.scenarioTitle} as live order ${payload.order.externalOrderId}.`,
-      })
-      await Promise.all([fetchSnapshot(), refreshScenarioHistoryQuietly()])
-    } catch (error) {
-      setScenarioExecutionState({ loadingId: null, error: error.message, success: '' })
     }
   }
 
@@ -166,8 +150,8 @@ export default function useScenarioActions({
       setScenarioApprovalState({
         loadingId: null,
         error: '',
-        success: payload.executionReady
-          ? `Approved ${payload.title} for execution under ${formatCodeLabel(payload.approvalPolicy)} approval.`
+        success: payload.approvalStatus === 'APPROVED'
+          ? `Approved decision ${payload.title} is governed and ready for external action under ${formatCodeLabel(payload.approvalPolicy)} approval.`
           : `Recorded owner review for ${payload.title}. Final approval is still required by ${payload.finalApprovalOwner || 'the assigned final approver'} before ${formatTimestamp(payload.approvalDueAt)}.`,
       })
       await Promise.all([fetchSnapshot(), refreshScenarioHistoryQuietly()])
@@ -217,7 +201,6 @@ export default function useScenarioActions({
   return {
     analyzeScenario,
     compareScenarios,
-    executeScenario,
     loadScenarioIntoPlanner,
     saveScenarioPlan,
     approveScenarioPlan,

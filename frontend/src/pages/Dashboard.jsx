@@ -193,7 +193,7 @@ export default function DashboardPage({ context }) {
       id: 'approval-pending',
       tag: 'Approvals',
       title: `${pendingApprovalScenarios.length} scenario${pendingApprovalScenarios.length === 1 ? '' : 's'} awaiting decision`,
-      note: 'Review approval posture before the team expects execution to move.',
+      note: 'Review approval posture before the team hands a decision off externally.',
        target: approvalDestination,
        actionLabel: approvalActionLabel,
       tone: 'status-partial',
@@ -355,7 +355,7 @@ export default function DashboardPage({ context }) {
       tone: pendingApprovalScenarios.length ? 'status-partial' : 'status-success',
       status: pendingApprovalScenarios.length ? 'Attention needed' : 'Clear',
       body: pendingApprovalScenarios.length
-        ? `${pendingApprovalScenarios.length} plan${pendingApprovalScenarios.length === 1 ? '' : 's'} are waiting for approval routing or execution readiness.`
+        ? `${pendingApprovalScenarios.length} plan${pendingApprovalScenarios.length === 1 ? '' : 's'} are waiting for approval routing or external handoff readiness.`
         : 'Scenario planning and approval routing are ready when the team starts modelling operational changes.',
       metrics: [
         `${pendingApprovalScenarios.length} pending`,

@@ -40,13 +40,13 @@ export default function ScenarioControlPage({ context }) {
               </span>
               <h2>{leadScenario ? leadScenario.title : 'No scenario governance blockers.'}</h2>
             </div>
-            <p>{leadScenario ? leadScenario.summary : 'Planning, approval, escalation, and execution history remain available for traceability.'}</p>
+              <p>{leadScenario ? leadScenario.summary : 'Planning, approval, escalation, and external handoff history remain available for traceability.'}</p>
           </div>
           <div className="workflow-action-console">
             <div className="workflow-action-card">
               <span>Next review pressure</span>
               <strong>{currentGovernanceCount} active decision{currentGovernanceCount === 1 ? '' : 's'}</strong>
-              <p>{overdueScenarios.length ? 'Resolve overdue governance before relying on pending execution paths.' : 'Use the approval board below to inspect current planning posture.'}</p>
+            <p>{overdueScenarios.length ? 'Resolve overdue governance before handing a decision off externally.' : 'Use the approval board below to inspect current planning posture.'}</p>
             </div>
           </div>
         </div>

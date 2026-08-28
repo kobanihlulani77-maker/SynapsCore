@@ -6,7 +6,6 @@ export default function ScenarioPlannerPage({ context }) {
     isScenariosPage,
     comparisonState,
     scenarioState,
-    scenarioExecutionState,
     scenarioLoadState,
     scenarioSaveState,
     scenarioApprovalState,
@@ -66,7 +65,7 @@ export default function ScenarioPlannerPage({ context }) {
       : 'Preview Scenario A before the plan moves toward approval.'
   const previewBoundary = scenarioState.result
     ? 'PREVIEW ONLY — NOT EXECUTABLE. Review projected impact, then save the plan if it should enter governance.'
-    : 'PREVIEW is analysis only. It never grants execution authority or bypasses approval.'
+    : 'PREVIEW is analysis only. It never represents an executed operation or bypasses approval.'
   const saveBlockedReason = !primaryContext.inputValid
     ? 'Scenario A inputs are incomplete.'
     : !scenarioPlanName.trim()
@@ -271,8 +270,6 @@ export default function ScenarioPlannerPage({ context }) {
         </div>
         {scenarioState.error ? <p className="error-text">{scenarioState.error}</p> : null}
         {comparisonState.error ? <p className="error-text">{comparisonState.error}</p> : null}
-        {scenarioExecutionState.error ? <p className="error-text">{scenarioExecutionState.error}</p> : null}
-        {scenarioExecutionState.success ? <p className="success-text">{scenarioExecutionState.success}</p> : null}
         {scenarioLoadState.error ? <p className="error-text">{scenarioLoadState.error}</p> : null}
         {scenarioLoadState.success ? <p className="success-text">{scenarioLoadState.success}</p> : null}
         {scenarioSaveState.error ? <p className="error-text">{scenarioSaveState.error}</p> : null}

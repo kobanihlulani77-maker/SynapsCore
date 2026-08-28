@@ -91,15 +91,6 @@ public class AccessControlService {
         );
     }
 
-    public SynapseActorContext requireScenarioExecutor(String warehouseCode, String actionDescription) {
-        SynapseActorContext actor = requireAnyRole(
-            Set.of(SynapseAccessRole.REVIEW_OWNER, SynapseAccessRole.FINAL_APPROVER),
-            actionDescription
-        );
-        requireWorkspaceWarehouseAccess(warehouseCode, actionDescription);
-        return actor;
-    }
-
     public SynapseActorContext requireTenantAdminControl(String actionDescription) {
         AccessOperator operator = requireCurrentOperator(actionDescription);
         if (operator == null) {

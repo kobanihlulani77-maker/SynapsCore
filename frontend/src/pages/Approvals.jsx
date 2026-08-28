@@ -33,13 +33,13 @@ export default function ApprovalsPage({ context }) {
   const selectedDecisionConsequence = !selectedApprovalScenario
     ? 'Select a pending or overdue decision to see the consequence before acting.'
     : selectedApprovalScenario.approvalPolicy === 'ESCALATED' && selectedApprovalScenario.approvalStage === 'PENDING_REVIEW'
-      ? 'Approval records owner review and may still require final approval before execution.'
+      ? 'Approval records owner review and may still require final approval before the decision is handed off externally.'
       : selectedApprovalScenario.approvalPolicy === 'ESCALATED'
-        ? 'Approval may clear the final governance step and make the scenario eligible for execution.'
-        : selectedApprovalScenario.executable
-          ? 'This plan is already approved for execution; use the scenario action console when ready.'
+        ? 'Approval completes the final governance step and marks the decision ready for external action.'
+        : selectedApprovalScenario.approvalStatus === 'APPROVED'
+          ? 'Governance is complete; the approved decision is ready for external operational follow-through.'
           : selectedApprovalScenario.approvalStatus === 'PENDING_APPROVAL'
-            ? 'Approval can move this saved plan toward execution eligibility. Rejection prevents this version from proceeding.'
+            ? 'Approval can move this saved plan through governance. Rejection prevents this version from proceeding.'
             : 'This item is visible for decision history and traceability.'
   const selectedAssignment = selectedApprovalScenario
     ? selectedApprovalScenario.approvalStage === 'PENDING_FINAL_APPROVAL'
@@ -99,7 +99,7 @@ export default function ApprovalsPage({ context }) {
 
         <div className="summary-grid compact-summary-grid">
           <MetricCard label="Pending" value={pendingApprovalScenarios.length} accent="amber" note="Plans still waiting on review or final approval." />
-          <MetricCard label="Approved" value={approvedScenarios.length} accent="teal" note="Plans already approved and available for execution or traceability." />
+          <MetricCard label="Approved" value={approvedScenarios.length} accent="teal" note="Plans with governance complete and external follow-through still outstanding." />
           <MetricCard label="Rejected" value={rejectedScenarios.length} accent="rose" note="Plans routed back or closed out with a rejection decision." />
           <MetricCard label="Overdue" value={overdueScenarios.length} accent="orange" note="Plans that have already breached expected approval timing." />
         </div>

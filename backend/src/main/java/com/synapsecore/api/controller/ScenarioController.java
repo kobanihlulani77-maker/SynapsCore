@@ -8,14 +8,12 @@ import com.synapsecore.domain.entity.ScenarioRunType;
 import com.synapsecore.domain.dto.OrderCreateRequest;
 import com.synapsecore.access.AccessControlService;
 import com.synapsecore.scenario.ScenarioAnalysisService;
-import com.synapsecore.scenario.ScenarioExecutionService;
 import com.synapsecore.scenario.ScenarioHistoryService;
 import com.synapsecore.scenario.dto.ScenarioApprovalRequest;
 import com.synapsecore.scenario.dto.ScenarioApprovalResponse;
 import com.synapsecore.scenario.dto.ScenarioCompareRequest;
 import com.synapsecore.scenario.dto.ScenarioComparisonResponse;
 import com.synapsecore.scenario.dto.ScenarioEscalationAcknowledgementRequest;
-import com.synapsecore.scenario.dto.ScenarioExecutionResponse;
 import com.synapsecore.scenario.dto.ScenarioHistoryFilter;
 import com.synapsecore.scenario.dto.ScenarioNotificationResponse;
 import com.synapsecore.scenario.dto.ScenarioOrderImpactResponse;
@@ -37,6 +35,7 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.server.ResponseStatusException;
 
 @RestController
 @RequestMapping("/api/scenarios")
@@ -46,7 +45,6 @@ public class ScenarioController {
     private final AccessControlService accessControlService;
     private final ScenarioAnalysisService scenarioAnalysisService;
     private final ScenarioHistoryService scenarioHistoryService;
-    private final ScenarioExecutionService scenarioExecutionService;
 
     @PostMapping("/order-impact")
     @ResponseStatus(HttpStatus.OK)
@@ -101,13 +99,13 @@ public class ScenarioController {
     }
 
     @PostMapping("/{scenarioRunId}/execute")
-    @ResponseStatus(HttpStatus.OK)
-    public ScenarioExecutionResponse executeScenario(@PathVariable long scenarioRunId) {
-        accessControlService.requireScenarioExecutor(
-            scenarioHistoryService.getScenarioRun(scenarioRunId).getWarehouseCode(),
-            "execute approved scenarios"
+    @ResponseStatus(HttpStatus.GONE)
+    public void executeScenario(@PathVariable long scenarioRunId) {
+        scenarioHistoryService.getScenarioRun(scenarioRunId);
+        throw new ResponseStatusException(
+            HttpStatus.GONE,
+            "Scenario execution is not supported. Approved decisions are handed off for external action."
         );
-        return scenarioExecutionService.execute(scenarioRunId);
     }
 
     @GetMapping("/{scenarioRunId}/request")

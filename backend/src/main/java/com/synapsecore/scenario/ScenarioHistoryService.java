@@ -12,7 +12,6 @@ import com.synapsecore.domain.entity.ScenarioApprovalPolicy;
 import com.synapsecore.domain.entity.ScenarioApprovalStage;
 import com.synapsecore.domain.entity.ScenarioReviewPriority;
 import com.synapsecore.domain.dto.OrderCreateRequest;
-import com.synapsecore.domain.dto.OrderResponse;
 import com.synapsecore.domain.repository.ScenarioRunRepository;
 import com.synapsecore.domain.entity.BusinessEventType;
 import com.synapsecore.domain.service.TenantOperationalPolicyService;
@@ -179,23 +178,6 @@ public class ScenarioHistoryService {
             .build());
     }
 
-    public ScenarioRun recordExecution(ScenarioRun sourceRun, OrderResponse order) {
-        return scenarioRunRepository.save(ScenarioRun.builder()
-            .tenant(sourceRun.getTenant() == null ? tenantContextService.getCurrentTenantOrDefault() : sourceRun.getTenant())
-            .type(ScenarioRunType.EXECUTION)
-            .title("Executed scenario: " + sourceRun.getTitle())
-            .summary("Created live order " + order.externalOrderId()
-                + " for " + order.itemCount() + " units in " + order.warehouseCode() + ".")
-            .recommendedOption(order.externalOrderId())
-            .warehouseCode(order.warehouseCode())
-            .approvalStatus(ScenarioApprovalStatus.NOT_REQUIRED)
-            .approvalPolicy(sourceRun.getApprovalPolicy())
-            .approvalStage(ScenarioApprovalStage.NOT_REQUIRED)
-            .reviewPriority(sourceRun.getReviewPriority())
-            .riskScore(sourceRun.getRiskScore())
-            .build());
-    }
-
     public ScenarioRun getScenarioRun(long scenarioRunId) {
         var currentOperator = accessDirectoryService.getCurrentOperator();
         if (currentOperator.isEmpty() && !starterProperties.isAllowDefaultTenantFallback()) {
@@ -215,11 +197,6 @@ public class ScenarioHistoryService {
                 "access scenario " + run.getId());
         }
         return run;
-    }
-
-    public OrderCreateRequest getExecutableOrderRequest(long scenarioRunId) {
-        ScenarioRun run = getScenarioRun(scenarioRunId);
-        return getExecutableOrderRequest(run);
     }
 
     public ScenarioRequestResponse getScenarioRequest(long scenarioRunId) {
@@ -309,7 +286,7 @@ public class ScenarioHistoryService {
             run.getSlaEscalatedAt(),
             isSlaEscalated(run),
             isOverdue(run),
-            isExecutable(run)
+            false
         );
     }
 
@@ -434,15 +411,6 @@ public class ScenarioHistoryService {
         return toScenarioRunResponse(run);
     }
 
-    public OrderCreateRequest getExecutableOrderRequest(ScenarioRun run) {
-        if (!isExecutable(run) || run.getRequestPayload() == null || run.getRequestPayload().isBlank()) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
-                "Scenario " + run.getId() + " cannot be executed. Only approved saved plans with stored request payloads are executable.");
-        }
-
-        return deserializeOrderRequest(run, "executed");
-    }
-
     private OrderCreateRequest getLoadableOrderRequest(ScenarioRun run) {
         if (!isLoadable(run) || run.getRequestPayload() == null || run.getRequestPayload().isBlank()) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
@@ -526,10 +494,6 @@ public class ScenarioHistoryService {
             .toList();
     }
 
-    private boolean isExecutable(ScenarioRun run) {
-        return run.getType() == ScenarioRunType.SAVED_PLAN && run.getApprovalStatus() == ScenarioApprovalStatus.APPROVED;
-    }
-
     private boolean isLoadable(ScenarioRun run) {
         return run.getType() == ScenarioRunType.PREVIEW || run.getType() == ScenarioRunType.SAVED_PLAN;
     }
@@ -545,7 +509,7 @@ public class ScenarioHistoryService {
             run.getRevisionOfScenarioRunId(),
             run.getRevisionNumber(),
             isLoadable(run) && run.getRequestPayload() != null && !run.getRequestPayload().isBlank(),
-            isExecutable(run) && run.getRequestPayload() != null && !run.getRequestPayload().isBlank(),
+            false,
             run.getApprovalStatus(),
             run.getApprovalPolicy(),
             run.getApprovalStage(),
@@ -751,7 +715,7 @@ public class ScenarioHistoryService {
 
     private String buildRecommendedOption(ScenarioOrderImpactResponse projectedImpact) {
         if (projectedImpact.projectedRecommendations().isEmpty()) {
-            return "Review and execute when ready";
+            return "Review and hand off when ready";
         }
         return projectedImpact.projectedRecommendations().get(0).title();
     }
