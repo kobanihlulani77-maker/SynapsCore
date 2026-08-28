@@ -20,6 +20,7 @@ import com.synapsecore.domain.entity.Inventory;
 import com.synapsecore.domain.entity.OperationalDispatchStatus;
 import com.synapsecore.domain.entity.OperationalDispatchWorkItem;
 import com.synapsecore.domain.entity.Product;
+import com.synapsecore.domain.entity.ScenarioRun;
 import com.synapsecore.domain.entity.ScenarioRunType;
 import com.synapsecore.domain.entity.Tenant;
 import com.synapsecore.domain.repository.AccessOperatorRepository;
@@ -865,6 +866,114 @@ class MvpFlowIntegrationTest {
     }
 
     @Test
+    void scenarioPhaseTwoHealthyPreviewPersistsEvidenceWithoutOperationalSideEffects() throws Exception {
+        Inventory inventoryBefore = loadInventory("SKU-FLX-100", "WH-NORTH");
+        long startingQuantity = inventoryBefore.getQuantityAvailable();
+        long startingOrders = customerOrderRepository.count();
+        long startingFulfillments = fulfillmentTaskRepository.count();
+        long startingDispatchWorkItems = operationalDispatchWorkItemRepository.count();
+        long startingAlerts = alertRepository.count();
+        long startingRecommendations = recommendationRepository.count();
+        long startingScenarioRuns = scenarioRunRepository.count();
+        long startingBusinessEvents = businessEventRepository.count();
+
+        mockMvc.perform(post("/api/scenarios/order-impact")
+                .contentType(APPLICATION_JSON)
+                .content(orderPayload("WH-NORTH", "SKU-FLX-100", 2, "95.00")))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.warehouseCode").value("WH-NORTH"))
+            .andExpect(jsonPath("$.projectedOrderValue").value(190.0))
+            .andExpect(jsonPath("$.totalUnits").value(2))
+            .andExpect(jsonPath("$.projectedInventory[0].quantityAvailable").value(26))
+            .andExpect(jsonPath("$.projectedInventory[0].lowStock").value(false))
+            .andExpect(jsonPath("$.projectedInventory[0].riskLevel").value("stable"))
+            .andExpect(jsonPath("$.projectedAlerts").isEmpty())
+            .andExpect(jsonPath("$.projectedRecommendations").isEmpty())
+            .andExpect(jsonPath("$.analyzedAt").exists());
+
+        ScenarioRun preview = latestPreviewRun();
+        assertThat(preview.getTenant().getCode()).isEqualTo(STARTER_TENANT);
+        assertThat(preview.getWarehouseCode()).isEqualTo("WH-NORTH");
+        assertThat(preview.getApprovalStatus().name()).isEqualTo("NOT_REQUIRED");
+        assertThat(preview.getApprovalStage().name()).isEqualTo("NOT_REQUIRED");
+        assertThat(preview.getReviewPriority().name()).isEqualTo("MEDIUM");
+        assertThat(preview.getRiskScore()).isZero();
+        assertThat(preview.getRequestedBy()).isNull();
+        assertThat(preview.getReviewOwner()).isNull();
+        assertThat(preview.getFinalApprovalOwner()).isNull();
+
+        assertThat(loadInventory("SKU-FLX-100", "WH-NORTH").getQuantityAvailable()).isEqualTo(startingQuantity);
+        assertThat(customerOrderRepository.count()).isEqualTo(startingOrders);
+        assertThat(fulfillmentTaskRepository.count()).isEqualTo(startingFulfillments);
+        assertThat(operationalDispatchWorkItemRepository.count()).isEqualTo(startingDispatchWorkItems);
+        assertThat(alertRepository.count()).isEqualTo(startingAlerts);
+        assertThat(recommendationRepository.count()).isEqualTo(startingRecommendations);
+        assertThat(scenarioRunRepository.count()).isEqualTo(startingScenarioRuns + 1);
+        assertThat(businessEventRepository.count()).isEqualTo(startingBusinessEvents + 1);
+        assertThat(businessEventRepository.findTop20ByOrderByCreatedAtDesc())
+            .extracting(event -> event.getEventType())
+            .contains(BusinessEventType.SCENARIO_ANALYZED)
+            .doesNotContain(BusinessEventType.SCENARIO_EXECUTED, BusinessEventType.SCENARIO_APPROVED);
+    }
+
+    @Test
+    void scenarioPhaseTwoRiskBoundariesMatchPolicyAndProjectedRecommendations() throws Exception {
+        mockMvc.perform(post("/api/scenarios/order-impact")
+                .contentType(APPLICATION_JSON)
+                .content(orderPayload("WH-NORTH", "SKU-FLX-100", 2, "95.00")))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.projectedInventory[0].quantityAvailable").value(26))
+            .andExpect(jsonPath("$.projectedInventory[0].riskLevel").value("stable"))
+            .andExpect(jsonPath("$.projectedAlerts").isEmpty())
+            .andExpect(jsonPath("$.projectedRecommendations").isEmpty());
+        assertThat(latestPreviewRun().getRiskScore()).isZero();
+        assertThat(latestPreviewRun().getReviewPriority().name()).isEqualTo("MEDIUM");
+
+        mockMvc.perform(post("/api/scenarios/order-impact")
+                .contentType(APPLICATION_JSON)
+                .content(orderPayload("WH-NORTH", "SKU-FLX-100", 9, "95.00")))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.projectedInventory[0].quantityAvailable").value(19))
+            .andExpect(jsonPath("$.projectedInventory[0].lowStock").value(true))
+            .andExpect(jsonPath("$.projectedInventory[0].riskLevel").value("high"))
+            .andExpect(jsonPath("$.projectedAlerts[0].type").value("LOW_STOCK"))
+            .andExpect(jsonPath("$.projectedAlerts[0].severity").value("HIGH"))
+            .andExpect(jsonPath("$.projectedRecommendations[0].type").value("TRANSFER_STOCK"));
+        assertThat(latestPreviewRun().getRiskScore()).isEqualTo(60);
+        assertThat(latestPreviewRun().getReviewPriority().name()).isEqualTo("HIGH");
+
+        mockMvc.perform(post("/api/scenarios/order-impact")
+                .contentType(APPLICATION_JSON)
+                .content(orderPayload("WH-NORTH", "SKU-FLX-100", 18, "95.00")))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.projectedInventory[0].quantityAvailable").value(10))
+            .andExpect(jsonPath("$.projectedInventory[0].lowStock").value(true))
+            .andExpect(jsonPath("$.projectedInventory[0].riskLevel").value("critical"))
+            .andExpect(jsonPath("$.projectedAlerts[0].type").value("LOW_STOCK"))
+            .andExpect(jsonPath("$.projectedAlerts[0].severity").value("CRITICAL"))
+            .andExpect(jsonPath("$.projectedRecommendations[0].type").value("REORDER_URGENTLY"));
+        assertThat(latestPreviewRun().getRiskScore()).isEqualTo(135);
+        assertThat(latestPreviewRun().getReviewPriority().name()).isEqualTo("CRITICAL");
+    }
+
+    @Test
+    void scenarioPhaseTwoRejectsInsufficientInventoryWithoutPlanningEvidence() throws Exception {
+        Inventory inventoryBefore = loadInventory("SKU-FLX-100", "WH-NORTH");
+        long startingQuantity = inventoryBefore.getQuantityAvailable();
+        long startingScenarioRuns = scenarioRunRepository.count();
+
+        mockMvc.perform(post("/api/scenarios/order-impact")
+                .contentType(APPLICATION_JSON)
+                .content(orderPayload("WH-NORTH", "SKU-FLX-100", (int) startingQuantity + 1, "95.00")))
+            .andExpect(status().isBadRequest())
+            .andExpect(jsonPath("$.message").value(
+                org.hamcrest.Matchers.containsString("Insufficient inventory")));
+
+        assertThat(loadInventory("SKU-FLX-100", "WH-NORTH").getQuantityAvailable()).isEqualTo(startingQuantity);
+        assertThat(scenarioRunRepository.count()).isEqualTo(startingScenarioRuns);
+    }
+
+    @Test
     void scenarioOrderImpactSupportsMultiLineOrderMixes() throws Exception {
         long startingOrders = customerOrderRepository.count();
 
@@ -1115,6 +1224,18 @@ class MvpFlowIntegrationTest {
                 .with(accessHeaders("Naledi Lead", "REVIEW_OWNER")))
             .andExpect(status().isBadRequest())
             .andExpect(jsonPath("$.message").value(org.hamcrest.Matchers.containsString("approved saved plans")));
+
+        mockMvc.perform(post("/api/scenarios/" + scenarioRunId + "/approve")
+                .with(accessHeaders("Naledi Lead", "REVIEW_OWNER"))
+                .contentType(APPLICATION_JSON)
+                .content("""
+                    {
+                      "actorRole": "REVIEW_OWNER",
+                      "approverName": "Naledi Lead"
+                    }
+                    """))
+            .andExpect(status().isBadRequest())
+            .andExpect(jsonPath("$.message").value(org.hamcrest.Matchers.containsString("Only saved plans require approval")));
 
         Inventory inventoryAfter = loadInventory("SKU-FLX-100", "WH-NORTH");
         assertThat(inventoryAfter.getQuantityAvailable()).isEqualTo(startingQuantity);
@@ -4853,6 +4974,28 @@ class MvpFlowIntegrationTest {
             .getId();
         Long warehouseId = warehouse.getId();
         return inventoryRepository.findByProductIdAndWarehouseId(productId, warehouseId).orElseThrow();
+    }
+
+    private com.synapsecore.domain.entity.ScenarioRun latestPreviewRun() {
+        return scenarioRunRepository.findTop12ByOrderByCreatedAtDesc().stream()
+            .filter(run -> run.getType() == ScenarioRunType.PREVIEW)
+            .findFirst()
+            .orElseThrow();
+    }
+
+    private String orderPayload(String warehouseCode, String productSku, int quantity, String unitPrice) {
+        return """
+            {
+              "warehouseCode": "%s",
+              "items": [
+                {
+                  "productSku": "%s",
+                  "quantity": %d,
+                  "unitPrice": %s
+                }
+              ]
+            }
+            """.formatted(warehouseCode, productSku, quantity, unitPrice);
     }
 
     private Product createTenantProduct(String warehouseCode, String catalogSku, String name, String category) {
