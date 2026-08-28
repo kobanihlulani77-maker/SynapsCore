@@ -9,6 +9,8 @@ param(
     [string]$PlannerPassword,
     [string]$IntegrationAdminUsername,
     [string]$IntegrationAdminPassword,
+    [string]$ReviewOwnerUsername,
+    [string]$ReviewOwnerPassword,
     [string]$ProofProductSku,
     [string]$PlatformAdminToken,
     [string]$BootstrapInitialToken
@@ -532,7 +534,8 @@ function Ensure-Operator {
         [string]$ActorName,
         [string]$DisplayName,
         [string]$Description,
-        [string[]]$Roles
+        [string[]]$Roles,
+        [string[]]$WarehouseScopes = @()
     )
 
     $body = @{
@@ -541,7 +544,7 @@ function Ensure-Operator {
         description = $Description
         active = $true
         roles = @($Roles)
-        warehouseScopes = @()
+        warehouseScopes = @($WarehouseScopes)
     }
 
     $operators = @(Get-JsonArray -Url "$script:ApiBaseUrlValue/api/access/admin/operators" -Session $AdminSession)
@@ -744,6 +747,8 @@ $PlannerUsernameValue = Require-Username -Name "PLAYWRIGHT_PLANNER_USERNAME" -Va
 $PlannerPasswordValue = Require-Password -Name "PLAYWRIGHT_PLANNER_PASSWORD" -Value (Get-FirstValue -Values @($PlannerPassword, $env:PLAYWRIGHT_PLANNER_PASSWORD, $env:PLAYWRIGHT_OPERATIONS_PLANNER_PASSWORD, (Get-HostedProofStateValue -Names @("PLAYWRIGHT_PLANNER_PASSWORD", "PLAYWRIGHT_OPERATIONS_PLANNER_PASSWORD")), (New-ProofPassword -Purpose "planner")))
 $IntegrationAdminUsernameValue = Require-Username -Name "PLAYWRIGHT_INTEGRATION_ADMIN_USERNAME" -Value (Get-FirstValue -Values @($IntegrationAdminUsername, $env:PLAYWRIGHT_INTEGRATION_ADMIN_USERNAME, $env:PLAYWRIGHT_INTEGRATION_LEAD_USERNAME, (Get-HostedProofStateValue -Names @("PLAYWRIGHT_INTEGRATION_ADMIN_USERNAME", "PLAYWRIGHT_INTEGRATION_LEAD_USERNAME")), "hosted.proof.integration"))
 $IntegrationAdminPasswordValue = Require-Password -Name "PLAYWRIGHT_INTEGRATION_ADMIN_PASSWORD" -Value (Get-FirstValue -Values @($IntegrationAdminPassword, $env:PLAYWRIGHT_INTEGRATION_ADMIN_PASSWORD, $env:PLAYWRIGHT_INTEGRATION_LEAD_PASSWORD, (Get-HostedProofStateValue -Names @("PLAYWRIGHT_INTEGRATION_ADMIN_PASSWORD", "PLAYWRIGHT_INTEGRATION_LEAD_PASSWORD")), (New-ProofPassword -Purpose "integration")))
+$ReviewOwnerUsernameValue = Require-Username -Name "PLAYWRIGHT_REVIEW_OWNER_USERNAME" -Value (Get-FirstValue -Values @($ReviewOwnerUsername, $env:PLAYWRIGHT_REVIEW_OWNER_USERNAME, (Get-HostedProofStateValue -Names @("PLAYWRIGHT_REVIEW_OWNER_USERNAME")), "hosted.proof.review"))
+$ReviewOwnerPasswordValue = Require-Password -Name "PLAYWRIGHT_REVIEW_OWNER_PASSWORD" -Value (Get-FirstValue -Values @($ReviewOwnerPassword, $env:PLAYWRIGHT_REVIEW_OWNER_PASSWORD, (Get-HostedProofStateValue -Names @("PLAYWRIGHT_REVIEW_OWNER_PASSWORD")), (New-ProofPassword -Purpose "review")))
 $ProofProductSkuValue = Normalize-ProofSku -Name "PLAYWRIGHT_PROOF_PRODUCT_SKU" -Value (Get-FirstValue -Values @($ProofProductSku, $env:PLAYWRIGHT_PROOF_PRODUCT_SKU, (Get-HostedProofStateValue -Names @("PLAYWRIGHT_PROOF_PRODUCT_SKU")), (Get-DefaultProofProductSku -TenantCode $script:TenantCodeValue)))
 $PlatformAdminTokenValue = Get-FirstValue -Values @($PlatformAdminToken, $env:SYNAPSECORE_PLATFORM_ADMIN_TOKEN)
 $BootstrapInitialTokenValue = Get-FirstValue -Values @($BootstrapInitialToken, $env:SYNAPSECORE_BOOTSTRAP_INITIAL_TOKEN)
@@ -758,9 +763,9 @@ if ($script:TenantCodeValue -ieq "SYNAPSE-DEMO") {
     throw "SYNAPSE-DEMO is blocked for hosted proof. Use a real verification tenant created through /api/access/tenants."
 }
 
-$distinctUsernames = @($TenantAdminUsernameValue, $PlannerUsernameValue, $IntegrationAdminUsernameValue) | Select-Object -Unique
-if ($distinctUsernames.Count -ne 3) {
-    throw "Hosted proof requires three distinct sign-in accounts: tenant admin, planner/operator, and integration admin."
+$distinctUsernames = @($TenantAdminUsernameValue, $PlannerUsernameValue, $IntegrationAdminUsernameValue, $ReviewOwnerUsernameValue) | Select-Object -Unique
+if ($distinctUsernames.Count -ne 4) {
+    throw "Hosted proof requires four distinct sign-in accounts: tenant admin, planner/operator, integration admin, and review owner."
 }
 
 Write-HostedProofState -Values @{
@@ -774,6 +779,8 @@ Write-HostedProofState -Values @{
     PLAYWRIGHT_PLANNER_PASSWORD = $PlannerPasswordValue
     PLAYWRIGHT_INTEGRATION_ADMIN_USERNAME = $IntegrationAdminUsernameValue
     PLAYWRIGHT_INTEGRATION_ADMIN_PASSWORD = $IntegrationAdminPasswordValue
+    PLAYWRIGHT_REVIEW_OWNER_USERNAME = $ReviewOwnerUsernameValue
+    PLAYWRIGHT_REVIEW_OWNER_PASSWORD = $ReviewOwnerPasswordValue
     PLAYWRIGHT_PROOF_PRODUCT_SKU = $ProofProductSkuValue
 }
 
@@ -900,7 +907,7 @@ Ensure-Operator `
     -ActorName "Operations Lead" `
     -DisplayName "Operations Lead" `
     -Description "Hosted proof tenant administrator." `
-    -Roles @("TENANT_ADMIN", "REVIEW_OWNER", "ESCALATION_OWNER", "INTEGRATION_ADMIN", "INTEGRATION_OPERATOR") | Out-Null
+    -Roles @("TENANT_ADMIN", "ESCALATION_OWNER", "INTEGRATION_ADMIN", "INTEGRATION_OPERATOR") | Out-Null
 
 Ensure-Operator `
     -AdminSession $adminSession `
@@ -916,6 +923,14 @@ Ensure-Operator `
     -Description "Hosted proof integration administrator." `
     -Roles @("INTEGRATION_ADMIN", "INTEGRATION_OPERATOR") | Out-Null
 
+Ensure-Operator `
+    -AdminSession $adminSession `
+    -ActorName "North Review Owner" `
+    -DisplayName "North Review Owner" `
+    -Description "Hosted proof review owner for the north warehouse lane." `
+    -Roles @("REVIEW_OWNER") `
+    -WarehouseScopes @("WH-NORTH") | Out-Null
+
 Ensure-User `
     -AdminSession $adminSession `
     -Username $PlannerUsernameValue `
@@ -929,6 +944,13 @@ Ensure-User `
     -FullName "Hosted Verification Integration Admin" `
     -OperatorActorName "Integration Lead" `
     -FinalPassword $IntegrationAdminPasswordValue
+
+Ensure-User `
+    -AdminSession $adminSession `
+    -Username $ReviewOwnerUsernameValue `
+    -FullName "Hosted Verification North Review Owner" `
+    -OperatorActorName "North Review Owner" `
+    -FinalPassword $ReviewOwnerPasswordValue
 
 Write-Host "Preparing real catalog and inventory baseline for proof flows..."
 Ensure-ProofCatalogAndInventory -AdminSession $adminSession -Sku $ProofProductSkuValue
@@ -944,6 +966,7 @@ Write-Host "PLAYWRIGHT_PROOF_PRODUCT_SKU=$ProofProductSkuValue"
 Write-Host "PLAYWRIGHT_TENANT_ADMIN_USERNAME=$TenantAdminUsernameValue"
 Write-Host "PLAYWRIGHT_PLANNER_USERNAME=$PlannerUsernameValue"
 Write-Host "PLAYWRIGHT_INTEGRATION_ADMIN_USERNAME=$IntegrationAdminUsernameValue"
+Write-Host "PLAYWRIGHT_REVIEW_OWNER_USERNAME=$ReviewOwnerUsernameValue"
 Write-Host "Secret proof passwords are stored in the ignored proof state file for this machine."
 Write-Host "Playwright reads that state file automatically; do not commit or print it."
 Write-Host ""

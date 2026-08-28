@@ -54,6 +54,7 @@ const users = {
     tenantCode: proofTenantCode,
     username: requiredEnv('PLAYWRIGHT_TENANT_ADMIN_USERNAME', 'PLAYWRIGHT_OPERATIONS_LEAD_USERNAME'),
     password: requiredEnv('PLAYWRIGHT_TENANT_ADMIN_PASSWORD', 'PLAYWRIGHT_OPERATIONS_LEAD_PASSWORD'),
+    actorName: 'Operations Lead',
   },
   operationsPlanner: {
     tenantCode: proofTenantCode,
@@ -64,6 +65,12 @@ const users = {
     tenantCode: proofTenantCode,
     username: requiredEnv('PLAYWRIGHT_INTEGRATION_ADMIN_USERNAME', 'PLAYWRIGHT_INTEGRATION_LEAD_USERNAME'),
     password: requiredEnv('PLAYWRIGHT_INTEGRATION_ADMIN_PASSWORD', 'PLAYWRIGHT_INTEGRATION_LEAD_PASSWORD'),
+  },
+  reviewOwner: {
+    tenantCode: proofTenantCode,
+    username: requiredEnv('PLAYWRIGHT_REVIEW_OWNER_USERNAME'),
+    password: requiredEnv('PLAYWRIGHT_REVIEW_OWNER_PASSWORD'),
+    actorName: 'North Review Owner',
   },
 }
 
@@ -1835,7 +1842,7 @@ async function createScenarioFixture() {
   }
   const scenarioPayload = {
     title,
-    requestedBy: 'Operations Planner',
+    requestedBy: users.operationsLead.actorName,
     request: {
       warehouseCode,
       items: [
@@ -2792,7 +2799,7 @@ test('replay recovery, scenario approval, execution, and browser role gating wor
   const scenarioFixture = await createScenarioFixture()
 
   try {
-    await loginViaUi(page, users.operationsLead)
+    await loginViaUi(page, users.reviewOwner)
     await navigateWithinApp(page, '/scenario-history')
     await expect(page.getByRole('heading', { level: 1, name: 'Scenario history and compare' })).toBeVisible()
 
