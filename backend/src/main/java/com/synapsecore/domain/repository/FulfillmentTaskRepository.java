@@ -35,6 +35,9 @@ public interface FulfillmentTaskRepository extends JpaRepository<FulfillmentTask
     List<FulfillmentTask> findAllByTenant_CodeIgnoreCaseAndStatusInOrderByUpdatedAtDesc(String tenantCode, Collection<FulfillmentStatus> statuses);
 
     @EntityGraph(attributePaths = {"tenant", "customerOrder", "warehouse"})
+    List<FulfillmentTask> findAllByStatusInOrderByUpdatedAtDesc(Collection<FulfillmentStatus> statuses);
+
+    @EntityGraph(attributePaths = {"tenant", "customerOrder", "warehouse"})
     Optional<FulfillmentTask> findTop1ByTenant_CodeIgnoreCaseAndStatusInOrderByUpdatedAtAsc(String tenantCode, Collection<FulfillmentStatus> statuses);
 
     long countByStatusIn(Collection<FulfillmentStatus> statuses);

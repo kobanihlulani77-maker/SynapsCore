@@ -14,7 +14,7 @@ import org.springframework.data.repository.query.Param;
 
 public interface InventoryRepository extends JpaRepository<Inventory, Long> {
 
-    @EntityGraph(attributePaths = {"product", "warehouse"})
+    @EntityGraph(attributePaths = {"product", "product.tenant", "warehouse", "warehouse.tenant"})
     @Query("select i from Inventory i order by i.warehouse.name asc, i.product.name asc")
     List<Inventory> findAllWithProductAndWarehouse();
 
@@ -27,7 +27,7 @@ public interface InventoryRepository extends JpaRepository<Inventory, Long> {
         """)
     List<Inventory> findAllWithProductAndWarehouseByTenantCode(@Param("tenantCode") String tenantCode);
 
-    @EntityGraph(attributePaths = {"product", "warehouse"})
+    @EntityGraph(attributePaths = {"product", "product.tenant", "warehouse", "warehouse.tenant"})
     Optional<Inventory> findByProductIdAndWarehouseId(Long productId, Long warehouseId);
 
     @Lock(LockModeType.PESSIMISTIC_WRITE)

@@ -16,7 +16,6 @@ import com.synapsecore.fulfillment.FulfillmentAssessment;
 import com.synapsecore.intelligence.InventoryInsight;
 import com.synapsecore.prediction.StockPrediction;
 import com.synapsecore.scenario.dto.ScenarioRecommendationProjection;
-import java.time.Instant;
 import java.util.Optional;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.locks.ReentrantLock;
@@ -247,6 +246,13 @@ public class RecommendationService {
         return recommendationRepository.save(recommendation);
     }
 
+    @org.springframework.transaction.annotation.Transactional
+    public void retireCurrentRecommendation(Long recommendationId) {
+        recommendationRepository.findById(recommendationId)
+            .filter(recommendation -> recommendation.getStatus() == RecommendationStatus.CURRENT)
+            .ifPresent(this::retire);
+    }
+
     private void retireInvalidatedTransfers(Inventory changedInventory) {
         String tenantCode = changedInventory.getWarehouse().getTenant().getCode();
         recommendationRepository.findAllByTenant_CodeIgnoreCaseAndTypeAndProduct_IdAndSourceWarehouse_IdAndStatus(
@@ -256,23 +262,41 @@ public class RecommendationService {
                 changedInventory.getWarehouse().getId(),
                 RecommendationStatus.CURRENT)
             .stream()
-            .filter(recommendation -> !transferStillValid(recommendation, changedInventory))
-            .forEach(this::retire);
+            .forEach(this::refreshOrRetireTransfer);
     }
 
-    private boolean transferStillValid(Recommendation recommendation, Inventory sourceInventory) {
-        if (recommendation.getDestinationWarehouse() == null || recommendation.getProduct() == null) {
-            return false;
+    private void refreshOrRetireTransfer(Recommendation recommendation) {
+        Optional<Inventory> destination = recommendation.getDestinationWarehouse() == null || recommendation.getProduct() == null
+            ? Optional.empty()
+            : inventoryRepository.findByProductIdAndWarehouseId(
+                recommendation.getProduct().getId(), recommendation.getDestinationWarehouse().getId());
+        Optional<TransferPlan> currentPlan = destination.flatMap(this::findTransferPlan);
+        if (currentPlan.isEmpty()) {
+            retire(recommendation);
+            return;
         }
-        return inventoryRepository.findByProductIdAndWarehouseId(
-                recommendation.getProduct().getId(), recommendation.getDestinationWarehouse().getId())
-            .filter(destination -> destination.getQuantityAvailable() <= destination.getReorderThreshold())
-            .map(destination -> {
-                long shortfall = destination.getReorderThreshold() - destination.getQuantityAvailable();
-                long transferable = sourceInventory.getQuantityAvailable() - sourceInventory.getReorderThreshold();
-                return shortfall > 0 && transferable >= shortfall;
-            })
-            .orElse(false);
+
+        Inventory destinationInventory = destination.get();
+        TransferPlan plan = currentPlan.get();
+        long shortfall = destinationInventory.getReorderThreshold() - destinationInventory.getQuantityAvailable();
+        long suggestedTransferUnits = Math.min(shortfall, plan.transferableUnits());
+        recommendation.setTenant(destinationInventory.getWarehouse().getTenant());
+        recommendation.setWarehouse(destinationInventory.getWarehouse());
+        recommendation.setProduct(destinationInventory.getProduct());
+        recommendation.setSourceWarehouse(plan.sourceInventory().getWarehouse());
+        recommendation.setDestinationWarehouse(destinationInventory.getWarehouse());
+        recommendation.setSuggestedQuantity(suggestedTransferUnits);
+        recommendation.setTitle("Transfer stock for SKU " + destinationInventory.getProduct().resolveCatalogSku()
+            + " from " + plan.sourceInventory().getWarehouse().getCode()
+            + " to " + destinationInventory.getWarehouse().getCode());
+        recommendation.setDescription(buildDescription(
+            destinationInventory,
+            null,
+            recommendation.getPriority(),
+            null,
+            Optional.of(plan)));
+        recommendation.setStatus(RecommendationStatus.CURRENT);
+        recommendationRepository.save(recommendation);
     }
 
     private String inventorySourceRef(Inventory inventory) {
@@ -382,7 +406,7 @@ public class RecommendationService {
                 + " to " + inventory.getWarehouse().getName()
                 + " to restore the receiving warehouse to its threshold.";
 
-            if (prediction.hoursToStockout() == null) {
+            if (prediction == null || prediction.hoursToStockout() == null) {
                 return base + " This route uses existing network surplus before placing a new purchase order.";
             }
 

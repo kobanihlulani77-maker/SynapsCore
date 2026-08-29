@@ -43,6 +43,7 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
@@ -51,6 +52,7 @@ import org.springframework.web.server.ResponseStatusException;
 
 @Service
 @RequiredArgsConstructor
+@Slf4j
 public class FulfillmentService {
 
     private static final List<FulfillmentStatus> BACKLOG_STATUSES = List.of(
@@ -458,8 +460,23 @@ public class FulfillmentService {
 
     private void evaluateTask(FulfillmentTask task, String source) {
         FulfillmentAssessment assessment = buildWarehouseAssessment(task, Instant.now());
-        Recommendation recommendation = recommendationService.createForFulfillment(task, assessment, source);
+        Recommendation recommendation = null;
+        try {
+            recommendation = recommendationService.createForFulfillment(task, assessment, source);
+        } catch (RuntimeException exception) {
+            log.warn("Recommendation evaluation failed for tenant {} warehouse {} order {} from {}: {}",
+                task.getTenant().getCode(),
+                task.getWarehouse().getCode(),
+                task.getCustomerOrder().getExternalOrderId(),
+                source,
+                exception.getMessage());
+        }
         alertService.syncFulfillmentAlerts(task, assessment, recommendation, source);
+    }
+
+    @Transactional
+    public void reconcileRecommendation(Long taskId, String source) {
+        fulfillmentTaskRepository.findById(taskId).ifPresent(task -> evaluateTask(task, source));
     }
 
     private FulfillmentAssessment buildWarehouseAssessment(FulfillmentTask task, Instant now) {

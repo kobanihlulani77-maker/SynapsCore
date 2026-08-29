@@ -43,6 +43,9 @@ public interface RecommendationRepository extends JpaRepository<Recommendation, 
         String tenantCode, String sourceType, String sourceRef, RecommendationStatus status);
 
     @EntityGraph(attributePaths = {"tenant", "warehouse", "product", "sourceWarehouse", "destinationWarehouse"})
+    List<Recommendation> findAllBySourceTypeAndStatus(String sourceType, RecommendationStatus status);
+
+    @EntityGraph(attributePaths = {"tenant", "warehouse", "product", "sourceWarehouse", "destinationWarehouse"})
     List<Recommendation> findAllByTenant_CodeIgnoreCaseAndTypeAndProduct_IdAndSourceWarehouse_IdAndStatus(
         String tenantCode, RecommendationType type, Long productId, Long sourceWarehouseId, RecommendationStatus status);
 }
