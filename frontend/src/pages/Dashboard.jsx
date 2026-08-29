@@ -645,7 +645,7 @@ export default function DashboardPage({ context }) {
                       <span className={`severity-tag severity-${alert.severity.toLowerCase()}`}>{alert.severity}</span>
                     </div>
                     <p>{alert.impactSummary}</p>
-                    <p className="muted-text">{alert.warehouseCode || 'Tenant-wide'} | {formatTimestamp(alert.createdAt)}</p>
+                    <p className="muted-text">{alert.warehouseCode || (alert.sourceType === 'TENANT' ? 'Tenant-wide' : 'Scope unavailable')} | {formatTimestamp(alert.createdAt)}</p>
                   </button>
                 )) : <EmptyState>No urgent alert pressure right now. This lane lights up when risk needs immediate operator ownership.</EmptyState>}
               </div>

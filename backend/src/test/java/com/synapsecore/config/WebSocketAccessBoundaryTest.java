@@ -42,6 +42,11 @@ class WebSocketAccessBoundaryTest {
             false
         )).isInstanceOf(IllegalArgumentException.class);
         assertThatThrownBy(() -> subscribe(
+            "/topic/tenant/ACCESS-BOUNDARY-REHEARSAL/alerts",
+            Set.of("INTEGRATION_OPERATOR"),
+            false
+        )).isInstanceOf(IllegalArgumentException.class);
+        assertThatThrownBy(() -> subscribe(
             "/topic/tenant/ACCESS-BOUNDARY-REHEARSAL/integrations.connectors",
             Set.of("INTEGRATION_OPERATOR"),
             false

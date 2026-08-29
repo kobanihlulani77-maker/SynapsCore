@@ -9,12 +9,17 @@ public record AlertResponse(
     Long id,
     AlertType type,
     AlertSeverity severity,
+    String warehouseCode,
+    String productSku,
+    String sourceType,
+    String sourceRef,
     String title,
     String description,
     String impactSummary,
     String recommendedAction,
     String policyExplanation,
     AlertStatus status,
-    Instant createdAt
+    Instant createdAt,
+    Instant updatedAt
 ) {
 }

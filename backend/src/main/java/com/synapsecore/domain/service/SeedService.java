@@ -517,17 +517,6 @@ public class SeedService {
             orderItemRepository.saveAll(orderItemUpdates);
         }
 
-        java.util.List<com.synapsecore.domain.entity.Alert> alertUpdates = new java.util.ArrayList<>();
-        for (var alert : alertRepository.findAll()) {
-            if (alert.getTenant() == null) {
-                alert.setTenant(tenant);
-                alertUpdates.add(alert);
-            }
-        }
-        if (!alertUpdates.isEmpty()) {
-            alertRepository.saveAll(alertUpdates);
-        }
-
         java.util.List<com.synapsecore.domain.entity.Recommendation> recommendationUpdates = new java.util.ArrayList<>();
         for (var recommendation : recommendationRepository.findAll()) {
             if (recommendation.getTenant() == null) {

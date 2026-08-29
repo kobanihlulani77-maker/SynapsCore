@@ -1,9 +1,8 @@
 package com.synapsecore.domain.service;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.synapsecore.alert.AlertScopeService;
 import com.synapsecore.domain.dto.DashboardSummaryResponse;
-import com.synapsecore.domain.entity.AlertStatus;
-import com.synapsecore.domain.repository.AlertRepository;
 import com.synapsecore.domain.repository.CustomerOrderRepository;
 import com.synapsecore.domain.repository.InventoryRepository;
 import com.synapsecore.domain.repository.RecommendationRepository;
@@ -22,7 +21,6 @@ import org.springframework.stereotype.Service;
 public class DashboardService {
 
     private final CustomerOrderRepository customerOrderRepository;
-    private final AlertRepository alertRepository;
     private final InventoryRepository inventoryRepository;
     private final RecommendationRepository recommendationRepository;
     private final WarehouseRepository warehouseRepository;
@@ -30,6 +28,7 @@ public class DashboardService {
     private final RedisTemplate<String, String> redisTemplate;
     private final ObjectMapper objectMapper;
     private final TenantContextService tenantContextService;
+    private final AlertScopeService alertScopeService;
 
     @Value("${synapsecore.dashboard.cache-enabled:true}")
     private boolean cacheEnabled;
@@ -39,7 +38,7 @@ public class DashboardService {
 
     public DashboardSummaryResponse getSummary() {
         String tenantCode = tenantContextService.getCurrentTenantCodeOrDefault();
-        if (!cacheEnabled) {
+        if (!cacheEnabled || alertScopeService.isCurrentOperatorWarehouseScoped()) {
             return refreshSummary();
         }
         try {
@@ -54,12 +53,13 @@ public class DashboardService {
 
     public DashboardSummaryResponse refreshSummary() {
         String tenantCode = tenantContextService.getCurrentTenantCodeOrDefault();
+        boolean warehouseScoped = alertScopeService.isCurrentOperatorWarehouseScoped();
         Instant now = Instant.now();
         Instant recentWindow = now.minus(24, ChronoUnit.HOURS);
         var fulfillmentOverview = fulfillmentService.getOverview();
         DashboardSummaryResponse summary = new DashboardSummaryResponse(
             customerOrderRepository.countByTenant_CodeIgnoreCase(tenantCode),
-            alertRepository.countByTenant_CodeIgnoreCaseAndStatus(tenantCode, AlertStatus.ACTIVE),
+            alertScopeService.countVisibleActiveAlerts(tenantCode),
             inventoryRepository.countLowStockItemsByTenantCode(tenantCode),
             recommendationRepository.countByTenant_CodeIgnoreCaseAndCreatedAtAfter(tenantCode, recentWindow),
             fulfillmentOverview.backlogCount(),
@@ -71,7 +71,7 @@ public class DashboardService {
             inventoryRepository.countByTenantCode(tenantCode),
             now
         );
-        if (!cacheEnabled) {
+        if (!cacheEnabled || warehouseScoped) {
             return summary;
         }
         try {

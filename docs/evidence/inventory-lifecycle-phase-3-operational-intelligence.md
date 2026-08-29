@@ -14,11 +14,13 @@ Status: technically verified from the existing repository test evidence. No prod
 
 **Result: PASS.** `MvpFlowIntegrationTest.inventoryUpdateFlowMarksLowStockImmediately` verifies that a real Inventory update crossing the configured threshold produces an active low-stock alert and an Inventory recommendation for the correct SKU. `InventoryIntelligenceService` calculates `quantityAvailable <= reorderThreshold`, and `AlertService.syncInventoryAlerts` persists the operational condition only after the real mutation path.
 
-The alert title, tenant, warehouse, severity, policy explanation, and recommended action are derived from the persisted Inventory lane. The test suite also verifies structured alert responses.
+The alert title is display text, while tenant, warehouse, Product, source, and
+active-condition identity are persisted structured fields. The test suite also
+verifies structured alert responses.
 
 ## 2. Low-stock recovery
 
-**Result: PASS.** `MvpFlowIntegrationTest.lowStockAlertResolvesWhenInventoryRecoversAboveThreshold` verifies that an active low-stock condition is resolved when a later real update restores stock above the threshold. The implementation keeps one active low-stock alert per tenant/SKU/warehouse title and changes it to `RESOLVED`; it does not leave a stale active condition.
+**Result: PASS.** `MvpFlowIntegrationTest.lowStockAlertResolvesWhenInventoryRecoversAboveThreshold` verifies that an active low-stock condition is resolved when a later real update restores stock above the threshold. The implementation keeps one active low-stock alert per tenant/Product/warehouse condition key and changes it to `RESOLVED`; it does not leave a stale active condition.
 
 ## 3. Depletion-risk calculation
 

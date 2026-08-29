@@ -17,10 +17,9 @@ import com.synapsecore.domain.entity.BusinessEventType;
 import com.synapsecore.domain.entity.IntegrationImportStatus;
 import com.synapsecore.domain.entity.IntegrationInboundStatus;
 import com.synapsecore.domain.entity.IntegrationReplayStatus;
-import com.synapsecore.domain.entity.AlertStatus;
+import com.synapsecore.alert.AlertScopeService;
 import com.synapsecore.domain.entity.FulfillmentStatus;
 import com.synapsecore.domain.entity.OperationalDispatchStatus;
-import com.synapsecore.domain.repository.AlertRepository;
 import com.synapsecore.domain.repository.AuditLogRepository;
 import com.synapsecore.domain.repository.BusinessEventRepository;
 import com.synapsecore.domain.repository.FulfillmentTaskRepository;
@@ -56,7 +55,7 @@ public class SystemRuntimeService {
     private final SynapseAccessProperties accessProperties;
     private final SynapseCorsProperties corsProperties;
     private final ApplicationAvailability applicationAvailability;
-    private final AlertRepository alertRepository;
+    private final AlertScopeService alertScopeService;
     private final AuditLogRepository auditLogRepository;
     private final BusinessEventRepository businessEventRepository;
     private final FulfillmentTaskRepository fulfillmentTaskRepository;
@@ -278,7 +277,7 @@ public class SystemRuntimeService {
                 windowStart
             ),
             recentAuditFailures,
-            alertRepository.countByTenant_CodeIgnoreCaseAndStatus(tenantCode, AlertStatus.ACTIVE),
+            alertScopeService.countVisibleActiveAlerts(tenantCode),
             fulfillmentTaskRepository.countByTenant_CodeIgnoreCaseAndStatusIn(
                 tenantCode,
                 List.of(FulfillmentStatus.QUEUED, FulfillmentStatus.PICKING, FulfillmentStatus.PACKED)

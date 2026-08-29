@@ -1251,18 +1251,33 @@ Returns:
 
 Alerts contain:
 
+- `id`
 - type
 - severity
+- `warehouseCode`
+- `productSku` when the condition is inventory-derived
+- `sourceType`
+- `sourceRef`
 - title
 - description
 - impact summary
 - recommended action
 - status
+- `createdAt`
+- `updatedAt`
 
-The current alert set includes:
+The current warehouse-scoped alert set includes:
 
 - `LOW_STOCK`
 - `DEPLETION_RISK` for fast-moving inventory that may stock out soon even before it falls below threshold
+- `FULFILLMENT_BACKLOG`
+- `DELIVERY_DELAY_RISK`
+- `FULFILLMENT_ANOMALY`
+
+Alert visibility is tenant- and warehouse-scoped. The five current alert types
+are derived from a warehouse lane; a scoped operator receives only assigned
+warehouse records. Alert identity and active deduplication use structured
+condition fields, not the display title.
 
 ## Recommendations
 
@@ -1296,6 +1311,9 @@ Development-only helper endpoint that:
 
 - subscribe to `/topic/tenant/{TENANT_CODE}/dashboard.summary`
 - subscribe to `/topic/tenant/{TENANT_CODE}/alerts`
+- warehouse-scoped clients must not subscribe to the raw `/alerts` snapshot;
+  they subscribe to `/topic/tenant/{TENANT_CODE}/alerts.changed` and refresh
+  the filtered REST snapshot instead
 - subscribe to `/topic/tenant/{TENANT_CODE}/recommendations`
 - subscribe to `/topic/tenant/{TENANT_CODE}/inventory`
 - subscribe to `/topic/tenant/{TENANT_CODE}/orders.recent`

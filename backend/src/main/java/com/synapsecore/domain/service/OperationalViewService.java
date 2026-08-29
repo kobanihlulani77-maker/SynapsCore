@@ -1,6 +1,7 @@
 package com.synapsecore.domain.service;
 
 import com.synapsecore.audit.AuditLogService;
+import com.synapsecore.alert.AlertScopeService;
 import com.synapsecore.domain.dto.AlertFeedResponse;
 import com.synapsecore.domain.dto.AlertResponse;
 import com.synapsecore.domain.dto.AuditLogResponse;
@@ -22,12 +23,10 @@ import com.synapsecore.scenario.ScenarioHistoryService;
 import com.synapsecore.scenario.dto.ScenarioNotificationResponse;
 import com.synapsecore.scenario.dto.ScenarioRunResponse;
 import com.synapsecore.domain.entity.Alert;
-import com.synapsecore.domain.entity.AlertStatus;
 import com.synapsecore.domain.entity.CustomerOrder;
 import com.synapsecore.domain.entity.Inventory;
 import com.synapsecore.domain.entity.OrderItem;
 import com.synapsecore.domain.entity.Recommendation;
-import com.synapsecore.domain.repository.AlertRepository;
 import com.synapsecore.domain.repository.CustomerOrderRepository;
 import com.synapsecore.domain.repository.InventoryRepository;
 import com.synapsecore.domain.repository.RecommendationRepository;
@@ -49,7 +48,7 @@ import org.springframework.stereotype.Service;
 @RequiredArgsConstructor
 public class OperationalViewService {
 
-    private final AlertRepository alertRepository;
+    private final AlertScopeService alertScopeService;
     private final RecommendationRepository recommendationRepository;
     private final InventoryRepository inventoryRepository;
     private final CustomerOrderRepository customerOrderRepository;
@@ -69,13 +68,15 @@ public class OperationalViewService {
     public AlertFeedResponse getAlertFeed() {
         String tenantCode = tenantContextService.getCurrentTenantCodeOrDefault();
         return new AlertFeedResponse(
-            alertRepository.findTop12ByTenant_CodeIgnoreCaseAndStatusOrderByCreatedAtDesc(tenantCode, AlertStatus.ACTIVE)
-                .stream()
+            alertScopeService.visibleActiveAlerts(tenantCode).stream()
                 .sorted(this::compareOperationalAlertPriority)
+                .limit(12)
                 .map(this::toAlertResponse)
                 .toList(),
-            alertRepository.findTop12ByTenant_CodeIgnoreCaseOrderByUpdatedAtDesc(tenantCode)
-                .stream().map(this::toAlertResponse).toList()
+            alertScopeService.visibleRecentAlerts(tenantCode).stream()
+                .limit(12)
+                .map(this::toAlertResponse)
+                .toList()
         );
     }
 
@@ -189,13 +190,18 @@ public class OperationalViewService {
             alert.getId(),
             alert.getType(),
             alert.getSeverity(),
+            alert.getWarehouse() == null ? null : alert.getWarehouse().getCode(),
+            alert.getProduct() == null ? null : alert.getProduct().resolveCatalogSku(),
+            alert.getSourceType(),
+            alert.getSourceRef(),
             alert.getTitle(),
             alert.getDescription(),
             alert.getImpactSummary(),
             alert.getRecommendedAction(),
             alert.getPolicyExplanation(),
             alert.getStatus(),
-            alert.getCreatedAt()
+            alert.getCreatedAt(),
+            alert.getUpdatedAt()
         );
     }
 

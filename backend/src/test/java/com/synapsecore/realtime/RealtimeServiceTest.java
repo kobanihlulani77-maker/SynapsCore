@@ -138,6 +138,7 @@ class RealtimeServiceTest {
             .containsOnlyKeys(
                 "/topic/tenant/STARTER-OPS/dashboard.summary",
                 "/topic/tenant/STARTER-OPS/alerts",
+                "/topic/tenant/STARTER-OPS/alerts.changed",
                 "/topic/tenant/STARTER-OPS/recommendations",
                 "/topic/tenant/STARTER-OPS/inventory",
                 "/topic/tenant/STARTER-OPS/fulfillment.overview",
@@ -220,6 +221,7 @@ class RealtimeServiceTest {
                 "/topic/tenant/STARTER-OPS/events.recent",
                 "/topic/tenant/STARTER-OPS/audit.recent",
                 "/topic/tenant/STARTER-OPS/system.incidents",
+                "/topic/tenant/STARTER-OPS/alerts.changed",
                 "/topic/tenant/STARTER-OPS/integrations.connectors",
                 "/topic/tenant/STARTER-OPS/integrations.imports",
                 "/topic/tenant/STARTER-OPS/integrations.replay",

@@ -27,6 +27,7 @@ export default function AlertsPage({ context }) {
   }
 
   const selectedAlert = activeAlerts.find((alert) => alert.id === selectedAlertId) || activeAlerts[0]
+  const alertScopeLabel = (alert) => alert?.warehouseCode || (alert?.sourceType === 'TENANT' ? 'Tenant-wide' : 'Scope unavailable')
   const criticalAlertCount = activeAlerts.filter((alert) => alert.severity === 'CRITICAL').length
   const highAlertCount = activeAlerts.filter((alert) => alert.severity === 'HIGH').length
   const warehouseHitCount = new Set(activeAlerts.map((alert) => alert.warehouseCode).filter(Boolean)).size
@@ -67,7 +68,7 @@ export default function AlertsPage({ context }) {
             </p>
             <div className="ops-pill-row">
               <span className="workspace-meta-pill">{responsePosture}</span>
-              <span className="workspace-meta-pill">Assign during triage</span>
+              <span className="workspace-meta-pill">Source-condition managed</span>
               <span className="workspace-meta-pill">{actionableAlertCount} action guided</span>
             </div>
           </div>
@@ -80,7 +81,7 @@ export default function AlertsPage({ context }) {
             <div className="workflow-action-card">
               <span>Ownership</span>
               <strong>Operator triage required</strong>
-              <p>SynapseCore exposes the issue and suggested response; the team still assigns the human owner.</p>
+              <p>SynapseCore exposes the issue and suggested response; the source condition controls its active or resolved state.</p>
             </div>
             <div className="ops-command-actions">
               <button className="secondary-button" onClick={() => mostSevereAlert && setSelectedAlertId(mostSevereAlert.id)} disabled={!mostSevereAlert} type="button">
@@ -133,7 +134,6 @@ export default function AlertsPage({ context }) {
                   <p>{alert.description}</p>
                   <p className="muted-text">{alert.impactSummary}</p>
                   <div className="attention-card-meta">
-                    <span>Owner: assign during triage</span>
                     <span>Status: {alert.status || 'ACTIVE'}</span>
                   </div>
                   <p className="action-line">Recommended action: {alert.recommendedAction}</p>
@@ -160,10 +160,10 @@ export default function AlertsPage({ context }) {
                 </div>
                 <div className="utility-metric-grid">
                   <div><span>Severity</span><strong>{selectedAlert.severity}</strong></div>
-                  <div><span>Warehouse</span><strong>{selectedAlert.warehouseCode || 'Tenant-wide'}</strong></div>
+                  <div><span>Warehouse</span><strong>{alertScopeLabel(selectedAlert)}</strong></div>
                   <div><span>Status</span><strong>{selectedAlert.status || 'Active'}</strong></div>
                   <div><span>Created</span><strong>{formatTimestamp(selectedAlert.createdAt)}</strong></div>
-                  <div><span>Owner</span><strong>Assign</strong></div>
+                  <div><span>Source</span><strong>{alert.sourceType || 'Operational signal'}</strong></div>
                   <div><span>Next step</span><strong>{selectedAlert.recommendedAction ? 'Action' : 'Review'}</strong></div>
                 </div>
                 <p className="action-line">Action: {selectedAlert.recommendedAction}</p>

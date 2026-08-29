@@ -33,6 +33,7 @@ public class RealtimeService {
         withTenantContext(normalizedTenantCode, () -> {
             realtimePublisher.publish(topic(normalizedTenantCode, "/dashboard.summary"), dashboardService.getSummary());
             realtimePublisher.publish(topic(normalizedTenantCode, "/alerts"), operationalViewService.getAlertFeed());
+            realtimePublisher.publish(topic(normalizedTenantCode, "/alerts.changed"), Map.of("changedAt", Instant.now()));
             realtimePublisher.publish(topic(normalizedTenantCode, "/recommendations"), operationalViewService.getRecommendations());
             realtimePublisher.publish(topic(normalizedTenantCode, "/inventory"), operationalViewService.getInventoryOverview());
             realtimePublisher.publish(topic(normalizedTenantCode, "/fulfillment.overview"), operationalViewService.getFulfillmentOverview());
@@ -55,6 +56,7 @@ public class RealtimeService {
             realtimePublisher.publish(topic(normalizedTenantCode, "/events.recent"), operationalViewService.getRecentEvents());
             realtimePublisher.publish(topic(normalizedTenantCode, "/audit.recent"), operationalViewService.getRecentAuditLogs());
             realtimePublisher.publish(topic(normalizedTenantCode, "/system.incidents"), operationalViewService.getSystemIncidents());
+            realtimePublisher.publish(topic(normalizedTenantCode, "/alerts.changed"), Map.of("changedAt", Instant.now()));
             realtimePublisher.publish(topic(normalizedTenantCode, "/integrations.connectors"), operationalViewService.getIntegrationConnectors());
             realtimePublisher.publish(topic(normalizedTenantCode, "/integrations.imports"), operationalViewService.getRecentIntegrationImportRuns());
             realtimePublisher.publish(topic(normalizedTenantCode, "/integrations.replay"), operationalViewService.getIntegrationReplayQueue());

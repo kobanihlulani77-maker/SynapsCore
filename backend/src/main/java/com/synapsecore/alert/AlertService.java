@@ -20,15 +20,18 @@ import java.util.ArrayList;
 import java.util.List;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 @Service
 @RequiredArgsConstructor
 public class AlertService {
 
     private final AlertRepository alertRepository;
+    private final AlertConditionLockService alertConditionLockService;
     private final BusinessEventService businessEventService;
     private final TenantOperationalPolicyService tenantOperationalPolicyService;
 
+    @Transactional
     public void syncInventoryAlerts(Inventory inventory,
                                     InventoryInsight insight,
                                     StockPrediction prediction,
@@ -38,6 +41,7 @@ public class AlertService {
         syncDepletionRiskAlert(inventory, insight, recommendation);
     }
 
+    @Transactional
     public void syncFulfillmentAlerts(FulfillmentTask task,
                                       FulfillmentAssessment assessment,
                                       Recommendation recommendation,
@@ -67,6 +71,16 @@ public class AlertService {
                                     InventoryInsight insight,
                                     Recommendation recommendation,
                                     String source) {
+        String conditionKey = buildInventoryConditionKey(AlertType.LOW_STOCK, inventory);
+        return alertConditionLockService.withLock(conditionKey,
+            () -> syncLowStockAlertLocked(inventory, insight, recommendation, source, conditionKey));
+    }
+
+    private Alert syncLowStockAlertLocked(Inventory inventory,
+                                    InventoryInsight insight,
+                                    Recommendation recommendation,
+                                    String source,
+                                    String conditionKey) {
         // MVP lifecycle choice:
         // - keep at most one ACTIVE low-stock alert per SKU/warehouse pair
         // - refresh that alert while the low-stock condition persists
@@ -74,11 +88,11 @@ public class AlertService {
         String title = "Low stock detected for SKU " + inventory.getProduct().resolveCatalogSku()
             + " in " + inventory.getWarehouse().getCode();
         String tenantCode = inventory.getWarehouse().getTenant() == null ? null : inventory.getWarehouse().getTenant().getCode();
-        Alert existing = alertRepository.findFirstByTenant_CodeIgnoreCaseAndTypeAndStatusAndTitle(
+        Alert existing = alertRepository.findFirstByTenant_CodeIgnoreCaseAndTypeAndStatusAndConditionKey(
                 tenantCode,
                 AlertType.LOW_STOCK,
                 AlertStatus.ACTIVE,
-                title)
+                conditionKey)
             .orElse(null);
 
         if (!insight.lowStock()) {
@@ -105,6 +119,7 @@ public class AlertService {
         Alert alert = existing == null
             ? Alert.builder().tenant(inventory.getWarehouse().getTenant()).type(AlertType.LOW_STOCK).title(title).build()
             : existing;
+        setInventoryIdentity(alert, inventory, AlertType.LOW_STOCK, conditionKey);
         alert.setSeverity(preview.severity());
         alert.setDescription(preview.description());
         alert.setImpactSummary(preview.impactSummary());
@@ -127,14 +142,23 @@ public class AlertService {
     private Alert syncDepletionRiskAlert(Inventory inventory,
                                          InventoryInsight insight,
                                          Recommendation recommendation) {
+        String conditionKey = buildInventoryConditionKey(AlertType.DEPLETION_RISK, inventory);
+        return alertConditionLockService.withLock(conditionKey,
+            () -> syncDepletionRiskAlertLocked(inventory, insight, recommendation, conditionKey));
+    }
+
+    private Alert syncDepletionRiskAlertLocked(Inventory inventory,
+                                         InventoryInsight insight,
+                                         Recommendation recommendation,
+                                         String conditionKey) {
         String title = "Depletion risk rising for SKU " + inventory.getProduct().resolveCatalogSku()
             + " in " + inventory.getWarehouse().getCode();
         String tenantCode = inventory.getWarehouse().getTenant() == null ? null : inventory.getWarehouse().getTenant().getCode();
-        Alert existing = alertRepository.findFirstByTenant_CodeIgnoreCaseAndTypeAndStatusAndTitle(
+        Alert existing = alertRepository.findFirstByTenant_CodeIgnoreCaseAndTypeAndStatusAndConditionKey(
                 tenantCode,
                 AlertType.DEPLETION_RISK,
                 AlertStatus.ACTIVE,
-                title)
+                conditionKey)
             .orElse(null);
 
         if (!insight.depletionRisk()) {
@@ -161,6 +185,7 @@ public class AlertService {
         Alert alert = existing == null
             ? Alert.builder().tenant(inventory.getWarehouse().getTenant()).type(AlertType.DEPLETION_RISK).title(title).build()
             : existing;
+        setInventoryIdentity(alert, inventory, AlertType.DEPLETION_RISK, conditionKey);
         alert.setSeverity(preview.severity());
         alert.setDescription(preview.description());
         alert.setImpactSummary(preview.impactSummary());
@@ -215,12 +240,22 @@ public class AlertService {
                                               FulfillmentAssessment assessment,
                                               Recommendation recommendation,
                                               String source) {
+        String conditionKey = buildFulfillmentConditionKey(AlertType.FULFILLMENT_BACKLOG, task);
+        return alertConditionLockService.withLock(conditionKey,
+            () -> syncFulfillmentBacklogAlertLocked(task, assessment, recommendation, source, conditionKey));
+    }
+
+    private Alert syncFulfillmentBacklogAlertLocked(FulfillmentTask task,
+                                              FulfillmentAssessment assessment,
+                                              Recommendation recommendation,
+                                              String source,
+                                              String conditionKey) {
         String title = "Fulfillment backlog building in " + task.getWarehouse().getCode();
-        Alert existing = alertRepository.findFirstByTenant_CodeIgnoreCaseAndTypeAndStatusAndTitle(
+        Alert existing = alertRepository.findFirstByTenant_CodeIgnoreCaseAndTypeAndStatusAndConditionKey(
                 task.getTenant().getCode(),
                 AlertType.FULFILLMENT_BACKLOG,
                 AlertStatus.ACTIVE,
-                title)
+                conditionKey)
             .orElse(null);
 
         if (!assessment.backlogRisk()) {
@@ -236,6 +271,7 @@ public class AlertService {
         Alert alert = existing == null
             ? Alert.builder().tenant(task.getTenant()).type(AlertType.FULFILLMENT_BACKLOG).title(title).build()
             : existing;
+        setFulfillmentIdentity(alert, task, AlertType.FULFILLMENT_BACKLOG, conditionKey);
         alert.setSeverity(assessment.severity());
         alert.setDescription("Dispatch backlog is building in " + task.getWarehouse().getName()
             + " with " + assessment.backlogCount() + " open fulfillment tasks and "
@@ -263,12 +299,22 @@ public class AlertService {
                                          FulfillmentAssessment assessment,
                                          Recommendation recommendation,
                                          String source) {
+        String conditionKey = buildFulfillmentConditionKey(AlertType.DELIVERY_DELAY_RISK, task);
+        return alertConditionLockService.withLock(conditionKey,
+            () -> syncDeliveryDelayAlertLocked(task, assessment, recommendation, source, conditionKey));
+    }
+
+    private Alert syncDeliveryDelayAlertLocked(FulfillmentTask task,
+                                         FulfillmentAssessment assessment,
+                                         Recommendation recommendation,
+                                         String source,
+                                         String conditionKey) {
         String title = "Delivery delay risk rising in " + task.getWarehouse().getCode();
-        Alert existing = alertRepository.findFirstByTenant_CodeIgnoreCaseAndTypeAndStatusAndTitle(
+        Alert existing = alertRepository.findFirstByTenant_CodeIgnoreCaseAndTypeAndStatusAndConditionKey(
                 task.getTenant().getCode(),
                 AlertType.DELIVERY_DELAY_RISK,
                 AlertStatus.ACTIVE,
-                title)
+                conditionKey)
             .orElse(null);
 
         if (!assessment.deliveryDelayRisk()) {
@@ -282,6 +328,7 @@ public class AlertService {
         Alert alert = existing == null
             ? Alert.builder().tenant(task.getTenant()).type(AlertType.DELIVERY_DELAY_RISK).title(title).build()
             : existing;
+        setFulfillmentIdentity(alert, task, AlertType.DELIVERY_DELAY_RISK, conditionKey);
         alert.setSeverity(assessment.severity());
         alert.setDescription("Shipment " + task.getCustomerOrder().getExternalOrderId()
             + " is outside the expected delivery lane for " + task.getWarehouse().getName() + ".");
@@ -306,12 +353,22 @@ public class AlertService {
                                               FulfillmentAssessment assessment,
                                               Recommendation recommendation,
                                               String source) {
+        String conditionKey = buildFulfillmentConditionKey(AlertType.FULFILLMENT_ANOMALY, task);
+        return alertConditionLockService.withLock(conditionKey,
+            () -> syncFulfillmentAnomalyAlertLocked(task, assessment, recommendation, source, conditionKey));
+    }
+
+    private Alert syncFulfillmentAnomalyAlertLocked(FulfillmentTask task,
+                                              FulfillmentAssessment assessment,
+                                              Recommendation recommendation,
+                                              String source,
+                                              String conditionKey) {
         String title = "Logistics anomaly detected in " + task.getWarehouse().getCode();
-        Alert existing = alertRepository.findFirstByTenant_CodeIgnoreCaseAndTypeAndStatusAndTitle(
+        Alert existing = alertRepository.findFirstByTenant_CodeIgnoreCaseAndTypeAndStatusAndConditionKey(
                 task.getTenant().getCode(),
                 AlertType.FULFILLMENT_ANOMALY,
                 AlertStatus.ACTIVE,
-                title)
+                conditionKey)
             .orElse(null);
 
         if (!assessment.anomalyDetected()) {
@@ -325,6 +382,7 @@ public class AlertService {
         Alert alert = existing == null
             ? Alert.builder().tenant(task.getTenant()).type(AlertType.FULFILLMENT_ANOMALY).title(title).build()
             : existing;
+        setFulfillmentIdentity(alert, task, AlertType.FULFILLMENT_ANOMALY, conditionKey);
         alert.setSeverity(assessment.severity());
         alert.setDescription("Exceptions, repeated delivery delays, or stacked overdue dispatches are building in "
             + task.getWarehouse().getName() + ".");
@@ -343,6 +401,41 @@ public class AlertService {
             );
         }
         return saved;
+    }
+
+    private void setInventoryIdentity(Alert alert,
+                                      Inventory inventory,
+                                      AlertType type,
+                                      String conditionKey) {
+        alert.setTenant(inventory.getWarehouse().getTenant());
+        alert.setWarehouse(inventory.getWarehouse());
+        alert.setProduct(inventory.getProduct());
+        alert.setSourceType("INVENTORY_PRODUCT_WAREHOUSE");
+        alert.setSourceRef(inventory.getProduct().getId() + "@" + inventory.getWarehouse().getId());
+        alert.setConditionKey(conditionKey);
+        alert.setType(type);
+    }
+
+    private void setFulfillmentIdentity(Alert alert,
+                                        FulfillmentTask task,
+                                        AlertType type,
+                                        String conditionKey) {
+        alert.setTenant(task.getTenant());
+        alert.setWarehouse(task.getWarehouse());
+        alert.setProduct(null);
+        alert.setSourceType("FULFILLMENT_WAREHOUSE");
+        alert.setSourceRef(task.getWarehouse().getCode());
+        alert.setConditionKey(conditionKey);
+        alert.setType(type);
+    }
+
+    private String buildInventoryConditionKey(AlertType type, Inventory inventory) {
+        return type.name() + "|PRODUCT:" + inventory.getProduct().getId()
+            + "|WAREHOUSE:" + inventory.getWarehouse().getId();
+    }
+
+    private String buildFulfillmentConditionKey(AlertType type, FulfillmentTask task) {
+        return type.name() + "|WAREHOUSE:" + task.getWarehouse().getId();
     }
 
     private String buildInventoryPolicyExplanation(Inventory inventory,
