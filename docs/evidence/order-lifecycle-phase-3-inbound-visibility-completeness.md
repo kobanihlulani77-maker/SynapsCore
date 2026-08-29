@@ -77,8 +77,10 @@ Production changes:
   callers.
 
 Focused result: `OrderLifecyclePhase3IntegrationTest`, 3 tests, 0 failures,
-0 errors. Full backend and repository checks are recorded below after they are
-run for this revision.
+0 errors. Full backend result for this revision: `cmd /c mvnw.cmd test`, 209
+tests, 0 failures, 0 errors, build success. `git diff --check` and the cached
+diff check also passed. No frontend files changed, so frontend checks were not
+required for this backend-only change.
 
 ## Final Readiness
 
