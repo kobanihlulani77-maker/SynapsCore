@@ -5,6 +5,7 @@ import com.synapsecore.domain.entity.FulfillmentTask;
 import com.synapsecore.domain.entity.Inventory;
 import com.synapsecore.domain.entity.Recommendation;
 import com.synapsecore.domain.entity.RecommendationPriority;
+import com.synapsecore.domain.entity.RecommendationStatus;
 import com.synapsecore.domain.entity.RecommendationType;
 import com.synapsecore.domain.entity.TenantOperationalPolicy;
 import com.synapsecore.domain.repository.InventoryRepository;
@@ -17,6 +18,8 @@ import com.synapsecore.prediction.StockPrediction;
 import com.synapsecore.scenario.dto.ScenarioRecommendationProjection;
 import java.time.Instant;
 import java.util.Optional;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.locks.ReentrantLock;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
@@ -28,42 +31,72 @@ public class RecommendationService {
     private final RecommendationRepository recommendationRepository;
     private final BusinessEventService businessEventService;
     private final TenantOperationalPolicyService tenantOperationalPolicyService;
+    private static final ConcurrentHashMap<String, ReentrantLock> CONDITION_LOCKS = new ConcurrentHashMap<>();
 
     public Recommendation createForInventory(Inventory inventory, InventoryInsight insight, StockPrediction prediction, String source) {
+        String conditionKey = inventoryConditionKey(inventory);
+        ReentrantLock lock = CONDITION_LOCKS.computeIfAbsent(conditionKey, ignored -> new ReentrantLock());
+        lock.lock();
+        try {
+            return createForInventoryLocked(inventory, insight, prediction, source);
+        } finally {
+            lock.unlock();
+            CONDITION_LOCKS.remove(conditionKey, lock);
+        }
+    }
+
+    private Recommendation createForInventoryLocked(Inventory inventory, InventoryInsight insight, StockPrediction prediction, String source) {
         ScenarioRecommendationProjection projection = previewForInventory(inventory, insight, prediction);
+        String tenantCode = inventory.getWarehouse().getTenant().getCode();
+        String sourceRef = inventorySourceRef(inventory);
+        String conditionKey = inventoryConditionKey(inventory);
+        Recommendation existing = recommendationRepository.findByTenantCodeAndConditionKeyForUpdate(
+            tenantCode, conditionKey, RecommendationStatus.CURRENT).orElse(null);
         if (projection == null) {
-            return null;
+            Recommendation retired = retire(existing);
+            retireInvalidatedTransfers(inventory);
+            return retired;
         }
 
-        Recommendation latest = recommendationRepository.findFirstByTenant_CodeIgnoreCaseAndTypeAndTitleOrderByCreatedAtDesc(
-                inventory.getWarehouse().getTenant() == null ? null : inventory.getWarehouse().getTenant().getCode(),
-                projection.type(),
-                projection.title())
-            .orElse(null);
-        if (latest != null
-            && latest.getDescription().equals(projection.description())
-            && latest.getCreatedAt().isAfter(Instant.now().minusSeconds(1800))) {
-            return latest;
-        }
         String policyExplanation = buildInventoryPolicyExplanation(inventory, insight, prediction, projection.priority());
-
-        Recommendation recommendation = recommendationRepository.save(Recommendation.builder()
+        Optional<TransferPlan> transferPlan = projection.type() == RecommendationType.TRANSFER_STOCK
+            ? findTransferPlan(inventory)
+            : Optional.empty();
+        Recommendation recommendation = existing == null ? Recommendation.builder()
             .tenant(inventory.getWarehouse().getTenant())
-            .type(projection.type())
-            .title(projection.title())
-            .description(projection.description())
-            .policyExplanation(policyExplanation)
-            .priority(projection.priority())
-            .build());
-
-        businessEventService.record(
-            BusinessEventType.RECOMMENDATION_GENERATED,
-            source,
-            "Generated " + projection.priority() + " recommendation for " + inventory.getProduct().resolveCatalogSku()
-                + " in " + inventory.getWarehouse().getCode()
-        );
-
-        return recommendation;
+            .warehouse(inventory.getWarehouse())
+            .product(inventory.getProduct())
+            .sourceType("INVENTORY")
+            .sourceRef(sourceRef)
+            .conditionKey(conditionKey)
+            .build() : existing;
+        recommendation.setTenant(inventory.getWarehouse().getTenant());
+        recommendation.setWarehouse(inventory.getWarehouse());
+        recommendation.setProduct(inventory.getProduct());
+        recommendation.setSourceWarehouse(transferPlan.map(plan -> plan.sourceInventory().getWarehouse()).orElse(null));
+        recommendation.setDestinationWarehouse(transferPlan.map(plan -> inventory.getWarehouse()).orElse(null));
+        recommendation.setSuggestedQuantity(transferPlan.map(plan -> Math.min(
+            inventory.getReorderThreshold() - inventory.getQuantityAvailable(), plan.transferableUnits())).orElse(null));
+        recommendation.setSourceType("INVENTORY");
+        recommendation.setSourceRef(sourceRef);
+        recommendation.setConditionKey(conditionKey);
+        recommendation.setType(projection.type());
+        recommendation.setTitle(projection.title());
+        recommendation.setDescription(projection.description());
+        recommendation.setPolicyExplanation(policyExplanation);
+        recommendation.setPriority(projection.priority());
+        recommendation.setStatus(RecommendationStatus.CURRENT);
+        Recommendation saved = recommendationRepository.save(recommendation);
+        if (existing == null) {
+            businessEventService.record(
+                BusinessEventType.RECOMMENDATION_GENERATED,
+                source,
+                "Generated " + projection.priority() + " recommendation for " + inventory.getProduct().resolveCatalogSku()
+                    + " in " + inventory.getWarehouse().getCode()
+            );
+        }
+        retireInvalidatedTransfers(inventory);
+        return saved;
     }
 
     public ScenarioRecommendationProjection previewForInventory(Inventory inventory,
@@ -108,8 +141,25 @@ public class RecommendationService {
     }
 
     public Recommendation createForFulfillment(FulfillmentTask task, FulfillmentAssessment assessment, String source) {
+        String conditionKey = fulfillmentConditionKey(task);
+        ReentrantLock lock = CONDITION_LOCKS.computeIfAbsent(conditionKey, ignored -> new ReentrantLock());
+        lock.lock();
+        try {
+            return createForFulfillmentLocked(task, assessment, source);
+        } finally {
+            lock.unlock();
+            CONDITION_LOCKS.remove(conditionKey, lock);
+        }
+    }
+
+    private Recommendation createForFulfillmentLocked(FulfillmentTask task, FulfillmentAssessment assessment, String source) {
+        String tenantCode = task.getTenant().getCode();
+        String sourceRef = fulfillmentSourceRef(task);
+        String conditionKey = fulfillmentConditionKey(task);
+        Recommendation existing = recommendationRepository.findByTenantCodeAndConditionKeyForUpdate(
+            tenantCode, conditionKey, RecommendationStatus.CURRENT).orElse(null);
         if (!assessment.backlogRisk() && !assessment.deliveryDelayRisk() && !assessment.anomalyDetected()) {
-            return null;
+            return retire(existing);
         }
 
         RecommendationType type = assessment.anomalyDetected()
@@ -155,33 +205,90 @@ public class RecommendationService {
                     + " Pull warehouse labor forward or rebalance the lane now.";
         };
 
-        Recommendation latest = recommendationRepository.findFirstByTenant_CodeIgnoreCaseAndTypeAndTitleOrderByCreatedAtDesc(
-                task.getTenant() == null ? null : task.getTenant().getCode(),
-                type,
-                title)
-            .orElse(null);
-        if (latest != null
-            && latest.getDescription().equals(description)
-            && latest.getCreatedAt().isAfter(Instant.now().minusSeconds(1800))) {
-            return latest;
-        }
         String policyExplanation = buildFulfillmentPolicyExplanation(assessment, priority, policy);
-
-        Recommendation recommendation = recommendationRepository.save(Recommendation.builder()
+        Recommendation recommendation = existing == null ? Recommendation.builder()
             .tenant(task.getTenant())
-            .type(type)
-            .title(title)
-            .description(description)
-            .policyExplanation(policyExplanation)
-            .priority(priority)
-            .build());
+            .warehouse(task.getWarehouse())
+            .sourceType("FULFILLMENT")
+            .sourceRef(sourceRef)
+            .conditionKey(conditionKey)
+            .build() : existing;
+        recommendation.setTenant(task.getTenant());
+        recommendation.setWarehouse(task.getWarehouse());
+        recommendation.setProduct(null);
+        recommendation.setSourceWarehouse(null);
+        recommendation.setDestinationWarehouse(null);
+        recommendation.setSuggestedQuantity(null);
+        recommendation.setSourceType("FULFILLMENT");
+        recommendation.setSourceRef(sourceRef);
+        recommendation.setConditionKey(conditionKey);
+        recommendation.setType(type);
+        recommendation.setTitle(title);
+        recommendation.setDescription(description);
+        recommendation.setPolicyExplanation(policyExplanation);
+        recommendation.setPriority(priority);
+        recommendation.setStatus(RecommendationStatus.CURRENT);
+        Recommendation saved = recommendationRepository.save(recommendation);
+        if (existing == null) {
+            businessEventService.record(
+                BusinessEventType.RECOMMENDATION_GENERATED,
+                source,
+                "Generated " + priority + " logistics recommendation for " + task.getWarehouse().getCode()
+            );
+        }
+        return saved;
+    }
 
-        businessEventService.record(
-            BusinessEventType.RECOMMENDATION_GENERATED,
-            source,
-            "Generated " + priority + " logistics recommendation for " + task.getWarehouse().getCode()
-        );
-        return recommendation;
+    private Recommendation retire(Recommendation recommendation) {
+        if (recommendation == null) {
+            return null;
+        }
+        recommendation.setStatus(RecommendationStatus.RETIRED);
+        return recommendationRepository.save(recommendation);
+    }
+
+    private void retireInvalidatedTransfers(Inventory changedInventory) {
+        String tenantCode = changedInventory.getWarehouse().getTenant().getCode();
+        recommendationRepository.findAllByTenant_CodeIgnoreCaseAndTypeAndProduct_IdAndSourceWarehouse_IdAndStatus(
+                tenantCode,
+                RecommendationType.TRANSFER_STOCK,
+                changedInventory.getProduct().getId(),
+                changedInventory.getWarehouse().getId(),
+                RecommendationStatus.CURRENT)
+            .stream()
+            .filter(recommendation -> !transferStillValid(recommendation, changedInventory))
+            .forEach(this::retire);
+    }
+
+    private boolean transferStillValid(Recommendation recommendation, Inventory sourceInventory) {
+        if (recommendation.getDestinationWarehouse() == null || recommendation.getProduct() == null) {
+            return false;
+        }
+        return inventoryRepository.findByProductIdAndWarehouseId(
+                recommendation.getProduct().getId(), recommendation.getDestinationWarehouse().getId())
+            .filter(destination -> destination.getQuantityAvailable() <= destination.getReorderThreshold())
+            .map(destination -> {
+                long shortfall = destination.getReorderThreshold() - destination.getQuantityAvailable();
+                long transferable = sourceInventory.getQuantityAvailable() - sourceInventory.getReorderThreshold();
+                return shortfall > 0 && transferable >= shortfall;
+            })
+            .orElse(false);
+    }
+
+    private String inventorySourceRef(Inventory inventory) {
+        return "inventory:" + inventory.getProduct().getId() + ":" + inventory.getWarehouse().getId();
+    }
+
+    private String inventoryConditionKey(Inventory inventory) {
+        return "INVENTORY|" + inventory.getProduct().getId() + "|" + inventory.getWarehouse().getId();
+    }
+
+    private String fulfillmentSourceRef(FulfillmentTask task) {
+        return "fulfillment:" + task.getWarehouse().getId();
+    }
+
+    private String fulfillmentConditionKey(FulfillmentTask task) {
+        return "FULFILLMENT|" + task.getWarehouse().getId();
     }
 
     private Optional<TransferPlan> findTransferPlan(Inventory inventory) {

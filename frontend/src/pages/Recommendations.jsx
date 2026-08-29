@@ -31,6 +31,12 @@ export default function RecommendationsPage({ context }) {
   const selectedRecommendation = recommendationCandidates.find((recommendation) => recommendation.id === selectedRecommendationId) || recommendationCandidates[0]
   const warehouseCoverage = new Set(snapshot.recommendations.map((item) => item.warehouseCode).filter(Boolean)).size
   const evidenceBackedCount = snapshot.recommendations.filter((recommendation) => Boolean(recommendation.policyExplanation)).length
+  const recommendationScopeLabel = (recommendation) => recommendation.type === 'TRANSFER_STOCK'
+    ? `${recommendation.sourceWarehouseCode || 'Source'} -> ${recommendation.destinationWarehouseCode || recommendation.warehouseCode || 'Destination'}`
+    : recommendation.warehouseCode || 'Tenant-wide'
+  const recommendationIdentityLabel = (recommendation) => recommendation.productSku
+    ? `${recommendation.productSku} | ${recommendationScopeLabel(recommendation)}`
+    : recommendationScopeLabel(recommendation)
   const nextDecisionLabel = recommendationNow.length
     ? 'Decide now'
     : recommendationSoon.length
@@ -121,7 +127,7 @@ export default function RecommendationsPage({ context }) {
                       <span className={`priority-tag priority-${recommendation.priority.toLowerCase()}`}>{recommendation.priority}</span>
                     </div>
                     <p>{recommendation.description}</p>
-                    <p className="muted-text">{recommendation.warehouseCode || 'Tenant-wide'} | {formatTimestamp(recommendation.createdAt)}</p>
+                    <p className="muted-text">{recommendationIdentityLabel(recommendation)} | {recommendation.status || 'CURRENT'} | {formatTimestamp(recommendation.updatedAt || recommendation.createdAt)}</p>
                     {recommendation.policyExplanation ? <p className="muted-text recommendation-evidence-line">{recommendation.policyExplanation}</p> : null}
                   </button>
                 )) : <EmptyState>No items in this action lane.</EmptyState>}
@@ -142,7 +148,7 @@ export default function RecommendationsPage({ context }) {
                   <strong>{selectedRecommendation.title}</strong>
                   <p>{selectedRecommendation.description}</p>
                   <p className="muted-text">Created {formatTimestamp(selectedRecommendation.createdAt)}</p>
-                  <p className="muted-text">{selectedRecommendation.warehouseCode || 'Tenant-wide lane'} | Priority {selectedRecommendation.priority}</p>
+                  <p className="muted-text">{recommendationIdentityLabel(selectedRecommendation)} | {selectedRecommendation.status || 'CURRENT'} | Priority {selectedRecommendation.priority}</p>
                   {selectedRecommendation.policyExplanation ? <p className="muted-text">Evidence: {selectedRecommendation.policyExplanation}</p> : null}
                 </div>
                 <div className="utility-metric-grid">

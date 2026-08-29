@@ -140,6 +140,7 @@ class RealtimeServiceTest {
                 "/topic/tenant/STARTER-OPS/alerts",
                 "/topic/tenant/STARTER-OPS/alerts.changed",
                 "/topic/tenant/STARTER-OPS/recommendations",
+                "/topic/tenant/STARTER-OPS/recommendations.changed",
                 "/topic/tenant/STARTER-OPS/inventory",
                 "/topic/tenant/STARTER-OPS/fulfillment.overview",
                 "/topic/tenant/STARTER-OPS/orders.recent",
@@ -156,6 +157,7 @@ class RealtimeServiceTest {
         assertThat(channel.payloadFor("/topic/tenant/STARTER-OPS/dashboard.summary")).isEqualTo(summary);
         assertThat(channel.payloadFor("/topic/tenant/STARTER-OPS/alerts")).isEqualTo(alerts);
         assertThat(channel.payloadFor("/topic/tenant/STARTER-OPS/recommendations")).isEqualTo(recommendations);
+        assertThat(channel.payloadFor("/topic/tenant/STARTER-OPS/recommendations.changed")).isInstanceOf(Map.class);
         assertThat(channel.payloadFor("/topic/tenant/STARTER-OPS/inventory")).isEqualTo(inventory);
         assertThat(channel.payloadFor("/topic/tenant/STARTER-OPS/fulfillment.overview")).isEqualTo(fulfillment);
         assertThat(channel.payloadFor("/topic/tenant/STARTER-OPS/orders.recent")).isEqualTo(recentOrders);

@@ -22,6 +22,7 @@ import com.synapsecore.integration.dto.IntegrationReplayRecordResponse;
 import com.synapsecore.scenario.ScenarioHistoryService;
 import com.synapsecore.scenario.dto.ScenarioNotificationResponse;
 import com.synapsecore.scenario.dto.ScenarioRunResponse;
+import com.synapsecore.decision.RecommendationScopeService;
 import com.synapsecore.domain.entity.Alert;
 import com.synapsecore.domain.entity.CustomerOrder;
 import com.synapsecore.domain.entity.Inventory;
@@ -41,6 +42,7 @@ import java.time.Instant;
 import java.util.Comparator;
 import java.util.List;
 import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
 
@@ -50,6 +52,8 @@ public class OperationalViewService {
 
     private final AlertScopeService alertScopeService;
     private final RecommendationRepository recommendationRepository;
+    @Autowired
+    private RecommendationScopeService recommendationScopeService;
     private final InventoryRepository inventoryRepository;
     private final CustomerOrderRepository customerOrderRepository;
     private final StockPredictionService stockPredictionService;
@@ -81,10 +85,12 @@ public class OperationalViewService {
     }
 
     public List<RecommendationResponse> getRecommendations() {
-        return recommendationRepository.findTop12ByTenant_CodeIgnoreCaseOrderByCreatedAtDesc(
-                tenantContextService.getCurrentTenantCodeOrDefault())
+        return recommendationScopeService.visible(recommendationRepository.findAllByTenant_CodeIgnoreCaseAndStatusOrderByUpdatedAtDesc(
+                tenantContextService.getCurrentTenantCodeOrDefault(),
+                com.synapsecore.domain.entity.RecommendationStatus.CURRENT))
             .stream()
             .sorted(this::compareOperationalRecommendationPriority)
+            .limit(12)
             .map(this::toRecommendationResponse)
             .toList();
     }
@@ -239,11 +245,20 @@ public class OperationalViewService {
         return new RecommendationResponse(
             recommendation.getId(),
             recommendation.getType(),
+            recommendation.getPriority(),
+            recommendation.getStatus(),
+            recommendation.getWarehouse() == null ? null : recommendation.getWarehouse().getCode(),
+            recommendation.getSourceWarehouse() == null ? null : recommendation.getSourceWarehouse().getCode(),
+            recommendation.getDestinationWarehouse() == null ? null : recommendation.getDestinationWarehouse().getCode(),
+            recommendation.getProduct() == null ? null : recommendation.getProduct().resolveCatalogSku(),
+            recommendation.getSourceType(),
+            recommendation.getSourceRef(),
             recommendation.getTitle(),
             recommendation.getDescription(),
             recommendation.getPolicyExplanation(),
-            recommendation.getPriority(),
-            recommendation.getCreatedAt()
+            recommendation.getCreatedAt(),
+            recommendation.getUpdatedAt(),
+            recommendation.getSuggestedQuantity()
         );
     }
 

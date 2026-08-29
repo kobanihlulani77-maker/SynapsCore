@@ -393,10 +393,16 @@ export default function useWorkspaceRealtime({
               scheduleDecisionSurfaceRefresh('alerts-changed-topic')
             })
           }
-          nextClient.subscribe(`${topicPrefix}/recommendations`, (message) => {
-            mergeSnapshot({ recommendations: JSON.parse(message.body) })
-            scheduleDecisionSurfaceRefresh('recommendations-topic')
-          })
+          if (hasTenantWideWarehouseAccess) {
+            nextClient.subscribe(`${topicPrefix}/recommendations`, (message) => {
+              mergeSnapshot({ recommendations: JSON.parse(message.body) })
+              scheduleDecisionSurfaceRefresh('recommendations-topic')
+            })
+          } else {
+            nextClient.subscribe(`${topicPrefix}/recommendations.changed`, () => {
+              scheduleDecisionSurfaceRefresh('recommendations-changed-topic')
+            })
+          }
           if (hasTenantWideWarehouseAccess) {
             nextClient.subscribe(`${topicPrefix}/inventory`, (message) => {
               mergeSnapshot({ inventory: JSON.parse(message.body) })

@@ -7,12 +7,15 @@ import com.synapsecore.domain.repository.CustomerOrderRepository;
 import com.synapsecore.domain.repository.InventoryRepository;
 import com.synapsecore.domain.repository.RecommendationRepository;
 import com.synapsecore.domain.repository.WarehouseRepository;
+import com.synapsecore.decision.RecommendationScopeService;
+import com.synapsecore.domain.entity.RecommendationStatus;
 import com.synapsecore.fulfillment.FulfillmentService;
 import com.synapsecore.tenant.TenantContextService;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.stereotype.Service;
 
@@ -29,6 +32,8 @@ public class DashboardService {
     private final ObjectMapper objectMapper;
     private final TenantContextService tenantContextService;
     private final AlertScopeService alertScopeService;
+    @Autowired
+    private RecommendationScopeService recommendationScopeService;
 
     @Value("${synapsecore.dashboard.cache-enabled:true}")
     private boolean cacheEnabled;
@@ -61,7 +66,8 @@ public class DashboardService {
             customerOrderRepository.countByTenant_CodeIgnoreCase(tenantCode),
             alertScopeService.countVisibleActiveAlerts(tenantCode),
             inventoryRepository.countLowStockItemsByTenantCode(tenantCode),
-            recommendationRepository.countByTenant_CodeIgnoreCaseAndCreatedAtAfter(tenantCode, recentWindow),
+            recommendationScopeService.visible(recommendationRepository.findAllByTenant_CodeIgnoreCaseAndStatusOrderByUpdatedAtDesc(
+                tenantCode, RecommendationStatus.CURRENT)).size(),
             fulfillmentOverview.backlogCount(),
             fulfillmentOverview.delayedShipmentCount(),
             fulfillmentOverview.atRiskCount(),

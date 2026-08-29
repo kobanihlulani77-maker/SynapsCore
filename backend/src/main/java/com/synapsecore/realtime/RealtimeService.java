@@ -35,6 +35,7 @@ public class RealtimeService {
             realtimePublisher.publish(topic(normalizedTenantCode, "/alerts"), operationalViewService.getAlertFeed());
             realtimePublisher.publish(topic(normalizedTenantCode, "/alerts.changed"), Map.of("changedAt", Instant.now()));
             realtimePublisher.publish(topic(normalizedTenantCode, "/recommendations"), operationalViewService.getRecommendations());
+            realtimePublisher.publish(topic(normalizedTenantCode, "/recommendations.changed"), Map.of("changedAt", Instant.now()));
             realtimePublisher.publish(topic(normalizedTenantCode, "/inventory"), operationalViewService.getInventoryOverview());
             realtimePublisher.publish(topic(normalizedTenantCode, "/fulfillment.overview"), operationalViewService.getFulfillmentOverview());
             realtimePublisher.publish(topic(normalizedTenantCode, "/orders.recent"), operationalViewService.getRecentOrders());
