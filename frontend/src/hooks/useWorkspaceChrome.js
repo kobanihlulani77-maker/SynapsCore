@@ -39,6 +39,42 @@ export default function useWorkspaceChrome({
   formatBuildValue,
   formatCodeLabel,
 }) {
+  const toArray = (value) => (Array.isArray(value) ? value : [])
+  snapshot = {
+    ...(snapshot || {}),
+    alerts: {
+      ...(snapshot?.alerts || {}),
+      activeAlerts: toArray(snapshot?.alerts?.activeAlerts),
+      recentAlerts: toArray(snapshot?.alerts?.recentAlerts),
+    },
+    recommendations: toArray(snapshot?.recommendations),
+    inventory: toArray(snapshot?.inventory),
+    recentOrders: toArray(snapshot?.recentOrders),
+    recentEvents: toArray(snapshot?.recentEvents),
+    auditLogs: toArray(snapshot?.auditLogs),
+    systemIncidents: toArray(snapshot?.systemIncidents),
+    integrationConnectors: toArray(snapshot?.integrationConnectors),
+    integrationImportRuns: toArray(snapshot?.integrationImportRuns),
+    integrationReplayQueue: toArray(snapshot?.integrationReplayQueue),
+    scenarioNotifications: toArray(snapshot?.scenarioNotifications),
+    slaEscalations: toArray(snapshot?.slaEscalations),
+    recentScenarios: toArray(snapshot?.recentScenarios),
+    fulfillment: {
+      ...(snapshot?.fulfillment || {}),
+      activeFulfillments: toArray(snapshot?.fulfillment?.activeFulfillments),
+    },
+  }
+  catalogState = { ...(catalogState || {}), products: toArray(catalogState?.products) }
+  warehouseOptions = toArray(warehouseOptions)
+  fulfillmentOverview = {
+    ...(fulfillmentOverview || {}),
+    activeFulfillments: toArray(fulfillmentOverview?.activeFulfillments),
+  }
+  scenarioHistoryItems = toArray(scenarioHistoryItems)
+  systemIncidents = toArray(systemIncidents)
+  accessAdminUsers = toArray(accessAdminUsers)
+  tenantDirectoryState = { ...(tenantDirectoryState || {}), items: toArray(tenantDirectoryState?.items) }
+  degradedSources = toArray(degradedSources)
   const signedInRoles = signedInSession?.roles || []
   const accessibleWorkspacePages = appPages.filter((page) => canAccessWorkspacePage(page.key, signedInRoles))
   const accessibleWorkspacePageKeys = new Set(accessibleWorkspacePages.map((page) => page.key))
