@@ -169,6 +169,7 @@ class MvpFlowIntegrationTest {
 
         String requestBody = """
             {
+              "externalOrderId": "MVP-FLX-100-001",
               "warehouseCode": "WH-NORTH",
               "items": [
                 {
@@ -898,6 +899,7 @@ class MvpFlowIntegrationTest {
     void dashboardSnapshotReturnsExpandedControlCenterData() throws Exception {
         String requestBody = """
             {
+              "externalOrderId": "MVP-SNAPSHOT-100-001",
               "warehouseCode": "WH-NORTH",
               "items": [
                 {
@@ -935,6 +937,7 @@ class MvpFlowIntegrationTest {
 
         String requestBody = """
             {
+              "externalOrderId": "SCENARIO-PREVIEW-100-001",
               "warehouseCode": "WH-NORTH",
               "items": [
                 {
@@ -1128,6 +1131,7 @@ class MvpFlowIntegrationTest {
 
         String requestBody = """
             {
+              "externalOrderId": "SCENARIO-MULTI-100-001",
               "warehouseCode": "WH-NORTH",
               "items": [
                 {
@@ -2459,6 +2463,7 @@ class MvpFlowIntegrationTest {
 
         String requestBody = """
             {
+              "externalOrderId": "MVP-MISSING-999-001",
               "warehouseCode": "WH-NORTH",
               "items": [
                 {
@@ -2478,7 +2483,7 @@ class MvpFlowIntegrationTest {
     }
 
     @Test
-    void generatedOrderIdsUseOperationalPrefixAndChangeOperationalState() throws Exception {
+    void missingExternalOrderIdIsRejectedBeforeOperationalMutation() throws Exception {
         long ordersBefore = customerOrderRepository.count();
         long totalInventoryBefore = inventoryRepository.findAll().stream()
             .mapToLong(Inventory::getQuantityAvailable)
@@ -2500,22 +2505,17 @@ class MvpFlowIntegrationTest {
         mockMvc.perform(post("/api/orders")
                 .contentType(APPLICATION_JSON)
                 .content(requestBody))
-            .andExpect(status().isCreated());
+            .andExpect(status().isBadRequest())
+            .andExpect(jsonPath("$.message").value(
+                "externalOrderId is required for live order creation; use a stable source-system order ID for retry safety."));
 
         long ordersAfter = customerOrderRepository.count();
         long totalInventoryAfter = inventoryRepository.findAll().stream()
             .mapToLong(Inventory::getQuantityAvailable)
             .sum();
 
-        assertThat(ordersAfter).isEqualTo(ordersBefore + 1);
-        assertThat(totalInventoryAfter).isLessThan(totalInventoryBefore);
-
-        mockMvc.perform(get("/api/orders/recent"))
-            .andExpect(status().isOk())
-            .andExpect(jsonPath("$[0].externalOrderId").value(org.hamcrest.Matchers.startsWith("ORD-")));
-
-        assertThat(businessEventRepository.findTop20ByOrderByCreatedAtDesc())
-            .anyMatch(event -> event.getEventType() == BusinessEventType.ORDER_INGESTED && "order-api".equals(event.getSource()));
+        assertThat(ordersAfter).isEqualTo(ordersBefore);
+        assertThat(totalInventoryAfter).isEqualTo(totalInventoryBefore);
     }
 
     @Test
@@ -4851,6 +4851,7 @@ class MvpFlowIntegrationTest {
     void successfulRequestsReturnTraceIdAndWriteAuditLogs() throws Exception {
         String requestBody = """
             {
+              "externalOrderId": "MVP-AUDIT-100-001",
               "warehouseCode": "WH-NORTH",
               "items": [
                 {
@@ -4914,6 +4915,7 @@ class MvpFlowIntegrationTest {
     void reseedRestoresStarterBaseline() throws Exception {
         String orderBody = """
             {
+              "externalOrderId": "MVP-RESEED-100-001",
               "warehouseCode": "WH-NORTH",
               "items": [
                 {

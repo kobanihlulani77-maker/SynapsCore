@@ -25,8 +25,8 @@ The Order creation boundary is transactionally safe for the tested paths:
 - the database uniqueness constraint and service precheck prevent duplicate
   stable external IDs from creating a second order;
 - concurrent duplicate stable IDs produce one created order and one conflict;
-- generated IDs are supported for direct convenience creation but are not a
-  general retry-idempotency mechanism;
+- direct live-order creation requires a stable external ID, so a lost response
+  can be retried against the same business identity;
 - one successful order creates one fulfillment lane and produces operational
   event/audit/realtime effects through the existing service path.
 
@@ -196,25 +196,25 @@ returns a safe `409` operational conflict. H2 logs the underlying unique-index
 warning during this test; that is expected evidence of the race being closed,
 not a second order or reservation.
 
-### 17. Generated-ID retry
+### 17. Missing-ID retry safety
 
-When `externalOrderId` is absent on the direct order API, the service generates
-an `ORD-...` identifier. The existing
-`MvpFlowIntegrationTest.generatedOrderIdsUseOperationalPrefixAndChangeOperationalState`
-proves generated-ID creation and operational state change.
+The direct live-order API now rejects an absent or blank `externalOrderId` with
+`400 Bad Request` before warehouse/product/inventory mutation. The focused test
+`MvpFlowIntegrationTest.missingExternalOrderIdIsRejectedBeforeOperationalMutation`
+verifies that the order count and available inventory do not change.
 
-An identical retry without a caller-supplied stable ID would generate a new
-business ID. It is therefore not safe to claim that a generated-ID retry is
-deduplicated.
+This closes the lost-response ambiguity for the intended direct operational
+boundary: callers must retain and resubmit the same stable source-system ID.
 
-### 18. Generated-ID retry classification
+### 18. Generated-ID classification
 
-**Classification B: intentional API boundary / controlled pilot requirement.**
+**Classification A resolved: required operational work completed.**
 
-The direct API supports generated IDs as a convenience path, while connector
-ingress requires an external ID. Retry-safe integration callers must preserve
-and resubmit the same source-system external ID. A future general idempotency-key
-contract would be a separate improvement and is not part of Order Phase 1.
+Generated `ORD-*` identities are no longer created by the live Order service.
+The API DTO remains nullable for internal request-shape compatibility, but the
+live creation service rejects missing IDs. Connector ingress already required a
+stable external ID, and Scenario execution is explicitly unsupported as a live
+order path.
 
 ### 19. Stable external-ID retry
 
@@ -228,9 +228,9 @@ Concurrent stable-ID protection is separately proven by the test in item 16.
 The platform carries a request correlation ID through request handling, logs and
 error responses. That request ID is diagnostic correlation, not the business
 deduplication key. `externalOrderId` is the business identity used for duplicate
-protection within a tenant. There is no general request-ID idempotency contract
-that turns a retried request with a newly generated business ID into the same
-order.
+protection within a tenant. There is no general request-ID idempotency contract;
+callers must retry with the same stable business ID rather than rely on request
+correlation to create one.
 
 ### 21. Connector default-warehouse boundary
 
@@ -271,10 +271,13 @@ in this backend-focused suite.
 
 ### 25. Production defects
 
-No Classification A production defect was found in the Phase 1 creation,
-authority, atomicity or duplicate-safety scope.
+A Classification A production gap was found in the Phase 1 retry-safety scope:
+the direct live order service generated a new business ID when the caller
+omitted `externalOrderId`. That gap was fixed by requiring a stable external ID
+before any live order mutation.
 
-No backend runtime code was changed.
+No unresolved Classification A production defect remains in the tested Phase 1
+scope.
 
 ### 26. Test or fixture defects
 
@@ -290,7 +293,7 @@ expected `201/409` pair.
 
 ### 27. Fixes made
 
-Only verification changes were made:
+The smallest production and verification changes were made:
 
 - added multi-line success coverage;
 - added multi-line rollback coverage;
@@ -298,17 +301,23 @@ Only verification changes were made:
 - added concurrent duplicate external-ID coverage;
 - corrected the rollback test transaction isolation so assertions read committed
   state;
+- changed live order creation to reject missing or blank external IDs before
+  operational mutation;
+- updated existing successful order fixtures to provide stable synthetic IDs;
+- updated the API and onboarding documentation to make the live-ID requirement
+  explicit;
 - added this evidence document.
 
-No product source, API contract, frontend code, database migration or proof
-selector was changed.
+No frontend code, database migration or proof selector was changed. The live
+order service boundary and its documented API requirement were intentionally
+changed to close the retry-safety gap.
 
 ### 28. Classification A/B/C/D
 
 | Classification | Phase 1 result |
 | --- | --- |
-| A: required operational work / production defect | None found. No blocker. |
-| B: intentional boundary or controlled-pilot limitation | Generated IDs are not retry-idempotent; stable external IDs are required for retry-safe integration behavior. Direct duplicate-line semantics differ from connector normalization by policy. |
+| A: required operational work / production defect | Missing live external-ID enforcement was fixed and verified. No unresolved blocker. |
+| B: intentional boundary or controlled-pilot limitation | Direct duplicate-line semantics differ from connector normalization by policy. A general idempotency-key contract remains outside this phase. |
 | C: evidence or fixture limitation | Phase 1 concurrency evidence runs on H2; PostgreSQL-specific contention behavior and production load characteristics are not claimed here. Full connector/realtime consumer observation is not part of this phase. |
 | D: deferred scope | Deep CSV/webhook/integration/replay verification, Order Phase 2 lifecycle work, and broader performance/scale validation. |
 
@@ -334,8 +343,10 @@ failures, 0 errors.
 
 ### 30. Full backend result if required
 
-Not required and not rerun. No production code changed. The focused suite covers
-the intended Order Phase 1 boundary and the relevant existing authority suites.
+Because production order-service code changed, the full backend suite was run:
+
+- **199 tests, 0 failures, 0 errors**;
+- Maven result: `BUILD SUCCESS`.
 
 ### 31. Frontend checks
 
@@ -347,9 +358,14 @@ no mutation UI or selector contract was changed.
 
 Intended Phase 1 files:
 
+- `backend/src/main/java/com/synapsecore/domain/service/OrderService.java`
 - `backend/src/test/java/com/synapsecore/MvpFlowIntegrationTest.java`
-- `backend/src/test/java/com/synapsecore/InventoryConcurrencyIntegrationTest.java`
+- `docs/api-spec.md`
+- `docs/company-data-onboarding-runbook.md`
 - `docs/evidence/order-lifecycle-phase-1-creation-atomicity.md`
+
+The existing `InventoryConcurrencyIntegrationTest.java` was not changed in this
+completeness pass and remains part of the previously committed Phase 1 evidence.
 
 Unrelated pre-existing worktree changes were preserved and are not part of this
 closure:
@@ -361,15 +377,14 @@ closure:
 
 ### 33. Commits
 
-The intended files are to be committed as one Phase 1 evidence change with the
+The intended files are committed as one Phase 1 completeness change with the
 message:
 
 ```text
-Verify Order creation atomicity and duplicate safety
+Require stable IDs for live order creation
 ```
 
-The commit SHA and push result are recorded in the closure response after the
-commit is created.
+The exact commit SHA and push result are recorded in the closure response.
 
 ### 34. Critical blockers
 
@@ -381,15 +396,15 @@ commit is created.
 
 ### 36. Classification A remaining
 
-**None.** The tested Order creation path does not require a production fix before
-Phase 1 closure.
+**None remaining.** The missing external-ID enforcement gap was fixed and
+verified before closure.
 
 ### 37. Readiness for Phase 2
 
 The repository is ready to begin Order Phase 2 only after this Phase 1 evidence
 is committed and pushed. Phase 2 is not started by this change. Its scope must
-be agreed separately and should not reinterpret the generated-ID limitation as
-already solved.
+be agreed separately and should not expand this boundary into a generic
+idempotency platform without operational evidence.
 
 ### 38. Phase 1 verdict
 
@@ -401,7 +416,8 @@ transaction rollback, duplicate lines, sequential duplicate IDs, concurrent
 duplicate IDs and immediate fulfillment/event/audit consistency. The remaining
 limitations are explicitly classified rather than hidden:
 
-- stable external IDs are required for retry-safe ingress;
+- stable external IDs are now required for direct and connector-backed live
+  creation;
 - no general request-ID idempotency key exists;
 - Phase 1 concurrency evidence uses H2 rather than a production PostgreSQL
   contention run;

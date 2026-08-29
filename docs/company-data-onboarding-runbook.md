@@ -140,7 +140,7 @@ In current SynapseCore, an order is a tenant-owned live operational record with 
 | --- | --- | --- | --- |
 | `id` | generated `Long` | System-generated | Internal primary key. |
 | `tenant` | many-to-one `Tenant` | System-controlled | Tenant must match warehouse tenant. |
-| `externalOrderId` | required length 80 | Required or generated | Preserves source order identity when supplied. |
+| `externalOrderId` | required length 80 | Required for live order creation | Preserves source order identity and makes retries safe within the tenant. |
 | `status` | `OrderStatus` | System-managed | Created as `CREATED`, immediately moved to `RECEIVED` on create. |
 | `statusReason` | length 320 | System-managed | Explains latest transition/source. |
 | `totalAmount` | decimal 14,2 | System-calculated | Sum of quantity x unit price. |

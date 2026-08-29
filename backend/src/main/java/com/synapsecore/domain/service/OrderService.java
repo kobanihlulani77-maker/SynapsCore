@@ -27,7 +27,6 @@ import java.math.BigDecimal;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.UUID;
 import lombok.extern.slf4j.Slf4j;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.ObjectProvider;
@@ -461,7 +460,10 @@ public class OrderService {
         if (externalOrderId != null && !externalOrderId.isBlank()) {
             return externalOrderId.trim();
         }
-        return "ORD-" + UUID.randomUUID().toString().substring(0, 8).toUpperCase();
+        throw new ResponseStatusException(
+            HttpStatus.BAD_REQUEST,
+            "externalOrderId is required for live order creation; use a stable source-system order ID for retry safety."
+        );
     }
 
     private void ensureOrderIdIsAvailable(String tenantCode, String externalOrderId) {

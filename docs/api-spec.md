@@ -6,6 +6,11 @@
 
 Create and process a new incoming order.
 
+`externalOrderId` is required for live order creation. Callers must supply the
+stable source-system order identity so a lost response can be retried without
+creating a second order or reservation. The direct endpoint does not generate a
+retry identity.
+
 Example body:
 
 ```json
