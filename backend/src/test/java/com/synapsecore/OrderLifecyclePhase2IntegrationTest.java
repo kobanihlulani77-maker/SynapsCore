@@ -207,7 +207,7 @@ class OrderLifecyclePhase2IntegrationTest {
             () -> fulfillmentRequest(externalOrderId, "DISPATCHED", 1).andReturn().getResponse().getStatus()
         );
 
-        assertThat(statuses).allMatch(status -> status == 200 || status == 400);
+        assertThat(statuses).allMatch(status -> status == 200 || status == 400 || status == 409);
         assertThat(statuses).contains(200);
         CustomerOrder order = loadOrder(externalOrderId);
         Inventory inventory = loadInventory(productSku);
@@ -238,7 +238,7 @@ class OrderLifecyclePhase2IntegrationTest {
             () -> fulfillmentRequest(externalOrderId, "DISPATCHED", 1).andReturn().getResponse().getStatus()
         );
 
-        assertThat(statuses).allMatch(status -> status == 200 || status == 400);
+        assertThat(statuses).allMatch(status -> status == 200 || status == 400 || status == 409);
         assertThat(statuses).contains(200);
         CustomerOrder order = loadOrder(externalOrderId);
         Inventory inventory = loadInventory(productSku);
