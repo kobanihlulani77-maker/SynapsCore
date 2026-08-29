@@ -67,6 +67,12 @@ The response includes:
 
 Moves an order through the fulfillment or delivery lane and re-runs logistics risk monitoring.
 
+Retry identity:
+
+- Callers performing an additive fulfillment update (`fulfilledUnits > 0`) must generate a stable `X-Request-Id` before the first request and reuse that same value if the response is lost or the outcome is uncertain.
+- SynapseCore persists the successful fulfillment audit with that tenant-scoped request identity. Reusing the same request ID for the same Order returns the committed fulfillment state without applying the delta, consuming stock, or publishing a second business event.
+- A new request ID represents a distinct fulfillment operation and may apply a legitimate additional delta. If a caller omits the header, the server-generated response ID cannot be recovered after a lost response, so arbitrary blind retry safety is not claimed for that request.
+
 Example body:
 
 ```json

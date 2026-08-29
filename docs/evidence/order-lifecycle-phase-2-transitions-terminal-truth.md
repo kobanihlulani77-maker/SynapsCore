@@ -187,7 +187,40 @@ The following are verified:
 - concurrent fulfillment/cancellation/failure is serialized by locks;
 - terminal fulfillment synchronization cannot reopen a terminal order.
 
-The current `FulfillmentUpdateRequest` has no persisted caller event id or idempotency key. A positive `fulfilledUnits` value is interpreted as a delta, so an external caller must not blindly resend the same partial dispatch delta after an unknown response. This is an explicit current integration contract limitation, not a claim of general fulfillment event-id idempotency. A future hardening change should add a stable event identity and persisted deduplication boundary before treating arbitrary network retries of partial fulfillment as safe.
+Positive fulfillment deltas now use the existing `X-Request-Id` as the caller-stable retry identity. The request ID is persisted in the successful `FULFILLMENT_UPDATED` audit record, scoped by tenant, action, and Order external ID. After the Order and FulfillmentTask locks are acquired, a repeat with the same identity returns the committed task state before applying the delta or publishing downstream operational evidence.
+
+The controlled-pilot contract is explicit: callers performing an additive fulfillment update must generate `X-Request-Id` before the first request and reuse it after a timeout or lost response. A new request ID means a distinct fulfillment operation. If the first request omitted the header, the server-generated response ID cannot be recovered after a lost response, so arbitrary blind retry safety is not claimed for that request.
+
+This is the same persisted-audit identity pattern already used by Inventory receive, adjustment, and reconciliation. No new event table, event bus, or broad idempotency subsystem was introduced.
+
+## Orders Phase 2 Final Retry Completeness
+
+### Production caller census
+
+The only production mutation entry point is `POST /api/fulfillment/updates` in `FulfillmentController`, which delegates to `FulfillmentService.recordUpdate`. No frontend source, webhook path, CSV importer, scheduled connector worker, or integration replay service directly calls this fulfillment update path. `scripts/verify-company-readiness.ps1` is support/manual verification tooling and currently submits a non-additive `DELAYED` update without a positive fulfillment delta. Tests are the remaining direct callers.
+
+There is no automatic fulfillment retry in the frontend or backend. A controlled external or operator caller can safely retry an uncertain additive update by reusing the original caller-supplied `X-Request-Id`.
+
+### Identity model
+
+- `externalOrderId` is the tenant-scoped business Order identity and the fulfillment target reference.
+- `X-Request-Id` is the caller-stable transport/operation identity for a retryable request. It remains distinct from the business Order identity and internal FulfillmentTask ID.
+- FulfillmentTask ID is the internal persisted fulfillment-lane identity.
+- There is no separate source-system fulfillment event ID in the current API contract. The supported retry contract uses the existing request trace identity.
+
+### Focused retry proof
+
+The focused `OrderLifecyclePhase2IntegrationTest` now includes a seven-test regression suite. Its isolated fixture creates an Order for 10 units, applies event A as `+3`, repeats event A with the same `X-Request-Id`, then applies event B as `+7` with a different request ID.
+
+| Check | Result |
+| --- | --- |
+| Same logical `+3` retry | Repeat returns `200` without a second quantity application. Fulfilled remains `3`; reserved remains `7`; on-hand becomes `7`; available remains `0`. |
+| Distinct `+7` event | New request identity progresses the same Order to fulfilled `10`; reserved, on-hand, and available each become `0`. |
+| Audit evidence | One successful `FULFILLMENT_UPDATED` audit record for event A and one for event B; no duplicate business fulfillment evidence for the retry. |
+| Business event evidence | One `FULFILLMENT_UPDATED` event for event A and one for event B. |
+| Multi-line behavior | The current fulfillment request is aggregate at Order/FulfillmentTask level and has no line identifier. Line-specific fulfillment updates are not part of the supported API, so no separate-line dedupe claim is made. |
+
+Before this correction, the same additive `+3` request entered the normal delta path again and would have advanced the task and Order line to `6` while consuming another three units from the reservation. That was a Classification A operational defect for a realistic lost-response retry and is now fixed at the existing locked fulfillment boundary.
 
 ## Findings and Disposition
 
@@ -197,10 +230,10 @@ The current `FulfillmentUpdateRequest` has no persisted caller event id or idemp
 | Partial failure did not release outstanding reservation | Classification A, fixed | Failure now releases outstanding reservation while preserving fulfilled units; focused proof passes. |
 | Fulfillment could reopen a cancelled/failed order | Classification A, fixed | Shared operational status validation blocks terminal reopening; focused proof passes. |
 | Direct fulfillment delivery from `RECEIVED` is an existing supported path | Compatibility boundary | Preserved only for fulfillment-derived delivery; manual transition remains guarded. |
-| No persisted event-id dedupe for positive partial fulfillment deltas | Pilot operating limitation / future hardening | Not expanded in this phase because it would change the request contract. Do not claim arbitrary partial fulfillment retry safety. |
+| Positive partial fulfillment retry could double-apply an uncertain delta | Classification A, fixed | Reused caller-supplied `X-Request-Id` is matched against the persisted successful fulfillment audit after the locked Order/Task read; the repeat returns committed state without a second stock, Order, event, audit, or realtime mutation. |
 
 ## Verification Interpretation
 
-The code-level Orders Phase 2 gate is green. The full suite confirms that the narrow changes preserve the existing 199-test baseline and add six passing Phase 2 tests, for 205 total. The test environment uses the repository's existing test profile and H2-backed integration contexts; this report does not substitute for deployment-owner confirmation against the live PostgreSQL/Redis deployment.
+The Orders Phase 2 retry-completeness gate is green. The focused suite now reports 7 tests, 0 failures, and 0 errors. The full backend suite after the narrow retry correction reports 206 tests, 0 failures, and 0 errors. The test environment uses the repository's existing test profile and H2-backed integration contexts; this report does not substitute for deployment-owner confirmation against the live PostgreSQL/Redis deployment.
 
 Orders Phase 3 is intentionally not started.

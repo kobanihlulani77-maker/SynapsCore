@@ -3,11 +3,13 @@ package com.synapsecore.fulfillment;
 import com.synapsecore.alert.AlertService;
 import com.synapsecore.access.AccessDirectoryService;
 import com.synapsecore.audit.AuditLogService;
+import com.synapsecore.audit.RequestTraceContext;
 import com.synapsecore.decision.RecommendationService;
 import com.synapsecore.domain.dto.FulfillmentOverviewResponse;
 import com.synapsecore.domain.dto.FulfillmentStatusResponse;
 import com.synapsecore.domain.dto.FulfillmentUpdateRequest;
 import com.synapsecore.domain.entity.AlertSeverity;
+import com.synapsecore.domain.entity.AuditStatus;
 import com.synapsecore.domain.entity.BusinessEventType;
 import com.synapsecore.domain.entity.CustomerOrder;
 import com.synapsecore.domain.entity.FulfillmentStatus;
@@ -15,6 +17,7 @@ import com.synapsecore.domain.entity.FulfillmentTask;
 import com.synapsecore.domain.entity.Recommendation;
 import com.synapsecore.domain.repository.CustomerOrderRepository;
 import com.synapsecore.domain.repository.FulfillmentTaskRepository;
+import com.synapsecore.domain.repository.AuditLogRepository;
 import com.synapsecore.domain.service.OrderService;
 import com.synapsecore.domain.service.TenantOperationalPolicyService;
 import com.synapsecore.event.BusinessEventService;
@@ -69,6 +72,8 @@ public class FulfillmentService {
     private final AlertService alertService;
     private final BusinessEventService businessEventService;
     private final AuditLogService auditLogService;
+    private final AuditLogRepository auditLogRepository;
+    private final RequestTraceContext requestTraceContext;
     private final OperationalStateChangePublisher operationalStateChangePublisher;
     private final OrderService orderService;
     private final TenantContextService tenantContextService;
@@ -146,6 +151,10 @@ public class FulfillmentService {
         entityManager.refresh(order, LockModeType.PESSIMISTIC_WRITE);
         task.setCustomerOrder(order);
 
+        if (wasCompletedMutation(tenantCode, order.getExternalOrderId())) {
+            return toResponse(task, buildWarehouseAssessment(task, Instant.now()));
+        }
+
         applyUpdate(task, request);
         CustomerOrder synchronizedOrder = orderService.synchronizeOrderLifecycleFromFulfillment(
             task,
@@ -181,6 +190,17 @@ public class FulfillmentService {
         evaluateTask(savedTask, source);
         operationalStateChangePublisher.publish(OperationalUpdateType.FULFILLMENT_UPDATE, source);
         return toResponse(savedTask, buildWarehouseAssessment(savedTask, Instant.now()));
+    }
+
+    private boolean wasCompletedMutation(String tenantCode, String externalOrderId) {
+        return auditLogRepository.findTopByTenantCodeIgnoreCaseAndActionAndTargetRefAndRequestIdAndStatus(
+                tenantCode,
+                "FULFILLMENT_UPDATED",
+                externalOrderId,
+                requestTraceContext.getRequiredRequestId(),
+                AuditStatus.SUCCESS
+            )
+            .isPresent();
     }
 
     @Transactional(readOnly = true)

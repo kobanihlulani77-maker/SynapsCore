@@ -10,6 +10,9 @@ import com.synapsecore.domain.entity.FulfillmentTask;
 import com.synapsecore.domain.entity.Inventory;
 import com.synapsecore.domain.entity.OrderStatus;
 import com.synapsecore.domain.entity.Product;
+import com.synapsecore.domain.entity.BusinessEventType;
+import com.synapsecore.domain.repository.AuditLogRepository;
+import com.synapsecore.domain.repository.BusinessEventRepository;
 import com.synapsecore.domain.repository.CustomerOrderRepository;
 import com.synapsecore.domain.repository.FulfillmentTaskRepository;
 import com.synapsecore.domain.repository.InventoryRepository;
@@ -57,6 +60,12 @@ class OrderLifecyclePhase2IntegrationTest {
     private FulfillmentTaskRepository fulfillmentTaskRepository;
 
     @Autowired
+    private AuditLogRepository auditLogRepository;
+
+    @Autowired
+    private BusinessEventRepository businessEventRepository;
+
+    @Autowired
     private TransactionTemplate transactionTemplate;
 
     @Test
@@ -78,6 +87,52 @@ class OrderLifecyclePhase2IntegrationTest {
         assertThat(inventory.getQuantityOnHand()).isEqualTo(6L);
         assertThat(inventory.getQuantityReserved()).isEqualTo(6L);
         assertThat(inventory.getQuantityAvailable()).isEqualTo(0L);
+    }
+
+    @Test
+    void repeatedPartialFulfillmentRequestIdIsRepeatSafeAndDistinctEventStillProgresses() throws Exception {
+        String externalOrderId = "ORDER-P2-RETRY-" + System.nanoTime();
+        String productSku = "SKU-ORDER-P2-RETRY-" + System.nanoTime();
+        String firstEventId = "order-p2-retry-first-" + System.nanoTime();
+        String secondEventId = "order-p2-retry-second-" + System.nanoTime();
+        createInventory(productSku, 10L);
+        createOrder(externalOrderId, productSku, 10);
+
+        long auditBefore = fulfillmentAuditCount(externalOrderId);
+        long businessEventsBefore = fulfillmentBusinessEventCount(externalOrderId);
+
+        fulfillmentRequest(externalOrderId, "DISPATCHED", 3, firstEventId)
+            .andExpect(status().isOk());
+        fulfillmentRequest(externalOrderId, "DISPATCHED", 3, firstEventId)
+            .andExpect(status().isOk());
+
+        CustomerOrder afterRetry = loadOrder(externalOrderId);
+        Inventory inventoryAfterRetry = loadInventory(productSku);
+        FulfillmentTask taskAfterRetry = loadTask(externalOrderId);
+        assertThat(afterRetry.getItems().get(0).getFulfilledQuantity()).isEqualTo(3);
+        assertThat(afterRetry.getItems().get(0).getReservedQuantity()).isEqualTo(7);
+        assertThat(taskAfterRetry.getFulfilledUnits()).isEqualTo(3);
+        assertThat(inventoryAfterRetry.getQuantityOnHand()).isEqualTo(7L);
+        assertThat(inventoryAfterRetry.getQuantityReserved()).isEqualTo(7L);
+        assertThat(inventoryAfterRetry.getQuantityAvailable()).isEqualTo(0L);
+        assertThat(fulfillmentAuditCount(externalOrderId)).isEqualTo(auditBefore + 1);
+        assertThat(fulfillmentBusinessEventCount(externalOrderId)).isEqualTo(businessEventsBefore + 1);
+
+        fulfillmentRequest(externalOrderId, "DISPATCHED", 7, secondEventId)
+            .andExpect(status().isOk());
+
+        CustomerOrder afterDistinctEvent = loadOrder(externalOrderId);
+        Inventory inventoryAfterDistinctEvent = loadInventory(productSku);
+        FulfillmentTask taskAfterDistinctEvent = loadTask(externalOrderId);
+        assertThat(afterDistinctEvent.getStatus()).isEqualTo(OrderStatus.FULFILLED);
+        assertThat(afterDistinctEvent.getItems().get(0).getFulfilledQuantity()).isEqualTo(10);
+        assertThat(afterDistinctEvent.getItems().get(0).getReservedQuantity()).isEqualTo(0);
+        assertThat(taskAfterDistinctEvent.getFulfilledUnits()).isEqualTo(10);
+        assertThat(inventoryAfterDistinctEvent.getQuantityOnHand()).isEqualTo(0L);
+        assertThat(inventoryAfterDistinctEvent.getQuantityReserved()).isEqualTo(0L);
+        assertThat(inventoryAfterDistinctEvent.getQuantityAvailable()).isEqualTo(0L);
+        assertThat(fulfillmentAuditCount(externalOrderId)).isEqualTo(auditBefore + 2);
+        assertThat(fulfillmentBusinessEventCount(externalOrderId)).isEqualTo(businessEventsBefore + 2);
     }
 
     @Test
@@ -242,14 +297,39 @@ class OrderLifecyclePhase2IntegrationTest {
 
     private org.springframework.test.web.servlet.ResultActions fulfillmentRequest(
             String externalOrderId, String fulfillmentStatus, Integer fulfilledUnits) throws Exception {
+        return fulfillmentRequest(externalOrderId, fulfillmentStatus, fulfilledUnits, null);
+    }
+
+    private org.springframework.test.web.servlet.ResultActions fulfillmentRequest(
+            String externalOrderId, String fulfillmentStatus, Integer fulfilledUnits, String requestId) throws Exception {
         String body = """
             {"externalOrderId":"%s","status":"%s","fulfilledUnits":%s,"note":"Order Phase 2 proof"}
             """.formatted(externalOrderId, fulfillmentStatus, fulfilledUnits);
-        return mockMvc.perform(post("/api/fulfillment/updates")
+        var request = post("/api/fulfillment/updates")
             .with(accessHeaders("Integration Lead", "INTEGRATION_ADMIN"))
             .header("X-Synapse-Tenant", "STARTER-OPS")
             .contentType(APPLICATION_JSON)
-            .content(body));
+            .content(body);
+        if (requestId != null) {
+            request.header("X-Request-Id", requestId);
+        }
+        return mockMvc.perform(request);
+    }
+
+    private long fulfillmentAuditCount(String externalOrderId) {
+        return auditLogRepository.findAll().stream()
+            .filter(log -> "STARTER-OPS".equalsIgnoreCase(log.getTenantCode()))
+            .filter(log -> "FULFILLMENT_UPDATED".equals(log.getAction()))
+            .filter(log -> externalOrderId.equals(log.getTargetRef()))
+            .count();
+    }
+
+    private long fulfillmentBusinessEventCount(String externalOrderId) {
+        return businessEventRepository.findAll().stream()
+            .filter(event -> "STARTER-OPS".equalsIgnoreCase(event.getTenantCode()))
+            .filter(event -> event.getEventType() == BusinessEventType.FULFILLMENT_UPDATED)
+            .filter(event -> event.getPayloadSummary().contains(externalOrderId))
+            .count();
     }
 
     private org.springframework.test.web.servlet.ResultActions transitionOrder(
