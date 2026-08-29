@@ -23,6 +23,8 @@ import com.synapsecore.event.OperationalUpdateType;
 import com.synapsecore.observability.OperationalMetricsService;
 import com.synapsecore.tenant.TenantContextService;
 import com.synapsecore.tenant.TenantScopeGuard;
+import jakarta.persistence.EntityManager;
+import jakarta.persistence.LockModeType;
 import java.time.Duration;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
@@ -72,6 +74,7 @@ public class FulfillmentService {
     private final TenantContextService tenantContextService;
     private final TenantScopeGuard tenantScopeGuard;
     private final OperationalMetricsService operationalMetricsService;
+    private final EntityManager entityManager;
     private final TenantOperationalPolicyService tenantOperationalPolicyService;
     private final AccessDirectoryService accessDirectoryService;
 
@@ -130,13 +133,18 @@ public class FulfillmentService {
     @Transactional
     public FulfillmentStatusResponse recordUpdate(FulfillmentUpdateRequest request, String source) {
         String tenantCode = tenantContextService.getCurrentTenantCodeOrDefault();
-        CustomerOrder order = customerOrderRepository.findByTenant_CodeIgnoreCaseAndExternalOrderId(tenantCode, request.externalOrderId().trim())
+        CustomerOrder order = customerOrderRepository.findByTenant_CodeIgnoreCaseAndExternalOrderIdForUpdate(tenantCode, request.externalOrderId().trim())
             .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Order not found: " + request.externalOrderId()));
         tenantScopeGuard.requireCustomerOrder(order, "fulfillment update");
-        FulfillmentTask task = fulfillmentTaskRepository.findByTenant_CodeIgnoreCaseAndCustomerOrder_ExternalOrderId(tenantCode, order.getExternalOrderId())
+        FulfillmentTask task = fulfillmentTaskRepository.findByTenant_CodeIgnoreCaseAndCustomerOrder_ExternalOrderIdForUpdate(tenantCode, order.getExternalOrderId())
             .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND,
                 "Fulfillment task not found for order " + request.externalOrderId()));
         tenantScopeGuard.requireFulfillmentTask(task, "fulfillment update");
+        order = customerOrderRepository.findByIdForUpdate(order.getId())
+            .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND,
+                "Order not found: " + request.externalOrderId()));
+        entityManager.refresh(order, LockModeType.PESSIMISTIC_WRITE);
+        task.setCustomerOrder(order);
 
         applyUpdate(task, request);
         CustomerOrder synchronizedOrder = orderService.synchronizeOrderLifecycleFromFulfillment(
