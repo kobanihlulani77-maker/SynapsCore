@@ -1,5 +1,6 @@
 package com.synapsecore.integration;
 
+import com.synapsecore.access.SynapseActorContext;
 import com.synapsecore.audit.RequestTraceContext;
 import com.synapsecore.domain.dto.OrderCreateRequest;
 import com.synapsecore.domain.dto.OrderItemRequest;
@@ -36,9 +37,16 @@ public class ExternalOrderWebhookService {
 
     public ExternalOrderWebhookResponse ingest(ExternalOrderWebhookRequest request,
                                                com.synapsecore.domain.entity.IntegrationConnector authenticatedConnector) {
+        return ingest(request, authenticatedConnector, null);
+    }
+
+    public ExternalOrderWebhookResponse ingest(ExternalOrderWebhookRequest request,
+                                               com.synapsecore.domain.entity.IntegrationConnector authenticatedConnector,
+                                               SynapseActorContext humanActor) {
         String sourceSystem = request.sourceSystem().trim().toLowerCase(Locale.ROOT);
         OrderCreateRequest mappedRequest = null;
         Long inboundRecordId = null;
+        OrderResponse createdOrder = null;
         String tenantCode = requestTraceContext.getCurrentTenant()
             .filter(currentTenant -> !RequestTraceContext.MISSING_TENANT_CONTEXT.equalsIgnoreCase(currentTenant))
             .orElse(authenticatedConnector != null ? integrationConnectorService.resolveTenantCode(authenticatedConnector) : null);
@@ -70,9 +78,10 @@ public class ExternalOrderWebhookService {
                 mapItems(request)
             );
             mappedRequest = preparedOrder.orderRequest();
+            requireHumanWarehouseAccess(humanActor, mappedRequest.warehouseCode());
             String ingestionSource = "integration-webhook:" + sourceSystem.toLowerCase(Locale.ROOT);
 
-            OrderResponse order = orderService.createOrder(mappedRequest, ingestionSource);
+            createdOrder = orderService.createOrder(mappedRequest, ingestionSource);
             integrationInboundRecordService.markAccepted(inboundRecordId, ingestionSource);
             integrationImportRunService.recordRun(
                 sourceSystem,
@@ -81,14 +90,14 @@ public class ExternalOrderWebhookService {
                 1,
                 1,
                 0,
-                "Accepted webhook order " + order.externalOrderId() + " from " + sourceSystem + "."
+                "Accepted webhook order " + createdOrder.externalOrderId() + " from " + sourceSystem + "."
             );
 
             return new ExternalOrderWebhookResponse(
                 sourceSystem,
                 ingestionSource,
                 Instant.now(),
-                order
+                createdOrder
             );
         } catch (org.springframework.web.server.ResponseStatusException exception) {
             var failure = IntegrationFailureCodes.extract(exception);
@@ -106,25 +115,61 @@ public class ExternalOrderWebhookService {
                 1,
                 0,
                 1,
-                "Rejected webhook order " + (mappedRequest == null ? request.externalOrderId().trim() : mappedRequest.externalOrderId()) + " from " + sourceSystem
+                "Rejected webhook order " + (mappedRequest == null ? normalizeExternalOrderId(request.externalOrderId()) : mappedRequest.externalOrderId()) + " from " + sourceSystem
                     + ". Reason: " + failure.failureMessage()
             );
-            integrationReplayService.recordFailure(
-                tenantCode,
-                sourceSystem,
-                IntegrationConnectorType.WEBHOOK_ORDER,
-                mappedRequest == null
-                    ? new OrderCreateRequest(
-                        request.externalOrderId().trim(),
-                        request.warehouseCode() == null ? "" : request.warehouseCode().trim(),
-                        mapItems(request)
-                    )
-                    : mappedRequest,
-                failure.failureCode(),
-                failure.failureMessage(),
-                inboundRecordId
-            );
+            if (IntegrationFailureCodes.isReplayable(failure.failureCode())) {
+                integrationReplayService.recordFailure(
+                    tenantCode,
+                    sourceSystem,
+                    IntegrationConnectorType.WEBHOOK_ORDER,
+                    mappedRequest == null
+                        ? new OrderCreateRequest(
+                            request.externalOrderId().trim(),
+                            request.warehouseCode() == null ? "" : request.warehouseCode().trim(),
+                            mapItems(request)
+                        )
+                        : mappedRequest,
+                    failure.failureCode(),
+                    failure.failureMessage(),
+                    inboundRecordId
+                );
+            }
             throw exception;
+        } catch (RuntimeException exception) {
+            String failureMessage = "Webhook processing failed unexpectedly; operator reconciliation is required.";
+            operationalMetricsService.recordIntegrationFailure(tenantCode, sourceSystem, IntegrationFailureCode.UNKNOWN.name());
+            if (inboundRecordId != null) {
+                if (createdOrder == null) {
+                    try {
+                        integrationInboundRecordService.markRejected(inboundRecordId, IntegrationFailureCode.UNKNOWN, failureMessage);
+                    } catch (RuntimeException evidenceException) {
+                        log.error("Webhook rejection evidence could not be finalized for inbound record {}.", inboundRecordId,
+                            evidenceException);
+                    }
+                } else {
+                    try {
+                        integrationInboundRecordService.markAccepted(inboundRecordId,
+                            "integration-webhook:" + sourceSystem.toLowerCase(Locale.ROOT));
+                    } catch (RuntimeException evidenceException) {
+                        log.error("Accepted webhook evidence could not be finalized for inbound record {} after order {} was created.",
+                            inboundRecordId, createdOrder.externalOrderId(), evidenceException);
+                    }
+                }
+            }
+            log.error("Webhook ingestion failed unexpectedly for source {} tenant {} externalOrderId {}.",
+                sourceSystem, tenantCode, request.externalOrderId(), exception);
+            throw exception;
+        }
+    }
+
+    private void requireHumanWarehouseAccess(SynapseActorContext humanActor, String warehouseCode) {
+        if (humanActor != null && !humanActor.canAccessWarehouse(warehouseCode)) {
+            throw new org.springframework.web.server.ResponseStatusException(
+                org.springframework.http.HttpStatus.FORBIDDEN,
+                "Current actor " + humanActor.actorName()
+                    + " is not assigned to warehouse " + warehouseCode + "."
+            );
         }
     }
 
@@ -136,5 +181,9 @@ public class ExternalOrderWebhookService {
                 item.unitPrice()
             ))
             .toList();
+    }
+
+    private String normalizeExternalOrderId(String externalOrderId) {
+        return externalOrderId == null ? "<missing>" : externalOrderId.trim();
     }
 }

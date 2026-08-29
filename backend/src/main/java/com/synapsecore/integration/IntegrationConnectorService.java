@@ -31,6 +31,8 @@ import java.time.Instant;
 import com.synapsecore.tenant.TenantContextService;
 import java.nio.charset.StandardCharsets;
 import java.net.URI;
+import java.net.InetAddress;
+import java.net.UnknownHostException;
 import java.net.URISyntaxException;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
@@ -65,6 +67,9 @@ public class IntegrationConnectorService {
     @org.springframework.beans.factory.annotation.Value("${synapsecore.integration.health-window-hours:24}")
     private long integrationHealthWindowHours;
 
+    @org.springframework.beans.factory.annotation.Value("${synapsecore.integration.pull-worker.allow-local-targets:false}")
+    private boolean allowLocalPullTargets;
+
     @Transactional(readOnly = true)
     public List<IntegrationConnectorResponse> getConnectors() {
         return getConnectors(null, null);
@@ -81,13 +86,20 @@ public class IntegrationConnectorService {
         return resolveConnectorSelection(tenantCode, normalizedSourceSystem, type)
             .stream()
             .filter(connector -> currentOperator.isEmpty()
-                || connector.getDefaultWarehouseCode() == null
-                || connector.getDefaultWarehouseCode().isBlank()
-                || accessDirectoryService.hasWarehouseAccess(currentOperator.get(), connector.getDefaultWarehouseCode()))
+                || isConnectorVisibleTo(currentOperator.get(), connector))
             .map(connector -> exactReadback
                 ? describeConnectorForExactReadback(connector)
                 : describeConnector(connector))
             .toList();
+    }
+
+    private boolean isConnectorVisibleTo(AccessOperator operator, IntegrationConnector connector) {
+        if (operator.getWarehouseScopes() == null || operator.getWarehouseScopes().isEmpty()) {
+            return true;
+        }
+        String defaultWarehouseCode = normalizeOptional(connector.getDefaultWarehouseCode());
+        return defaultWarehouseCode != null
+            && accessDirectoryService.hasWarehouseAccess(operator, defaultWarehouseCode);
     }
 
     @Transactional
@@ -396,7 +408,16 @@ public class IntegrationConnectorService {
             return;
         }
         String trimmedToken = request.inboundAccessToken().trim();
-        connector.setInboundAccessTokenHash(hashInboundAccessToken(trimmedToken));
+        String tokenHash = hashInboundAccessToken(trimmedToken);
+        boolean alreadyAssigned = integrationConnectorRepository.findAllByInboundAccessTokenHash(tokenHash).stream()
+            .anyMatch(existing -> existing.getId() == null || !existing.getId().equals(connector.getId()));
+        if (alreadyAssigned) {
+            throw IntegrationFailureCodes.badRequest(
+                IntegrationFailureCode.INVALID_CONNECTOR_TOKEN,
+                "Inbound connector token is already assigned to another connector."
+            );
+        }
+        connector.setInboundAccessTokenHash(tokenHash);
         connector.setInboundAccessTokenHint(maskInboundAccessToken(trimmedToken));
     }
 
@@ -475,18 +496,53 @@ public class IntegrationConnectorService {
         try {
             URI uri = new URI(pullEndpointUrl);
             String scheme = uri.getScheme() == null ? "" : uri.getScheme().toLowerCase(Locale.ROOT);
-            if ((!scheme.equals("https") && !scheme.equals("http")) || uri.getHost() == null || uri.getHost().isBlank()) {
+            if ((!scheme.equals("https") && !scheme.equals("http")) || uri.getHost() == null || uri.getHost().isBlank()
+                || uri.getUserInfo() != null) {
                 throw new ResponseStatusException(
                     HttpStatus.BAD_REQUEST,
-                    "pullEndpointUrl must be an absolute HTTP(S) URL for scheduled pull connectors."
+                    "pullEndpointUrl must be an absolute HTTP(S) URL without embedded credentials for scheduled pull connectors."
                 );
             }
+            requireSafePullTarget(uri);
         } catch (URISyntaxException exception) {
             throw new ResponseStatusException(
                 HttpStatus.BAD_REQUEST,
                 "pullEndpointUrl must be a valid HTTP(S) URL for scheduled pull connectors."
             );
         }
+    }
+
+    public void requireSafePullTarget(URI uri) {
+        if (allowLocalPullTargets) {
+            return;
+        }
+        String host = uri.getHost();
+        if (host == null || host.isBlank() || host.equalsIgnoreCase("localhost")) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                "Scheduled pull endpoints cannot target localhost or an unresolved host.");
+        }
+        try {
+            for (InetAddress address : InetAddress.getAllByName(host)) {
+                if (isUnsafeAddress(address)) {
+                    throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                        "Scheduled pull endpoints cannot target private, loopback, link-local, multicast, or metadata network addresses.");
+                }
+            }
+        } catch (UnknownHostException exception) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                "Scheduled pull endpoint host could not be resolved safely.");
+        }
+    }
+
+    private boolean isUnsafeAddress(InetAddress address) {
+        byte[] bytes = address.getAddress();
+        boolean uniqueLocalIpv6 = bytes.length == 16 && (bytes[0] & 0xfe) == 0xfc;
+        return address.isAnyLocalAddress()
+            || address.isLoopbackAddress()
+            || address.isLinkLocalAddress()
+            || address.isSiteLocalAddress()
+            || address.isMulticastAddress()
+            || uniqueLocalIpv6;
     }
 
     private Integer resolveSupportedMappingVersion(Integer requestedMappingVersion, Integer existingMappingVersion) {

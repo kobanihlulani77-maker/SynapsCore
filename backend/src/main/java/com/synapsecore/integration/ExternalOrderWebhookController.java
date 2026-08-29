@@ -48,10 +48,10 @@ public class ExternalOrderWebhookController {
             com.synapsecore.domain.entity.IntegrationConnectorType.WEBHOOK_ORDER,
             "accept webhook orders"
         );
-        if (authenticatedConnector.isEmpty()) {
-            accessControlService.requireHumanIngestion("ingest webhook orders");
-        }
-        return externalOrderWebhookService.ingest(request, authenticatedConnector.orElse(null));
+        var humanActor = authenticatedConnector.isEmpty()
+            ? accessControlService.requireHumanIngestion("ingest webhook orders")
+            : null;
+        return externalOrderWebhookService.ingest(request, authenticatedConnector.orElse(null), humanActor);
     }
 
     @PostMapping(value = "/csv-import", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
@@ -72,10 +72,10 @@ public class ExternalOrderWebhookController {
             com.synapsecore.domain.entity.IntegrationConnectorType.CSV_ORDER_IMPORT,
             "accept CSV imports"
         );
-        if (authenticatedConnector.isEmpty()) {
-            accessControlService.requireHumanIngestion("import CSV orders");
-        }
-        return externalOrderCsvImportService.ingest(file, sourceSystem, authenticatedConnector.orElse(null));
+        var humanActor = authenticatedConnector.isEmpty()
+            ? accessControlService.requireHumanIngestion("import CSV orders")
+            : null;
+        return externalOrderCsvImportService.ingest(file, sourceSystem, authenticatedConnector.orElse(null), humanActor);
     }
 
     @GetMapping("/connectors")

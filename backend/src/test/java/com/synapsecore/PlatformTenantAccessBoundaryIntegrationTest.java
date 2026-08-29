@@ -606,6 +606,128 @@ class PlatformTenantAccessBoundaryIntegrationTest {
     }
 
     @Test
+    void warehouseScopedHumanIngressCannotCreateOrReplayAnotherWarehouseOrder() throws Exception {
+        MockHttpSession tenantWideIntegrationAdmin = tenantLogin(
+            REHEARSAL_TENANT,
+            "boundary.integration.admin.all",
+            ROLE_PASSWORD
+        );
+        mockMvc.perform(post("/api/integrations/orders/connectors")
+                .session(tenantWideIntegrationAdmin)
+                .contentType(APPLICATION_JSON)
+                .content("""
+                    {
+                      "sourceSystem":"boundary_scoped_ingress",
+                      "type":"WEBHOOK_ORDER",
+                      "displayName":"Boundary Scoped Ingress",
+                      "enabled":true,
+                      "syncMode":"REALTIME_PUSH",
+                      "validationPolicy":"RELAXED",
+                      "transformationPolicy":"NORMALIZE_CODES",
+                      "allowDefaultWarehouseFallback":false,
+                      "defaultWarehouseCode":"%s",
+                      "notes":"Synthetic warehouse authority verification."
+                    }
+                    """.formatted(warehouseA)))
+            .andExpect(status().isOk());
+        mockMvc.perform(post("/api/integrations/orders/connectors")
+                .session(tenantWideIntegrationAdmin)
+                .contentType(APPLICATION_JSON)
+                .content("""
+                    {
+                      "sourceSystem":"boundary_scoped_batch",
+                      "type":"CSV_ORDER_IMPORT",
+                      "displayName":"Boundary Scoped Batch",
+                      "enabled":true,
+                      "syncMode":"BATCH_FILE_DROP",
+                      "validationPolicy":"RELAXED",
+                      "transformationPolicy":"NORMALIZE_CODES",
+                      "allowDefaultWarehouseFallback":false,
+                      "defaultWarehouseCode":"%s",
+                      "notes":"Synthetic warehouse authority verification."
+                    }
+                    """.formatted(warehouseA)))
+            .andExpect(status().isOk());
+        mockMvc.perform(post("/api/integrations/orders/connectors")
+                .session(tenantWideIntegrationAdmin)
+                .contentType(APPLICATION_JSON)
+                .content("""
+                    {
+                      "sourceSystem":"boundary_tenantwide_connector",
+                      "type":"CSV_ORDER_IMPORT",
+                      "displayName":"Boundary Tenant-Wide Connector",
+                      "enabled":true,
+                      "syncMode":"BATCH_FILE_DROP",
+                      "validationPolicy":"RELAXED",
+                      "transformationPolicy":"NORMALIZE_CODES",
+                      "allowDefaultWarehouseFallback":false,
+                      "notes":"Synthetic connector visibility verification."
+                    }
+                    """))
+            .andExpect(status().isOk());
+
+        MockHttpSession northScopedOperator = tenantLogin(
+            REHEARSAL_TENANT,
+            "boundary.integration.operator",
+            ROLE_PASSWORD
+        );
+        mockMvc.perform(get("/api/integrations/orders/connectors")
+                .session(tenantWideIntegrationAdmin)
+                .param("sourceSystem", "boundary_tenantwide_connector")
+                .param("type", "CSV_ORDER_IMPORT"))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$[0].sourceSystem").value("boundary_tenantwide_connector"));
+        mockMvc.perform(get("/api/integrations/orders/connectors")
+                .session(northScopedOperator)
+                .param("sourceSystem", "boundary_tenantwide_connector")
+                .param("type", "CSV_ORDER_IMPORT"))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$").isEmpty());
+        long ordersBefore = customerOrderRepository.countByTenant_CodeIgnoreCase(REHEARSAL_TENANT);
+        mockMvc.perform(post("/api/integrations/orders/webhook")
+                .session(northScopedOperator)
+                .contentType(APPLICATION_JSON)
+                .content("""
+                    {
+                      "sourceSystem":"boundary_scoped_ingress",
+                      "externalOrderId":"BOUNDARY-SCOPED-COAST-WEBHOOK",
+                      "warehouseCode":"%s",
+                      "customerReference":"BOUNDARY-CUSTOMER",
+                      "occurredAt":"2026-08-22T10:00:00Z",
+                      "items":[{"productSku":"BOUNDARY-SKU","quantity":1,"unitPrice":10.00}]
+                    }
+                    """.formatted(warehouseB)))
+            .andExpect(status().isForbidden());
+
+        String csv = "sourceSystem,externalOrderId,warehouseCode,productSku,quantity,unitPrice\n"
+            + "boundary_scoped_batch,BOUNDARY-SCOPED-COAST-CSV," + warehouseB + ",BOUNDARY-SKU,1,10.00\n";
+        mockMvc.perform(multipart("/api/integrations/orders/csv-import")
+                .file(new MockMultipartFile("file", "orders.csv", "text/csv", csv.getBytes(StandardCharsets.UTF_8)))
+                .param("sourceSystem", "boundary_scoped_batch")
+                .session(northScopedOperator))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.ordersImported").value(0))
+            .andExpect(jsonPath("$.ordersFailed").value(1));
+
+        mockMvc.perform(get("/api/integrations/orders/imports/recent")
+                .session(northScopedOperator))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$").isEmpty());
+
+        assertThat(customerOrderRepository.countByTenant_CodeIgnoreCase(REHEARSAL_TENANT)).isEqualTo(ordersBefore);
+        mockMvc.perform(get("/api/integrations/orders/replay-queue")
+                .session(northScopedOperator)
+                .param("externalOrderId", "BOUNDARY-SCOPED-COAST-WEBHOOK"))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$").isEmpty());
+        mockMvc.perform(get("/api/integrations/orders/replay-queue")
+                .session(northScopedOperator)
+                .param("externalOrderId", "BOUNDARY-SCOPED-COAST-CSV"))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$").isEmpty());
+    }
+
+    @Test
     void platformOwnerUsesDedicatedSessionAndTenantSessionsCannotInheritIt() throws Exception {
         mockMvc.perform(post("/api/platform/session/login")
                 .contentType(APPLICATION_JSON)

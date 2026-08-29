@@ -8,7 +8,9 @@ import com.synapsecore.domain.entity.IntegrationConnectorType;
 import com.synapsecore.domain.entity.IntegrationSyncMode;
 import com.synapsecore.domain.repository.IntegrationConnectorRepository;
 import com.synapsecore.integration.dto.ExternalOrderWebhookRequest;
+import java.io.ByteArrayOutputStream;
 import java.io.IOException;
+import java.io.InputStream;
 import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
@@ -40,6 +42,7 @@ public class IntegrationScheduledPullWorkerService {
     private final RequestTraceContext requestTraceContext;
     private final HttpClient httpClient = HttpClient.newBuilder()
         .connectTimeout(Duration.ofSeconds(10))
+        .followRedirects(HttpClient.Redirect.NEVER)
         .build();
 
     @Value("${synapsecore.integration.pull-worker.enabled:true}")
@@ -50,6 +53,9 @@ public class IntegrationScheduledPullWorkerService {
 
     @Value("${synapsecore.integration.pull-worker.fetch-timeout-seconds:20}")
     private int fetchTimeoutSeconds;
+
+    @Value("${synapsecore.integration.pull-worker.max-response-bytes:1048576}")
+    private long maxResponseBytes;
 
     @Scheduled(fixedDelayString = "${synapsecore.integration.pull-worker.interval-ms:60000}")
     public void processScheduledPulls() {
@@ -119,18 +125,44 @@ public class IntegrationScheduledPullWorkerService {
 
     private String fetchConnectorPayload(IntegrationConnector connector) throws IOException, InterruptedException {
         String tenantCode = integrationConnectorService.resolveTenantCode(connector);
-        HttpRequest request = HttpRequest.newBuilder(URI.create(connector.getPullEndpointUrl().trim()))
+        URI endpoint = URI.create(connector.getPullEndpointUrl().trim());
+        integrationConnectorService.requireSafePullTarget(endpoint);
+        HttpRequest request = HttpRequest.newBuilder(endpoint)
             .GET()
             .timeout(Duration.ofSeconds(Math.max(fetchTimeoutSeconds, 1)))
             .header("Accept", "application/json")
             .header("X-SynapseCore-Tenant", tenantCode)
             .header("X-SynapseCore-Connector", connector.getSourceSystem())
             .build();
-        HttpResponse<String> response = httpClient.send(request, HttpResponse.BodyHandlers.ofString());
+        HttpResponse<InputStream> response = httpClient.send(request, HttpResponse.BodyHandlers.ofInputStream());
         if (response.statusCode() < 200 || response.statusCode() >= 300) {
+            response.body().close();
             throw new IllegalStateException("Scheduled pull returned HTTP " + response.statusCode());
         }
-        return response.body();
+        long configuredLimit = maxResponseBytes > 0 ? maxResponseBytes : 1048576;
+        long contentLength = response.headers().firstValueAsLong("Content-Length").orElse(-1L);
+        if (contentLength > configuredLimit) {
+            response.body().close();
+            throw new IllegalStateException("Scheduled pull response exceeds the configured response-size limit.");
+        }
+        try (InputStream body = response.body()) {
+            return readBoundedResponse(body, configuredLimit);
+        }
+    }
+
+    private String readBoundedResponse(InputStream body, long maxBytes) throws IOException {
+        ByteArrayOutputStream output = new ByteArrayOutputStream();
+        byte[] buffer = new byte[8192];
+        long total = 0;
+        int read;
+        while ((read = body.read(buffer)) != -1) {
+            total += read;
+            if (total > maxBytes) {
+                throw new IllegalStateException("Scheduled pull response exceeds the configured response-size limit.");
+            }
+            output.write(buffer, 0, read);
+        }
+        return output.toString(java.nio.charset.StandardCharsets.UTF_8);
     }
 
     private List<ExternalOrderWebhookRequest> parseOrders(String responseBody,

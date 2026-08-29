@@ -2735,6 +2735,67 @@ class MvpFlowIntegrationTest {
     }
 
     @Test
+    void duplicateIntegrationDeliveryAcrossWebhookAndCsvDoesNotCreateReplayWork() throws Exception {
+        String externalOrderId = "PHASE1-DUPLICATE-CROSS-PATH";
+        String webhookBody = """
+            {
+              "sourceSystem": "erp_north",
+              "externalOrderId": "%s",
+              "warehouseCode": "WH-NORTH",
+              "customerReference": "PHASE1-DUPLICATE-CUSTOMER",
+              "occurredAt": "2026-04-01T09:45:00Z",
+              "items": [{"productSku":"SKU-FLX-100","quantity":1,"unitPrice":95.00}]
+            }
+            """.formatted(externalOrderId);
+
+        mockMvc.perform(post("/api/integrations/orders/webhook")
+                .contentType(APPLICATION_JSON)
+                .content(webhookBody))
+            .andExpect(status().isCreated())
+            .andExpect(jsonPath("$.order.externalOrderId").value(externalOrderId));
+
+        MockMultipartFile duplicateCsv = new MockMultipartFile(
+            "file",
+            "duplicate-cross-path.csv",
+            "text/csv",
+            ("sourceSystem,externalOrderId,warehouseCode,productSku,quantity,unitPrice\n"
+                + "erp_batch,%s,WH-NORTH,SKU-FLX-100,1,95.00\n").formatted(externalOrderId).getBytes()
+        );
+
+        mockMvc.perform(multipart("/api/integrations/orders/csv-import")
+                .file(duplicateCsv)
+                .param("sourceSystem", "erp_batch"))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.ordersImported").value(0))
+            .andExpect(jsonPath("$.ordersFailed").value(1))
+            .andExpect(jsonPath("$.failedOrders[0].externalOrderId").value(externalOrderId))
+            .andExpect(jsonPath("$.failedOrders[0].failureCode").value("DUPLICATE_EXTERNAL_ORDER_ID"));
+
+        assertThat(customerOrderRepository.findAll().stream()
+            .filter(order -> externalOrderId.equals(order.getExternalOrderId()))
+            .count()).isEqualTo(1);
+        mockMvc.perform(get("/api/integrations/orders/replay-queue")
+                .param("externalOrderId", externalOrderId))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$").isEmpty());
+    }
+
+    @Test
+    void oversizedWebhookPayloadIsRejectedBeforeBusinessProcessing() throws Exception {
+        long startingOrderCount = customerOrderRepository.count();
+        String oversizedPayload = "{\"sourceSystem\":\"erp_north\",\"externalOrderId\":\"OVERSIZED-WEBHOOK\","
+            + "\"warehouseCode\":\"WH-NORTH\",\"items\":[{\"productSku\":\"SKU-FLX-100\",\"quantity\":1,"
+            + "\"unitPrice\":95.00}],\"padding\":\"" + "x".repeat(300000) + "\"}";
+
+        mockMvc.perform(post("/api/integrations/orders/webhook")
+                .contentType(APPLICATION_JSON)
+                .content(oversizedPayload))
+            .andExpect(status().isPayloadTooLarge());
+
+        assertThat(customerOrderRepository.count()).isEqualTo(startingOrderCount);
+    }
+
+    @Test
     void scheduledPullConnectorFetchesOrderApiFeedIntoOperationalFlow() throws Exception {
         com.sun.net.httpserver.HttpServer server = com.sun.net.httpserver.HttpServer.create(
             new java.net.InetSocketAddress("127.0.0.1", 0),

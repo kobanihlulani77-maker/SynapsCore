@@ -76,11 +76,15 @@ synapsecore:
   integration:
     csv-import:
       max-bytes: ${SYNAPSECORE_INTEGRATION_CSV_IMPORT_MAX_BYTES:262144}
+    webhook:
+      max-bytes: ${SYNAPSECORE_INTEGRATION_WEBHOOK_MAX_BYTES:262144}
     pull-worker:
       enabled: ${SYNAPSECORE_INTEGRATION_PULL_WORKER_ENABLED:true}
       interval-ms: ${SYNAPSECORE_INTEGRATION_PULL_WORKER_INTERVAL_MS:60000}
       batch-size: ${SYNAPSECORE_INTEGRATION_PULL_WORKER_BATCH_SIZE:10}
       fetch-timeout-seconds: ${SYNAPSECORE_INTEGRATION_PULL_WORKER_FETCH_TIMEOUT_SECONDS:20}
+      max-response-bytes: ${SYNAPSECORE_INTEGRATION_PULL_WORKER_MAX_RESPONSE_BYTES:1048576}
+      allow-local-targets: ${SYNAPSECORE_INTEGRATION_PULL_WORKER_ALLOW_LOCAL_TARGETS:false}
   dashboard:
     cache-enabled: ${DASHBOARD_CACHE_ENABLED:true}
     summary-cache-key: synapsecore:dashboard:summary

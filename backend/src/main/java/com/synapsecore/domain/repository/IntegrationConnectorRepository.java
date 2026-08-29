@@ -33,6 +33,8 @@ public interface IntegrationConnectorRepository extends JpaRepository<Integratio
                                                                                                  IntegrationConnectorType type,
                                                                                                  String inboundAccessTokenHash);
 
+    List<IntegrationConnector> findAllByInboundAccessTokenHash(String inboundAccessTokenHash);
+
     @Query("""
         select connector
         from IntegrationConnector connector

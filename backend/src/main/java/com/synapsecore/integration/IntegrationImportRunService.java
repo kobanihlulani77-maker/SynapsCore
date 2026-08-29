@@ -1,5 +1,6 @@
 package com.synapsecore.integration;
 
+import com.synapsecore.access.AccessDirectoryService;
 import com.synapsecore.domain.entity.IntegrationConnectorType;
 import com.synapsecore.domain.entity.IntegrationImportRun;
 import com.synapsecore.domain.entity.IntegrationImportStatus;
@@ -18,6 +19,7 @@ import org.springframework.stereotype.Service;
 public class IntegrationImportRunService {
 
     private final IntegrationImportRunRepository integrationImportRunRepository;
+    private final AccessDirectoryService accessDirectoryService;
     private final OperationalStateChangePublisher operationalStateChangePublisher;
     private final TenantContextService tenantContextService;
     private final OperationalMetricsService operationalMetricsService;
@@ -47,6 +49,13 @@ public class IntegrationImportRunService {
     }
 
     public List<IntegrationImportRunResponse> getRecentRuns() {
+        // Import runs currently have no authoritative warehouse column. Redact
+        // them for scoped operators rather than leaking tenant-wide telemetry.
+        if (accessDirectoryService.getCurrentOperator()
+            .map(operator -> operator.getWarehouseScopes() != null && !operator.getWarehouseScopes().isEmpty())
+            .orElse(false)) {
+            return List.of();
+        }
         return integrationImportRunRepository.findTop20ByTenantCodeIgnoreCaseOrderByCreatedAtDesc(
                 tenantContextService.getCurrentTenantCodeOrDefault())
             .stream()

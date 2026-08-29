@@ -45,6 +45,7 @@ synapsecore:
   integration:
     pull-worker:
       enabled: false
+      allow-local-targets: true
     replay:
       max-attempts: 2
       backoff-seconds: 0

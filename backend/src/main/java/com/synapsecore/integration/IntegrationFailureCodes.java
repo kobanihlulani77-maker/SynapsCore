@@ -25,6 +25,17 @@ public final class IntegrationFailureCodes {
         return new IntegrationFailureExceptionDetails(mapKnownReason(exception.getReason()), exception.getReason());
     }
 
+    /**
+     * Replay is reserved for failures that can become valid after an operational
+     * repair. Source-invalid and duplicate deliveries are already terminal.
+     */
+    public static boolean isReplayable(IntegrationFailureCode code) {
+        return switch (code) {
+            case CONNECTOR_DISABLED, PRODUCT_NOT_FOUND, INVENTORY_NOT_FOUND, INSUFFICIENT_INVENTORY -> true;
+            default -> false;
+        };
+    }
+
     private static IntegrationFailureCode mapKnownReason(String reason) {
         if (reason == null || reason.isBlank()) {
             return IntegrationFailureCode.UNKNOWN;

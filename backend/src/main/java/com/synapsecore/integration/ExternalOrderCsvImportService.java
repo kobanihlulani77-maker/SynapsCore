@@ -1,5 +1,6 @@
 package com.synapsecore.integration;
 
+import com.synapsecore.access.SynapseActorContext;
 import com.synapsecore.audit.RequestTraceContext;
 import com.synapsecore.audit.AuditLogService;
 import com.synapsecore.domain.dto.OrderCreateRequest;
@@ -62,6 +63,13 @@ public class ExternalOrderCsvImportService {
     public ExternalOrderCsvImportResponse ingest(MultipartFile file,
                                                  String sourceSystemDefault,
                                                  com.synapsecore.domain.entity.IntegrationConnector authenticatedConnector) {
+        return ingest(file, sourceSystemDefault, authenticatedConnector, null);
+    }
+
+    public ExternalOrderCsvImportResponse ingest(MultipartFile file,
+                                                 String sourceSystemDefault,
+                                                 com.synapsecore.domain.entity.IntegrationConnector authenticatedConnector,
+                                                 SynapseActorContext humanActor) {
         if (file == null || file.isEmpty()) {
             throw IntegrationFailureCodes.badRequest(IntegrationFailureCode.MISSING_FILE, "CSV file is required.");
         }
@@ -79,6 +87,9 @@ public class ExternalOrderCsvImportService {
 
         groupedRows.forEach((key, rows) -> {
             Long inboundRecordId = null;
+            OrderResponse createdOrder = null;
+            OrderCreateRequest preparedOrderRequest = null;
+            int preparedLineItemCount = 0;
             String tenantCode = requestTraceContext.getCurrentTenant()
                 .filter(currentTenant -> !RequestTraceContext.MISSING_TENANT_CONTEXT.equalsIgnoreCase(currentTenant))
                 .orElse(authenticatedConnector != null ? integrationConnectorService.resolveTenantCode(authenticatedConnector) : null);
@@ -123,9 +134,12 @@ public class ExternalOrderCsvImportService {
                         .map(row -> new OrderItemRequest(row.productSku(), row.quantity(), row.unitPrice()))
                         .toList()
                 );
+                requireHumanWarehouseAccess(humanActor, preparedOrder.orderRequest().warehouseCode());
+                preparedOrderRequest = preparedOrder.orderRequest();
+                preparedLineItemCount = preparedOrder.lineItemCount();
 
-                OrderResponse order = orderService.createOrder(
-                    preparedOrder.orderRequest(),
+                createdOrder = orderService.createOrder(
+                    preparedOrderRequest,
                     buildIngestionSource(key.sourceSystem())
                 );
                 integrationInboundRecordService.markAccepted(inboundRecordId, buildIngestionSource(key.sourceSystem()));
@@ -134,10 +148,10 @@ public class ExternalOrderCsvImportService {
                     key.sourceSystem(),
                     buildIngestionSource(key.sourceSystem()),
                     key.externalOrderId(),
-                    preparedOrder.orderRequest().warehouseCode(),
-                    preparedOrder.lineItemCount(),
+                    preparedOrderRequest.warehouseCode(),
+                    preparedLineItemCount,
                     Instant.now(),
-                    order
+                    createdOrder
                 ));
             } catch (ResponseStatusException exception) {
                 var failure = IntegrationFailureCodes.extract(exception);
@@ -156,21 +170,66 @@ public class ExternalOrderCsvImportService {
                     failure.failureCode(),
                     failure.failureMessage()
                 ));
-                integrationReplayService.recordFailure(
-                    tenantCode,
-                    key.sourceSystem(),
-                    IntegrationConnectorType.CSV_ORDER_IMPORT,
-                    new OrderCreateRequest(
+                if (IntegrationFailureCodes.isReplayable(failure.failureCode())) {
+                    integrationReplayService.recordFailure(
+                        tenantCode,
+                        key.sourceSystem(),
+                        IntegrationConnectorType.CSV_ORDER_IMPORT,
+                        new OrderCreateRequest(
+                            key.externalOrderId(),
+                            key.warehouseCode(),
+                            rows.stream()
+                                .map(row -> new OrderItemRequest(row.productSku(), row.quantity(), row.unitPrice()))
+                                .toList()
+                        ),
+                        failure.failureCode(),
+                        failure.failureMessage(),
+                        inboundRecordId
+                    );
+                }
+            } catch (RuntimeException exception) {
+                String failureMessage = "CSV processing failed unexpectedly; operator reconciliation is required.";
+                operationalMetricsService.recordIntegrationFailure(tenantCode, key.sourceSystem(), IntegrationFailureCode.UNKNOWN.name());
+                if (inboundRecordId != null) {
+                    if (createdOrder == null) {
+                        try {
+                            integrationInboundRecordService.markRejected(inboundRecordId, IntegrationFailureCode.UNKNOWN, failureMessage);
+                        } catch (RuntimeException evidenceException) {
+                            log.error("CSV rejection evidence could not be finalized for inbound record {}.", inboundRecordId,
+                                evidenceException);
+                        }
+                    } else {
+                        try {
+                            integrationInboundRecordService.markAccepted(inboundRecordId,
+                                buildIngestionSource(key.sourceSystem()));
+                        } catch (RuntimeException evidenceException) {
+                            log.error("Accepted CSV evidence could not be finalized for inbound record {} after order {} was created.",
+                                inboundRecordId, createdOrder.externalOrderId(), evidenceException);
+                        }
+                    }
+                }
+                if (createdOrder != null && preparedOrderRequest != null) {
+                    importedOrders.add(new ExternalOrderCsvImportOrderResult(
+                        key.sourceSystem(),
+                        buildIngestionSource(key.sourceSystem()),
+                        key.externalOrderId(),
+                        preparedOrderRequest.warehouseCode(),
+                        preparedLineItemCount,
+                        Instant.now(),
+                        createdOrder
+                    ));
+                } else {
+                    failedOrders.add(new ExternalOrderCsvImportFailure(
+                        key.sourceSystem(),
                         key.externalOrderId(),
                         key.warehouseCode(),
-                        rows.stream()
-                            .map(row -> new OrderItemRequest(row.productSku(), row.quantity(), row.unitPrice()))
-                            .toList()
-                    ),
-                    failure.failureCode(),
-                    failure.failureMessage(),
-                    inboundRecordId
-                );
+                        rows.stream().map(ParsedCsvRow::rowNumber).toList(),
+                        IntegrationFailureCode.UNKNOWN,
+                        failureMessage
+                    ));
+                }
+                log.error("CSV ingestion failed unexpectedly for source {} tenant {} externalOrderId {}.",
+                    key.sourceSystem(), tenantCode, key.externalOrderId(), exception);
             }
         });
 
@@ -223,6 +282,16 @@ public class ExternalOrderCsvImportService {
         }
 
         return response;
+    }
+
+    private void requireHumanWarehouseAccess(SynapseActorContext humanActor, String warehouseCode) {
+        if (humanActor != null && !humanActor.canAccessWarehouse(warehouseCode)) {
+            throw new ResponseStatusException(
+                HttpStatus.FORBIDDEN,
+                "Current actor " + humanActor.actorName()
+                    + " is not assigned to warehouse " + warehouseCode + "."
+            );
+        }
     }
 
     private CsvFileContent readCsv(MultipartFile file, String defaultSourceSystem) {
