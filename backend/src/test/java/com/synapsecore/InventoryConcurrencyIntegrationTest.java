@@ -145,6 +145,45 @@ class InventoryConcurrencyIntegrationTest {
     }
 
     @Test
+    void concurrentDuplicateExternalOrderIdCreatesOneOrderAndReturnsOneConflict() throws Exception {
+        String productSku = "SKU-CONC-DUPLICATE-ID-" + System.nanoTime();
+        String externalOrderId = "CONC-DUPLICATE-ID-" + System.nanoTime();
+        createInventory(productSku, 2L);
+
+        String orderBody = """
+            {
+              "externalOrderId":"%s",
+              "warehouseCode":"WH-NORTH",
+              "items":[{"productSku":"%s","quantity":1,"unitPrice":10.00}]
+            }
+            """.formatted(externalOrderId, productSku);
+
+        List<Integer> statuses = runConcurrently(List.of(
+            () -> mockMvc.perform(post("/api/orders")
+                    .with(accessHeaders("Integration Lead", "INTEGRATION_ADMIN"))
+                    .header("X-Synapse-Tenant", "STARTER-OPS")
+                    .contentType(APPLICATION_JSON)
+                    .content(orderBody))
+                .andReturn().getResponse().getStatus(),
+            () -> mockMvc.perform(post("/api/orders")
+                    .with(accessHeaders("Integration Lead", "INTEGRATION_ADMIN"))
+                    .header("X-Synapse-Tenant", "STARTER-OPS")
+                    .contentType(APPLICATION_JSON)
+                    .content(orderBody))
+                .andReturn().getResponse().getStatus()
+        ));
+
+        assertThat(statuses).containsExactlyInAnyOrder(201, 409);
+        Inventory finalInventory = loadInventory(productSku, "WH-NORTH");
+        assertThat(finalInventory.getQuantityOnHand()).isEqualTo(2L);
+        assertThat(finalInventory.getQuantityReserved()).isEqualTo(1L);
+        assertThat(finalInventory.getQuantityAvailable()).isEqualTo(1L);
+        assertThat(customerOrderRepository
+            .findByTenant_CodeIgnoreCaseAndExternalOrderId("STARTER-OPS", externalOrderId))
+            .isPresent();
+    }
+
+    @Test
     void concurrentUpdatesOnExistingRowRemainValid() throws Exception {
         String productSku = "SKU-CONC-UPDATE-" + System.nanoTime();
         createInventory(productSku, 10L);

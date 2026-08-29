@@ -70,6 +70,8 @@ import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.request.RequestPostProcessor;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.PlatformTransactionManager;
+import org.springframework.transaction.support.TransactionTemplate;
 import org.springframework.web.filter.OncePerRequestFilter;
 import org.springframework.web.context.request.RequestContextHolder;
 
@@ -153,6 +155,9 @@ class MvpFlowIntegrationTest {
 
     @Autowired
     private EntityManager entityManager;
+
+    @Autowired
+    private PlatformTransactionManager transactionManager;
 
     @Test
     void orderIngestionDeductsInventoryAndCreatesOperationalResponses() throws Exception {
@@ -2511,6 +2516,112 @@ class MvpFlowIntegrationTest {
 
         assertThat(businessEventRepository.findTop20ByOrderByCreatedAtDesc())
             .anyMatch(event -> event.getEventType() == BusinessEventType.ORDER_INGESTED && "order-api".equals(event.getSource()));
+    }
+
+    @Test
+    void multiLineOrderReservesEachLineAndCreatesOneFulfillmentLane() throws Exception {
+        String firstSku = "SKU-ORDER-MULTI-A-" + System.nanoTime();
+        String secondSku = "SKU-ORDER-MULTI-B-" + System.nanoTime();
+        createTenantInventory("WH-NORTH", firstSku, 5L, 0L);
+        createTenantInventory("WH-NORTH", secondSku, 7L, 0L);
+
+        String externalOrderId = "ORD-MULTI-" + System.nanoTime();
+        String requestBody = """
+            {
+              "externalOrderId": "%s",
+              "warehouseCode": "WH-NORTH",
+              "items": [
+                {"productSku": "%s", "quantity": 2, "unitPrice": 12.50},
+                {"productSku": "%s", "quantity": 3, "unitPrice": 8.00}
+              ]
+            }
+            """.formatted(externalOrderId, firstSku, secondSku);
+
+        mockMvc.perform(post("/api/orders")
+                .contentType(APPLICATION_JSON)
+                .content(requestBody))
+            .andExpect(status().isCreated())
+            .andExpect(jsonPath("$.externalOrderId").value(externalOrderId))
+            .andExpect(jsonPath("$.warehouseCode").value("WH-NORTH"))
+            .andExpect(jsonPath("$.items.length()").value(2));
+
+        assertThat(loadInventory(firstSku, "WH-NORTH").getQuantityReserved()).isEqualTo(2L);
+        assertThat(loadInventory(secondSku, "WH-NORTH").getQuantityReserved()).isEqualTo(3L);
+        assertThat(customerOrderRepository
+            .findByTenant_CodeIgnoreCaseAndExternalOrderId("STARTER-OPS", externalOrderId))
+            .hasValueSatisfying(order -> assertThat(order.getItems()).hasSize(2));
+        assertThat(fulfillmentTaskRepository
+            .findByTenant_CodeIgnoreCaseAndCustomerOrder_ExternalOrderId("STARTER-OPS", externalOrderId))
+            .isPresent();
+    }
+
+    @Test
+    @Transactional(propagation = Propagation.NOT_SUPPORTED)
+    @DirtiesContext(methodMode = DirtiesContext.MethodMode.AFTER_METHOD)
+    void multiLineOrderFailureRollsBackEarlierReservationsAndOrderPersistence() throws Exception {
+        String firstSku = "SKU-ORDER-ROLLBACK-A-" + System.nanoTime();
+        String secondSku = "SKU-ORDER-ROLLBACK-B-" + System.nanoTime();
+        TransactionTemplate requiresNew = new TransactionTemplate(transactionManager);
+        requiresNew.setPropagationBehavior(Propagation.REQUIRES_NEW.value());
+        requiresNew.executeWithoutResult(status -> {
+            createTenantInventory("WH-NORTH", firstSku, 5L, 0L);
+            createTenantInventory("WH-NORTH", secondSku, 1L, 0L);
+        });
+
+        String externalOrderId = "ORD-ROLLBACK-" + System.nanoTime();
+        String requestBody = """
+            {
+              "externalOrderId": "%s",
+              "warehouseCode": "WH-NORTH",
+              "items": [
+                {"productSku": "%s", "quantity": 2, "unitPrice": 12.50},
+                {"productSku": "%s", "quantity": 2, "unitPrice": 8.00}
+              ]
+            }
+            """.formatted(externalOrderId, firstSku, secondSku);
+
+        mockMvc.perform(post("/api/orders")
+                .contentType(APPLICATION_JSON)
+                .content(requestBody))
+            .andExpect(status().isConflict());
+
+        requiresNew.executeWithoutResult(status -> {
+            assertThat(loadInventory(firstSku, "WH-NORTH").getQuantityReserved()).isZero();
+            assertThat(loadInventory(firstSku, "WH-NORTH").getQuantityAvailable()).isEqualTo(5L);
+            assertThat(loadInventory(secondSku, "WH-NORTH").getQuantityReserved()).isZero();
+            assertThat(loadInventory(secondSku, "WH-NORTH").getQuantityAvailable()).isEqualTo(1L);
+            assertThat(customerOrderRepository
+                .findByTenant_CodeIgnoreCaseAndExternalOrderId("STARTER-OPS", externalOrderId))
+                .isEmpty();
+        });
+    }
+
+    @Test
+    void duplicateProductLinesReserveExactlyTheirSubmittedTotal() throws Exception {
+        String productSku = "SKU-ORDER-DUP-LINE-" + System.nanoTime();
+        createTenantInventory("WH-NORTH", productSku, 5L, 0L);
+        String externalOrderId = "ORD-DUP-LINE-" + System.nanoTime();
+        String requestBody = """
+            {
+              "externalOrderId": "%s",
+              "warehouseCode": "WH-NORTH",
+              "items": [
+                {"productSku": "%s", "quantity": 2, "unitPrice": 12.50},
+                {"productSku": "%s", "quantity": 3, "unitPrice": 12.50}
+              ]
+            }
+            """.formatted(externalOrderId, productSku, productSku);
+
+        mockMvc.perform(post("/api/orders")
+                .contentType(APPLICATION_JSON)
+                .content(requestBody))
+            .andExpect(status().isCreated())
+            .andExpect(jsonPath("$.items.length()").value(2));
+
+        Inventory inventory = loadInventory(productSku, "WH-NORTH");
+        assertThat(inventory.getQuantityOnHand()).isEqualTo(5L);
+        assertThat(inventory.getQuantityReserved()).isEqualTo(5L);
+        assertThat(inventory.getQuantityAvailable()).isZero();
     }
 
     @Test
@@ -5148,6 +5259,24 @@ class MvpFlowIntegrationTest {
             .catalogSku(catalogSku)
             .name(name)
             .category(category)
+            .build());
+    }
+
+    private Inventory createTenantInventory(String warehouseCode,
+                                             String catalogSku,
+                                             long quantityOnHand,
+                                             long quantityReserved) {
+        Product product = createTenantProduct(warehouseCode, catalogSku, "Order Phase 1 Product", "Verification");
+        var warehouse = warehouseRepository.findByCode(warehouseCode).orElseThrow();
+        return inventoryRepository.save(Inventory.builder()
+            .tenant(warehouse.getTenant())
+            .product(product)
+            .warehouse(warehouse)
+            .quantityOnHand(quantityOnHand)
+            .quantityReserved(quantityReserved)
+            .quantityInbound(0L)
+            .quantityAvailable(quantityOnHand - quantityReserved)
+            .reorderThreshold(0L)
             .build());
     }
 
