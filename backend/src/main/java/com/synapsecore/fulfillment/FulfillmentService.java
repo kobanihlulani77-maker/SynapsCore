@@ -9,6 +9,7 @@ import com.synapsecore.domain.dto.FulfillmentOverviewResponse;
 import com.synapsecore.domain.dto.FulfillmentStatusResponse;
 import com.synapsecore.domain.dto.FulfillmentUpdateRequest;
 import com.synapsecore.domain.entity.AlertSeverity;
+import com.synapsecore.domain.entity.AuditLog;
 import com.synapsecore.domain.entity.AuditStatus;
 import com.synapsecore.domain.entity.BusinessEventType;
 import com.synapsecore.domain.entity.CustomerOrder;
@@ -31,12 +32,16 @@ import jakarta.persistence.LockModeType;
 import java.time.Duration;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
+import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
 import java.util.Collection;
 import java.util.Comparator;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Optional;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpStatus;
@@ -151,10 +156,19 @@ public class FulfillmentService {
         entityManager.refresh(order, LockModeType.PESSIMISTIC_WRITE);
         task.setCustomerOrder(order);
 
-        if (wasCompletedMutation(tenantCode, order.getExternalOrderId())) {
+        String requestFingerprint = buildRequestFingerprint(request);
+        Optional<AuditLog> completedMutation = findCompletedMutation(tenantCode, order.getExternalOrderId());
+        if (completedMutation.isPresent()) {
+            String committedFingerprint = extractRequestFingerprint(completedMutation.get().getDetails());
+            if (!requestFingerprint.equals(committedFingerprint)) {
+                throw new ResponseStatusException(HttpStatus.CONFLICT,
+                    "X-Request-Id was already used for a different fulfillment operation.");
+            }
             return toResponse(task, buildWarehouseAssessment(task, Instant.now()));
         }
 
+        validateStateTransition(task.getStatus(), request.status());
+        validateRequestQuantity(request);
         applyUpdate(task, request);
         CustomerOrder synchronizedOrder = orderService.synchronizeOrderLifecycleFromFulfillment(
             task,
@@ -184,7 +198,13 @@ public class FulfillmentService {
             source,
             "FulfillmentTask",
             order.getExternalOrderId(),
-            "Updated fulfillment for " + order.getExternalOrderId() + " to " + savedTask.getStatus() + "."
+            "Updated fulfillment for " + order.getExternalOrderId()
+                + " to " + savedTask.getStatus()
+                + " in " + savedTask.getWarehouse().getCode()
+                + "; fulfilledUnits=" + (request.fulfilledUnits() == null ? "null" : request.fulfilledUnits())
+                + "; fulfilledProductSku=" + (request.fulfilledProductSku() == null ? "null" : request.fulfilledProductSku().trim())
+                + "; occurredAt=" + (request.occurredAt() == null ? "null" : request.occurredAt())
+                + "; requestFingerprint=" + requestFingerprint + "."
         );
 
         operationalMetricsService.recordFulfillmentUpdate(tenantCode, savedTask.getStatus(), source);
@@ -193,15 +213,113 @@ public class FulfillmentService {
         return toResponse(savedTask, buildWarehouseAssessment(savedTask, Instant.now()));
     }
 
-    private boolean wasCompletedMutation(String tenantCode, String externalOrderId) {
+    private Optional<AuditLog> findCompletedMutation(String tenantCode, String externalOrderId) {
         return auditLogRepository.findTopByTenantCodeIgnoreCaseAndActionAndTargetRefAndRequestIdAndStatus(
                 tenantCode,
                 "FULFILLMENT_UPDATED",
                 externalOrderId,
                 requestTraceContext.getRequiredRequestId(),
                 AuditStatus.SUCCESS
-            )
-            .isPresent();
+            );
+    }
+
+    private String extractRequestFingerprint(String details) {
+        if (details == null) {
+            return null;
+        }
+        String marker = "requestFingerprint=";
+        int start = details.lastIndexOf(marker);
+        if (start < 0) {
+            return null;
+        }
+        String value = details.substring(start + marker.length()).trim();
+        return value.endsWith(".") ? value.substring(0, value.length() - 1) : value;
+    }
+
+    private String buildRequestFingerprint(FulfillmentUpdateRequest request) {
+        String canonical = String.join("|",
+            fingerprintPart(request.externalOrderId() == null ? null : request.externalOrderId().trim()),
+            fingerprintPart(request.status()),
+            fingerprintPart(request.fulfilledUnits()),
+            fingerprintPart(request.fulfilledProductSku() == null ? null : request.fulfilledProductSku().trim()),
+            fingerprintPart(request.carrier() == null ? null : request.carrier().trim()),
+            fingerprintPart(request.trackingReference() == null ? null : request.trackingReference().trim()),
+            fingerprintPart(request.promisedDispatchAt()),
+            fingerprintPart(request.expectedDeliveryAt()),
+            fingerprintPart(request.occurredAt()),
+            fingerprintPart(request.note() == null ? null : request.note().trim())
+        );
+        try {
+            byte[] digest = MessageDigest.getInstance("SHA-256")
+                .digest(canonical.getBytes(StandardCharsets.UTF_8));
+            StringBuilder hex = new StringBuilder(digest.length * 2);
+            for (byte value : digest) {
+                hex.append(String.format(Locale.ROOT, "%02x", value));
+            }
+            return hex.toString();
+        } catch (NoSuchAlgorithmException exception) {
+            throw new IllegalStateException("SHA-256 is required for fulfillment retry identity.", exception);
+        }
+    }
+
+    private String fingerprintPart(Object value) {
+        if (value == null) {
+            return "-1:";
+        }
+        String text = value.toString();
+        return text.length() + ":" + text;
+    }
+
+    private void validateRequestQuantity(FulfillmentUpdateRequest request) {
+        if (request.fulfilledUnits() == null) {
+            return;
+        }
+        if (request.status() != FulfillmentStatus.DISPATCHED) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                "fulfilledUnits is only supported for DISPATCHED fulfillment updates.");
+        }
+        if (request.fulfilledUnits() < 1) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                "fulfilledUnits must be positive for DISPATCHED fulfillment updates.");
+        }
+    }
+
+    private void validateStateTransition(FulfillmentStatus current, FulfillmentStatus next) {
+        boolean allowed = switch (current) {
+            case QUEUED -> next == FulfillmentStatus.QUEUED
+                || next == FulfillmentStatus.PICKING
+                || next == FulfillmentStatus.PACKED
+                || next == FulfillmentStatus.DISPATCHED
+                || next == FulfillmentStatus.DELIVERED
+                || next == FulfillmentStatus.DELAYED
+                || next == FulfillmentStatus.EXCEPTION;
+            case PICKING -> next == FulfillmentStatus.PICKING
+                || next == FulfillmentStatus.PACKED
+                || next == FulfillmentStatus.DISPATCHED
+                || next == FulfillmentStatus.DELIVERED
+                || next == FulfillmentStatus.DELAYED
+                || next == FulfillmentStatus.EXCEPTION;
+            case PACKED -> next == FulfillmentStatus.PACKED
+                || next == FulfillmentStatus.DISPATCHED
+                || next == FulfillmentStatus.DELIVERED
+                || next == FulfillmentStatus.DELAYED
+                || next == FulfillmentStatus.EXCEPTION;
+            case DISPATCHED -> next == FulfillmentStatus.DISPATCHED
+                || next == FulfillmentStatus.DELIVERED
+                || next == FulfillmentStatus.DELAYED
+                || next == FulfillmentStatus.EXCEPTION;
+            case DELAYED -> next == FulfillmentStatus.DELAYED
+                || next == FulfillmentStatus.PICKING
+                || next == FulfillmentStatus.PACKED
+                || next == FulfillmentStatus.DISPATCHED
+                || next == FulfillmentStatus.EXCEPTION;
+            case DELIVERED -> next == FulfillmentStatus.DELIVERED;
+            case EXCEPTION -> next == FulfillmentStatus.EXCEPTION;
+        };
+        if (!allowed) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                "Fulfillment cannot transition from " + current + " to " + next + ".");
+        }
     }
 
     @Transactional(readOnly = true)
@@ -209,6 +327,9 @@ public class FulfillmentService {
         String tenantCode = tenantContextService.getCurrentTenantCodeOrDefault();
         List<FulfillmentTask> activeTasks = fulfillmentTaskRepository
             .findAllByTenant_CodeIgnoreCaseAndStatusInOrderByUpdatedAtDesc(tenantCode, ACTIVE_STATUSES);
+        activeTasks = activeTasks.stream()
+            .filter(task -> !isTerminalOrder(task.getCustomerOrder().getStatus()))
+            .toList();
         var currentOperator = accessDirectoryService.getCurrentOperator();
         if (currentOperator.isPresent()) {
             activeTasks = activeTasks.stream()
@@ -252,6 +373,13 @@ public class FulfillmentService {
             responses,
             now
         );
+    }
+
+    private boolean isTerminalOrder(com.synapsecore.domain.entity.OrderStatus status) {
+        return status == com.synapsecore.domain.entity.OrderStatus.CANCELLED
+            || status == com.synapsecore.domain.entity.OrderStatus.FAILED
+            || status == com.synapsecore.domain.entity.OrderStatus.RETURNED
+            || status == com.synapsecore.domain.entity.OrderStatus.DELIVERED;
     }
 
     @Transactional(readOnly = true)

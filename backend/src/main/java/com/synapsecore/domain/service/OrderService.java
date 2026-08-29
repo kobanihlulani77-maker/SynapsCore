@@ -250,7 +250,10 @@ public class OrderService {
                 applyOperationalStatus(order, OrderStatus.DELIVERED, source, note, true);
             }
             case DELAYED -> applyOperationalStatus(order, OrderStatus.BLOCKED, source, note == null ? "Delivery delay detected." : note);
-            case EXCEPTION -> applyOperationalStatus(order, OrderStatus.FAILED, source, note == null ? "Fulfillment exception detected." : note);
+            case EXCEPTION -> {
+                releaseOutstandingReservations(order, source);
+                applyOperationalStatus(order, OrderStatus.FAILED, source, note == null ? "Fulfillment exception detected." : note);
+            }
             default -> {
             }
         }
@@ -366,6 +369,11 @@ public class OrderService {
     }
 
     private void fulfillReservedUnits(CustomerOrder order, int units, String source, String note) {
+        if (units > remainingReservedUnits(order)) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT,
+                "Fulfillment quantity " + units + " exceeds the remaining reserved quantity for "
+                    + order.getExternalOrderId() + ".");
+        }
         int remaining = units;
         for (OrderItem item : order.getItems()) {
             if (remaining == 0) {
