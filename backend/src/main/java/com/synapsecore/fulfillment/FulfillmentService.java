@@ -280,7 +280,8 @@ public class FulfillmentService {
                 }
             }
             case DISPATCHED -> {
-                if (task.getFulfilledUnits() < task.getTotalUnits()) {
+                if ((request.fulfilledUnits() == null || request.fulfilledUnits() <= 0)
+                    && task.getFulfilledUnits() < task.getTotalUnits()) {
                     task.setFulfilledUnits(task.getTotalUnits());
                 }
                 task.setDispatchedAt(occurredAt);

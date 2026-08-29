@@ -23,6 +23,8 @@ import com.synapsecore.fulfillment.FulfillmentService;
 import com.synapsecore.observability.OperationalMetricsService;
 import com.synapsecore.tenant.TenantContextService;
 import com.synapsecore.tenant.TenantScopeGuard;
+import jakarta.persistence.EntityManager;
+import jakarta.persistence.LockModeType;
 import java.math.BigDecimal;
 import java.time.Instant;
 import java.util.ArrayList;
@@ -52,6 +54,7 @@ public class OrderService {
     private final OperationalStateChangePublisher operationalStateChangePublisher;
     private final AuditLogService auditLogService;
     private final ObjectProvider<FulfillmentService> fulfillmentServiceProvider;
+    private final EntityManager entityManager;
     private final TenantContextService tenantContextService;
     private final TenantScopeGuard tenantScopeGuard;
     private final OperationalMetricsService operationalMetricsService;
@@ -176,9 +179,10 @@ public class OrderService {
                                          OrderLifecycleTransitionRequest request,
                                          String source) {
         String tenantCode = tenantContextService.getCurrentTenantCodeOrDefault();
-        CustomerOrder order = customerOrderRepository.findByTenant_CodeIgnoreCaseAndExternalOrderId(tenantCode, externalOrderId.trim())
+        CustomerOrder order = customerOrderRepository.findByTenant_CodeIgnoreCaseAndExternalOrderIdForUpdate(tenantCode, externalOrderId.trim())
             .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND,
                 "Order not found: " + externalOrderId));
+        entityManager.refresh(order, LockModeType.PESSIMISTIC_WRITE);
         tenantScopeGuard.requireCustomerOrder(order, "order transition");
         applyTransition(order, request.status(), source, request.note(), Boolean.TRUE.equals(request.restockInventory()));
         CustomerOrder savedOrder = customerOrderRepository.save(order);
@@ -226,7 +230,7 @@ public class OrderService {
                 if (remainingReservedUnits(order) > 0) {
                     fulfillReservedUnits(order, remainingReservedUnits(order), source, "Fulfillment delivery");
                 }
-                applyOperationalStatus(order, OrderStatus.DELIVERED, source, note);
+                applyOperationalStatus(order, OrderStatus.DELIVERED, source, note, true);
             }
             case DELAYED -> applyOperationalStatus(order, OrderStatus.BLOCKED, source, note == null ? "Delivery delay detected." : note);
             case EXCEPTION -> applyOperationalStatus(order, OrderStatus.FAILED, source, note == null ? "Fulfillment exception detected." : note);
@@ -253,9 +257,10 @@ public class OrderService {
                                                    String reason,
                                                    boolean restockInventory) {
         String tenantCode = tenantContextService.getCurrentTenantCodeOrDefault();
-        CustomerOrder order = customerOrderRepository.findByTenant_CodeIgnoreCaseAndExternalOrderId(tenantCode, externalOrderId.trim())
+        CustomerOrder order = customerOrderRepository.findByTenant_CodeIgnoreCaseAndExternalOrderIdForUpdate(tenantCode, externalOrderId.trim())
             .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND,
                 "Order not found: " + externalOrderId));
+        entityManager.refresh(order, LockModeType.PESSIMISTIC_WRITE);
         tenantScopeGuard.requireCustomerOrder(order, "order transition");
         applyTransition(order, status, source, reason, restockInventory);
         return customerOrderRepository.save(order);
@@ -271,9 +276,7 @@ public class OrderService {
             case CANCELLED -> cancelOutstandingReservations(order, source, note);
             case RETURNED -> processReturn(order, source, note, restockInventory);
             case FAILED -> {
-                if (fulfilledUnits(order) == 0) {
-                    cancelOutstandingReservations(order, source, note == null ? "Failed before fulfillment." : note);
-                }
+                releaseOutstandingReservations(order, source);
                 applyOperationalStatus(order, OrderStatus.FAILED, source, note);
             }
             case BLOCKED -> applyOperationalStatus(order, OrderStatus.BLOCKED, source, note);
@@ -284,6 +287,11 @@ public class OrderService {
     }
 
     private void cancelOutstandingReservations(CustomerOrder order, String source, String note) {
+        releaseOutstandingReservations(order, source);
+        applyOperationalStatus(order, OrderStatus.CANCELLED, source, note == null ? "Order cancelled." : note);
+    }
+
+    private void releaseOutstandingReservations(CustomerOrder order, String source) {
         for (OrderItem item : order.getItems()) {
             if (item.getReservedQuantity() > 0) {
                 Inventory inventory = inventoryService.requireInventory(
@@ -301,7 +309,6 @@ public class OrderService {
                 item.setReservedQuantity(0);
             }
         }
-        applyOperationalStatus(order, OrderStatus.CANCELLED, source, note == null ? "Order cancelled." : note);
     }
 
     private void processReturn(CustomerOrder order, String source, String note, boolean restockInventory) {
@@ -369,7 +376,21 @@ public class OrderService {
     }
 
     private void applyOperationalStatus(CustomerOrder order, OrderStatus nextStatus, String source, String note) {
+        applyOperationalStatus(order, nextStatus, source, note, false);
+    }
+
+    private void applyOperationalStatus(CustomerOrder order,
+                                        OrderStatus nextStatus,
+                                        String source,
+                                        String note,
+                                        boolean allowFulfillmentDeliveryFromReceived) {
         OrderStatus previousStatus = order.getStatus();
+        boolean directFulfillmentDelivery = allowFulfillmentDeliveryFromReceived
+            && previousStatus == OrderStatus.RECEIVED
+            && nextStatus == OrderStatus.DELIVERED;
+        if (!directFulfillmentDelivery) {
+            validateTransition(previousStatus, nextStatus);
+        }
         if (previousStatus == nextStatus) {
             order.setStatusReason(note);
             return;
@@ -413,6 +434,8 @@ public class OrderService {
         boolean allowed = switch (currentStatus) {
             case CREATED -> nextStatus == OrderStatus.RECEIVED || nextStatus == OrderStatus.CANCELLED;
             case RECEIVED -> nextStatus == OrderStatus.PROCESSING
+                || nextStatus == OrderStatus.PARTIALLY_FULFILLED
+                || nextStatus == OrderStatus.FULFILLED
                 || nextStatus == OrderStatus.BLOCKED
                 || nextStatus == OrderStatus.CANCELLED
                 || nextStatus == OrderStatus.FAILED;
@@ -425,7 +448,8 @@ public class OrderService {
                 || nextStatus == OrderStatus.DELIVERED
                 || nextStatus == OrderStatus.BLOCKED
                 || nextStatus == OrderStatus.RETURNED
-                || nextStatus == OrderStatus.CANCELLED;
+                || nextStatus == OrderStatus.CANCELLED
+                || nextStatus == OrderStatus.FAILED;
             case FULFILLED -> nextStatus == OrderStatus.DELIVERED
                 || nextStatus == OrderStatus.RETURNED
                 || nextStatus == OrderStatus.BLOCKED;
