@@ -1,6 +1,6 @@
 # Domain 11: Controlled Provisioning and Public Entry Closure
 
-Status: implemented and locally verified
+Status: implemented and deployed proof verified
 
 ## Product contract
 
@@ -68,10 +68,52 @@ Local verification recorded for this closure:
 - frontend lint, build, and verify: passed
 - documentation link check: 777 links checked, none missing
 
-The live public-control execution was first attempted before deployment of this
-revision and correctly exercised the still-deployed public bundle; it must be
-rerun after the frontend deployment serves this revision. That pre-deployment
-failure is deployment lag, not evidence to weaken the public route assertion.
+## Post-deployment closure evidence
+
+The live connection check passed after the frontend deployment served the
+corrected bundle:
+
+- `FRONTEND_UP=True`
+- `BACKEND_UP=True`
+- `DB_READY=True`
+- `AUTH_READY=True`
+- `WS_READY=True`
+- `PROOF_ALLOWED=True`
+- deployed frontend bundle: `index-CXlr1fZ2.js`
+
+The post-deployment controls execution completed all seven batches:
+
+- 201 controls inventory, 0 unverified
+- 170 verified working
+- 24 role-restricted and verified
+- 5 verified working with documented limitation
+- 2 disabled by design and verified
+- 0 unexpected network failures
+- 0 HTTP 5xx responses
+
+The full hosted proof then completed successfully:
+
+- 6 tests passed
+- 0 failed
+- runtime readiness, authenticated dashboard snapshot, realtime, catalog,
+  replay, scenario governance, role gating, operational surfaces, and auth
+  rate-limit handling all passed
+- total run time: approximately 3.6 minutes
+
+During post-deployment verification, the browser surfaced an initial frontend
+hydration crash on an incomplete dashboard snapshot. The frontend was hardened
+with snapshot normalization and defensive dashboard hydration defaults in
+commits `60b3611`, `9b1efca`, and `3221a19`; the corrected deployed bundle then
+rendered the authenticated dashboard and passed the controls suite. The hosted
+proof readiness helper was also aligned with the current truthful trust-rail
+label `Last successful snapshot ...` rather than requiring the older `Snapshot
+...` wording. Workspace and security mutation checks now wait for their actual
+successful `PUT` response before asserting the UI result.
+
+The green browser run still reports console HTTP 401 and 400 entries from
+intentional negative-control coverage. These represent deliberate unauthorized
+and invalid-input assertions; they were not unexpected network failures,
+server errors, React errors, or unexplained application failures.
 
 ## Boundaries not expanded here
 
@@ -79,3 +121,5 @@ This closure does not redesign authentication/session behavior, build an email
 invitation system, add a Platform Owner provisioning wizard, or change tenant
 role semantics outside the initial provisioning handoff. Those remain separate
 review domains.
+
+No Phase 12 or later access/authentication review was started by this closure.

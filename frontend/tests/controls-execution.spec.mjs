@@ -336,8 +336,16 @@ test('BATCH 4 catalog and workspace-admin mutation controls execute with readbac
     const nameField = page.getByLabel('Company workspace name')
     await nameField.fill(workspaceBefore.tenantName)
     await page.getByLabel('Workspace description').fill(workspaceBefore.description || 'Gate 4 workspace verification')
-    await page.getByRole('button', { name: /Save Workspace|Working/i }).click()
-    await expect(page.locator('.success-text')).toContainText(/workspace settings were updated/i)
+    const saveWorkspaceButton = page.getByRole('button', { name: 'Save Workspace', exact: true })
+    await expect(saveWorkspaceButton).toBeEnabled({ timeout: 30_000 })
+    const workspaceUpdateResponse = page.waitForResponse((response) => (
+      response.request().method() === 'PUT'
+      && response.url().endsWith('/api/access/admin/workspace')
+      && response.status() === 200
+    ), { timeout: 60_000 })
+    await saveWorkspaceButton.click()
+    await workspaceUpdateResponse
+    await expect(page.locator('.success-text')).toContainText(/workspace settings were updated/i, { timeout: 60_000 })
     const workspaceAfter = await readJson(await api.get('/api/access/admin/workspace'))
     expect(workspaceAfter.tenantName).toBe(workspaceBefore.tenantName)
 
@@ -348,8 +356,16 @@ test('BATCH 4 catalog and workspace-admin mutation controls execute with readbac
       await invalidate.check()
       await invalidate.uncheck()
     }
-    await page.getByRole('button', { name: /Save Security Policy|Working/i }).click()
-    await expect(page.locator('.success-text')).toContainText(/Security settings updated/i)
+    const saveSecurityButton = page.getByRole('button', { name: 'Save Security Policy', exact: true })
+    await expect(saveSecurityButton).toBeEnabled({ timeout: 30_000 })
+    const securityUpdateResponse = page.waitForResponse((response) => (
+      response.request().method() === 'PUT'
+      && response.url().endsWith('/api/access/admin/workspace/security')
+      && response.status() === 200
+    ), { timeout: 60_000 })
+    await saveSecurityButton.click()
+    await securityUpdateResponse
+    await expect(page.locator('.success-text')).toContainText(/Security settings updated/i, { timeout: 60_000 })
     const securityAfter = await readJson(await api.get('/api/access/admin/workspace'))
     expect(securityAfter.securitySettings?.passwordRotationDays).toBe(workspaceAfter.securitySettings?.passwordRotationDays)
     expect(securityAfter.securitySettings?.sessionTimeoutMinutes).toBe(workspaceAfter.securitySettings?.sessionTimeoutMinutes)

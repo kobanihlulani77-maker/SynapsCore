@@ -480,7 +480,7 @@ async function activateSelectableButton(buttonLocator) {
 
 async function waitForDashboardSnapshotReady(page, options = {}) {
   const { timeoutMs = 90_000, refreshAfterMs = 25_000, refreshIntervalMs = 20_000 } = options
-  const snapshotTimestamp = page.locator('#workspace-trust-rail .muted-text').filter({ hasText: /^Snapshot / }).first()
+  const snapshotTimestamp = page.locator('#workspace-trust-rail .muted-text').filter({ hasText: /^(Snapshot |Last successful snapshot )/ }).first()
   const snapshotLoadError = page.locator('.error-text:visible').filter({ hasText: /Snapshot load issue:/ }).first()
   const startedAt = Date.now()
   let lastRefreshAt = 0
