@@ -205,10 +205,23 @@ public class OrderService {
     @Transactional
     public CustomerOrder synchronizeOrderLifecycleFromFulfillment(FulfillmentTask task,
                                                                   int requestedFulfilledUnits,
+                                                                  String requestedFulfilledProductSku,
                                                                   String source,
                                                                   String note) {
         CustomerOrder order = task.getCustomerOrder();
         tenantScopeGuard.requireCustomerOrder(order, "fulfillment lifecycle synchronization");
+
+        String fulfilledProductSku = requestedFulfilledProductSku == null || requestedFulfilledProductSku.isBlank()
+            ? null
+            : requestedFulfilledProductSku.trim();
+        if (fulfilledProductSku != null && task.getStatus() != com.synapsecore.domain.entity.FulfillmentStatus.DISPATCHED) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                "fulfilledProductSku is only supported for DISPATCHED fulfillment updates.");
+        }
+        if (fulfilledProductSku != null && requestedFulfilledUnits < 1) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                "fulfilledUnits must be positive when fulfilledProductSku is supplied.");
+        }
 
         switch (task.getStatus()) {
             case QUEUED, PICKING, PACKED -> applyOperationalStatus(order, OrderStatus.PROCESSING, source, note);
@@ -217,7 +230,11 @@ public class OrderService {
                     ? requestedFulfilledUnits
                     : remainingReservedUnits(order);
                 if (fulfilledUnits > 0) {
-                    fulfillReservedUnits(order, fulfilledUnits, source, "Fulfillment dispatch");
+                    if (fulfilledProductSku == null) {
+                        fulfillReservedUnits(order, fulfilledUnits, source, "Fulfillment dispatch");
+                    } else {
+                        fulfillReservedUnitsForProduct(order, fulfilledProductSku, fulfilledUnits, source, "Fulfillment dispatch");
+                    }
                 }
                 applyOperationalStatus(
                     order,
@@ -351,6 +368,51 @@ public class OrderService {
     private void fulfillReservedUnits(CustomerOrder order, int units, String source, String note) {
         int remaining = units;
         for (OrderItem item : order.getItems()) {
+            if (remaining == 0) {
+                break;
+            }
+            int fulfillable = Math.min(item.getReservedQuantity(), remaining);
+            if (fulfillable <= 0) {
+                continue;
+            }
+            Inventory inventory = inventoryService.requireInventory(
+                order.getTenant().getCode(),
+                order.getWarehouse().getCode(),
+                item.getProduct().resolveCatalogSku(),
+                "order fulfillment");
+            inventoryService.fulfillReservedStock(
+                inventory,
+                fulfillable,
+                source,
+                note == null ? "Committed during fulfillment." : note
+            );
+            item.setReservedQuantity(item.getReservedQuantity() - fulfillable);
+            item.setFulfilledQuantity(item.getFulfilledQuantity() + fulfillable);
+            remaining -= fulfillable;
+        }
+    }
+
+    private void fulfillReservedUnitsForProduct(CustomerOrder order,
+                                                String productSku,
+                                                int units,
+                                                String source,
+                                                String note) {
+        List<OrderItem> matchingItems = order.getItems().stream()
+            .filter(item -> productSku.equalsIgnoreCase(item.getProduct().resolveCatalogSku()))
+            .toList();
+        if (matchingItems.isEmpty()) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                "Product " + productSku + " is not an order line for " + order.getExternalOrderId() + ".");
+        }
+
+        int remaining = units;
+        int reservedForProduct = matchingItems.stream().mapToInt(OrderItem::getReservedQuantity).sum();
+        if (units > reservedForProduct) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                "Fulfillment quantity " + units + " exceeds the reserved quantity for product " + productSku + ".");
+        }
+
+        for (OrderItem item : matchingItems) {
             if (remaining == 0) {
                 break;
             }

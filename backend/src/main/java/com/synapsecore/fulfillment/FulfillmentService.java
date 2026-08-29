@@ -159,6 +159,7 @@ public class FulfillmentService {
         CustomerOrder synchronizedOrder = orderService.synchronizeOrderLifecycleFromFulfillment(
             task,
             request.fulfilledUnits() == null ? 0 : request.fulfilledUnits(),
+            request.fulfilledProductSku(),
             source,
             request.note()
         );

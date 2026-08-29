@@ -86,6 +86,14 @@ Example body:
 }
 ```
 
+For a `DISPATCHED` update, callers may additionally provide `fulfilledUnits`
+and the optional `fulfilledProductSku`. When the SKU is supplied, the
+fulfilled quantity is applied only to matching order line(s); when it is
+omitted, the existing aggregate reservation allocation is retained. A
+supplied SKU is rejected for non-dispatch statuses or non-positive quantities.
+This selector identifies the product line within the existing Order; it does
+not replace `externalOrderId` as the stable business Order identity.
+
 Typical statuses:
 
 - `QUEUED`
