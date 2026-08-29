@@ -89,6 +89,29 @@ public class IntegrationReplayService {
                                                          IntegrationFailureCode failureCode,
                                                          String failureMessage,
                                                          Long inboundRecordId) {
+        var activeReplay = integrationReplayRecordRepository
+            .findActiveByTenantCodeIgnoreCaseAndExternalOrderIdForUpdate(
+                tenantCode,
+                request.externalOrderId(),
+                List.of(IntegrationReplayStatus.PENDING, IntegrationReplayStatus.REPLAY_FAILED,
+                    IntegrationReplayStatus.DEAD_LETTERED))
+            .orElse(null);
+        if (activeReplay != null) {
+            if (activeReplay.getStatus() == IntegrationReplayStatus.DEAD_LETTERED) {
+                integrationInboundRecordService.markRejected(
+                    inboundRecordId,
+                    activeReplay.getFailureCode(),
+                    "Equivalent replay identity is already dead-lettered; source correction or manual re-ingestion is required.");
+            } else {
+                integrationInboundRecordService.markReplayQueued(
+                    inboundRecordId,
+                    activeReplay.getId(),
+                    activeReplay.getFailureCode(),
+                    activeReplay.getFailureMessage());
+            }
+            return toResponse(activeReplay);
+        }
+
         IntegrationReplayRecord record = integrationReplayRecordRepository.save(IntegrationReplayRecord.builder()
             .tenantCode(tenantCode)
             .sourceSystem(sourceSystem)
@@ -373,18 +396,23 @@ public class IntegrationReplayService {
         }
 
         try {
-            integrationConnectorService.requireEnabledConnectorForTenant(
-                tenantCode,
-                record.getSourceSystem(),
-                record.getConnectorType(),
-                "replay failed inbound orders");
-
-            OrderResponse order = orderService.createOrderForTenant(
-                tenantCode,
-                request,
-                (enforceWarehouseAccess ? "integration-replay:" : "integration-replay:auto:") + record.getSourceSystem()
-            );
-
+            OrderResponse existingOrder = orderService
+                .findOrderForTenantByExternalOrderId(tenantCode, request.externalOrderId())
+                .orElse(null);
+            boolean alreadyCompleted = existingOrder != null;
+            OrderResponse order = existingOrder;
+            if (order == null) {
+                integrationConnectorService.requireEnabledConnectorForTenant(
+                    tenantCode,
+                    record.getSourceSystem(),
+                    record.getConnectorType(),
+                    "replay failed inbound orders");
+                order = orderService.createOrderForTenant(
+                    tenantCode,
+                    request,
+                    (enforceWarehouseAccess ? "integration-replay:" : "integration-replay:auto:") + record.getSourceSystem()
+                );
+            }
             record.setStatus(IntegrationReplayStatus.REPLAYED);
             record.setReplayAttemptCount(record.getReplayAttemptCount() + 1);
             record.setLastAttemptedAt(attemptedAt);
@@ -392,7 +420,9 @@ public class IntegrationReplayService {
             record.setResolvedAt(attemptedAt);
             record.setReplayedOrderExternalId(order.externalOrderId());
             record.setFailureCode(null);
-            record.setLastReplayMessage(limit("Replayed successfully as live order " + order.externalOrderId() + "."));
+            record.setLastReplayMessage(limit(alreadyCompleted
+                ? "Business order " + order.externalOrderId() + " already existed; replay reconciled without creating a duplicate."
+                : "Replayed successfully as live order " + order.externalOrderId() + "."));
             record = integrationReplayRecordRepository.save(record);
             integrationInboundRecordService.markReplayed(record.getInboundRecordId(), order.externalOrderId());
 

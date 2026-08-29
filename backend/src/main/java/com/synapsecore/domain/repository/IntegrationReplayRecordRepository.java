@@ -115,6 +115,21 @@ public interface IntegrationReplayRecordRepository extends JpaRepository<Integra
     @Query("""
         select record
         from IntegrationReplayRecord record
+        where lower(record.tenantCode) = lower(?1)
+          and lower(record.externalOrderId) = lower(?2)
+          and record.status in ?3
+        order by record.createdAt asc
+        """)
+    java.util.Optional<IntegrationReplayRecord> findActiveByTenantCodeIgnoreCaseAndExternalOrderIdForUpdate(
+        String tenantCode,
+        String externalOrderId,
+        Collection<IntegrationReplayStatus> statuses
+    );
+
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("""
+        select record
+        from IntegrationReplayRecord record
         where record.id = ?1
         """)
     java.util.Optional<IntegrationReplayRecord> findByIdForUpdate(Long id);

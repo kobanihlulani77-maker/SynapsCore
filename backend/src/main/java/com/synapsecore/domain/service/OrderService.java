@@ -29,6 +29,7 @@ import java.math.BigDecimal;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Optional;
 import lombok.extern.slf4j.Slf4j;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.ObjectProvider;
@@ -200,6 +201,19 @@ public class OrderService {
                 "Order not found: " + externalOrderId));
         tenantScopeGuard.requireCustomerOrder(order, "order warehouse lookup");
         return order.getWarehouse().getCode();
+    }
+
+    @Transactional(readOnly = true)
+    public Optional<OrderResponse> findOrderForTenantByExternalOrderId(String tenantCode, String externalOrderId) {
+        if (tenantCode == null || tenantCode.isBlank() || externalOrderId == null || externalOrderId.isBlank()) {
+            return Optional.empty();
+        }
+        return customerOrderRepository
+            .findByTenant_CodeIgnoreCaseAndExternalOrderId(tenantCode, externalOrderId.trim())
+            .map(order -> {
+                tenantScopeGuard.requireCustomerOrder(order, "order identity reconciliation");
+                return toOrderResponse(order);
+            });
     }
 
     @Transactional

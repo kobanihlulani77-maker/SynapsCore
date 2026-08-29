@@ -55,6 +55,7 @@ import java.time.Duration;
 import java.util.Collections;
 import java.util.Enumeration;
 import java.util.LinkedHashSet;
+import java.util.List;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
@@ -2778,6 +2779,116 @@ class MvpFlowIntegrationTest {
                 .param("externalOrderId", externalOrderId))
             .andExpect(status().isOk())
             .andExpect(jsonPath("$").isEmpty());
+    }
+
+    @Test
+    void duplicateFailedIntegrationDeliverySharesOneActiveReplayRecord() throws Exception {
+        String csvBody = """
+            externalOrderId,warehouseCode,productSku,quantity,unitPrice
+            PHASE2-DUPLICATE-FAILED,WH-NORTH,SKU-PHASE2-MISSING,2,88.00
+            """;
+
+        for (String fileName : List.of("phase2-duplicate-failed-1.csv", "phase2-duplicate-failed-2.csv")) {
+            MockMultipartFile file = new MockMultipartFile(
+                "file",
+                fileName,
+                "text/csv",
+                csvBody.getBytes(StandardCharsets.UTF_8)
+            );
+
+            mockMvc.perform(multipart("/api/integrations/orders/csv-import")
+                    .file(file)
+                    .param("sourceSystem", "erp_batch"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.ordersImported").value(0))
+                .andExpect(jsonPath("$.ordersFailed").value(1))
+                .andExpect(jsonPath("$.failedOrders[0].failureCode").value("PRODUCT_NOT_FOUND"));
+        }
+
+        var replayRecords = integrationReplayRecordRepository.findAll().stream()
+            .filter(record -> "PHASE2-DUPLICATE-FAILED".equals(record.getExternalOrderId()))
+            .toList();
+        assertThat(replayRecords).hasSize(1);
+        assertThat(replayRecords.getFirst().getStatus())
+            .isEqualTo(com.synapsecore.domain.entity.IntegrationReplayStatus.PENDING);
+
+        var inboundRecords = integrationInboundRecordRepository.findAll().stream()
+            .filter(record -> "PHASE2-DUPLICATE-FAILED".equals(record.getExternalOrderId()))
+            .toList();
+        assertThat(inboundRecords).hasSize(2);
+        assertThat(inboundRecords).allSatisfy(record -> {
+            assertThat(record.getStatus())
+                .isEqualTo(com.synapsecore.domain.entity.IntegrationInboundStatus.REPLAY_QUEUED);
+            assertThat(record.getReplayRecordId()).isEqualTo(replayRecords.getFirst().getId());
+        });
+    }
+
+    @Test
+    void replayReconcilesExistingBusinessOrderWithoutCreatingDuplicate() throws Exception {
+        String externalOrderId = "PHASE2-ALREADY-COMPLETED";
+        MockMultipartFile file = new MockMultipartFile(
+            "file",
+            "phase2-existing-order.csv",
+            "text/csv",
+            ("externalOrderId,warehouseCode,productSku,quantity,unitPrice\n"
+                + externalOrderId + ",WH-NORTH,SKU-PHASE2-MISSING,2,88.00\n")
+                .getBytes(StandardCharsets.UTF_8)
+        );
+
+        mockMvc.perform(multipart("/api/integrations/orders/csv-import")
+                .file(file)
+                .param("sourceSystem", "erp_batch"))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.ordersFailed").value(1));
+
+        Product product = createTenantProduct("WH-NORTH", "SKU-PHASE2-MISSING", "Phase 2 Recovery Product", "Recovery");
+        var warehouse = warehouseRepository.findByCode("WH-NORTH").orElseThrow();
+        inventoryRepository.save(Inventory.builder()
+            .tenant(warehouse.getTenant())
+            .product(product)
+            .warehouse(warehouse)
+            .quantityOnHand(10L)
+            .quantityReserved(0L)
+            .quantityInbound(0L)
+            .quantityAvailable(10L)
+            .reorderThreshold(2L)
+            .build());
+
+        mockMvc.perform(post("/api/orders")
+                .contentType(APPLICATION_JSON)
+                .content("""
+                    {
+                      "externalOrderId": "PHASE2-ALREADY-COMPLETED",
+                      "warehouseCode": "WH-NORTH",
+                      "items": [
+                        {"productSku": "SKU-PHASE2-MISSING", "quantity": 2, "unitPrice": 88.00}
+                      ]
+                    }
+                    """))
+            .andExpect(status().isCreated());
+
+        var replayRecord = integrationReplayRecordRepository.findAll().stream()
+            .filter(record -> externalOrderId.equals(record.getExternalOrderId()))
+            .findFirst()
+            .orElseThrow();
+        long orderCountBeforeReplay = customerOrderRepository.findAll().stream()
+            .filter(order -> externalOrderId.equals(order.getExternalOrderId()))
+            .count();
+
+        mockMvc.perform(post("/api/integrations/orders/replay/" + replayRecord.getId())
+                .with(accessHeaders("Integration Operator", "INTEGRATION_OPERATOR")))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.replay.status").value("REPLAYED"))
+            .andExpect(jsonPath("$.replay.replayedOrderExternalId").value(externalOrderId))
+            .andExpect(jsonPath("$.replay.lastReplayMessage")
+                .value(org.hamcrest.Matchers.containsString("already existed")))
+            .andExpect(jsonPath("$.order.externalOrderId").value(externalOrderId));
+
+        assertThat(customerOrderRepository.findAll().stream()
+            .filter(order -> externalOrderId.equals(order.getExternalOrderId()))
+            .count()).isEqualTo(orderCountBeforeReplay);
+        assertThat(integrationReplayRecordRepository.findById(replayRecord.getId()).orElseThrow().getStatus())
+            .isEqualTo(com.synapsecore.domain.entity.IntegrationReplayStatus.REPLAYED);
     }
 
     @Test
