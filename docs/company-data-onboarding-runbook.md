@@ -237,7 +237,7 @@ Dependencies:
 | `POST /api/inventory/receive` | Supported operational action | Requires existing inventory row. |
 | `POST /api/inventory/adjust` | Supported operational action | Requires existing row and reason. |
 | `POST /api/inventory/reconcile` | Supported operational action | Requires existing row. |
-| Inventory UI | Readback/review only | No current manual edit form in UI. |
+| Inventory UI | Readback/review plus controlled adjustment | Receive and reconciliation remain supported API/integration operations; no Inventory CSV control exists. |
 | Proof/readiness scripts | Proof/test only | Good rehearsal; not Company 1 data load. |
 | Seed tooling | Seed only | Starter/dev data only. |
 | Direct SQL | Unsafe | Do not use. |

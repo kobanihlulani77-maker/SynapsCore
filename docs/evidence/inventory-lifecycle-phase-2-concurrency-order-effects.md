@@ -42,14 +42,14 @@ The first-row race logs an underlying database uniqueness warning in the H2 test
 The current API semantics are deliberately documented rather than generalized into a new idempotency subsystem:
 
 - `POST /api/inventory/update` sets an absolute available baseline while preserving reservations. Repeating the same payload is generally repeat-safe, although it still produces the normal mutation/audit path.
-- `POST /api/inventory/receive` is additive. Repeating `+10` applies `+20` total. It is not idempotent without a caller-supplied operation identity.
-- `POST /api/inventory/adjust` is additive. Repeating `-5` applies `-10` total. It is not idempotent without a caller-supplied operation identity.
-- `POST /api/inventory/reconcile` sets an absolute count. Repeating a count restores the same stock value but produces a new reconciliation operation and can change variance/history timestamps.
+- `POST /api/inventory/receive` is additive, but a caller can make a retry safe by reusing the original `X-Request-Id`. The backend recognizes the committed tenant/action/SKU/warehouse audit identity and returns the committed state without applying the receipt again.
+- `POST /api/inventory/adjust` is additive, but a caller can make a retry safe by reusing the original `X-Request-Id`. The same committed-operation identity prevents a second adjustment.
+- `POST /api/inventory/reconcile` sets an absolute count. Reusing the original `X-Request-Id` returns the committed state without creating a second reconciliation operation; a new request ID intentionally represents a new count operation.
 - The frontend `fetchJson` helper performs one fetch for a mutation and surfaces transport errors; it does not automatically retry receive, adjust, or reconcile. Realtime reconnect/poll behavior is separate from mutation retry.
 - Fulfillment has no general event-id idempotency key. The tested duplicate dispatch behavior is safe for the supported lifecycle because the first commit consumes the reservation and a later dispatch has no reserved units left to consume. The concurrency fix also prevents stale Order line counters.
 - Repeated cancellation is accepted as a `200` idempotent no-op after the reservation has been released. Repeated return is rejected with `400` once no fulfilled units remain returnable.
 
-For a controlled pilot, callers must not blindly retry additive inventory commands after an unknown network outcome. A future operation-id/idempotency design remains a separate hardening item and was not introduced without a demonstrated requirement.
+For a controlled pilot, callers must retain and reuse the original `X-Request-Id` when retrying after an unknown network outcome. The frontend adjustment form does this for an interrupted submission. The frontend does not automatically retry, and a new request ID remains a new operation.
 
 ## Order and fulfillment stock effects
 
@@ -110,7 +110,7 @@ Final full result: `194` tests, `0` failures, `0` errors, `BUILD SUCCESS`.
 
 ## Limitations and follow-up
 
-- Receive and adjustment mutations remain non-idempotent for an unknown client/network outcome. The UI does not auto-retry them; pilot integrations should use caller-side reconciliation and explicit operator review.
+- Receive, adjustment, and reconciliation retries are safe when the caller reuses the original `X-Request-Id`; there is no automatic client retry and callers that generate a new ID can still create a new operation.
 - Reconciliation is absolute and concurrency-safe, but the winner is last successful commit; no optimistic version policy was added.
 - First-row creation relies on the database uniqueness constraint and conflict mapping rather than an application retry that returns the created row to both callers.
 - The focused concurrency profile uses H2. PostgreSQL deployment evidence remains important for lock behavior, isolation, and uniqueness conflict handling.

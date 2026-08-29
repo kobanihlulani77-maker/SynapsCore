@@ -20,4 +20,12 @@ public interface AuditLogRepository extends JpaRepository<AuditLog, Long> {
     Optional<AuditLog> findTopByStatusOrderByCreatedAtDesc(AuditStatus status);
 
     Optional<AuditLog> findTopByTenantCodeIgnoreCaseAndStatusOrderByCreatedAtDesc(String tenantCode, AuditStatus status);
+
+    Optional<AuditLog> findTopByTenantCodeIgnoreCaseAndActionAndTargetRefAndRequestIdAndStatus(
+        String tenantCode,
+        String action,
+        String targetRef,
+        String requestId,
+        AuditStatus status
+    );
 }

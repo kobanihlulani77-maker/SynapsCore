@@ -453,6 +453,102 @@ class MvpFlowIntegrationTest {
     }
 
     @Test
+    void inventoryMutationRetriesReuseCommittedRequestIdentity() throws Exception {
+        Inventory before = loadInventory("SKU-FLX-100", "WH-NORTH");
+        long startingAvailable = before.getQuantityAvailable();
+        long startingOnHand = before.getQuantityOnHand();
+
+        String receiveRequestId = "inventory-retry-receive-" + System.nanoTime();
+        String receiveBody = """
+            {
+              "productSku": "SKU-FLX-100",
+              "warehouseCode": "WH-NORTH",
+              "quantityReceived": 3,
+              "note": "Retry identity proof"
+            }
+            """;
+
+        mockMvc.perform(post("/api/inventory/receive")
+                .header("X-Request-Id", receiveRequestId)
+                .contentType(APPLICATION_JSON)
+                .content(receiveBody))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.quantityAvailable").value(startingAvailable + 3));
+        mockMvc.perform(post("/api/inventory/receive")
+                .header("X-Request-Id", receiveRequestId)
+                .contentType(APPLICATION_JSON)
+                .content(receiveBody))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.quantityAvailable").value(startingAvailable + 3));
+
+        String adjustmentRequestId = "inventory-retry-adjust-" + System.nanoTime();
+        String adjustmentBody = """
+            {
+              "productSku": "SKU-FLX-100",
+              "warehouseCode": "WH-NORTH",
+              "quantityDelta": -2,
+              "reason": "Retry identity proof"
+            }
+            """;
+
+        mockMvc.perform(post("/api/inventory/adjust")
+                .header("X-Request-Id", adjustmentRequestId)
+                .contentType(APPLICATION_JSON)
+                .content(adjustmentBody))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.quantityAvailable").value(startingAvailable + 1));
+        mockMvc.perform(post("/api/inventory/adjust")
+                .header("X-Request-Id", adjustmentRequestId)
+                .contentType(APPLICATION_JSON)
+                .content(adjustmentBody))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.quantityAvailable").value(startingAvailable + 1));
+
+        String reconcileRequestId = "inventory-retry-reconcile-" + System.nanoTime();
+        long countedOnHand = startingOnHand + 1;
+        String reconcileBody = """
+            {
+              "productSku": "SKU-FLX-100",
+              "warehouseCode": "WH-NORTH",
+              "countedOnHand": %d,
+              "note": "Retry identity proof"
+            }
+            """.formatted(countedOnHand);
+
+        mockMvc.perform(post("/api/inventory/reconcile")
+                .header("X-Request-Id", reconcileRequestId)
+                .contentType(APPLICATION_JSON)
+                .content(reconcileBody))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.quantityOnHand").value(countedOnHand));
+        mockMvc.perform(post("/api/inventory/reconcile")
+                .header("X-Request-Id", reconcileRequestId)
+                .contentType(APPLICATION_JSON)
+                .content(reconcileBody))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.quantityOnHand").value(countedOnHand));
+
+        Inventory after = loadInventory("SKU-FLX-100", "WH-NORTH");
+        assertThat(after.getQuantityOnHand()).isEqualTo(countedOnHand);
+        assertThat(after.getQuantityAvailable()).isEqualTo(countedOnHand - after.getQuantityReserved());
+        assertThat(auditLogRepository.findAll().stream()
+            .filter(log -> receiveRequestId.equals(log.getRequestId())
+                && "INVENTORY_RECEIVED".equals(log.getAction())
+                && AuditStatus.SUCCESS.equals(log.getStatus()))
+            .count()).isEqualTo(1);
+        assertThat(auditLogRepository.findAll().stream()
+            .filter(log -> adjustmentRequestId.equals(log.getRequestId())
+                && "INVENTORY_ADJUSTED".equals(log.getAction())
+                && AuditStatus.SUCCESS.equals(log.getStatus()))
+            .count()).isEqualTo(1);
+        assertThat(auditLogRepository.findAll().stream()
+            .filter(log -> reconcileRequestId.equals(log.getRequestId())
+                && "INVENTORY_RECONCILED".equals(log.getAction())
+                && AuditStatus.SUCCESS.equals(log.getStatus()))
+            .count()).isEqualTo(1);
+    }
+
+    @Test
     void productCatalogCanBeCreatedUpdatedAndImportedThroughTenantScopedApis() throws Exception {
         String createBody = """
             {

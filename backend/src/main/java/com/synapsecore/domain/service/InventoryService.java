@@ -1,6 +1,7 @@
 package com.synapsecore.domain.service;
 
 import com.synapsecore.audit.AuditLogService;
+import com.synapsecore.audit.RequestTraceContext;
 import com.synapsecore.domain.dto.InventoryAdjustmentRequest;
 import com.synapsecore.domain.dto.InventoryReceiptRequest;
 import com.synapsecore.domain.dto.InventoryReconciliationRequest;
@@ -10,7 +11,9 @@ import com.synapsecore.domain.entity.BusinessEventType;
 import com.synapsecore.domain.entity.Inventory;
 import com.synapsecore.domain.entity.Product;
 import com.synapsecore.domain.entity.Warehouse;
+import com.synapsecore.domain.entity.AuditStatus;
 import com.synapsecore.domain.repository.InventoryRepository;
+import com.synapsecore.domain.repository.AuditLogRepository;
 import com.synapsecore.domain.repository.ProductRepository;
 import com.synapsecore.domain.repository.WarehouseRepository;
 import com.synapsecore.event.BusinessEventService;
@@ -42,6 +45,8 @@ public class InventoryService {
     private final BusinessEventService businessEventService;
     private final OperationalStateChangePublisher operationalStateChangePublisher;
     private final AuditLogService auditLogService;
+    private final AuditLogRepository auditLogRepository;
+    private final RequestTraceContext requestTraceContext;
     private final TenantContextService tenantContextService;
     private final TenantScopeGuard tenantScopeGuard;
 
@@ -86,6 +91,9 @@ public class InventoryService {
     public InventoryStatusResponse receiveInventory(InventoryReceiptRequest request) {
         String tenantCode = tenantContextService.getCurrentTenantCodeOrDefault();
         Inventory inventory = requireInventoryForUpdate(tenantCode, request.warehouseCode(), request.productSku(), "inventory receipt");
+        if (wasCompletedMutation(tenantCode, "INVENTORY_RECEIVED", inventory)) {
+            return toInventoryStatusResponse(inventory);
+        }
         inventory.setQuantityOnHand(inventory.getQuantityOnHand() + request.quantityReceived());
         long inbound = inventory.getQuantityInbound() == null ? 0L : inventory.getQuantityInbound();
         inventory.setQuantityInbound(Math.max(inbound - request.quantityReceived(), 0L));
@@ -114,6 +122,9 @@ public class InventoryService {
     public InventoryStatusResponse adjustInventory(InventoryAdjustmentRequest request) {
         String tenantCode = tenantContextService.getCurrentTenantCodeOrDefault();
         Inventory inventory = requireInventoryForUpdate(tenantCode, request.warehouseCode(), request.productSku(), "inventory adjustment");
+        if (wasCompletedMutation(tenantCode, "INVENTORY_ADJUSTED", inventory)) {
+            return toInventoryStatusResponse(inventory);
+        }
         if (request.quantityDelta() == 0) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
                 "Inventory adjustment quantityDelta must be non-zero.");
@@ -151,6 +162,9 @@ public class InventoryService {
     public InventoryStatusResponse reconcileInventory(InventoryReconciliationRequest request) {
         String tenantCode = tenantContextService.getCurrentTenantCodeOrDefault();
         Inventory inventory = requireInventoryForUpdate(tenantCode, request.warehouseCode(), request.productSku(), "inventory reconciliation");
+        if (wasCompletedMutation(tenantCode, "INVENTORY_RECONCILED", inventory)) {
+            return toInventoryStatusResponse(inventory);
+        }
         if (request.countedOnHand() < inventory.getQuantityReserved()) {
             throw new ResponseStatusException(HttpStatus.CONFLICT,
                 "Reconciliation count is lower than reserved commitments for SKU "
@@ -385,6 +399,17 @@ public class InventoryService {
             return action + " " + stateSummary;
         }
         return action + " Note: " + noteOrReason.trim() + ". " + stateSummary;
+    }
+
+    private boolean wasCompletedMutation(String tenantCode, String action, Inventory inventory) {
+        return auditLogRepository.findTopByTenantCodeIgnoreCaseAndActionAndTargetRefAndRequestIdAndStatus(
+                tenantCode,
+                action,
+                inventory.getProduct().resolveCatalogSku() + "@" + inventory.getWarehouse().getCode(),
+                requestTraceContext.getRequiredRequestId(),
+                AuditStatus.SUCCESS
+            )
+            .isPresent();
     }
 
     private String savedInventoryDescription(Inventory inventory) {

@@ -82,7 +82,7 @@ The safe operational topics and tenant-scoped routing remain available where the
 
 ## 14. Degraded mode and recovery
 
-**Result: PASS by existing implementation and frontend contract; focused fault injection not added.** `useWorkspaceRealtime` exposes `connecting`, `live`, `reconnecting`, and `degraded` states. On transport failure it starts a 15-second snapshot refresh loop, keeps the degraded state visible, and stops the loop after a live connection returns. It never converts a failed transport into fake live status.
+**Result: PASS by existing implementation and frontend contract; focused browser fault injection remains an evidence gap.** `useWorkspaceRealtime` exposes `connecting`, `live`, `reconnecting`, and `degraded` states. On transport failure it starts a 15-second snapshot refresh loop, keeps the degraded state visible, and stops the loop after a live connection returns. It never converts a failed transport into fake live status.
 
 The focused backend realtime tests pass. A browser-level forced-disconnect recovery test is not part of this Phase 3 run, so that specific rendered recovery path remains a pilot/owner verification item.
 
@@ -106,7 +106,7 @@ The evidence proves the supported audit contract and representative Inventory ac
 
 **Result: PASS by source inspection.** `frontend/src/pages/Inventory.jsx` presents product, warehouse, available quantity, threshold, velocity, stockout window, risk level, warehouse coverage, and a signal matrix. A warehouse-scoped `TENANT_ADMIN` receives the controlled adjustment form with a required non-zero whole-unit delta and reason, then performs readback through `fetchSnapshot`.
 
-The page intentionally does not add receive, reconcile, or Inventory CSV controls. That remains consistent with the supported frontend scope.
+The page intentionally exposes controlled adjustment only. Receive and reconcile remain API/integration/support operations, and Inventory CSV is not supported. This remains consistent with the supported frontend scope.
 
 ## 19. Direct negative smoke coverage
 
@@ -185,6 +185,7 @@ No deployment was required. Hosted proof and owner-managed live checks were not 
 
 - The focused integration profile uses H2; PostgreSQL lock, isolation, and query-plan behavior remain deployment evidence responsibilities.
 - Exact recommendation deduplication boundary timing is source-supported, not independently controlled with a clock fixture.
+- Receive, adjustment, and reconciliation retry identity is now verified by `MvpFlowIntegrationTest.inventoryMutationRetriesReuseCommittedRequestIdentity`; automatic client retries remain out of scope.
 - Dispatch fault injection is not covered by the focused suite; durable `FAILED` handling is source-supported and normal queue processing is tested.
 - Browser-level forced realtime disconnect/recovery is not rerun here.
 - The Inventory page exposes controlled adjustment only. Receive, reconcile, and CSV import remain API/integration surfaces, not new UI functionality.

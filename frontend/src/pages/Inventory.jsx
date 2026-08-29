@@ -4,6 +4,9 @@ import EmptyState from '../components/EmptyState'
 import Panel from '../components/Panel'
 import { MetricCard } from '../components/Card'
 
+const createInventoryRequestId = () => globalThis.crypto?.randomUUID?.()
+  || `inventory-${Date.now()}-${Math.random().toString(36).slice(2)}`
+
 export default function InventoryPage({ context }) {
   const {
     isAuthenticated,
@@ -66,6 +69,7 @@ export default function InventoryPage({ context }) {
   )
   const [adjustmentDelta, setAdjustmentDelta] = useState('')
   const [adjustmentReason, setAdjustmentReason] = useState('')
+  const [adjustmentRequestId, setAdjustmentRequestId] = useState('')
   const [inventoryActionState, setInventoryActionState] = useState({ loading: false, error: '', success: '' })
 
   const submitInventoryAdjustment = async (event) => {
@@ -81,10 +85,12 @@ export default function InventoryPage({ context }) {
     }
 
     setInventoryActionState({ loading: true, error: '', success: '' })
+    const requestId = adjustmentRequestId || createInventoryRequestId()
+    setAdjustmentRequestId(requestId)
     try {
       await fetchJson('/api/inventory/adjust', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', 'X-Request-Id': requestId },
         body: JSON.stringify({
           productSku: selectedInventoryItem.productSku,
           warehouseCode: selectedInventoryItem.warehouseCode,
@@ -94,6 +100,7 @@ export default function InventoryPage({ context }) {
       })
       setAdjustmentDelta('')
       setAdjustmentReason('')
+      setAdjustmentRequestId('')
       setInventoryActionState({ loading: false, error: '', success: 'Inventory adjustment accepted. Refreshing the selected warehouse lane for readback.' })
       await fetchSnapshot?.()
     } catch (error) {
@@ -238,6 +245,7 @@ export default function InventoryPage({ context }) {
                       <span className="scenario-type-tag">TENANT_ADMIN</span>
                     </div>
                     <p className="muted-text">Warehouse {selectedInventoryItem.warehouseCode} | Before {selectedInventoryItem.quantityAvailable}. This changes the SynapseCore inventory record; source reconciliation remains a separate responsibility.</p>
+                    <p className="muted-text">If the response is interrupted, retry the same submission rather than creating a new adjustment; the request identity prevents a committed adjustment from being applied twice.</p>
                     <div className="session-control-row">
                       <label className="field">
                         <span>Quantity delta</span>
