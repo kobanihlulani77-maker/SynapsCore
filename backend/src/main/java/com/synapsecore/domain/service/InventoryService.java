@@ -114,6 +114,10 @@ public class InventoryService {
     public InventoryStatusResponse adjustInventory(InventoryAdjustmentRequest request) {
         String tenantCode = tenantContextService.getCurrentTenantCodeOrDefault();
         Inventory inventory = requireInventoryForUpdate(tenantCode, request.warehouseCode(), request.productSku(), "inventory adjustment");
+        if (request.quantityDelta() == 0) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                "Inventory adjustment quantityDelta must be non-zero.");
+        }
         long nextOnHand = inventory.getQuantityOnHand() + request.quantityDelta();
         if (nextOnHand < inventory.getQuantityReserved()) {
             throw new ResponseStatusException(HttpStatus.CONFLICT,

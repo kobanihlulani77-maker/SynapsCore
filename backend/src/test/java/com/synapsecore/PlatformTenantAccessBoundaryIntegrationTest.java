@@ -22,6 +22,7 @@ import com.synapsecore.domain.entity.ScenarioRun;
 import com.synapsecore.domain.repository.AccessOperatorRepository;
 import com.synapsecore.domain.repository.AccessUserRepository;
 import com.synapsecore.domain.repository.AlertRepository;
+import com.synapsecore.domain.repository.AuditLogRepository;
 import com.synapsecore.domain.repository.BusinessEventRepository;
 import com.synapsecore.domain.repository.CustomerOrderRepository;
 import com.synapsecore.domain.repository.FulfillmentTaskRepository;
@@ -119,6 +120,9 @@ class PlatformTenantAccessBoundaryIntegrationTest {
 
     @Autowired
     private BusinessEventRepository businessEventRepository;
+
+    @Autowired
+    private AuditLogRepository auditLogRepository;
 
     @Autowired
     private PasswordEncoder passwordEncoder;
@@ -267,6 +271,290 @@ class PlatformTenantAccessBoundaryIntegrationTest {
                 .content("{\"externalOrderId\":\"BOUNDARY-INTEGRATION-ORDER\",\"status\":\"PICKING\"}"))
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.fulfillmentStatus").value("PICKING"));
+    }
+
+    @Test
+    void directInventoryMutationsHonorWarehouseAuthorityAndPreserveWarehouseState() throws Exception {
+        MockHttpSession tenantWideAdmin = tenantLogin(REHEARSAL_TENANT, TENANT_ADMIN_USERNAME, TENANT_ADMIN_PASSWORD);
+        String suffix = Long.toString(System.nanoTime());
+        String productSku = "PHASE1-INV-" + suffix;
+        String northAdminUsername = "phase1.north." + suffix;
+        String coastAdminUsername = "phase1.coast." + suffix;
+
+        mockMvc.perform(post("/api/products")
+                .session(tenantWideAdmin)
+                .contentType(APPLICATION_JSON)
+                .content("{\"sku\":\"%s\",\"name\":\"Phase 1 Inventory Fixture\",\"category\":\"Verification\"}".formatted(productSku)))
+            .andExpect(status().isCreated());
+        createRoleUser(tenantWideAdmin, northAdminUsername, "TENANT_ADMIN", List.of(warehouseA));
+        createRoleUser(tenantWideAdmin, coastAdminUsername, "TENANT_ADMIN", List.of(warehouseB));
+
+        MockHttpSession northAdmin = tenantLogin(REHEARSAL_TENANT, northAdminUsername, ROLE_PASSWORD);
+        MockHttpSession coastAdmin = tenantLogin(REHEARSAL_TENANT, coastAdminUsername, ROLE_PASSWORD);
+        MockHttpSession integrationAdmin = tenantLogin(REHEARSAL_TENANT, "boundary.integration.admin", ROLE_PASSWORD);
+
+        MvcResult createdNorth = mockMvc.perform(post("/api/inventory/update")
+                .session(northAdmin)
+                .contentType(APPLICATION_JSON)
+                .content(inventoryPayload(productSku, warehouseA, 20L, 5L)))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.productSku").value(productSku))
+            .andExpect(jsonPath("$.warehouseCode").value(warehouseA))
+            .andExpect(jsonPath("$.quantityAvailable").value(20))
+            .andExpect(jsonPath("$.quantityOnHand").value(20))
+            .andExpect(jsonPath("$.quantityReserved").value(0))
+            .andReturn();
+        assertInventoryCount(productSku, 1);
+        assertThat(auditLogRepository.findTop20ByOrderByCreatedAtDesc())
+            .anyMatch(log -> "INVENTORY_UPDATED".equals(log.getAction())
+                && log.getTargetRef().contains(productSku + "@" + warehouseA)
+                && createdNorth.getResponse().getHeader("X-Request-Id").equals(log.getRequestId()));
+
+        mockMvc.perform(post("/api/orders")
+                .session(integrationAdmin)
+                .contentType(APPLICATION_JSON)
+                .content(orderPayloadForSku("PHASE1-RESERVE-" + suffix, warehouseA, productSku, 1)))
+            .andExpect(status().isCreated());
+
+        MvcResult existingNorth = mockMvc.perform(post("/api/inventory/update")
+                .session(northAdmin)
+                .contentType(APPLICATION_JSON)
+                .content(inventoryPayload(productSku, warehouseA, 25L, 7L)))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.warehouseCode").value(warehouseA))
+            .andExpect(jsonPath("$.quantityAvailable").value(25))
+            .andExpect(jsonPath("$.quantityOnHand").value(26))
+            .andExpect(jsonPath("$.quantityReserved").value(1))
+            .andExpect(jsonPath("$.reorderThreshold").value(7))
+            .andReturn();
+        assertInventoryCount(productSku, 1);
+        assertThat(inventoryFor(productSku, warehouseA).getQuantityReserved()).isEqualTo(1L);
+        assertThat(existingNorth.getResponse().getHeader("X-Request-Id")).isNotBlank();
+
+        mockMvc.perform(post("/api/inventory/update")
+                .session(coastAdmin)
+                .contentType(APPLICATION_JSON)
+                .content(inventoryPayload(productSku, warehouseB, 12L, 4L)))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.warehouseCode").value(warehouseB))
+            .andExpect(jsonPath("$.quantityAvailable").value(12));
+        assertInventoryCount(productSku, 2);
+
+        mockMvc.perform(post("/api/inventory/receive")
+                .session(coastAdmin)
+                .contentType(APPLICATION_JSON)
+                .content(receivePayload(productSku, warehouseB, 2L)))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.warehouseCode").value(warehouseB))
+            .andExpect(jsonPath("$.quantityAvailable").value(14));
+        mockMvc.perform(post("/api/inventory/adjust")
+                .session(coastAdmin)
+                .contentType(APPLICATION_JSON)
+                .content(adjustPayload(productSku, warehouseB, -1L, "Coast cycle count")))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.warehouseCode").value(warehouseB))
+            .andExpect(jsonPath("$.quantityAvailable").value(13));
+        mockMvc.perform(post("/api/inventory/reconcile")
+                .session(coastAdmin)
+                .contentType(APPLICATION_JSON)
+                .content(reconcilePayload(productSku, warehouseB, 17L, "Coast counted stock")))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.warehouseCode").value(warehouseB))
+            .andExpect(jsonPath("$.quantityAvailable").value(17))
+            .andExpect(jsonPath("$.reconciliationVariance").value(4));
+
+        mockMvc.perform(post("/api/inventory/receive")
+                .session(northAdmin)
+                .contentType(APPLICATION_JSON)
+                .content(receivePayload(productSku, warehouseA, 4L)))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.warehouseCode").value(warehouseA))
+            .andExpect(jsonPath("$.quantityOnHand").value(30))
+            .andExpect(jsonPath("$.quantityReserved").value(1))
+            .andExpect(jsonPath("$.quantityAvailable").value(29))
+            .andExpect(jsonPath("$.lastReceivedAt").isNotEmpty());
+        assertThat(businessEventRepository.findTop20ByOrderByCreatedAtDesc())
+            .anyMatch(event -> event.getEventType() == BusinessEventType.INVENTORY_RECEIVED
+                && event.getPayloadSummary().contains(productSku)
+                && event.getPayloadSummary().contains(warehouseA));
+
+        mockMvc.perform(post("/api/inventory/adjust")
+                .session(northAdmin)
+                .contentType(APPLICATION_JSON)
+                .content(adjustPayload(productSku, warehouseA, -3L, "Phase 1 cycle count")))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.warehouseCode").value(warehouseA))
+            .andExpect(jsonPath("$.quantityOnHand").value(27))
+            .andExpect(jsonPath("$.quantityReserved").value(1))
+            .andExpect(jsonPath("$.quantityAvailable").value(26))
+            .andExpect(jsonPath("$.lastAdjustedAt").isNotEmpty());
+
+        mockMvc.perform(post("/api/inventory/reconcile")
+                .session(northAdmin)
+                .contentType(APPLICATION_JSON)
+                .content(reconcilePayload(productSku, warehouseA, 30L, "Phase 1 counted stock")))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.warehouseCode").value(warehouseA))
+            .andExpect(jsonPath("$.quantityOnHand").value(30))
+            .andExpect(jsonPath("$.quantityReserved").value(1))
+            .andExpect(jsonPath("$.quantityAvailable").value(29))
+            .andExpect(jsonPath("$.reconciliationVariance").value(3))
+            .andExpect(jsonPath("$.lastReconciledAt").isNotEmpty());
+
+        assertThat(inventoryFor(productSku, warehouseB).getQuantityAvailable()).isEqualTo(17L);
+        assertThat(inventoryFor(productSku, warehouseA).getQuantityAvailable()).isEqualTo(29L);
+        assertThat(businessEventRepository.findTop20ByOrderByCreatedAtDesc())
+            .anyMatch(event -> event.getEventType() == BusinessEventType.INVENTORY_ADJUSTED
+                && event.getPayloadSummary().contains(warehouseA))
+            .anyMatch(event -> event.getEventType() == BusinessEventType.INVENTORY_RECONCILED
+                && event.getPayloadSummary().contains(warehouseA));
+
+        assertWrongWarehouseDenied(northAdmin, "/api/inventory/update", inventoryPayload(productSku, warehouseB, 99L, 5L));
+        assertWrongWarehouseDenied(northAdmin, "/api/inventory/receive", receivePayload(productSku, warehouseB, 2L));
+        assertWrongWarehouseDenied(northAdmin, "/api/inventory/adjust", adjustPayload(productSku, warehouseB, 2L, "Wrong warehouse"));
+        assertWrongWarehouseDenied(northAdmin, "/api/inventory/reconcile", reconcilePayload(productSku, warehouseB, 99L, "Wrong warehouse"));
+
+        assertWrongWarehouseDenied(coastAdmin, "/api/inventory/update", inventoryPayload(productSku, warehouseA, 99L, 5L));
+        assertWrongWarehouseDenied(coastAdmin, "/api/inventory/receive", receivePayload(productSku, warehouseA, 2L));
+        assertWrongWarehouseDenied(coastAdmin, "/api/inventory/adjust", adjustPayload(productSku, warehouseA, 2L, "Wrong warehouse"));
+        assertWrongWarehouseDenied(coastAdmin, "/api/inventory/reconcile", reconcilePayload(productSku, warehouseA, 99L, "Wrong warehouse"));
+
+        mockMvc.perform(post("/api/inventory/receive")
+                .session(tenantWideAdmin)
+                .contentType(APPLICATION_JSON)
+                .content(receivePayload(productSku, warehouseB, 3L)))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.warehouseCode").value(warehouseB));
+        mockMvc.perform(post("/api/inventory/adjust")
+                .session(tenantWideAdmin)
+                .contentType(APPLICATION_JSON)
+                .content(adjustPayload(productSku, warehouseA, 1L, "Tenant-wide authority")))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.warehouseCode").value(warehouseA));
+
+        mockMvc.perform(post("/api/inventory/update")
+                .session(northAdmin)
+                .contentType(APPLICATION_JSON)
+                .content(inventoryPayload(productSku, warehouseA, -1L, 5L)))
+            .andExpect(status().isBadRequest());
+        mockMvc.perform(post("/api/inventory/receive")
+                .session(northAdmin)
+                .contentType(APPLICATION_JSON)
+                .content(receivePayload(productSku, warehouseA, 0L)))
+            .andExpect(status().isBadRequest());
+        mockMvc.perform(post("/api/inventory/adjust")
+                .session(northAdmin)
+                .contentType(APPLICATION_JSON)
+                .content(adjustPayload(productSku, warehouseA, 0L, "Zero delta")))
+            .andExpect(status().isBadRequest());
+        mockMvc.perform(post("/api/inventory/adjust")
+                .session(northAdmin)
+                .contentType(APPLICATION_JSON)
+                .content("{\"productSku\":\"%s\",\"warehouseCode\":\"%s\",\"quantityDelta\":-99,\"reason\":\"Below reserved\"}".formatted(productSku, warehouseA)))
+            .andExpect(status().isConflict());
+        mockMvc.perform(post("/api/inventory/adjust")
+                .session(northAdmin)
+                .contentType(APPLICATION_JSON)
+                .content(adjustPayload(productSku, warehouseA, 1L, "")))
+            .andExpect(status().isBadRequest());
+        mockMvc.perform(post("/api/inventory/reconcile")
+                .session(northAdmin)
+                .contentType(APPLICATION_JSON)
+                .content(reconcilePayload(productSku, warehouseA, 0L, "Below reserved")))
+            .andExpect(status().isConflict());
+        mockMvc.perform(post("/api/inventory/reconcile")
+                .session(northAdmin)
+                .contentType(APPLICATION_JSON)
+                .content(reconcilePayload(productSku, warehouseA, -1L, "Negative count")))
+            .andExpect(status().isBadRequest());
+
+        String missingSku = "PHASE1-MISSING-" + suffix;
+        mockMvc.perform(post("/api/products")
+                .session(tenantWideAdmin)
+                .contentType(APPLICATION_JSON)
+                .content("{\"sku\":\"%s\",\"name\":\"Missing Inventory Fixture\",\"category\":\"Verification\"}".formatted(missingSku)))
+            .andExpect(status().isCreated());
+        mockMvc.perform(post("/api/inventory/receive")
+                .session(tenantWideAdmin)
+                .contentType(APPLICATION_JSON)
+                .content(receivePayload(missingSku, warehouseA, 1L)))
+            .andExpect(status().isNotFound());
+        mockMvc.perform(post("/api/inventory/adjust")
+                .session(tenantWideAdmin)
+                .contentType(APPLICATION_JSON)
+                .content(adjustPayload(missingSku, warehouseA, 1L, "Missing row")))
+            .andExpect(status().isNotFound());
+        mockMvc.perform(post("/api/inventory/reconcile")
+                .session(tenantWideAdmin)
+                .contentType(APPLICATION_JSON)
+                .content(reconcilePayload(missingSku, warehouseA, 1L, "Missing row")))
+            .andExpect(status().isNotFound());
+
+        for (String username : List.of(
+            "boundary.review",
+            "boundary.final",
+            "boundary.escalation",
+            "boundary.integration.admin",
+            "boundary.integration.operator"
+        )) {
+            MockHttpSession session = tenantLogin(REHEARSAL_TENANT, username, ROLE_PASSWORD);
+            for (String pathAndBody : List.of(
+                "/api/inventory/update|" + inventoryPayload(productSku, warehouseA, 99L, 5L),
+                "/api/inventory/receive|" + receivePayload(productSku, warehouseA, 1L),
+                "/api/inventory/adjust|" + adjustPayload(productSku, warehouseA, 1L, "Role denial"),
+                "/api/inventory/reconcile|" + reconcilePayload(productSku, warehouseA, 30L, "Role denial")
+            )) {
+                String[] request = pathAndBody.split("\\|", 2);
+                mockMvc.perform(post(request[0])
+                        .session(session)
+                        .contentType(APPLICATION_JSON)
+                        .content(request[1]))
+                    .andExpect(status().isForbidden());
+            }
+        }
+        for (String pathAndBody : List.of(
+            "/api/inventory/update|" + inventoryPayload(productSku, warehouseA, 99L, 5L),
+            "/api/inventory/receive|" + receivePayload(productSku, warehouseA, 1L),
+            "/api/inventory/adjust|" + adjustPayload(productSku, warehouseA, 1L, "Anonymous denial"),
+            "/api/inventory/reconcile|" + reconcilePayload(productSku, warehouseA, 30L, "Anonymous denial")
+        )) {
+            String[] request = pathAndBody.split("\\|", 2);
+            mockMvc.perform(post(request[0])
+                    .contentType(APPLICATION_JSON)
+                    .content(request[1]))
+                .andExpect(status().isForbidden());
+        }
+
+        MockHttpSession platformSession = platformLogin();
+        for (String pathAndBody : List.of(
+            "/api/inventory/update|" + inventoryPayload(productSku, warehouseA, 99L, 5L),
+            "/api/inventory/receive|" + receivePayload(productSku, warehouseA, 1L),
+            "/api/inventory/adjust|" + adjustPayload(productSku, warehouseA, 1L, "Platform denial"),
+            "/api/inventory/reconcile|" + reconcilePayload(productSku, warehouseA, 30L, "Platform denial")
+        )) {
+            String[] request = pathAndBody.split("\\|", 2);
+            mockMvc.perform(post(request[0])
+                    .session(platformSession)
+                    .contentType(APPLICATION_JSON)
+                    .content(request[1]))
+                .andExpect(status().isForbidden());
+        }
+
+        MockHttpSession isolationAdmin = tenantLogin(ISOLATION_TENANT, "isolation.admin", "Isolation-Admin-2026!");
+        String isolationSku = "PHASE1-OTHER-" + suffix;
+        mockMvc.perform(post("/api/products")
+                .session(isolationAdmin)
+                .contentType(APPLICATION_JSON)
+                .content("{\"sku\":\"%s\",\"name\":\"Other Tenant Inventory Fixture\",\"category\":\"Isolation\"}".formatted(isolationSku)))
+            .andExpect(status().isCreated());
+        long rowsBeforeCrossTenantAttempt = inventoryRepository.countByTenantCode(REHEARSAL_TENANT);
+        mockMvc.perform(post("/api/inventory/update")
+                .session(tenantWideAdmin)
+                .contentType(APPLICATION_JSON)
+                .content(inventoryPayload(isolationSku, warehouseA, 77L, 5L)))
+            .andExpect(status().isNotFound());
+        assertThat(inventoryRepository.countByTenantCode(REHEARSAL_TENANT)).isEqualTo(rowsBeforeCrossTenantAttempt);
+        assertThat(inventoryFor(productSku, warehouseA).getQuantityAvailable()).isEqualTo(30L);
     }
 
     @Test
@@ -2906,6 +3194,29 @@ class PlatformTenantAccessBoundaryIntegrationTest {
             .andExpect(status().isOk());
     }
 
+    private void assertInventoryCount(String productSku, int expectedCount) {
+        long count = inventoryRepository.findAllWithProductAndWarehouseByTenantCode(REHEARSAL_TENANT).stream()
+            .filter(inventory -> productSku.equalsIgnoreCase(inventory.getProduct().resolveCatalogSku()))
+            .count();
+        assertThat(count).isEqualTo(expectedCount);
+    }
+
+    private com.synapsecore.domain.entity.Inventory inventoryFor(String productSku, String warehouseCode) {
+        return inventoryRepository.findAllWithProductAndWarehouseByTenantCode(REHEARSAL_TENANT).stream()
+            .filter(inventory -> productSku.equalsIgnoreCase(inventory.getProduct().resolveCatalogSku()))
+            .filter(inventory -> warehouseCode.equalsIgnoreCase(inventory.getWarehouse().getCode()))
+            .findFirst()
+            .orElseThrow();
+    }
+
+    private void assertWrongWarehouseDenied(MockHttpSession session, String path, String body) throws Exception {
+        mockMvc.perform(post(path)
+                .session(session)
+                .contentType(APPLICATION_JSON)
+                .content(body))
+            .andExpect(status().isForbidden());
+    }
+
     private long saveStandardScenarioPlan(MockHttpSession session,
                                           String title,
                                           String reviewOwner,
@@ -2972,6 +3283,31 @@ class PlatformTenantAccessBoundaryIntegrationTest {
     private String inventoryPayload(String warehouseCode, long quantity) {
         return "{\"productSku\":\"BOUNDARY-SKU\",\"warehouseCode\":\"%s\",\"quantityAvailable\":%d,\"reorderThreshold\":5}"
             .formatted(warehouseCode, quantity);
+    }
+
+    private String inventoryPayload(String productSku, String warehouseCode, long quantity, long reorderThreshold) {
+        return "{\"productSku\":\"%s\",\"warehouseCode\":\"%s\",\"quantityAvailable\":%d,\"reorderThreshold\":%d}"
+            .formatted(productSku, warehouseCode, quantity, reorderThreshold);
+    }
+
+    private String receivePayload(String productSku, String warehouseCode, long quantity) {
+        return "{\"productSku\":\"%s\",\"warehouseCode\":\"%s\",\"quantityReceived\":%d}"
+            .formatted(productSku, warehouseCode, quantity);
+    }
+
+    private String adjustPayload(String productSku, String warehouseCode, long delta, String reason) {
+        return "{\"productSku\":\"%s\",\"warehouseCode\":\"%s\",\"quantityDelta\":%d,\"reason\":\"%s\"}"
+            .formatted(productSku, warehouseCode, delta, reason);
+    }
+
+    private String reconcilePayload(String productSku, String warehouseCode, long countedOnHand, String note) {
+        return "{\"productSku\":\"%s\",\"warehouseCode\":\"%s\",\"countedOnHand\":%d,\"note\":\"%s\"}"
+            .formatted(productSku, warehouseCode, countedOnHand, note);
+    }
+
+    private String orderPayloadForSku(String externalOrderId, String warehouseCode, String productSku, int quantity) {
+        return "{\"externalOrderId\":\"%s\",\"warehouseCode\":\"%s\",\"items\":[{\"productSku\":\"%s\",\"quantity\":%d,\"unitPrice\":10.00}]}"
+            .formatted(externalOrderId, warehouseCode, productSku, quantity);
     }
 
     private String connectorPayload(String sourceSystem) {
