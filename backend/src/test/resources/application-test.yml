@@ -32,6 +32,10 @@ management:
       enabled: false
 
 synapsecore:
+  starter:
+    require-explicit-tenant-provisioning: false
+    seed-starter-inventory-on-tenant-onboarding: true
+    seed-starter-connectors-on-tenant-onboarding: true
   bootstrap:
     platform-admin-token: test-only-platform-admin-token
   access:

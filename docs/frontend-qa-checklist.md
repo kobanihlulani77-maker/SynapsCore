@@ -11,7 +11,7 @@
 ## Public Routes
 
 - [ ] Homepage hero, trust, workspace explanation, and CTA sections render cleanly
-- [ ] Create Workspace route renders all steps without overflow
+- [ ] No public workspace-creation route or provisioning CTA is exposed
 - [ ] Sign In page renders cleanly with strong workspace-code guidance
 - [ ] Public navigation works on desktop and mobile widths
 
@@ -91,5 +91,5 @@
 ## Known Honest Boundaries
 
 - [ ] Demo copy does not imply live backend data when backend is unavailable
-- [ ] Create Workspace flow is described honestly if live provisioning is not yet connected
+- [ ] Controlled provisioning is described as an internal/protected operation, not public signup
 - [ ] Demo preview mode remains clearly documented as planned or explicitly labeled if implemented later

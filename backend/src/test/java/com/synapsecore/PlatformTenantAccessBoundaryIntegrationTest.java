@@ -61,6 +61,7 @@ import org.springframework.test.web.servlet.MvcResult;
     "management.health.redis.enabled=false",
     "management.endpoint.health.validate-group-membership=false",
     "synapsecore.realtime.broker-mode=SIMPLE_IN_MEMORY",
+    "synapsecore.starter.require-explicit-tenant-provisioning=false",
     "synapsecore.bootstrap.initial-token=boundary-bootstrap-fixture",
     "synapsecore.bootstrap.platform-admin-token=boundary-automation-fixture",
     "synapsecore.platform-owner.username=platform.owner",

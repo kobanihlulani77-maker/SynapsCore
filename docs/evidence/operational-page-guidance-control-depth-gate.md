@@ -31,7 +31,7 @@ Events were deepened and hosted proof passed on the accepted Wave 3 revision.
 
 Administrative surfaces, public/auth truth, role-aware actions, and final
 application-wide consistency were validated on the deployed frontend. Users,
-Company Settings, Profile, and Create Workspace remain honest about authority,
+Company Settings and Profile remain honest about authority,
 scope, loading, recovery, and supported boundaries.
 
 ## Deployment And Proof Evidence

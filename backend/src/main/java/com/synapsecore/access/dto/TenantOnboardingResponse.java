@@ -12,6 +12,8 @@ public record TenantOnboardingResponse(
     String executiveUsername,
     String executiveActorName,
     List<String> starterWarehouseCodes,
-    Instant createdAt
+    Instant createdAt,
+    String readiness,
+    List<TenantProvisionedUserResponse> provisionedUsers
 ) {
 }

@@ -85,7 +85,7 @@ For Company 1, "workspace created" means "tenant created and verified as the com
 | `scripts/prepare-hosted-proof.ps1` | Proof/test only, partially reusable | Reuses the supported API, readiness warm-up, duplicate checks, and generated proof state. Proof tenant/user/data setup is not Company 1 provisioning. |
 | `scripts/verify-company-readiness.ps1` | Local/self-host rehearsal | Creates a temporary rehearsal tenant and exercises later-phase flows. Not a Phase 3 live Company 1 provisioning command. |
 | Starter seed behavior | Development/bootstrap support | Controlled by `synapsecore.starter.*` settings. In production, tenant-onboarding starter inventory/connectors default to disabled. |
-| `/create-workspace` public route | Public setup brief, not Company 1 onboarding | Prepares a frontend brief and sign-in target. It does not persist a production tenant/workspace. |
+| Public workspace creation route | Not supported | Customers do not self-provision. The public experience provides product/contact information and login to an already-provisioned workspace. |
 | Direct database manipulation | Unsafe | Not approved for Company 1 provisioning except emergency recovery under a separately approved incident plan. |
 
 ## Hosted-Proof Provisioning Trace
@@ -120,17 +120,12 @@ Not reusable as Company 1 provisioning:
 - proof data baseline
 - Playwright state file storage
 
-## `/create-workspace` Classification
+## Public Entry Classification
 
-Route: `/create-workspace`
-
-Current behavior:
-
-- public frontend route
-- multi-step workspace setup brief
-- collects company name, workspace code, admin draft, operations profile, team shape, and launch priority
-- prepares local frontend state and can prefill sign-in target
-- does not call `/api/access/tenants`
+Supported public routes are the homepage, product, contact, and sign-in. The
+customer-facing frontend does not collect provisioning credentials or create a
+tenant. New company onboarding is performed through the protected provisioning
+operation and followed by customer login.
 - does not persist a live backend tenant/workspace
 - does not create users in the database
 - intentionally states that live tenant creation uses supported backend provisioning paths

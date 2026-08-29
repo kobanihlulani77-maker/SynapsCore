@@ -175,7 +175,7 @@ export default function SignInPage({ context }) {
               <button className="primary-button" disabled={signInBusy || !authSessionState.tenantCode.trim() || !authSessionState.username.trim() || !authSessionState.password.trim()} type="submit">
                 {signInBusy ? 'Opening Workspace...' : 'Enter Platform'}
               </button>
-              <button className="secondary-button" onClick={() => navigateToPage('create-workspace')} type="button">Create Workspace</button>
+              <button className="secondary-button" onClick={() => navigateToPage('contact')} type="button">Contact SynapseCore</button>
               <button className="ghost-button" onClick={() => navigateToPage('product')} type="button">Product Overview</button>
             </div>
           </form>

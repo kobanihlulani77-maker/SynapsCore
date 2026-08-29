@@ -49,7 +49,7 @@ The frontend is a React single-page application built with Vite. It has two majo
 
 - public experience
   - homepage
-  - create workspace
+  - controlled company provisioning handoff
   - sign in
 - authenticated command center
   - dashboard

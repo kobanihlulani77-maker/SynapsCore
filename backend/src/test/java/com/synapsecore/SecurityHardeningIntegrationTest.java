@@ -27,6 +27,7 @@ import org.springframework.web.bind.annotation.RestController;
 
 @SpringBootTest(properties = {
     "spring.profiles.active=prod",
+    "synapsecore.starter.require-explicit-tenant-provisioning=false",
     "spring.datasource.url=jdbc:h2:mem:securityhardening;MODE=PostgreSQL;DB_CLOSE_DELAY=-1;DB_CLOSE_ON_EXIT=FALSE",
     "spring.datasource.username=sa",
     "spring.datasource.password=",

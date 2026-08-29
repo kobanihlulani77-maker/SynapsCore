@@ -49,13 +49,12 @@ SynapseCore works through a layered operational model:
 flowchart TD
     A["External event or operator action"] --> B{"Public entry or authenticated action?"}
 
-    B -->|Public entry| C["Frontend public pages<br/>Homepage / Create Workspace / Sign In"]
+    B -->|Public entry| C["Frontend public pages<br/>Homepage / Product / Contact / Sign In"]
     B -->|Authenticated action| D["Frontend authenticated shell<br/>Dashboard / Orders / Inventory / Replay / Approvals / Runtime"]
 
-    C --> E{"Create workspace or sign in?"}
-    E -->|Create workspace| F["Workspace creation flow<br/>Company info / workspace code / first admin / setup guidance"]
+    C --> E{"Learn, discuss pilot, or sign in?"}
+    E -->|Learn or discuss pilot| F["Public product/contact information<br/>No tenant or user provisioning"]
     E -->|Sign in| G["Sign-in form<br/>workspace code + username + password"]
-    F --> G
 
     G --> H["POST /api/auth/session/login"]
     H --> I{"Tenant and credentials valid?"}
@@ -146,12 +145,8 @@ Public entry is how a company or operator reaches SynapseCore before any protect
 flowchart TD
     A["User opens SynapseCore frontend"] --> B{"Purpose?"}
     B -->|Learn platform| C["Homepage<br/>public product explanation"]
-    B -->|Start pilot or workspace| D["Create Workspace flow"]
+    B -->|Discuss controlled pilot| D["Contact / pilot conversation"]
     B -->|Enter existing company workspace| E["Sign In flow"]
-
-    D --> F["Collect company info / workspace code / first admin details"]
-    F --> G["Explain guided setup path<br/>catalog / inventory / operators / integrations"]
-    G --> E
 
     E --> H["Enter workspace code + username + password"]
     H --> I["Auth request sent to backend"]
@@ -694,7 +689,7 @@ flowchart TD
 The platform can currently do all of these operational paths:
 
 - public homepage education
-- create workspace guidance
+- controlled company provisioning guidance
 - company workspace sign-in
 - tenant-safe session establishment
 - dashboard snapshot loading
@@ -1094,15 +1089,15 @@ This section lists the current state and classification vocabulary the system ca
 This is the most code-grounded view in the document.
 It shows the primary request chains and where truth is stored or fanned out.
 
-### 14.1 Public workspace creation
+### 14.1 Protected controlled company provisioning
 
 **User action**
 
-- company admin submits create-workspace flow
+- authorized platform operator submits the protected controlled-provisioning request
 
 **Frontend surface**
 
-- public create workspace page
+- protected platform provisioning workflow
 
 **Backend path**
 
@@ -1836,8 +1831,6 @@ It exists so the document does not stop at backend and runtime logic only.
 
 - `pages/PublicExperience.jsx`
   - homepage and public platform framing
-- `pages/CreateWorkspace.jsx`
-  - create-workspace guided onboarding surface
 - `pages/SignIn.jsx`
   - workspace code + username + password sign-in flow
 

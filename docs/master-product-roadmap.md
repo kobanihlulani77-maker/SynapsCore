@@ -20,7 +20,7 @@ It separates:
 ### Frontend Maturity
 
 - productized public homepage
-- create-workspace experience
+- controlled company provisioning handoff
 - polished sign-in and authenticated shell
 - command-center dashboard
 - upgraded operational and admin surfaces

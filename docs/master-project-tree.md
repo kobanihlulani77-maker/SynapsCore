@@ -61,7 +61,7 @@ Proof/testing only:
 Purpose:
 
 - public homepage
-- create-workspace journey
+- controlled provisioning handoff and login entry
 - sign-in experience
 - authenticated operations command center
 - proof-facing UI surfaces

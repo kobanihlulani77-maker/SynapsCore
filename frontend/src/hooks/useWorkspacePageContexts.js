@@ -476,13 +476,6 @@ export default function useWorkspacePageContexts({
         navigateToPage,
         publicPages,
       },
-      createWorkspaceContext: {
-        effectivePageMeta,
-        navigateToPage,
-        publicPages,
-        authSessionState,
-        setAuthSessionState,
-      },
     },
     authenticatedAppProps: {
       currentPage,

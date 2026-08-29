@@ -195,7 +195,38 @@ export default function PlatformApplication({ initialPage }) {
     event.preventDefault()
     setTenantOnboardingState({ loading: true, success: '', error: '', result: null })
     try {
-      const result = await platformFetch('/api/access/tenants', { method: 'POST', body: JSON.stringify(tenantForm) })
+      const tenantCode = tenantForm.tenantCode.trim().toUpperCase()
+      const tenantName = tenantForm.tenantName.trim()
+      const result = await platformFetch('/api/access/tenants', { method: 'POST', body: JSON.stringify({
+        ...tenantForm,
+        tenantCode,
+        tenantName,
+        warehouses: [
+          { code: 'WH-NORTH', name: `${tenantName} North Hub`, location: tenantForm.primaryLocation.trim() },
+          { code: 'WH-COAST', name: `${tenantName} Coast Hub`, location: tenantForm.secondaryLocation?.trim() || `${tenantForm.primaryLocation.trim()} Reserve` },
+        ],
+        users: [
+          {
+            username: tenantForm.adminUsername.trim(),
+            fullName: tenantForm.adminFullName.trim(),
+            operatorActorName: 'Operations Lead',
+            operatorDisplayName: 'Operations Lead',
+            operatorDescription: 'Controlled platform bootstrap administrator.',
+            roles: ['TENANT_ADMIN', 'REVIEW_OWNER', 'ESCALATION_OWNER', 'INTEGRATION_ADMIN', 'INTEGRATION_OPERATOR'],
+            warehouseScopes: [],
+            initialPassword: tenantForm.adminPassword,
+          },
+          {
+            username: `${tenantCode.toLowerCase().replaceAll('-', '.')}.executive`,
+            fullName: `${tenantName} Executive Approver`,
+            operatorActorName: 'Executive Operations Director',
+            operatorDisplayName: 'Executive Operations Director',
+            operatorDescription: 'Controlled platform bootstrap final approver.',
+            roles: ['FINAL_APPROVER'],
+            warehouseScopes: [],
+          },
+        ],
+      }) })
       await loadOverview()
       setTenantForm(emptyTenantForm)
       setTenantOnboardingState({ loading: false, success: 'Tenant workspace created through the platform-owner session.', error: '', result })

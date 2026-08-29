@@ -101,8 +101,8 @@ const workspaceSteps = [
     body: 'Operators use company workspace code, username, and password to enter the correct SynapseCore environment.',
   },
   {
-    title: 'First admin creates the workspace',
-    body: 'A company admin stands up the initial workspace, identity boundary, and rollout path for the team.',
+    title: 'SynapseCore provisions the workspace',
+    body: 'The SynapseCore team provisions the approved company boundary and rollout path before customer operators sign in.',
   },
   {
     title: 'Workspace code identifies the company',
@@ -170,13 +170,13 @@ export default function PublicExperience({ context }) {
     { label: 'Recovery posture', value: 'Replay-ready' },
   ]
 
-  const finalCtaLabel = isContact ? 'Return Home' : 'Create Company Workspace'
+  const finalCtaLabel = isContact ? 'Return Home' : 'Contact SynapseCore'
   const finalCtaAction = () => {
     if (isContact) {
       navigateToPage('landing')
       return
     }
-    navigateToPage('create-workspace')
+    navigateToPage('contact')
   }
 
   return (
@@ -220,13 +220,7 @@ export default function PublicExperience({ context }) {
           </div>
           <div className="history-action-row">
             <button className="primary-button" onClick={() => navigateToPage('sign-in')} type="button">Sign In to Workspace</button>
-            <button
-              className="secondary-button"
-              onClick={() => navigateToPage('create-workspace')}
-              type="button"
-            >
-              Create Company Workspace
-            </button>
+            <button className="secondary-button" onClick={() => navigateToPage('contact')} type="button">Contact SynapseCore</button>
           </div>
         </article>
 
@@ -335,9 +329,9 @@ export default function PublicExperience({ context }) {
 
       <section className="public-section-shell" id="workspace-onboarding" aria-labelledby="workspace-onboarding-title">
         <div className="public-section-heading">
-          <p className="panel-kicker">Create workspace path</p>
+          <p className="panel-kicker">Controlled company rollout</p>
           <h2 id="workspace-onboarding-title">A company workspace gives each team its own operating environment.</h2>
-          <p>SynapseCore uses workspace codes to separate companies cleanly. Existing operators sign in to the right environment, and first-time admins stand up the workspace for rollout.</p>
+          <p>SynapseCore uses workspace codes to separate companies cleanly. The SynapseCore team provisions the approved environment, then existing operators sign in to the right company workspace.</p>
         </div>
         <div className="public-workspace-path">
           {workspaceSteps.map((step, index) => (
@@ -354,11 +348,11 @@ export default function PublicExperience({ context }) {
         <article className="public-final-cta-card">
           <div>
             <p className="panel-kicker">{isContact ? 'Pilot planning' : 'Next step'}</p>
-            <h2>{isContact ? 'Start with the company pressure you need to control first.' : 'See the platform, then stand up the right workspace path.'}</h2>
+            <h2>{isContact ? 'Start with the company pressure you need to control first.' : 'See the platform, then discuss the right pilot path.'}</h2>
             <p>
               {isContact
-                ? 'Prepare the first company workspace, define the rollout scope, and align catalog, inventory, integrations, and users in a deliberate onboarding motion.'
-                : 'Operators can sign in today. Company admins can prepare the initial workspace and pilot path without changing backend contracts or waiting on the full onboarding flow.'}
+                ? 'Bring the company pressure, rollout scope, and operating context to a controlled onboarding conversation.'
+                : 'Operators sign in after SynapseCore provisions and validates the approved company workspace. Company Admins then configure their existing tenant.'}
             </p>
           </div>
           <div className="history-action-row">

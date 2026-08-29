@@ -10,7 +10,7 @@ the application-wide public/auth and role-aware consistency review:
 - `/users`
 - `/company-settings`
 - `/profile`
-- `/create-workspace`
+- protected controlled provisioning handoff (not a public route)
 - `/sign-in` and `/platform-sign-in`
 - public routes and role-aware next actions
 
@@ -89,11 +89,11 @@ that remain with an administrator. It does not advertise self-service role,
 warehouse, tenant, governance, MFA/SSO, or unsupported recovery controls.
 Rendered classification: **INTENTIONALLY SIMPLE / STRONG FOR PURPOSE**.
 
-### Create Workspace And Public/Auth Boundaries
+### Public/Auth Boundaries
 
-`/create-workspace` states that the customer submits company context and a
-proposed first-admin brief; Platform Owner provisioning remains the controlled
-next step. It does not claim that a customer self-creates a live tenant.
+The public application does not expose `/create-workspace` or a customer
+provisioning form. Protected controlled provisioning remains the next step
+before customer sign-in.
 `/sign-in` clearly requires workspace code, username, and password. The
 dedicated `/platform-sign-in` surface identifies the separate control-plane
 identity. Public home, product, and contact routes remain pilot-scoped and do
@@ -106,14 +106,13 @@ Verification used installed visible Google Chrome at `1366x768`.
 
 ### Public/auth routes
 
-All five public routes rendered without overflow, blank states, console errors,
+All supported public routes rendered without overflow, blank states, console errors,
 page errors, or HTTP error responses:
 
 | Route | Result |
 | --- | --- |
 | `/` | PASS |
 | `/product` | PASS |
-| `/create-workspace` | PASS |
 | `/sign-in` | PASS |
 | `/contact` | PASS |
 

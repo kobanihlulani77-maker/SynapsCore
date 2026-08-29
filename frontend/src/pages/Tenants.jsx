@@ -21,7 +21,7 @@ export default function TenantsPage({ context }) {
   if (!isAuthenticated || !isTenantsPage) return null
 
   const currentTenant = tenantDirectoryState.items.find((tenant) => tenant.code === signedInSession?.tenantCode)
-  const canCreateWorkspace = signedInRoles.includes('TENANT_ADMIN') || signedInRoles.includes('PLATFORM_OWNER')
+  const canCreateWorkspace = signedInRoles.includes('PLATFORM_OWNER')
   const tenantFormReady = Boolean(
     tenantOnboardingForm.tenantCode.trim()
       && tenantOnboardingForm.tenantName.trim()
@@ -92,7 +92,7 @@ export default function TenantsPage({ context }) {
             <p className="muted-text integration-note">
               {canCreateWorkspace
                 ? 'Create a new company workspace with controlled sites, an admin operator, and a clean operational boundary. Executive access is created without forcing a developer-style bootstrap flow.'
-                : 'Workspace creation is restricted to platform or tenant admins with rollout authority.'}
+                : 'Tenant Admins manage their existing company workspace. New company provisioning is restricted to Platform Owner control-plane authority.'}
             </p>
             <div className="admin-form-section">
               <div>

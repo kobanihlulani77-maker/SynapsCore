@@ -313,6 +313,31 @@ $onboarding = Invoke-JsonRequest -Method Post -Url "$BackendUrl/api/access/tenan
     adminPassword    = $adminPassword
     primaryLocation  = "Johannesburg"
     secondaryLocation = "Cape Town"
+    warehouses       = @(
+        @{ code = "WH-NORTH"; name = "Production North Hub"; location = "Johannesburg" }
+        @{ code = "WH-COAST"; name = "Production Coast Hub"; location = "Cape Town" }
+    )
+    users            = @(
+        @{
+            username = $adminUsername
+            fullName = "Workspace Admin $timestamp"
+            operatorActorName = "Operations Lead"
+            operatorDisplayName = "Operations Lead"
+            operatorDescription = "Controlled production-readiness administrator."
+            roles = @("TENANT_ADMIN", "REVIEW_OWNER", "ESCALATION_OWNER", "INTEGRATION_ADMIN", "INTEGRATION_OPERATOR")
+            warehouseScopes = @()
+            initialPassword = $adminPassword
+        }
+        @{
+            username = "$($tenantCode.ToLower().Replace('-', '.')).executive"
+            fullName = "$tenantName Executive Approver"
+            operatorActorName = "Executive Operations Director"
+            operatorDisplayName = "Executive Operations Director"
+            operatorDescription = "Controlled production-readiness final approver."
+            roles = @("FINAL_APPROVER")
+            warehouseScopes = @()
+        }
+    )
 }
 Assert-True ($onboarding.StatusCode -eq 200) "Tenant onboarding did not succeed."
 Assert-True ($onboarding.Json.tenantCode -eq $tenantCode) "Tenant onboarding response returned the wrong tenant code."

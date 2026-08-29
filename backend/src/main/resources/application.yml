@@ -66,9 +66,10 @@ synapsecore:
   starter:
     auto-seed-on-empty: ${SYNAPSECORE_STARTER_AUTO_SEED_ON_EMPTY:true}
     allow-default-tenant-fallback: ${SYNAPSECORE_STARTER_ALLOW_DEFAULT_TENANT_FALLBACK:true}
-    seed-starter-inventory-on-tenant-onboarding: ${SYNAPSECORE_STARTER_SEED_INVENTORY_ON_TENANT_ONBOARDING:true}
-    seed-starter-connectors-on-tenant-onboarding: ${SYNAPSECORE_STARTER_SEED_CONNECTORS_ON_TENANT_ONBOARDING:true}
+    seed-starter-inventory-on-tenant-onboarding: ${SYNAPSECORE_STARTER_SEED_INVENTORY_ON_TENANT_ONBOARDING:false}
+    seed-starter-connectors-on-tenant-onboarding: ${SYNAPSECORE_STARTER_SEED_CONNECTORS_ON_TENANT_ONBOARDING:false}
     allow-tenant-admin-tenant-onboarding: ${SYNAPSECORE_STARTER_ALLOW_TENANT_ADMIN_TENANT_ONBOARDING:true}
+    require-explicit-tenant-provisioning: ${SYNAPSECORE_STARTER_REQUIRE_EXPLICIT_TENANT_PROVISIONING:true}
   fulfillment:
     default-dispatch-hours: ${FULFILLMENT_DEFAULT_DISPATCH_HOURS:2}
     default-delivery-hours: ${FULFILLMENT_DEFAULT_DELIVERY_HOURS:24}

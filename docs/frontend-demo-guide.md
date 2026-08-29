@@ -25,7 +25,7 @@ http://localhost:5173
 These surfaces should still render cleanly when the backend or database is unavailable:
 
 - Public homepage
-- Create workspace journey
+- Controlled company provisioning is an internal/protected operation
 - Sign-in experience and workspace copy
 - Global design system, shell styling, and responsive layouts
 - Empty, unavailable, and placeholder states on most authenticated surfaces if a session is already established in a local demo build
@@ -62,18 +62,18 @@ Message:
 
 "This is not just reporting. It is the operational front door for a company workspace."
 
-### 2. Open Create Workspace
+### 2. Explain Controlled Onboarding
 
 Show:
 
-- Company information
-- Workspace code concept
-- First admin setup
-- Operations profile steps
+- The controlled company rollout explanation on the homepage
+- The existing-workspace sign-in surface
+- The contact/pilot path for a new company conversation
 
 Message:
 
-"A workspace is the company boundary. Operators later join using workspace code, username, and password."
+"A workspace is the company boundary. SynapseCore provisions the approved
+company setup, then operators enter with workspace code, username, and password."
 
 Honest note:
 
@@ -141,7 +141,7 @@ Message:
 Use this fallback story:
 
 - Start on homepage
-- Move to Create Workspace
+- Move to Contact SynapseCore
 - Move to Sign In
 - Explain the authenticated command-center design using the now-polished layout and route structure
 - Be explicit that live operational data requires backend connectivity

@@ -24,7 +24,7 @@ Key frontend areas:
 
 ```mermaid
 flowchart LR
-    A["Public homepage"] --> B["Create workspace"]
+    A["Public homepage"] --> B["Contact / controlled pilot conversation"]
     A --> C["Sign in"]
     C --> D["Authenticated shell"]
     D --> E["Dashboard"]
@@ -45,24 +45,14 @@ Purpose:
 - explain what SynapseCore is
 - show who it is for
 - present the command-center story before login
-- hand users into either sign-in or workspace creation
+- hand existing company users into sign-in or public product/contact information
 
-### Create Workspace
+### Controlled Company Provisioning
 
-Route:
-
-- `/create-workspace`
-
-Purpose:
-
-- explain company setup
-- explain workspace code
-- guide the first admin through what the rollout needs
-
-Current truth:
-
-- this is a productized frontend onboarding experience
-- it does not claim a live backend provisioning flow unless one is implemented
+There is no public workspace-creation route. SynapseCore provisions an approved
+company through the protected platform administration API, including its
+warehouses, initial users, roles, and warehouse scopes. Customer users receive
+their approved credentials and use `/sign-in` to enter an existing workspace.
 
 ### Sign In
 

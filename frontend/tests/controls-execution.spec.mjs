@@ -82,7 +82,7 @@ const highImpactLimitedIds = new Set([
   'CTRL-153',
   'CTRL-162',
 ])
-const disabledByDesignIds = new Set(['CTRL-137', 'CTRL-139'])
+const disabledByDesignIds = new Set(['CTRL-137', 'CTRL-139', ...range(48, 69)])
 
 function range(start, end) {
   return Array.from({ length: end - start + 1 }, (_, index) => `CTRL-${String(start + index).padStart(3, '0')}`)
@@ -180,20 +180,9 @@ test('BATCH 1 public and authentication controls execute and recover', async ({ 
   await expect(page).toHaveURL(/\/contact$/)
   await page.getByRole('button', { name: 'Home', exact: true }).click()
   await expect(page).toHaveURL(/\/$/)
-  await page.getByRole('button', { name: 'Create Company Workspace' }).first().click()
-  await expect(page).toHaveURL(/\/create-workspace$/)
-
-  await fillWorkspaceWizardToReview(page, 'A')
-  await page.getByRole('button', { name: 'Prepare Workspace Brief' }).click()
-  await expect(page.getByText(/workspace brief|review/i).first()).toBeVisible()
-  await page.getByRole('button', { name: 'Continue to Sign In' }).click()
-  await expect(page).toHaveURL(/\/sign-in$/)
-
-  await page.goto('/create-workspace')
-  await fillWorkspaceWizardToReview(page, 'B')
-  await page.getByRole('button', { name: 'Prepare Workspace Brief' }).click()
-  await page.getByRole('button', { name: 'Review Product Surface' }).click()
-  await expect(page).toHaveURL(/\/product$/)
+  await expect(page.getByRole('button', { name: 'Contact SynapseCore' }).first()).toBeVisible()
+  await page.getByRole('button', { name: 'Contact SynapseCore' }).first().click()
+  await expect(page).toHaveURL(/\/contact$/)
   await page.goto('/sign-in')
 
   const signInCard = page.locator('.public-signin-card')
@@ -215,10 +204,9 @@ test('BATCH 1 public and authentication controls execute and recover', async ({ 
   await page.getByRole('button', { name: 'Product Overview' }).click()
   await expect(page).toHaveURL(/\/product$/)
   await page.goto('/sign-in')
-  await page.locator('form').getByRole('button', { name: 'Create Workspace' }).click()
-  await expect(page).toHaveURL(/\/create-workspace$/)
+  await expect(page.locator('form').getByRole('button', { name: 'Create Workspace' })).toHaveCount(0)
 
-  recorder.mark(publicAuthIds, 'VERIFIED WORKING', 'Public, create-workspace, and sign-in controls were operated through browser UI, including validation failure, password reveal, remember checkbox, Enter submit, and successful session navigation.')
+  recorder.mark(publicAuthIds, 'VERIFIED WORKING', 'Public, contact, and sign-in controls were operated through browser UI, including validation failure, password reveal, remember checkbox, Enter submit, and successful session navigation. Public workspace self-provisioning controls are absent.')
 })
 
 test('BATCH 2 shell navigation search and shared controls execute', async ({ page }) => {
@@ -626,27 +614,4 @@ async function clickClearCatalogFormOrRecordDefect(page) {
     })
     await clearButton.evaluate((button) => button.click())
   }
-}
-
-async function fillWorkspaceWizardToReview(page, suffix) {
-  await page.getByPlaceholder('Acme Distribution Group').fill(`Gate Four Demo Workspace ${suffix}`)
-  await page.getByLabel('Industry').selectOption({ index: 1 })
-  await page.getByRole('button', { name: 'Continue' }).click()
-  await page.getByPlaceholder('ACME-OPS').fill(`GATE-FOUR-${suffix}`)
-  await page.getByRole('button', { name: 'Generate' }).click()
-  await page.getByLabel('Operations profile').selectOption({ index: 1 })
-  await page.getByLabel('Scale profile').selectOption({ index: 1 })
-  await page.getByRole('button', { name: 'Continue' }).click()
-  await page.getByPlaceholder('Amina Dlamini').fill(`Gate Four Admin ${suffix}`)
-  await page.getByPlaceholder('amina@acmeops.com').fill(`gate4.${suffix.toLowerCase()}@example.com`)
-  await page.getByPlaceholder('amina.admin').fill(`gate4.admin.${suffix.toLowerCase()}`)
-  await page.getByPlaceholder('Choose a strong setup password').fill('GateFourStrong123!')
-  await page.getByRole('button', { name: 'Show' }).click()
-  await expect(page.getByPlaceholder('Choose a strong setup password')).toHaveAttribute('type', 'text')
-  await page.getByRole('button', { name: 'Hide' }).click()
-  await page.getByRole('button', { name: 'Continue' }).click()
-  await page.getByPlaceholder('Operations planners, warehouse leads, and tenant admins').fill('Operators and reviewers')
-  await page.getByPlaceholder('Catalog, users, inventory, or integration stability').fill('Validate controlled rollout path')
-  await page.getByRole('button', { name: 'Back' }).click()
-  await page.getByRole('button', { name: 'Continue' }).click()
 }

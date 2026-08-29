@@ -10,6 +10,7 @@ public class SynapseStarterProperties {
     private boolean seedStarterInventoryOnTenantOnboarding = true;
     private boolean seedStarterConnectorsOnTenantOnboarding = true;
     private boolean allowTenantAdminTenantOnboarding = true;
+    private boolean requireExplicitTenantProvisioning = true;
 
     public boolean isAutoSeedOnEmpty() {
         return autoSeedOnEmpty;
@@ -49,5 +50,13 @@ public class SynapseStarterProperties {
 
     public void setAllowTenantAdminTenantOnboarding(boolean allowTenantAdminTenantOnboarding) {
         this.allowTenantAdminTenantOnboarding = allowTenantAdminTenantOnboarding;
+    }
+
+    public boolean isRequireExplicitTenantProvisioning() {
+        return requireExplicitTenantProvisioning;
+    }
+
+    public void setRequireExplicitTenantProvisioning(boolean requireExplicitTenantProvisioning) {
+        this.requireExplicitTenantProvisioning = requireExplicitTenantProvisioning;
     }
 }

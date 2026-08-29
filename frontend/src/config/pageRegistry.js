@@ -18,15 +18,6 @@ export const publicPages = [
     focus: ['Operational awareness', 'Action guidance', 'Trust layer'],
   },
   {
-    key: 'create-workspace',
-    path: '/create-workspace',
-    audience: 'public',
-    label: 'Create Workspace',
-    title: 'Prepare a company workspace for pilot onboarding.',
-    description: 'Capture company identity, proposed first-admin details, and rollout context for Platform Owner provisioning before the operational team signs in.',
-    focus: ['Company setup', 'Workspace identity', 'Guided rollout'],
-  },
-  {
     key: 'sign-in',
     path: '/sign-in',
     audience: 'public',

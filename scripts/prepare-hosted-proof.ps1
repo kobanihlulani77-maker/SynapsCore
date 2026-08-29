@@ -883,6 +883,31 @@ if ($null -eq $tenant) {
             adminPassword = $TenantAdminPasswordValue
             primaryLocation = "Verification North Hub"
             secondaryLocation = "Verification Coast Hub"
+            warehouses = @(
+                @{ code = "WH-NORTH"; name = "Verification North Hub"; location = "Verification North Hub" }
+                @{ code = "WH-COAST"; name = "Verification Coast Hub"; location = "Verification Coast Hub" }
+            )
+            users = @(
+                @{
+                    username = $TenantAdminUsernameValue
+                    fullName = "Hosted Verification Tenant Admin"
+                    operatorActorName = "Operations Lead"
+                    operatorDisplayName = "Operations Lead"
+                    operatorDescription = "Hosted proof tenant administrator."
+                    roles = @("TENANT_ADMIN", "REVIEW_OWNER", "ESCALATION_OWNER", "INTEGRATION_ADMIN", "INTEGRATION_OPERATOR")
+                    warehouseScopes = @()
+                    initialPassword = $TenantAdminPasswordValue
+                }
+                @{
+                    username = "$($script:TenantCodeValue.ToLower().Replace('-', '.')).executive"
+                    fullName = "Hosted Verification Executive Approver"
+                    operatorActorName = "Executive Operations Director"
+                    operatorDisplayName = "Executive Operations Director"
+                    operatorDescription = "Hosted proof final approver."
+                    roles = @("FINAL_APPROVER")
+                    warehouseScopes = @()
+                }
+            )
         } | Out-Null
 } else {
     Write-Host "Tenant workspace $script:TenantCodeValue already exists; reusing it."

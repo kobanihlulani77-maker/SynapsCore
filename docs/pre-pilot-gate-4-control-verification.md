@@ -93,7 +93,7 @@ The table below is generated from frontend/test-results/control-inventory/contro
 | CTRL-002 | /, /product, /contact | PublicExperience | button | page.label | VERIFIED WORKING | BATCH 1 public and authentication controls execute and recover |  |
 | CTRL-003 | /, /product, /contact | PublicExperience | button | Sign In to Workspace | VERIFIED WORKING | BATCH 1 public and authentication controls execute and recover |  |
 | CTRL-004 | /, /product, /contact | PublicExperience | button | Sign In to Workspace | VERIFIED WORKING | BATCH 1 public and authentication controls execute and recover |  |
-| CTRL-005 | /, /product, /contact | PublicExperience | button | Create Company Workspace | VERIFIED WORKING | BATCH 1 public and authentication controls execute and recover |  |
+| CTRL-005 | /, /product, /contact | PublicExperience | button | Contact SynapseCore | VERIFIED WORKING | Domain 11 public-entry closure | Public workspace self-provisioning is intentionally not supported. |
 | CTRL-006 | /, /product, /contact | PublicExperience | button | Sign In to Workspace | VERIFIED WORKING | BATCH 1 public and authentication controls execute and recover |  |
 | CTRL-007 | /, /product, /contact | PublicExperience | button | finalCtaLabel | VERIFIED WORKING | BATCH 1 public and authentication controls execute and recover |  |
 | CTRL-008 | /alerts | AlertsPage | button | Focus highest severity | VERIFIED WORKING | BATCH 3 dashboard runtime audit and operational read controls execute |  |
@@ -136,28 +136,7 @@ The table below is generated from frontend/test-results/control-inventory/contro
 | CTRL-045 | /company-settings | SettingsPage | select | selectedWorkspaceConnectorDraft.supportOwnerActorName | VERIFIED WORKING | BATCH 4 catalog and workspace-admin mutation controls execute with readback |  |
 | CTRL-046 | /company-settings | SettingsPage | input | https://company.example.com/orders-feed | VERIFIED WORKING | BATCH 4 catalog and workspace-admin mutation controls execute with readback |  |
 | CTRL-047 | /company-settings | SettingsPage | button | Save Connector Policy | VERIFIED WORKING | BATCH 4 catalog and workspace-admin mutation controls execute with readback |  |
-| CTRL-048 | /create-workspace | CreateWorkspacePage | button |  | VERIFIED WORKING | BATCH 1 public and authentication controls execute and recover |  |
-| CTRL-049 | /create-workspace | CreateWorkspacePage | button | page.label | VERIFIED WORKING | BATCH 1 public and authentication controls execute and recover |  |
-| CTRL-050 | /create-workspace | CreateWorkspacePage | button | Sign In to Workspace | VERIFIED WORKING | BATCH 1 public and authentication controls execute and recover |  |
-| CTRL-051 | /create-workspace | CreateWorkspacePage | button |  | VERIFIED WORKING | BATCH 1 public and authentication controls execute and recover |  |
-| CTRL-052 | /create-workspace | CreateWorkspacePage | input | Acme Distribution Group | VERIFIED WORKING | BATCH 1 public and authentication controls execute and recover |  |
-| CTRL-053 | /create-workspace | CreateWorkspacePage | select | draft.industry | VERIFIED WORKING | BATCH 1 public and authentication controls execute and recover |  |
-| CTRL-054 | /create-workspace | CreateWorkspacePage | input | ACME-OPS | VERIFIED WORKING | BATCH 1 public and authentication controls execute and recover |  |
-| CTRL-055 | /create-workspace | CreateWorkspacePage | button | Generate | VERIFIED WORKING | BATCH 1 public and authentication controls execute and recover |  |
-| CTRL-056 | /create-workspace | CreateWorkspacePage | select | draft.operationsProfile | VERIFIED WORKING | BATCH 1 public and authentication controls execute and recover |  |
-| CTRL-057 | /create-workspace | CreateWorkspacePage | select | draft.scaleProfile | VERIFIED WORKING | BATCH 1 public and authentication controls execute and recover |  |
-| CTRL-058 | /create-workspace | CreateWorkspacePage | input | Amina Dlamini | VERIFIED WORKING | BATCH 1 public and authentication controls execute and recover |  |
-| CTRL-059 | /create-workspace | CreateWorkspacePage | input | amina@acmeops.com | VERIFIED WORKING | BATCH 1 public and authentication controls execute and recover |  |
-| CTRL-060 | /create-workspace | CreateWorkspacePage | input | amina.admin | VERIFIED WORKING | BATCH 1 public and authentication controls execute and recover |  |
-| CTRL-061 | /create-workspace | CreateWorkspacePage | input | Choose a strong setup password | VERIFIED WORKING | BATCH 1 public and authentication controls execute and recover |  |
-| CTRL-062 | /create-workspace | CreateWorkspacePage | button | showPassword ? 'Hide' : 'Show' | VERIFIED WORKING | BATCH 1 public and authentication controls execute and recover |  |
-| CTRL-063 | /create-workspace | CreateWorkspacePage | input | Operations planners, warehouse leads, and tenant admins | VERIFIED WORKING | BATCH 1 public and authentication controls execute and recover |  |
-| CTRL-064 | /create-workspace | CreateWorkspacePage | textarea | Catalog, users, inventory, or integration stability | VERIFIED WORKING | BATCH 1 public and authentication controls execute and recover |  |
-| CTRL-065 | /create-workspace | CreateWorkspacePage | button | Back | VERIFIED WORKING | BATCH 1 public and authentication controls execute and recover |  |
-| CTRL-066 | /create-workspace | CreateWorkspacePage | button | Prepare Workspace Brief | VERIFIED WORKING | BATCH 1 public and authentication controls execute and recover |  |
-| CTRL-067 | /create-workspace | CreateWorkspacePage | button | Continue | VERIFIED WORKING | BATCH 1 public and authentication controls execute and recover |  |
-| CTRL-068 | /create-workspace | CreateWorkspacePage | button | Review Product Surface | VERIFIED WORKING | BATCH 1 public and authentication controls execute and recover |  |
-| CTRL-069 | /create-workspace | CreateWorkspacePage | button | Continue to Sign In | VERIFIED WORKING | BATCH 1 public and authentication controls execute and recover |  |
+| CTRL-048 through CTRL-069 | retired public workspace controls | CreateWorkspacePage | mixed | retired | DISABLED BY DESIGN | Domain 11 public-entry closure | Public self-provisioning journey removed; controlled provisioning is protected backend/API authority. |
 | CTRL-070 | /dashboard | DashboardPage | button |  | VERIFIED WORKING | BATCH 3 dashboard runtime audit and operational read controls execute |  |
 | CTRL-071 | /dashboard | DashboardPage | button | primaryAttentionItem?.actionLabel // 'Open Audit' | VERIFIED WORKING | BATCH 3 dashboard runtime audit and operational read controls execute |  |
 | CTRL-072 | /dashboard | DashboardPage | button | Open Runtime | VERIFIED WORKING | BATCH 3 dashboard runtime audit and operational read controls execute |  |
@@ -239,7 +218,7 @@ The table below is generated from frontend/test-results/control-inventory/contro
 | CTRL-148 | /sign-in | SignInPage | button | showPassword ? 'Hide' : 'Show' | VERIFIED WORKING | BATCH 1 public and authentication controls execute and recover |  |
 | CTRL-149 | /sign-in | SignInPage | checkbox |  | VERIFIED WORKING | BATCH 1 public and authentication controls execute and recover |  |
 | CTRL-150 | /sign-in | SignInPage | button | signInBusy ? 'Opening Workspace...' : 'Enter Platform' | VERIFIED WORKING | BATCH 1 public and authentication controls execute and recover |  |
-| CTRL-151 | /sign-in | SignInPage | button | Create Workspace | VERIFIED WORKING | BATCH 1 public and authentication controls execute and recover |  |
+| CTRL-151 | /sign-in | SignInPage | button | Contact SynapseCore | VERIFIED WORKING | Domain 11 public-entry closure | Sign-in has no public signup or workspace-creation CTA. |
 | CTRL-152 | /sign-in | SignInPage | button | Product Overview | VERIFIED WORKING | BATCH 1 public and authentication controls execute and recover |  |
 | CTRL-153 | /tenant-management | TenantsPage | button | Unlabeled interactive control | WORKING WITH LIMITATION | BATCH 6 admin users profile tenants and platform controls execute | Requires fresh tenant result to become enabled. |
 | CTRL-154 | /tenant-management | TenantsPage | input | ACME-OPS | VERIFIED WORKING | BATCH 6 admin users profile tenants and platform controls execute |  |
