@@ -67,29 +67,30 @@ export default function useWorkspaceBootstrap({
   setComparisonForm,
   normalizeScenarioForm,
   scenarioHistoryFilters,
+  normalizeSnapshot,
 }) {
   function mergeReplaySurfaceSnapshot(replaySurfaceData) {
     snapshotSetter((current) => {
       const previousSnapshot = current || emptySnapshot
-      return {
+      return normalizeSnapshot({
         ...emptySnapshot,
         ...previousSnapshot,
         integrationConnectors: replaySurfaceData?.integrationConnectors ?? previousSnapshot.integrationConnectors ?? [],
         integrationReplayQueue: replaySurfaceData?.integrationReplayQueue ?? previousSnapshot.integrationReplayQueue ?? [],
         generatedAt: previousSnapshot.generatedAt ?? new Date().toISOString(),
-      }
+      }, previousSnapshot)
     })
   }
 
   function mergeOrderSurfaceSnapshot(orderSurfaceData) {
     snapshotSetter((current) => {
       const previousSnapshot = current || emptySnapshot
-      return {
+      return normalizeSnapshot({
         ...emptySnapshot,
         ...previousSnapshot,
         recentOrders: orderSurfaceData?.recentOrders ?? previousSnapshot.recentOrders ?? [],
         generatedAt: previousSnapshot.generatedAt ?? new Date().toISOString(),
-      }
+      }, previousSnapshot)
     })
   }
 
@@ -194,7 +195,7 @@ export default function useWorkspaceBootstrap({
     snapshotSetter((current) => {
       const previousSnapshot = current || emptySnapshot
       const baseSnapshot = nextSnapshot || previousSnapshot
-      return {
+      return normalizeSnapshot({
         ...emptySnapshot,
         ...previousSnapshot,
         ...baseSnapshot,
@@ -209,7 +210,7 @@ export default function useWorkspaceBootstrap({
         slaEscalations: baseSnapshot.slaEscalations ?? previousSnapshot.slaEscalations ?? [],
         recentScenarios: baseSnapshot.recentScenarios ?? previousSnapshot.recentScenarios ?? [],
         generatedAt: baseSnapshot.generatedAt ?? previousSnapshot.generatedAt ?? new Date().toISOString(),
-      }
+      }, previousSnapshot)
     })
     pageStateSetter((current) => ({
       ...current,

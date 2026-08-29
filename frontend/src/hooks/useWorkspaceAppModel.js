@@ -50,6 +50,7 @@ import {
   isBootstrapTenantAdmin,
   parseCsvValues,
   resolvePreferredOperatorName,
+  normalizeSnapshot,
 } from '../config/workspaceModel'
 
 const readRememberedWorkspacePreference = () => readStoredJson(globalThis.localStorage, workspacePreferenceStorageKey, null)
@@ -269,6 +270,7 @@ export default function useWorkspaceAppModel() {
     defaultScenarioReviewOwner,
     defaultSignInTenantCode,
     emptySnapshot,
+    normalizeSnapshot,
     handleExpiredSession,
     activePageRequiresAuth: (pageMeta) => pageMeta.audience === 'app',
     pageLookup,

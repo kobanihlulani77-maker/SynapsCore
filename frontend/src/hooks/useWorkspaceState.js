@@ -15,6 +15,7 @@ import {
   defaultTenantOnboardingForm,
   emptyRequestState,
   emptySnapshot,
+  normalizeSnapshot,
 } from '../config/workspaceModel'
 
 export default function useWorkspaceState({ initialPage }) {
@@ -95,7 +96,7 @@ export default function useWorkspaceState({ initialPage }) {
       || nextPartial.summary?.lastUpdatedAt
       || nextPartial.fulfillment?.generatedAt
       || current.generatedAt
-    return { ...current, ...nextPartial, generatedAt: nextGeneratedAt }
+    return normalizeSnapshot({ ...current, ...nextPartial, generatedAt: nextGeneratedAt }, current)
   })
   const resetSignedInWorkspace = () => {
     setSnapshot(emptySnapshot)

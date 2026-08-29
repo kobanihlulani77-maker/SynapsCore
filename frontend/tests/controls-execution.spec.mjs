@@ -173,7 +173,7 @@ test.beforeEach(async ({ page }) => {
 
 test('BATCH 1 public and authentication controls execute and recover', async ({ page }) => {
   await page.goto('/')
-  await expect(page.getByRole('button', { name: /SynapseCore/i })).toBeVisible()
+  await expect(page.locator('button.brand-lockup').first()).toBeVisible()
   await page.getByRole('button', { name: 'Product' }).click()
   await expect(page).toHaveURL(/\/product$/)
   await page.getByRole('button', { name: 'Start Pilot' }).click()

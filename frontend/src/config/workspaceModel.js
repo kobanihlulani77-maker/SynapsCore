@@ -17,6 +17,59 @@ export const emptySnapshot = {
   generatedAt: null,
 }
 
+export const normalizeSnapshot = (snapshot, fallback = emptySnapshot) => {
+  const source = snapshot && typeof snapshot === 'object' ? snapshot : {}
+  const previous = fallback && typeof fallback === 'object' ? fallback : emptySnapshot
+  const sourceAlerts = source.alerts && typeof source.alerts === 'object' ? source.alerts : {}
+  const previousAlerts = previous.alerts && typeof previous.alerts === 'object' ? previous.alerts : {}
+  const sourceFulfillment = source.fulfillment && typeof source.fulfillment === 'object' ? source.fulfillment : {}
+  const previousFulfillment = previous.fulfillment && typeof previous.fulfillment === 'object' ? previous.fulfillment : {}
+  const arrayValue = (key) => (
+    Array.isArray(source[key])
+      ? source[key]
+      : Array.isArray(previous[key])
+        ? previous[key]
+        : emptySnapshot[key]
+  )
+
+  return {
+    ...emptySnapshot,
+    ...previous,
+    ...source,
+    alerts: {
+      ...emptySnapshot.alerts,
+      ...previousAlerts,
+      ...sourceAlerts,
+      activeAlerts: Array.isArray(sourceAlerts.activeAlerts)
+        ? sourceAlerts.activeAlerts
+        : Array.isArray(previousAlerts.activeAlerts) ? previousAlerts.activeAlerts : [],
+      recentAlerts: Array.isArray(sourceAlerts.recentAlerts)
+        ? sourceAlerts.recentAlerts
+        : Array.isArray(previousAlerts.recentAlerts) ? previousAlerts.recentAlerts : [],
+    },
+    fulfillment: {
+      ...emptySnapshot.fulfillment,
+      ...previousFulfillment,
+      ...sourceFulfillment,
+      activeFulfillments: Array.isArray(sourceFulfillment.activeFulfillments)
+        ? sourceFulfillment.activeFulfillments
+        : Array.isArray(previousFulfillment.activeFulfillments) ? previousFulfillment.activeFulfillments : [],
+    },
+    recommendations: arrayValue('recommendations'),
+    inventory: arrayValue('inventory'),
+    recentOrders: arrayValue('recentOrders'),
+    recentEvents: arrayValue('recentEvents'),
+    auditLogs: arrayValue('auditLogs'),
+    systemIncidents: arrayValue('systemIncidents'),
+    integrationConnectors: arrayValue('integrationConnectors'),
+    integrationImportRuns: arrayValue('integrationImportRuns'),
+    integrationReplayQueue: arrayValue('integrationReplayQueue'),
+    scenarioNotifications: arrayValue('scenarioNotifications'),
+    slaEscalations: arrayValue('slaEscalations'),
+    recentScenarios: arrayValue('recentScenarios'),
+  }
+}
+
 export const emptyRequestState = { loading: false, error: '', result: null }
 
 export const defaultScenarioHistoryFilters = {
