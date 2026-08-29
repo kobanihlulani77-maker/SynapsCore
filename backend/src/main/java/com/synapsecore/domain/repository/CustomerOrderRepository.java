@@ -3,6 +3,7 @@ package com.synapsecore.domain.repository;
 import com.synapsecore.domain.entity.CustomerOrder;
 import jakarta.persistence.LockModeType;
 import java.time.Instant;
+import java.util.Collection;
 import java.util.List;
 import org.springframework.data.jpa.repository.EntityGraph;
 import org.springframework.data.jpa.repository.JpaRepository;
@@ -44,6 +45,19 @@ public interface CustomerOrderRepository extends JpaRepository<CustomerOrder, Lo
     @Query("select o.id from CustomerOrder o where upper(o.tenant.code) = upper(:tenantCode) order by o.createdAt desc")
     List<Long> findRecentOrderIdsByTenantCode(String tenantCode, Pageable pageable);
 
+    @Query("""
+        select o.id
+        from CustomerOrder o
+        where upper(o.tenant.code) = upper(:tenantCode)
+          and upper(o.warehouse.code) in :warehouseCodes
+        order by o.createdAt desc
+        """)
+    List<Long> findRecentOrderIdsByTenantCodeAndWarehouseCodes(
+        @Param("tenantCode") String tenantCode,
+        @Param("warehouseCodes") Collection<String> warehouseCodes,
+        Pageable pageable
+    );
+
     @EntityGraph(attributePaths = {"warehouse", "items", "items.product"})
     List<CustomerOrder> findByIdIn(List<Long> ids);
 
@@ -62,6 +76,30 @@ public interface CustomerOrderRepository extends JpaRepository<CustomerOrder, Lo
     long countByTenant_CodeIgnoreCase(String tenantCode);
 
     long countByTenant_CodeIgnoreCaseAndCreatedAtAfter(String tenantCode, Instant createdAt);
+
+    @Query("""
+        select count(o)
+        from CustomerOrder o
+        where upper(o.tenant.code) = upper(:tenantCode)
+          and upper(o.warehouse.code) in :warehouseCodes
+        """)
+    long countByTenantCodeAndWarehouseCodes(
+        @Param("tenantCode") String tenantCode,
+        @Param("warehouseCodes") Collection<String> warehouseCodes
+    );
+
+    @Query("""
+        select count(o)
+        from CustomerOrder o
+        where upper(o.tenant.code) = upper(:tenantCode)
+          and upper(o.warehouse.code) in :warehouseCodes
+          and o.createdAt > :createdAt
+        """)
+    long countByTenantCodeAndWarehouseCodesAndCreatedAtAfter(
+        @Param("tenantCode") String tenantCode,
+        @Param("warehouseCodes") Collection<String> warehouseCodes,
+        @Param("createdAt") Instant createdAt
+    );
 
     long countByTenant_CodeIgnoreCaseAndWarehouse_IdAndCreatedAtAfter(String tenantCode, Long warehouseId, Instant createdAt);
 }

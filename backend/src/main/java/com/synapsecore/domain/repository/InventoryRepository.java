@@ -3,6 +3,7 @@ package com.synapsecore.domain.repository;
 import com.synapsecore.domain.entity.Inventory;
 import jakarta.persistence.LockModeType;
 import jakarta.persistence.QueryHint;
+import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 import org.springframework.data.jpa.repository.EntityGraph;
@@ -81,6 +82,18 @@ public interface InventoryRepository extends JpaRepository<Inventory, Long> {
         """)
     long countLowStockItemsByTenantCode(@Param("tenantCode") String tenantCode);
 
+    @Query("""
+        select count(i)
+        from Inventory i
+        where i.quantityAvailable <= i.reorderThreshold
+          and upper(i.warehouse.tenant.code) = upper(:tenantCode)
+          and upper(i.warehouse.code) in :warehouseCodes
+        """)
+    long countLowStockItemsByTenantCodeAndWarehouseCodes(
+        @Param("tenantCode") String tenantCode,
+        @Param("warehouseCodes") Collection<String> warehouseCodes
+    );
+
     @Query("select i from Inventory i where i.quantityAvailable <= i.reorderThreshold")
     List<Inventory> findLowStockItems();
 
@@ -98,6 +111,17 @@ public interface InventoryRepository extends JpaRepository<Inventory, Long> {
         where upper(i.warehouse.tenant.code) = upper(:tenantCode)
         """)
     long countByTenantCode(@Param("tenantCode") String tenantCode);
+
+    @Query("""
+        select count(i)
+        from Inventory i
+        where upper(i.warehouse.tenant.code) = upper(:tenantCode)
+          and upper(i.warehouse.code) in :warehouseCodes
+        """)
+    long countByTenantCodeAndWarehouseCodes(
+        @Param("tenantCode") String tenantCode,
+        @Param("warehouseCodes") Collection<String> warehouseCodes
+    );
 
     @Query("""
         select count(distinct i.product.id)

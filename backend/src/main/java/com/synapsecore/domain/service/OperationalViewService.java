@@ -1,6 +1,7 @@
 package com.synapsecore.domain.service;
 
 import com.synapsecore.audit.AuditLogService;
+import com.synapsecore.access.AccessDirectoryService;
 import com.synapsecore.alert.AlertScopeService;
 import com.synapsecore.domain.dto.AlertFeedResponse;
 import com.synapsecore.domain.dto.AlertResponse;
@@ -68,6 +69,7 @@ public class OperationalViewService {
     private final IntegrationReplayService integrationReplayService;
     private final FulfillmentService fulfillmentService;
     private final TenantContextService tenantContextService;
+    private final AccessDirectoryService accessDirectoryService;
 
     public AlertFeedResponse getAlertFeed() {
         String tenantCode = tenantContextService.getCurrentTenantCodeOrDefault();
@@ -117,9 +119,16 @@ public class OperationalViewService {
                 .toList();
         }
 
-        List<Long> orderIds = customerOrderRepository.findRecentOrderIdsByTenantCode(
-            tenantContextService.getCurrentTenantCodeOrDefault(),
-            PageRequest.of(0, 12));
+        String tenantCode = tenantContextService.getCurrentTenantCodeOrDefault();
+        var warehouseScopes = accessDirectoryService.getCurrentOperator()
+            .map(accessDirectoryService::getWarehouseScopes)
+            .orElse(List.of());
+        List<Long> orderIds = warehouseScopes.isEmpty()
+            ? customerOrderRepository.findRecentOrderIdsByTenantCode(tenantCode, PageRequest.of(0, 12))
+            : customerOrderRepository.findRecentOrderIdsByTenantCodeAndWarehouseCodes(
+                tenantCode,
+                warehouseScopes,
+                PageRequest.of(0, 12));
         if (orderIds.isEmpty()) {
             return List.of();
         }
@@ -135,11 +144,11 @@ public class OperationalViewService {
     }
 
     public List<BusinessEventResponse> getRecentEvents() {
-        return businessEventQueryService.getRecentEvents();
+        return isCurrentOperatorWarehouseScoped() ? List.of() : businessEventQueryService.getRecentEvents();
     }
 
     public List<AuditLogResponse> getRecentAuditLogs() {
-        return auditLogService.getRecentAuditLogs();
+        return isCurrentOperatorWarehouseScoped() ? List.of() : auditLogService.getRecentAuditLogs();
     }
 
     public List<SystemIncidentResponse> getSystemIncidents() {
@@ -189,6 +198,13 @@ public class OperationalViewService {
             getRecentScenarios(),
             Instant.now()
         );
+    }
+
+    private boolean isCurrentOperatorWarehouseScoped() {
+        return accessDirectoryService.getCurrentOperator()
+            .map(accessDirectoryService::getWarehouseScopes)
+            .map(scopes -> !scopes.isEmpty())
+            .orElse(false);
     }
 
     private AlertResponse toAlertResponse(Alert alert) {

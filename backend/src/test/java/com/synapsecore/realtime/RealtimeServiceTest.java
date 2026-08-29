@@ -328,7 +328,7 @@ class RealtimeServiceTest {
         private final DashboardSummaryResponse summary;
 
         private StubDashboardService(DashboardSummaryResponse summary) {
-            super(null, null, null, null, null, null, null, null, null);
+            super(null, null, null, null, null, null, null, null, null, null);
             this.summary = summary;
         }
 
@@ -371,7 +371,7 @@ class RealtimeServiceTest {
             List<ScenarioRunResponse> slaEscalations,
             List<ScenarioRunResponse> recentScenarios
         ) {
-            super(null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null);
+            super(null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null);
             this.alerts = alerts;
             this.recommendations = recommendations;
             this.inventory = inventory;

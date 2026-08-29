@@ -70,10 +70,10 @@ export default function DashboardPage({ context }) {
     meta: formatTimestamp(item.timestamp),
   }))
 
-  const resolvedRecentOrderCount = Math.max(snapshot.summary?.recentOrderCount ?? 0, snapshot.recentOrders.length)
-  const resolvedLowStockCount = Math.max(snapshot.summary?.lowStockItems ?? 0, snapshot.inventory.filter((item) => item.lowStock).length)
-  const resolvedActiveAlertCount = Math.max(snapshot.summary?.activeAlerts ?? 0, activeAlerts.length)
-  const resolvedRecommendationCount = Math.max(snapshot.summary?.recommendationsCount ?? 0, snapshot.recommendations.length)
+  const resolvedRecentOrderCount = snapshot.summary?.recentOrderCount ?? 0
+  const resolvedLowStockCount = snapshot.summary?.lowStockItems ?? 0
+  const resolvedActiveAlertCount = snapshot.summary?.activeAlerts ?? 0
+  const resolvedRecommendationCount = snapshot.summary?.recommendationsCount ?? 0
   const runtimeStatusLabel = runtime ? formatCodeLabel(runtime.overallStatus) : 'Loading'
   const readinessLabel = runtime ? formatCodeLabel(runtime.readinessState) : 'Monitoring'
   const incidentSeverityCount = systemIncidents.filter((incident) => ['CRITICAL', 'HIGH'].includes(incident.severity)).length

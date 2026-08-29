@@ -411,12 +411,14 @@ export default function useWorkspaceRealtime({
             nextClient.subscribe(`${topicPrefix}/fulfillment.overview`, (message) => mergeSnapshot({ fulfillment: JSON.parse(message.body) }))
             nextClient.subscribe(`${topicPrefix}/orders.recent`, (message) => mergeSnapshot({ recentOrders: JSON.parse(message.body) }))
           }
-          nextClient.subscribe(`${topicPrefix}/events.recent`, (message) => {
-            mergeSnapshot({ recentEvents: JSON.parse(message.body) })
-            scheduleDecisionSurfaceRefresh('events-recent-topic')
-          })
-          nextClient.subscribe(`${topicPrefix}/audit.recent`, (message) => mergeSnapshot({ auditLogs: JSON.parse(message.body) }))
-          nextClient.subscribe(`${topicPrefix}/system.incidents`, (message) => mergeSnapshot({ systemIncidents: JSON.parse(message.body) }))
+          if (hasTenantWideWarehouseAccess) {
+            nextClient.subscribe(`${topicPrefix}/events.recent`, (message) => {
+              mergeSnapshot({ recentEvents: JSON.parse(message.body) })
+              scheduleDecisionSurfaceRefresh('events-recent-topic')
+            })
+            nextClient.subscribe(`${topicPrefix}/audit.recent`, (message) => mergeSnapshot({ auditLogs: JSON.parse(message.body) }))
+            nextClient.subscribe(`${topicPrefix}/system.incidents`, (message) => mergeSnapshot({ systemIncidents: JSON.parse(message.body) }))
+          }
           if (hasIntegrationAccess) {
             nextClient.subscribe(`${topicPrefix}/integrations.changed`, () => void fetchSnapshot())
             if (hasTenantWideWarehouseAccess) {

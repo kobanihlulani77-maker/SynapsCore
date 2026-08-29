@@ -1,6 +1,7 @@
 package com.synapsecore.domain.service;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.synapsecore.access.AccessDirectoryService;
 import com.synapsecore.alert.AlertScopeService;
 import com.synapsecore.domain.dto.DashboardSummaryResponse;
 import com.synapsecore.domain.repository.CustomerOrderRepository;
@@ -32,6 +33,7 @@ public class DashboardService {
     private final ObjectMapper objectMapper;
     private final TenantContextService tenantContextService;
     private final AlertScopeService alertScopeService;
+    private final AccessDirectoryService accessDirectoryService;
     @Autowired
     private RecommendationScopeService recommendationScopeService;
 
@@ -59,13 +61,20 @@ public class DashboardService {
     public DashboardSummaryResponse refreshSummary() {
         String tenantCode = tenantContextService.getCurrentTenantCodeOrDefault();
         boolean warehouseScoped = alertScopeService.isCurrentOperatorWarehouseScoped();
+        var warehouseScopes = accessDirectoryService.getCurrentOperator()
+            .map(accessDirectoryService::getWarehouseScopes)
+            .orElse(java.util.List.of());
         Instant now = Instant.now();
         Instant recentWindow = now.minus(24, ChronoUnit.HOURS);
         var fulfillmentOverview = fulfillmentService.getOverview();
         DashboardSummaryResponse summary = new DashboardSummaryResponse(
-            customerOrderRepository.countByTenant_CodeIgnoreCase(tenantCode),
+            warehouseScoped
+                ? customerOrderRepository.countByTenantCodeAndWarehouseCodes(tenantCode, warehouseScopes)
+                : customerOrderRepository.countByTenant_CodeIgnoreCase(tenantCode),
             alertScopeService.countVisibleActiveAlerts(tenantCode),
-            inventoryRepository.countLowStockItemsByTenantCode(tenantCode),
+            warehouseScoped
+                ? inventoryRepository.countLowStockItemsByTenantCodeAndWarehouseCodes(tenantCode, warehouseScopes)
+                : inventoryRepository.countLowStockItemsByTenantCode(tenantCode),
             recommendationScopeService.visible(recommendationRepository.findAllByTenant_CodeIgnoreCaseAndStatusOrderByUpdatedAtDesc(
                 tenantCode, RecommendationStatus.CURRENT)).size(),
             fulfillmentOverview.backlogCount(),
@@ -73,8 +82,12 @@ public class DashboardService {
             fulfillmentOverview.atRiskCount(),
             inventoryRepository.countDistinctProductsByTenantCode(tenantCode),
             warehouseRepository.countByTenant_CodeIgnoreCase(tenantCode),
-            customerOrderRepository.countByTenant_CodeIgnoreCaseAndCreatedAtAfter(tenantCode, recentWindow),
-            inventoryRepository.countByTenantCode(tenantCode),
+            warehouseScoped
+                ? customerOrderRepository.countByTenantCodeAndWarehouseCodesAndCreatedAtAfter(tenantCode, warehouseScopes, recentWindow)
+                : customerOrderRepository.countByTenant_CodeIgnoreCaseAndCreatedAtAfter(tenantCode, recentWindow),
+            warehouseScoped
+                ? inventoryRepository.countByTenantCodeAndWarehouseCodes(tenantCode, warehouseScopes)
+                : inventoryRepository.countByTenantCode(tenantCode),
             now
         );
         if (!cacheEnabled || warehouseScoped) {

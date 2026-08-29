@@ -39,10 +39,10 @@ export default function useWorkspaceChrome({
   const signedInRoles = signedInSession?.roles || []
   const accessibleWorkspacePages = appPages.filter((page) => canAccessWorkspacePage(page.key, signedInRoles))
   const accessibleWorkspacePageKeys = new Set(accessibleWorkspacePages.map((page) => page.key))
-  const resolvedActiveAlertCount = Math.max(summary?.activeAlerts ?? 0, snapshot.alerts.activeAlerts.length)
-  const resolvedRecommendationCount = Math.max(summary?.recommendationsCount ?? 0, snapshot.recommendations.length)
-  const resolvedRecentOrderCount = Math.max(summary?.recentOrderCount ?? 0, snapshot.recentOrders.length)
-  const resolvedLowStockCount = Math.max(summary?.lowStockItems ?? 0, snapshot.inventory.filter((item) => item.lowStock).length)
+  const resolvedActiveAlertCount = summary?.activeAlerts ?? 0
+  const resolvedRecommendationCount = summary?.recommendationsCount ?? 0
+  const resolvedRecentOrderCount = summary?.recentOrderCount ?? 0
+  const resolvedLowStockCount = summary?.lowStockItems ?? 0
   const accessAdminLoading = Boolean(accessAdminState?.loading)
   const accessAdminError = Boolean(accessAdminState?.error)
 
@@ -53,7 +53,7 @@ export default function useWorkspaceChrome({
     orders: resolvedRecentOrderCount,
     inventory: summary?.inventoryRecordsCount ?? snapshot.inventory.length,
     catalog: catalogState.products.length,
-    locations: summary?.totalWarehouses ?? warehouseOptions.length,
+    locations: warehouseOptions.length,
     fulfillment: fulfillmentOverview.backlogCount + fulfillmentOverview.delayedShipmentCount,
     scenarios: pendingReviewCount,
     'scenario-history': scenarioHistoryItems.length,
@@ -86,8 +86,8 @@ export default function useWorkspaceChrome({
               : 'Waiting for live summary')
       )
       : 'Sign in to unlock the control center',
-    alerts: isAuthenticated ? (snapshot.alerts.activeAlerts.length ? `${snapshot.alerts.activeAlerts.length} active operational alert${snapshot.alerts.activeAlerts.length === 1 ? '' : 's'}` : 'No active alert pressure') : 'Protected by workspace sign-in',
-    recommendations: isAuthenticated ? (snapshot.recommendations.length ? `${snapshot.recommendations.length} recommendation${snapshot.recommendations.length === 1 ? '' : 's'} waiting for review` : 'No immediate recommendation pressure') : 'Protected by workspace sign-in',
+    alerts: isAuthenticated ? (resolvedActiveAlertCount ? `${resolvedActiveAlertCount} active operational alert${resolvedActiveAlertCount === 1 ? '' : 's'}` : 'No active alert pressure') : 'Protected by workspace sign-in',
+    recommendations: isAuthenticated ? (resolvedRecommendationCount ? `${resolvedRecommendationCount} recommendation${resolvedRecommendationCount === 1 ? '' : 's'} waiting for review` : 'No immediate recommendation pressure') : 'Protected by workspace sign-in',
     orders: isAuthenticated ? (resolvedRecentOrderCount ? `${resolvedRecentOrderCount} order${resolvedRecentOrderCount === 1 ? '' : 's'} moved recently` : 'Order flow is currently quiet') : 'Protected by workspace sign-in',
     inventory: isAuthenticated ? (resolvedLowStockCount ? `${resolvedLowStockCount} low-stock item${resolvedLowStockCount === 1 ? '' : 's'}` : 'Inventory posture is stable') : 'Protected by workspace sign-in',
     catalog: isAuthenticated ? `${catalogState.products.length} tenant product${catalogState.products.length === 1 ? '' : 's'} available` : 'Protected by workspace sign-in',

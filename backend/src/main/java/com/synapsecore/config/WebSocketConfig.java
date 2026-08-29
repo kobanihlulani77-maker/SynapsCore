@@ -169,6 +169,9 @@ public class WebSocketConfig implements WebSocketMessageBrokerConfigurer {
             "/RECOMMENDATIONS",
             "/SCENARIOS.NOTIFICATIONS",
             "/SCENARIOS.ESCALATED",
+            "/EVENTS.RECENT",
+            "/AUDIT.RECENT",
+            "/SYSTEM.INCIDENTS",
             "/INTEGRATIONS.CONNECTORS",
             "/INTEGRATIONS.IMPORTS",
             "/INTEGRATIONS.REPLAY"

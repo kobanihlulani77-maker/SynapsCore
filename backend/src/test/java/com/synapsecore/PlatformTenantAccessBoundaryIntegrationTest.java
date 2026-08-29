@@ -1314,6 +1314,77 @@ class PlatformTenantAccessBoundaryIntegrationTest {
     }
 
     @Test
+    void dashboardSummaryMatchesWarehouseScopedDomainTruthAndDoesNotExposeRawActivity() throws Exception {
+        MockHttpSession scopedOperator = tenantLogin(
+            REHEARSAL_TENANT,
+            "boundary.integration.operator",
+            ROLE_PASSWORD
+        );
+        var dashboard = objectMapper.readTree(mockMvc.perform(get("/api/dashboard/snapshot")
+                .session(scopedOperator))
+            .andExpect(status().isOk())
+            .andReturn()
+            .getResponse()
+            .getContentAsString());
+        var summary = dashboard.path("summary");
+
+        assertThat(summary.path("totalOrders").asLong())
+            .isEqualTo(customerOrderRepository.countByTenantCodeAndWarehouseCodes(REHEARSAL_TENANT, List.of(warehouseA)));
+        assertThat(summary.path("recentOrderCount").asLong())
+            .isEqualTo(customerOrderRepository.countByTenantCodeAndWarehouseCodesAndCreatedAtAfter(
+                REHEARSAL_TENANT,
+                List.of(warehouseA),
+                Instant.now().minusSeconds(24 * 60 * 60)));
+        assertThat(summary.path("lowStockItems").asLong())
+            .isEqualTo(inventoryRepository.countLowStockItemsByTenantCodeAndWarehouseCodes(
+                REHEARSAL_TENANT,
+                List.of(warehouseA)));
+        assertThat(summary.path("inventoryRecordsCount").asLong())
+            .isEqualTo(inventoryRepository.countByTenantCodeAndWarehouseCodes(REHEARSAL_TENANT, List.of(warehouseA)));
+        assertThat(summary.path("totalProducts").asLong()).isEqualTo(1);
+        assertThat(summary.path("totalWarehouses").asLong()).isEqualTo(2);
+
+        assertThat(dashboard.path("recentOrders").findValuesAsText("warehouseCode"))
+            .containsOnly(warehouseA);
+        assertThat(dashboard.path("recentEvents")).isEmpty();
+        assertThat(dashboard.path("auditLogs")).isEmpty();
+
+        var alerts = objectMapper.readTree(mockMvc.perform(get("/api/alerts")
+                .session(scopedOperator))
+            .andExpect(status().isOk())
+            .andReturn()
+            .getResponse()
+            .getContentAsString());
+        var recommendations = objectMapper.readTree(mockMvc.perform(get("/api/recommendations")
+                .session(scopedOperator))
+            .andExpect(status().isOk())
+            .andReturn()
+            .getResponse()
+            .getContentAsString());
+        assertThat(summary.path("activeAlerts").asInt()).isEqualTo(alerts.path("activeAlerts").size());
+        assertThat(summary.path("recommendationsCount").asInt()).isEqualTo(recommendations.size());
+
+        MockHttpSession tenantWideAdmin = tenantLogin(
+            REHEARSAL_TENANT,
+            "boundary.tenant.admin",
+            ROLE_PASSWORD
+        );
+        var tenantWideSummary = objectMapper.readTree(mockMvc.perform(get("/api/dashboard/summary")
+                .session(tenantWideAdmin))
+            .andExpect(status().isOk())
+            .andReturn()
+            .getResponse()
+            .getContentAsString());
+        assertThat(tenantWideSummary.path("totalOrders").asLong())
+            .isEqualTo(customerOrderRepository.countByTenant_CodeIgnoreCase(REHEARSAL_TENANT));
+        assertThat(tenantWideSummary.path("inventoryRecordsCount").asLong())
+            .isEqualTo(inventoryRepository.countByTenantCode(REHEARSAL_TENANT));
+        assertThat(tenantWideSummary.path("totalWarehouses").asLong()).isEqualTo(2);
+        assertThat(tenantWideSummary.path("totalOrders").asLong())
+            .isGreaterThan(summary.path("totalOrders").asLong());
+    }
+
+    @Test
     void tenantActivityAndRuntimeStayTenantScopedWhilePlatformViewsRemainMetadataOnly() throws Exception {
         MockHttpSession rehearsalAdmin = tenantLogin(REHEARSAL_TENANT, TENANT_ADMIN_USERNAME, TENANT_ADMIN_PASSWORD);
         MockHttpSession isolationAdmin = tenantLogin(ISOLATION_TENANT, "isolation.admin", "Isolation-Admin-2026!");

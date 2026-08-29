@@ -232,8 +232,7 @@ export default function useWorkspacePageContexts({
   const enabledConnectorCount = snapshot.integrationConnectors.filter((connector) => connector.enabled).length
   const pendingReplayCount = snapshot.integrationReplayQueue.length
   const pendingReviewCount = scenarioHistoryItems.filter((scenario) => scenario.approvalStatus === 'PENDING_APPROVAL').length
-  const activeDecisionCount = Math.max(summary?.activeAlerts ?? 0, snapshot.alerts.activeAlerts.length)
-    + Math.max(summary?.recommendationsCount ?? 0, snapshot.recommendations.length)
+  const activeDecisionCount = (summary?.activeAlerts ?? 0) + (summary?.recommendationsCount ?? 0)
   const systemIncidents = snapshot.systemIncidents.filter((incident) => (
     signedInWarehouseScopes.length === 0
       || (incident.warehouseCode && signedInWarehouseScopes.some((scope) => scope.toLowerCase() === incident.warehouseCode.toLowerCase()))

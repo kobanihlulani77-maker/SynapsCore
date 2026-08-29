@@ -202,7 +202,7 @@ class OperationalDispatchQueueServiceTest {
         private int refreshCalls;
 
         private RecordingDashboardService() {
-            super(null, null, null, null, null, null, null, null, null);
+            super(null, null, null, null, null, null, null, null, null, null);
         }
 
         @Override
