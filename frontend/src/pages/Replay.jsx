@@ -121,10 +121,15 @@ export default function ReplayPage({ context }) {
       && Date.parse(selectedRecord.nextEligibleAt) > Date.now()
   )
   const replayBlockedByConnector = selectedConnector ? !selectedConnector.enabled : false
+  const deadLetterReplayable = ['CONNECTOR_DISABLED', 'PRODUCT_NOT_FOUND', 'INVENTORY_NOT_FOUND', 'INSUFFICIENT_INVENTORY']
+    .includes(selectedRecord?.failureCode)
+  const replayBlockedByDeadLetter = selectedRecord?.status === 'DEAD_LETTERED' && !deadLetterReplayable
   const replayBlockedMessage = replayBlockedByConnector
     ? `Connector ${selectedRecord?.sourceSystem || 'unknown'} is disabled. Re-enable it before replaying failed inbound work.`
     : replayBlockedByEligibility
       ? `This replay record is gated until ${formatTimestamp(selectedRecord?.nextEligibleAt)}.`
+      : replayBlockedByDeadLetter
+        ? 'This dead-lettered record is not eligible for replay. Correct the source data and submit a new legitimate inbound operation.'
       : ''
   const signedInCanReplay = Boolean(
     signedInSession
@@ -139,6 +144,7 @@ export default function ReplayPage({ context }) {
       || !hasWarehouseScope(signedInWarehouseScopes, selectedRecord.warehouseCode)
       || replayBlockedByEligibility
       || replayBlockedByConnector
+      || replayBlockedByDeadLetter
     )
   )
   const replayDecision = !selectedRecord
@@ -164,7 +170,21 @@ export default function ReplayPage({ context }) {
           title: `${selectedRecord.externalOrderId} still needs recovery.`,
           body: selectedRecord.lastReplayMessage || selectedRecord.failureMessage || 'The previous replay attempt did not complete successfully.',
           next: 'Review connector posture and failure detail before trying again.',
-        }
+          }
+        : selectedRecord.status === 'DEAD_LETTERED'
+          ? {
+            label: replayBlockedByDeadLetter ? 'Source correction' : 'Repair and requeue',
+            tone: replayBlockedByDeadLetter ? 'status-failure' : 'status-partial',
+            title: replayBlockedByDeadLetter
+              ? `${selectedRecord.externalOrderId} requires corrected source data.`
+              : `${selectedRecord.externalOrderId} exhausted recovery attempts.`,
+            body: replayBlockedByDeadLetter
+              ? 'This terminal record cannot be reopened safely because its failure is not classified as recoverable.'
+              : selectedRecord.lastReplayMessage || selectedRecord.failureMessage || 'Repair the prerequisite, then explicitly requeue the retained business identity.',
+            next: replayBlockedByDeadLetter
+              ? 'Correct the source and submit a new legitimate inbound operation.'
+              : 'Confirm the prerequisite repair before using the controlled replay action.',
+          }
         : replayBlockedMessage
           ? {
             label: 'Blocked',
@@ -309,7 +329,9 @@ export default function ReplayPage({ context }) {
                     disabled={selectedReplayActionDisabled}
                     type="button"
                   >
-                    {integrationReplayState.loadingId === selectedRecord.id ? 'Replaying...' : 'Replay Into Live Flow'}
+                    {integrationReplayState.loadingId === selectedRecord.id
+                      ? 'Replaying...'
+                      : selectedRecord.status === 'DEAD_LETTERED' ? 'Requeue and Replay' : 'Replay Into Live Flow'}
                   </button>
                 </div>
                 <div className="history-action-row">

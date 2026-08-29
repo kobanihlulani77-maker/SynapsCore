@@ -125,6 +125,9 @@ class MvpFlowIntegrationTest {
     private IntegrationInboundRecordRepository integrationInboundRecordRepository;
 
     @Autowired
+    private com.synapsecore.domain.repository.IntegrationImportRunRepository integrationImportRunRepository;
+
+    @Autowired
     private AlertRepository alertRepository;
 
     @Autowired
@@ -4853,6 +4856,161 @@ class MvpFlowIntegrationTest {
                 .value(org.hamcrest.Matchers.hasItem("DEAD_LETTERED")))
             .andExpect(jsonPath("$[?(@.externalOrderId == 'CSV-DEAD-1001')].failureCode")
                 .value(org.hamcrest.Matchers.hasItem("PRODUCT_NOT_FOUND")));
+    }
+
+    @Test
+    void deadLetteredRecoverableOrderCanBeRequeuedAfterPrerequisiteRepair() throws Exception {
+        String externalOrderId = "CSV-DEAD-REPAIR-1001";
+        MockMultipartFile file = new MockMultipartFile(
+            "file",
+            "dead-letter-repair-orders.csv",
+            "text/csv",
+            ("externalOrderId,warehouseCode,productSku,quantity,unitPrice\n"
+                + externalOrderId + ",WH-NORTH,SKU-DEAD-REPAIR-404,2,88.00\n").getBytes()
+        );
+
+        mockMvc.perform(multipart("/api/integrations/orders/csv-import")
+                .file(file)
+                .param("sourceSystem", "erp_batch"))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.ordersImported").value(0))
+            .andExpect(jsonPath("$.ordersFailed").value(1));
+
+        var replayRecord = integrationReplayRecordRepository.findAll().stream()
+            .filter(record -> externalOrderId.equals(record.getExternalOrderId()))
+            .findFirst()
+            .orElseThrow();
+        assertThat(customerOrderRepository.findAll().stream()
+            .filter(order -> externalOrderId.equals(order.getExternalOrderId()))
+            .count()).isZero();
+        assertThat(fulfillmentTaskRepository.findAll().stream()
+            .filter(task -> task.getCustomerOrder() != null
+                && externalOrderId.equals(task.getCustomerOrder().getExternalOrderId()))
+            .count()).isZero();
+
+        mockMvc.perform(post("/api/integrations/orders/replay/" + replayRecord.getId())
+                .with(accessHeaders("Integration Operator", "INTEGRATION_OPERATOR"))
+                .header("X-Synapse-Tenant", STARTER_TENANT))
+            .andExpect(status().isNotFound());
+        replayRecord = integrationReplayRecordRepository.findById(replayRecord.getId()).orElseThrow();
+        assertThat(replayRecord.getStatus()).isEqualTo(com.synapsecore.domain.entity.IntegrationReplayStatus.REPLAY_FAILED);
+
+        mockMvc.perform(post("/api/integrations/orders/replay/" + replayRecord.getId())
+                .with(accessHeaders("Integration Operator", "INTEGRATION_OPERATOR"))
+                .header("X-Synapse-Tenant", STARTER_TENANT))
+            .andExpect(status().isNotFound());
+        replayRecord = integrationReplayRecordRepository.findById(replayRecord.getId()).orElseThrow();
+        assertThat(replayRecord.getStatus()).isEqualTo(com.synapsecore.domain.entity.IntegrationReplayStatus.DEAD_LETTERED);
+        assertThat(replayRecord.getReplayAttemptCount()).isEqualTo(2);
+        Instant originalDeadLetteredAt = replayRecord.getDeadLetteredAt();
+
+        Product repairedProduct = createTenantProduct("WH-NORTH", "SKU-DEAD-REPAIR-404", "Dead Letter Repair Rotor", "Recovery");
+        var warehouse = warehouseRepository.findByCode("WH-NORTH").orElseThrow();
+        inventoryRepository.save(Inventory.builder()
+            .tenant(warehouse.getTenant())
+            .product(repairedProduct)
+            .warehouse(warehouse)
+            .quantityOnHand(8L)
+            .quantityReserved(0L)
+            .quantityInbound(0L)
+            .quantityAvailable(8L)
+            .reorderThreshold(2L)
+            .build());
+
+        mockMvc.perform(post("/api/integrations/orders/replay/" + replayRecord.getId())
+                .with(accessHeaders("Integration Operator", "INTEGRATION_OPERATOR"))
+                .header("X-Synapse-Tenant", STARTER_TENANT))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.replay.status").value("REPLAYED"))
+            .andExpect(jsonPath("$.replay.replayAttemptCount").value(3))
+            .andExpect(jsonPath("$.order.externalOrderId").value(externalOrderId));
+
+        var recoveredReplay = integrationReplayRecordRepository.findById(replayRecord.getId()).orElseThrow();
+        assertThat(recoveredReplay.getStatus()).isEqualTo(com.synapsecore.domain.entity.IntegrationReplayStatus.REPLAYED);
+        assertThat(recoveredReplay.getDeadLetteredAt()).isEqualTo(originalDeadLetteredAt);
+        assertThat(recoveredReplay.getFailureCode()).isNull();
+        assertThat(customerOrderRepository.findAll().stream()
+            .filter(order -> externalOrderId.equals(order.getExternalOrderId()))
+            .count()).isEqualTo(1);
+        assertThat(fulfillmentTaskRepository.findAll().stream()
+            .filter(task -> task.getCustomerOrder() != null
+                && externalOrderId.equals(task.getCustomerOrder().getExternalOrderId()))
+            .count()).isEqualTo(1);
+        assertThat(loadInventory("SKU-DEAD-REPAIR-404", "WH-NORTH").getQuantityAvailable()).isEqualTo(6L);
+        assertThat(businessEventRepository.findTop20ByOrderByCreatedAtDesc())
+            .anyMatch(event -> event.getEventType() == BusinessEventType.INTEGRATION_REPLAY_QUEUED
+                && event.getPayloadSummary().contains("Requeued dead-lettered order " + externalOrderId));
+        assertThat(integrationReplayRecordRepository.findAll().stream()
+            .filter(record -> externalOrderId.equals(record.getExternalOrderId()))
+            .count()).isEqualTo(1);
+    }
+
+    @Test
+    void replayDoesNotRewriteHistoricalImportRunOutcome() throws Exception {
+        String externalOrderId = "CSV-HISTORICAL-REPLAY-1001";
+        String missingSku = "SKU-HISTORICAL-REPLAY";
+        MockMultipartFile file = new MockMultipartFile(
+            "file",
+            "historical-replay-orders.csv",
+            "text/csv",
+            ("externalOrderId,warehouseCode,productSku,quantity,unitPrice\n"
+                + "CSV-HISTORICAL-OK-1001,WH-NORTH,SKU-FLX-100,1,88.00\n"
+                + externalOrderId + ",WH-NORTH," + missingSku + ",2,88.00\n").getBytes()
+        );
+
+        mockMvc.perform(multipart("/api/integrations/orders/csv-import")
+                .file(file)
+                .param("sourceSystem", "erp_batch"))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.ordersImported").value(1))
+            .andExpect(jsonPath("$.ordersFailed").value(1));
+
+        var importBeforeReplay = integrationImportRunRepository
+            .findTopByTenantCodeIgnoreCaseAndSourceSystemIgnoreCaseAndConnectorTypeOrderByCreatedAtDesc(
+                STARTER_TENANT,
+                "erp_batch",
+                com.synapsecore.domain.entity.IntegrationConnectorType.CSV_ORDER_IMPORT
+            )
+            .orElseThrow();
+        assertThat(importBeforeReplay.getStatus()).isEqualTo(com.synapsecore.domain.entity.IntegrationImportStatus.PARTIAL_SUCCESS);
+        assertThat(importBeforeReplay.getRecordsReceived()).isEqualTo(2);
+        assertThat(importBeforeReplay.getOrdersImported()).isEqualTo(1);
+        assertThat(importBeforeReplay.getOrdersFailed()).isEqualTo(1);
+
+        var replayRecord = integrationReplayRecordRepository.findAll().stream()
+            .filter(record -> externalOrderId.equals(record.getExternalOrderId()))
+            .findFirst()
+            .orElseThrow();
+        Product repairedProduct = createTenantProduct("WH-NORTH", missingSku, "Historical Replay Rotor", "Recovery");
+        var warehouse = warehouseRepository.findByCode("WH-NORTH").orElseThrow();
+        inventoryRepository.save(Inventory.builder()
+            .tenant(warehouse.getTenant())
+            .product(repairedProduct)
+            .warehouse(warehouse)
+            .quantityOnHand(6L)
+            .quantityReserved(0L)
+            .quantityInbound(0L)
+            .quantityAvailable(6L)
+            .reorderThreshold(1L)
+            .build());
+
+        mockMvc.perform(post("/api/integrations/orders/replay/" + replayRecord.getId())
+                .with(accessHeaders("Integration Operator", "INTEGRATION_OPERATOR"))
+                .header("X-Synapse-Tenant", STARTER_TENANT))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.replay.status").value("REPLAYED"))
+            .andExpect(jsonPath("$.order.externalOrderId").value(externalOrderId));
+
+        var importAfterReplay = integrationImportRunRepository.findById(importBeforeReplay.getId()).orElseThrow();
+        assertThat(importAfterReplay.getStatus()).isEqualTo(com.synapsecore.domain.entity.IntegrationImportStatus.PARTIAL_SUCCESS);
+        assertThat(importAfterReplay.getRecordsReceived()).isEqualTo(2);
+        assertThat(importAfterReplay.getOrdersImported()).isEqualTo(1);
+        assertThat(importAfterReplay.getOrdersFailed()).isEqualTo(1);
+        assertThat(integrationInboundRecordRepository.findAll().stream()
+            .filter(record -> externalOrderId.equals(record.getExternalOrderId()))
+            .findFirst()
+            .orElseThrow()
+            .getStatus()).isEqualTo(com.synapsecore.domain.entity.IntegrationInboundStatus.REPLAYED);
     }
 
     @Test

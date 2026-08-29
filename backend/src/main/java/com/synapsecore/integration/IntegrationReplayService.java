@@ -101,7 +101,7 @@ public class IntegrationReplayService {
                 integrationInboundRecordService.markRejected(
                     inboundRecordId,
                     activeReplay.getFailureCode(),
-                    "Equivalent replay identity is already dead-lettered; source correction or manual re-ingestion is required.");
+                    "Equivalent replay identity is already dead-lettered; use the retained replay record after the prerequisite is repaired, or correct the source before re-ingestion.");
             } else {
                 integrationInboundRecordService.markReplayQueued(
                     inboundRecordId,
@@ -196,8 +196,32 @@ public class IntegrationReplayService {
                 "Integration replay record " + replayRecordId + " has already been resolved.");
         }
         if (record.getStatus() == IntegrationReplayStatus.DEAD_LETTERED) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
-                "Integration replay record " + replayRecordId + " is dead-lettered and must be re-ingested manually.");
+            if (record.getFailureCode() == null || !IntegrationFailureCodes.isReplayable(record.getFailureCode())) {
+                throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                    "Integration replay record " + replayRecordId + " is dead-lettered for a non-replayable failure and requires corrected source data.");
+            }
+            record.setStatus(IntegrationReplayStatus.PENDING);
+            record.setNextEligibleAt(Instant.now());
+            record.setLastReplayMessage(limit(
+                "Dead-lettered replay explicitly requeued after prerequisite repair; prior attempts retained: "
+                    + record.getReplayAttemptCount() + "."));
+            integrationReplayRecordRepository.save(record);
+            businessEventService.recordForTenant(
+                tenantCode,
+                BusinessEventType.INTEGRATION_REPLAY_QUEUED,
+                "integration-replay",
+                "Requeued dead-lettered order " + record.getExternalOrderId() + " for controlled recovery by " + actorName + "."
+            );
+            auditLogService.recordSuccess(
+                "INTEGRATION_REPLAY_REQUEUED",
+                actorName,
+                "integration-replay",
+                "IntegrationReplayRecord",
+                String.valueOf(record.getId()),
+                "Requeued a dead-lettered replay after prerequisite repair; previous attempts retained: "
+                    + record.getReplayAttemptCount() + "."
+            );
+            operationalStateChangePublisher.publish(OperationalUpdateType.INTEGRATION_STATE, "integration-replay");
         }
 
         OrderCreateRequest request = deserializeRequest(record);
