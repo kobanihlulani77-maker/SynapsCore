@@ -88,6 +88,7 @@ synapsecore:
   dashboard:
     cache-enabled: ${DASHBOARD_CACHE_ENABLED:true}
     summary-cache-key: synapsecore:dashboard:summary
+    summary-cache-ttl-seconds: ${DASHBOARD_SUMMARY_CACHE_TTL_SECONDS:30}
   queue:
     dispatch-interval-ms: ${DISPATCH_INTERVAL_MS:1500}
     batch-size: ${DISPATCH_BATCH_SIZE:16}

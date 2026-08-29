@@ -12,6 +12,7 @@ import com.synapsecore.decision.RecommendationScopeService;
 import com.synapsecore.domain.entity.RecommendationStatus;
 import com.synapsecore.fulfillment.FulfillmentService;
 import com.synapsecore.tenant.TenantContextService;
+import java.time.Duration;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
 import lombok.RequiredArgsConstructor;
@@ -42,6 +43,9 @@ public class DashboardService {
 
     @Value("${synapsecore.dashboard.summary-cache-key}")
     private String cacheKey;
+
+    @Value("${synapsecore.dashboard.summary-cache-ttl-seconds:30}")
+    private long summaryCacheTtlSeconds;
 
     public DashboardSummaryResponse getSummary() {
         String tenantCode = tenantContextService.getCurrentTenantCodeOrDefault();
@@ -94,7 +98,11 @@ public class DashboardService {
             return summary;
         }
         try {
-            redisTemplate.opsForValue().set(cacheKey + ":" + tenantCode, objectMapper.writeValueAsString(summary));
+            redisTemplate.opsForValue().set(
+                cacheKey + ":" + tenantCode,
+                objectMapper.writeValueAsString(summary),
+                Duration.ofSeconds(Math.max(summaryCacheTtlSeconds, 1))
+            );
         } catch (Exception ignored) {
         }
         return summary;

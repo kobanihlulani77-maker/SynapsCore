@@ -186,6 +186,10 @@ export default function useWorkspaceBootstrap({
     const nextSnapshot = snapshotResult.status === 'fulfilled' ? snapshotResult.value : null
     const replaySurfaceData = replaySurfaceResult.status === 'fulfilled' ? replaySurfaceResult.value : null
     const orderSurfaceData = orderSurfaceResult.status === 'fulfilled' ? orderSurfaceResult.value : null
+    const failedSources = []
+    if (snapshotResult.status !== 'fulfilled') failedSources.push('Dashboard snapshot')
+    if (shouldHydrateReplaySurface && replaySurfaceResult.status !== 'fulfilled') failedSources.push('Replay and integration surface')
+    if (shouldHydrateOrderSurface && orderSurfaceResult.status !== 'fulfilled') failedSources.push('Order surface')
 
     snapshotSetter((current) => {
       const previousSnapshot = current || emptySnapshot
@@ -207,10 +211,18 @@ export default function useWorkspaceBootstrap({
         generatedAt: baseSnapshot.generatedAt ?? previousSnapshot.generatedAt ?? new Date().toISOString(),
       }
     })
-    pageStateSetter({
+    pageStateSetter((current) => ({
+      ...current,
       loading: false,
-      error: snapshotResult.status === 'fulfilled' ? '' : '',
-    })
+      error: failedSources.length
+        ? `${failedSources.join(', ')} unavailable. Retained values may be stale.`
+        : '',
+      freshness: failedSources.length ? (current.lastSuccessfulAt ? 'stale' : 'unknown') : 'current',
+      lastSuccessfulAt: snapshotResult.status === 'fulfilled'
+        ? (nextSnapshot?.generatedAt || nextSnapshot?.summary?.lastUpdatedAt || new Date().toISOString())
+        : current.lastSuccessfulAt,
+      degradedSources: failedSources,
+    }))
   }
 
   async function fetchCatalogProducts(options = {}) {

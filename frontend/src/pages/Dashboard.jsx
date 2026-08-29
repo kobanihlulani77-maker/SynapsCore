@@ -3,6 +3,7 @@ import LoadingState from '../components/LoadingState'
 import Panel from '../components/Panel'
 import { MetricCard } from '../components/Card'
 import ActivityFeed from '../components/ActivityFeed'
+import OperationalGuidance from '../components/OperationalGuidance'
 
 export default function DashboardPage({ context }) {
   const {
@@ -16,6 +17,10 @@ export default function DashboardPage({ context }) {
     signedInSession,
     signedInRoles,
     connectionState,
+    pageError,
+    pageFreshness,
+    degradedSources,
+    lastSuccessfulSnapshotAt,
     liveClockLabel,
     pageStatus,
     fulfillmentOverview,
@@ -141,10 +146,22 @@ export default function DashboardPage({ context }) {
   const runtimeIsHealthy = Boolean(runtime && ['UP', 'CORRECT', 'ACCEPTING_TRAFFIC'].includes(runtime.overallStatus) && readinessIsHealthy)
   const runtimeIsBlocked = Boolean(runtime && !runtimeIsHealthy && runtime.overallStatus !== 'UNKNOWN')
   const connectionIsLive = connectionState === 'live'
+  const dashboardTruthIsCurrent = pageFreshness === 'current'
   const overdueApprovalCount = pendingApprovalScenarios.filter((scenario) => scenario.overdue).length
   const seriousAlertCount = activeAlerts.filter((alert) => ['CRITICAL', 'HIGH'].includes(alert.severity)).length
   const highSeverityIncidentCount = systemIncidents.filter((incident) => ['CRITICAL', 'HIGH'].includes(incident.severity)).length
   const dashboardAttentionItems = [
+    !dashboardTruthIsCurrent ? {
+      id: 'dashboard-freshness',
+      tag: pageFreshness === 'stale' ? 'Stale data' : 'Data unavailable',
+      title: pageFreshness === 'stale' ? 'The last snapshot may be stale' : 'Dashboard truth is not confirmed',
+      note: degradedSources.length
+        ? `${degradedSources.join(', ')} could not be evaluated. Do not interpret retained values as current.`
+        : 'Wait for a successful snapshot before treating zero or healthy states as confirmed.',
+      target: 'runtime',
+      actionLabel: 'Open Runtime',
+      tone: 'status-failure',
+    } : null,
     !runtime ? {
       id: 'runtime-loading',
       tag: 'Runtime evidence',
@@ -245,7 +262,7 @@ export default function DashboardPage({ context }) {
     } : null,
   ].filter(Boolean)
   const primaryAttentionItem = dashboardAttentionItems[0]
-  const operationalState = runtimeIsBlocked || highSeverityIncidentCount
+  const operationalState = runtimeIsBlocked || highSeverityIncidentCount || !dashboardTruthIsCurrent
     ? 'Blocked'
     : (!runtime || !connectionIsLive || degradedConnectorCount || systemIncidents.length)
       ? 'Degraded'
@@ -390,6 +407,20 @@ export default function DashboardPage({ context }) {
 
   return (
     <>
+      {!dashboardTruthIsCurrent ? (
+        <section className="content-grid" aria-label="Dashboard data trust">
+          <Panel wide kicker="Dashboard data trust" title="Do not treat retained values as current">
+            <OperationalGuidance
+              stateLabel={pageFreshness === 'stale' ? 'Stale' : 'Unavailable'}
+              stateTone="status-failure"
+              stateDetail={pageError || 'The Dashboard has not completed a successful authoritative refresh.'}
+              attention={degradedSources.length ? `${degradedSources.join(', ')} could not be evaluated.` : 'Zero and healthy states are not confirmed while the source is unavailable.'}
+              nextAction="Retry the workspace refresh or investigate Runtime before acting on Dashboard values."
+              evidence={lastSuccessfulSnapshotAt ? `Last successful snapshot ${formatTimestamp(lastSuccessfulSnapshotAt)}.` : 'No successful snapshot is available for this session.'}
+            />
+          </Panel>
+        </section>
+      ) : null}
       <section className="dashboard-command-header dashboard-operational-answer" id="dashboard-act-now">
         <article className="dashboard-command-identity">
           <p className="panel-kicker">Company command center</p>
@@ -437,7 +468,7 @@ export default function DashboardPage({ context }) {
         <div className="dashboard-health-card">
           <span>Live system</span>
           <strong>{connectionState === 'live' ? 'Connected' : formatCodeLabel(connectionState)}</strong>
-          <p>{snapshot.generatedAt ? `Snapshot ${formatTimestamp(snapshot.generatedAt)}` : `Monitoring ${liveClockLabel}`}</p>
+          <p>{lastSuccessfulSnapshotAt ? `Last successful snapshot ${formatTimestamp(lastSuccessfulSnapshotAt)}` : `Monitoring ${liveClockLabel}`}</p>
         </div>
         <div className="dashboard-health-card">
           <span>Runtime trust</span>

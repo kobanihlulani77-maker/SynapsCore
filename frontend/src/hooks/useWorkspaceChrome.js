@@ -7,6 +7,9 @@ export default function useWorkspaceChrome({
   currentPage,
   isAuthenticated,
   summary,
+  pageFreshness = 'unknown',
+  degradedSources = [],
+  lastSuccessfulSnapshotAt = null,
   snapshot,
   catalogState,
   warehouseOptions,
@@ -45,6 +48,13 @@ export default function useWorkspaceChrome({
   const resolvedLowStockCount = summary?.lowStockItems ?? 0
   const accessAdminLoading = Boolean(accessAdminState?.loading)
   const accessAdminError = Boolean(accessAdminState?.error)
+  const dashboardFreshnessDetail = degradedSources.length
+    ? `${degradedSources.join(', ')} unavailable`
+    : pageFreshness === 'stale'
+      ? 'Last successful snapshot may be stale'
+      : pageFreshness === 'unknown'
+        ? 'No successful snapshot yet'
+        : ''
 
   const pageBadgeMap = {
     dashboard: summary?.totalOrders ?? 0,
@@ -79,11 +89,13 @@ export default function useWorkspaceChrome({
   const pageStatusMap = {
     dashboard: isAuthenticated
       ? (
-        summary?.lastUpdatedAt
-          ? `Updated ${formatTimestamp(summary.lastUpdatedAt)}`
-          : (resolvedActiveAlertCount || resolvedRecommendationCount || resolvedRecentOrderCount || resolvedLowStockCount
-              ? 'Live signals flowing'
-              : 'Waiting for live summary')
+        pageFreshness !== 'current'
+          ? `Dashboard ${formatCodeLabel(pageFreshness)}${dashboardFreshnessDetail ? ` | ${dashboardFreshnessDetail}` : ''}`
+          : (lastSuccessfulSnapshotAt
+            ? `Last successful snapshot ${formatTimestamp(lastSuccessfulSnapshotAt)}`
+            : (resolvedActiveAlertCount || resolvedRecommendationCount || resolvedRecentOrderCount || resolvedLowStockCount
+                ? 'Live signals flowing'
+                : 'Waiting for live summary'))
       )
       : 'Sign in to unlock the control center',
     alerts: isAuthenticated ? (resolvedActiveAlertCount ? `${resolvedActiveAlertCount} active operational alert${resolvedActiveAlertCount === 1 ? '' : 's'}` : 'No active alert pressure') : 'Protected by workspace sign-in',

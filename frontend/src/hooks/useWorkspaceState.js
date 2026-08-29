@@ -37,7 +37,13 @@ export default function useWorkspaceState({ initialPage }) {
   const [selectedIntegrationConnectorId, setSelectedIntegrationConnectorId] = useState(null)
   const [selectedReplayRecordId, setSelectedReplayRecordId] = useState(null)
   const [connectionState, setConnectionState] = useState('connecting')
-  const [pageState, setPageState] = useState({ loading: true, error: '' })
+  const [pageState, setPageState] = useState({
+    loading: true,
+    error: '',
+    freshness: 'unknown',
+    lastSuccessfulAt: null,
+    degradedSources: [],
+  })
   const [actionState, setActionState] = useState({ loading: false, error: '' })
   const [systemRuntimeState, setSystemRuntimeState] = useState({ loading: true, error: '', runtime: null })
   const [tenantDirectoryState, setTenantDirectoryState] = useState({ loading: true, error: '', items: [] })
@@ -74,7 +80,23 @@ export default function useWorkspaceState({ initialPage }) {
   const [scenarioHistoryState, setScenarioHistoryState] = useState({ loading: true, error: '', items: [] })
   const searchInputRef = useRef(null)
 
-  const mergeSnapshot = (partial) => setSnapshot((current) => ({ ...current, ...partial, generatedAt: new Date().toISOString() }))
+  const mergeSnapshot = (partial) => setSnapshot((current) => {
+    const currentSummaryTimestamp = Date.parse(current.summary?.lastUpdatedAt || '')
+    const incomingSummaryTimestamp = Date.parse(partial.summary?.lastUpdatedAt || '')
+    const summaryIsOlder = partial.summary
+      && Number.isFinite(currentSummaryTimestamp)
+      && Number.isFinite(incomingSummaryTimestamp)
+      && incomingSummaryTimestamp < currentSummaryTimestamp
+    const nextPartial = { ...partial }
+    if (summaryIsOlder) {
+      delete nextPartial.summary
+    }
+    const nextGeneratedAt = nextPartial.generatedAt
+      || nextPartial.summary?.lastUpdatedAt
+      || nextPartial.fulfillment?.generatedAt
+      || current.generatedAt
+    return { ...current, ...nextPartial, generatedAt: nextGeneratedAt }
+  })
   const resetSignedInWorkspace = () => {
     setSnapshot(emptySnapshot)
     setScenarioHistoryState({ loading: false, error: '', items: [] })

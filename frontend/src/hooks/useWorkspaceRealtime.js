@@ -88,7 +88,13 @@ export default function useWorkspaceRealtime({
           lastSnapshotSyncError: error?.message || String(error),
         })
         if (active && !isSessionBootstrapError(error?.message)) {
-          setPageState({ loading: false, error: error.message })
+          setPageState((current) => ({
+            ...current,
+            loading: false,
+            error: error.message,
+            freshness: current.lastSuccessfulAt ? 'stale' : 'unknown',
+            degradedSources: current.degradedSources?.length ? current.degradedSources : ['Dashboard snapshot'],
+          }))
         }
       }
     }
@@ -159,6 +165,15 @@ export default function useWorkspaceRealtime({
           fetchJson('/api/recommendations', timeoutInit(8_000)),
         ])
 
+        const failedSources = [
+          ['summary', 'Dashboard summary', summaryResult],
+          ['inventory', 'Inventory', inventoryResult],
+          ['alerts', 'Alerts', alertsResult],
+          ['recommendations', 'Recommendations', recommendationsResult],
+        ]
+          .filter(([, , result]) => result.status === 'rejected')
+          .map(([, label]) => label)
+
         const nextPartial = {}
         if (summaryResult.status === 'fulfilled' && summaryResult.value) {
           nextPartial.summary = summaryResult.value
@@ -175,6 +190,15 @@ export default function useWorkspaceRealtime({
 
         if (Object.keys(nextPartial).length) {
           mergeSnapshot(nextPartial)
+          setPageState((current) => ({
+            ...current,
+            error: failedSources.length
+              ? `${failedSources.join(', ')} unavailable. Retained values may be stale.`
+              : '',
+            freshness: failedSources.length ? 'degraded' : 'current',
+            lastSuccessfulAt: new Date().toISOString(),
+            degradedSources: failedSources,
+          }))
           publishRealtimeDebug({
             lastDecisionSurfaceRefreshAt: new Date().toISOString(),
             lastDecisionSurfaceRefreshReason: reason,
@@ -182,6 +206,12 @@ export default function useWorkspaceRealtime({
             lastDecisionSurfaceRefreshKeys: Object.keys(nextPartial),
           })
         } else {
+          setPageState((current) => ({
+            ...current,
+            error: `${failedSources.length ? failedSources.join(', ') : 'Dashboard sources'} unavailable. Retained values may be stale.`,
+            freshness: current.lastSuccessfulAt ? 'stale' : 'unknown',
+            degradedSources: failedSources.length ? failedSources : ['Dashboard sources'],
+          }))
           publishRealtimeDebug({
             lastDecisionSurfaceRefreshAt: new Date().toISOString(),
             lastDecisionSurfaceRefreshReason: reason,
@@ -431,6 +461,7 @@ export default function useWorkspaceRealtime({
             nextClient.subscribe(`${topicPrefix}/scenarios.notifications`, (message) => mergeSnapshot({ scenarioNotifications: JSON.parse(message.body) }))
             nextClient.subscribe(`${topicPrefix}/scenarios.escalated`, (message) => mergeSnapshot({ slaEscalations: JSON.parse(message.body) }))
           }
+          void loadSnapshot()
         },
         onStompError: (frame) => {
           handleTransportFailure(nextClient, 'degraded', {

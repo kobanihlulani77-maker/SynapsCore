@@ -46,6 +46,15 @@ class DeploymentHardeningConfigurationTest {
     }
 
     @Test
+    void dashboardSummaryCacheHasAConfiguredBoundedTtl() throws IOException {
+        String baseConfig = Files.readString(Path.of("src/main/resources/application.yml"));
+        String dashboardService = Files.readString(Path.of("src/main/java/com/synapsecore/domain/service/DashboardService.java"));
+
+        assertThat(baseConfig).contains("summary-cache-ttl-seconds: ${DASHBOARD_SUMMARY_CACHE_TTL_SECONDS:30}");
+        assertThat(dashboardService).contains("Duration.ofSeconds(Math.max(summaryCacheTtlSeconds, 1))");
+    }
+
+    @Test
     void productionProfileOnlyExposesPublicHealthActuatorEndpoint() throws IOException {
         String prodConfig = Files.readString(Path.of("src/main/resources/application-prod.yml"));
         String baseConfig = Files.readString(Path.of("src/main/resources/application.yml"));

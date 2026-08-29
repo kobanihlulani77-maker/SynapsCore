@@ -130,6 +130,7 @@ async function main() {
   const tenantAppRoutes = await fs.readFile(path.join(srcDir, 'components', 'AppRoutes.jsx'), 'utf8')
   const workspaceAppModel = await fs.readFile(path.join(srcDir, 'hooks', 'useWorkspaceAppModel.js'), 'utf8')
   const workspaceChrome = await fs.readFile(path.join(srcDir, 'hooks', 'useWorkspaceChrome.js'), 'utf8')
+  const workspaceState = await fs.readFile(path.join(srcDir, 'hooks', 'useWorkspaceState.js'), 'utf8')
   const workspaceRealtime = await fs.readFile(path.join(srcDir, 'hooks', 'useWorkspaceRealtime.js'), 'utf8')
   const accessBoundarySignals = [
     [pageRegistry.includes("audience: 'platform'"), 'Platform routes must use the dedicated platform audience.'],
@@ -147,6 +148,10 @@ async function main() {
     [workspaceRealtime.includes("hasIntegrationAccess"), 'Integration realtime subscriptions must be role-aware.'],
     [workspaceRealtime.includes("/integrations.changed"), 'Scoped integration realtime must use the metadata-only change signal.'],
     [workspaceRealtime.includes('hasTenantWideWarehouseAccess'), 'Raw tenant-wide realtime topics must be scope-aware.'],
+    [workspaceState.includes("freshness: 'unknown'"), 'Workspace state must distinguish unknown freshness from an evaluated zero.'],
+    [workspaceState.includes('incomingSummaryTimestamp < currentSummaryTimestamp'), 'Older realtime summaries must not overwrite newer summary truth.'],
+    [!workspaceState.includes('generatedAt: new Date().toISOString()'), 'Partial snapshot merges must not fabricate a fresh source timestamp.'],
+    [workspaceRealtime.includes('degradedSources'), 'Realtime source failures must remain visible as degraded state.'],
   ]
   accessBoundarySignals.forEach(([valid, message]) => {
     if (!valid) failures.push(message)

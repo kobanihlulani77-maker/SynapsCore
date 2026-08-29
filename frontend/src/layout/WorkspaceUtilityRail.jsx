@@ -57,6 +57,9 @@ export default function WorkspaceUtilityRail({ context }) {
     selectedApprovalScenario,
     escalatedScenarios,
     selectedEscalationScenario,
+    pageFreshness,
+    pageError,
+    lastSuccessfulSnapshotAt,
   } = context
 
   if (!isAuthenticated) {
@@ -68,6 +71,11 @@ export default function WorkspaceUtilityRail({ context }) {
   const focusedRecommendation = recommendationCandidates.find((recommendation) => recommendation.id === selectedRecommendationId) || recommendationCandidates[0]
   const focusedOrder = snapshot.recentOrders.find((order) => order.id === selectedOrderId) || snapshot.recentOrders[0]
   const focusedInventory = snapshot.inventory.find((item) => item.id === selectedInventoryId) || highRiskInventory[0] || lowStockInventory[0] || snapshot.inventory[0]
+  const dashboardDataIsCurrent = pageFreshness === 'current'
+  const dashboardDataValue = (value) => dashboardDataIsCurrent ? value : '?'
+  const dashboardDataDetail = dashboardDataIsCurrent
+    ? (lastSuccessfulSnapshotAt ? `Last successful snapshot ${formatTimestamp(lastSuccessfulSnapshotAt)}.` : 'Awaiting the first synchronized snapshot.')
+    : (pageError || 'Retained values may be stale until the next authoritative refresh.')
 
   const pageUtilityContext = (() => {
     switch (currentPage) {
@@ -300,12 +308,12 @@ export default function WorkspaceUtilityRail({ context }) {
           <span className={`utility-state utility-${connectionState}`}>{connectionState === 'live' ? 'Live' : formatCodeLabel(connectionState)}</span>
         </div>
         <strong>{connectionState === 'live' ? 'Operational signals are streaming cleanly' : 'Monitoring live operating state'}</strong>
-        <p className="muted-text">{snapshot.generatedAt ? `Snapshot ${formatTimestamp(snapshot.generatedAt)}` : 'Awaiting the first synchronized snapshot.'}</p>
+        <p className="muted-text">{dashboardDataDetail}</p>
         <div className="utility-metric-grid">
-          <div><span>Alerts</span><strong>{snapshot.alerts.activeAlerts.length}</strong></div>
-          <div><span>Actions</span><strong>{snapshot.recommendations.length}</strong></div>
-          <div><span>Replay</span><strong>{pendingReplayCount}</strong></div>
-          <div><span>Incidents</span><strong>{systemIncidents.length}</strong></div>
+          <div><span>Alerts</span><strong>{dashboardDataValue(snapshot.alerts.activeAlerts.length)}</strong></div>
+          <div><span>Actions</span><strong>{dashboardDataValue(snapshot.recommendations.length)}</strong></div>
+          <div><span>Replay</span><strong>{dashboardDataValue(pendingReplayCount)}</strong></div>
+          <div><span>Incidents</span><strong>{dashboardDataValue(systemIncidents.length)}</strong></div>
         </div>
       </article>
       <article className="utility-card" id="workspace-page-focus">
@@ -338,10 +346,12 @@ export default function WorkspaceUtilityRail({ context }) {
       <article className="utility-card">
         <div className="utility-card-header">
           <p className="panel-kicker">Act now</p>
-          <span className="scenario-type-tag">{urgentActions.length ? `${urgentActions.length} items` : 'Stable'}</span>
+          <span className="scenario-type-tag">{!dashboardDataIsCurrent ? 'Needs refresh' : urgentActions.length ? `${urgentActions.length} items` : 'Stable'}</span>
         </div>
         <div className="stack-list compact-stack-list">
-          {urgentActions.length ? urgentActions.map((action) => (
+          {!dashboardDataIsCurrent ? (
+            <div className="empty-state">Operational action pressure is unavailable until the dashboard sources refresh successfully.</div>
+          ) : urgentActions.length ? urgentActions.map((action) => (
             <button key={action.id} className="utility-action" onClick={() => navigateToPage(action.target)} type="button">
               <span>{action.kicker}</span>
               <strong>{action.title}</strong>
