@@ -138,18 +138,26 @@ activity.
 
 ## Verification Status
 
-The focused Maven run was attempted but could not resolve the Spring Boot parent
-POM because the sandbox denied access to Maven Central. The external-access
-retry was refused by the current session safety boundary. Therefore the changed
-code has not been reported as compiled or tested in this environment.
+The local Maven attempt could not resolve the Spring Boot parent POM because the
+sandbox could not access Maven Central. This is a Classification C local/sandbox
+dependency-access limitation, not a Runtime product defect.
 
-Required pending verification remains:
+The exact candidate tree was verified by GitHub Actions:
 
-- focused Runtime health/configuration/failure tests;
-- full backend suite after focused tests pass;
-- production-shaped PostgreSQL/Redis Runtime checks where the existing harness supports them;
-- safe hosted Runtime proof after deployment of the changed revision;
-- docs link check and `git diff --check`.
+- Candidate SHA: `22b89c607b79d5258caaa9445cb35c53aadf0b5a`
+- Run: `33315989175`
+- Status: `completed`
+- Conclusion: `success`
+- Backend `./mvnw test`: PASS
+- Frontend dependency installation: PASS
+- Frontend production build: PASS
+- Compose validation input preparation: PASS
+- Development Compose validation: PASS
+- Production Compose validation: PASS
+
+The candidate CI run is the authoritative compilation and test evidence for the
+changed Runtime source/configuration. Main promotion, deployment, and safe
+hosted Runtime proof remain separate gates.
 
 No destructive hosted PostgreSQL or Redis outage test is required. Managed
 Render restore remains unproven application evidence and is classified as a
@@ -159,13 +167,14 @@ provider boundary/evidence gap.
 
 | Class | Current Runtime items |
 | --- | --- |
-| A | None can be closed until the changed code compiles and the focused safety tests pass. The prior custom-status, fallback-bound, raw-payload-log, and unbounded-webhook concerns are the corrected A candidates. |
+| A | None. The candidate CI passed backend tests, frontend build, and both Compose validations; the prior custom-status, fallback-bound, raw-payload-log, and unbounded-webhook concerns are verified corrections. |
 | B | Single backend instance, no HA, no multi-region, no distributed scheduler, session loss requiring re-login, framework-default pools, derived runtime incidents, no `/actuator/info` commit endpoint. |
-| C | Managed provider restore, actual Render PostgreSQL/Redis outage, exact Render SIGTERM timing, long-duration resource behavior, owner/live Runtime walkthrough, and the pending post-change verification evidence. |
+| C | Local/sandbox Maven Central access limitation, managed provider restore, actual Render PostgreSQL/Redis outage, exact Render SIGTERM timing, long-duration resource behavior, and owner/live Runtime walkthrough. |
 | D | Active-active, multi-region, automatic failover, service mesh, centralized observability, distributed tracing, and automated disaster-recovery orchestration. |
 
 ## Closure Position
 
-This evidence record is intentionally not an acceptance claim. Runtime closure
-requires the pending focused/full verification and safe hosted Runtime proof.
+This record verifies the candidate CI gate. Runtime closure still requires safe
+promotion to `main`, successful main CI, deployment health, and non-destructive
+hosted Runtime proof.
 No Realtime domain work has started.
