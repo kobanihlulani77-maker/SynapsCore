@@ -181,6 +181,9 @@ export default function useWorkspacePageContexts({
     saveWorkspaceSecuritySettings,
     saveWorkspaceWarehouse,
     saveWorkspaceConnectorSupport,
+    createWorkspaceWarehouse,
+    retireWorkspaceWarehouse,
+    reactivateWorkspaceWarehouse,
   } = workspaceAdminActions
 
   const {
