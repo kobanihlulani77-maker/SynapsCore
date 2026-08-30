@@ -142,7 +142,10 @@ expected warning/error lines from deliberate failure, authorization, duplicate,
 and replay fixtures; they did not produce test failures.
 
 Hosted proof was not claimed as a result of this local cycle. The safe next
-hosted step is an unauthenticated/live health check after deployment. A
+hosted step was an unauthenticated/live health check after deployment. The
+post-push check from this shell could not connect to either Render endpoint and
+returned `PROOF_ALLOWED=False`; this is an execution-environment connectivity
+observation, not evidence that the deployed application is unhealthy. A
 Platform Owner walkthrough requires the private credential path and must remain
 non-destructive; it is not represented as completed here.
 
