@@ -818,6 +818,14 @@ class PlatformTenantAccessBoundaryIntegrationTest {
                 mockMvc.perform(get(endpoint).session(session))
                     .andExpect(status().isOk());
             }
+            if (!expectation.tenantWide()) {
+                mockMvc.perform(get("/api/events/recent").session(session))
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$").isEmpty());
+                mockMvc.perform(get("/api/audit/recent").session(session))
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$").isEmpty());
+            }
         }
     }
 

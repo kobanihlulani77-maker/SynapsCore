@@ -63,6 +63,9 @@ public class AuditLogService {
     }
 
     public List<AuditLogResponse> getRecentAuditLogs() {
+        if (isCurrentOperatorWarehouseScoped()) {
+            return List.of();
+        }
         return auditLogRepository.findTop20ByTenantCodeIgnoreCaseOrderByCreatedAtDesc(
                 tenantContextService.getCurrentTenantCodeOrDefault())
             .stream()
@@ -80,6 +83,13 @@ public class AuditLogService {
                 log.getCreatedAt()
             ))
             .toList();
+    }
+
+    private boolean isCurrentOperatorWarehouseScoped() {
+        return accessDirectoryService.getCurrentOperator()
+            .map(accessDirectoryService::getWarehouseScopes)
+            .map(scopes -> !scopes.isEmpty())
+            .orElse(false);
     }
 
     private boolean isVisibleTenantActivity(AuditLog log) {
