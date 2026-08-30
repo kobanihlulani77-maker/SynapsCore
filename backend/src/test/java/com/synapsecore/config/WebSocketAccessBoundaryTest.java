@@ -1,5 +1,6 @@
 package com.synapsecore.config;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import com.synapsecore.access.SynapseAccessRole;
@@ -144,8 +145,68 @@ class WebSocketAccessBoundaryTest {
         )).isInstanceOf(IllegalArgumentException.class);
     }
 
+    @Test
+    void rejectsClientSendForKnownAndUnknownDestinations() {
+        assertThatThrownBy(() -> message(
+            StompCommand.SEND,
+            "/topic/tenant/ACCESS-BOUNDARY-REHEARSAL/dashboard.summary",
+            Set.of("TENANT_ADMIN"),
+            true
+        )).isInstanceOf(IllegalArgumentException.class)
+            .hasMessage("Client realtime SEND is not supported.");
+        assertThatThrownBy(() -> message(
+            StompCommand.SEND,
+            "/topic/tenant/ACCESS-BOUNDARY-REHEARSAL/orders.recent",
+            Set.of("TENANT_ADMIN"),
+            true
+        )).isInstanceOf(IllegalArgumentException.class);
+        assertThatThrownBy(() -> message(
+            StompCommand.SEND,
+            "/topic/tenant/OTHER/alerts",
+            Set.of("TENANT_ADMIN"),
+            true
+        )).isInstanceOf(IllegalArgumentException.class);
+        assertThatThrownBy(() -> message(
+            StompCommand.SEND,
+            "/topic/tenant/ACCESS-BOUNDARY-REHEARSAL/unknown.topic",
+            Set.of("TENANT_ADMIN"),
+            true
+        )).isInstanceOf(IllegalArgumentException.class);
+    }
+
+    @Test
+    void rejectsUnknownAndNonTenantSubscriptions() {
+        assertThatThrownBy(() -> subscribe("/topic/random", Set.of("TENANT_ADMIN"), true))
+            .isInstanceOf(IllegalArgumentException.class);
+        assertThatThrownBy(() -> subscribe("/topic/platform/anything", Set.of("TENANT_ADMIN"), true))
+            .isInstanceOf(IllegalArgumentException.class);
+        assertThatThrownBy(() -> subscribe("/topic/tenant/ACCESS-BOUNDARY-REHEARSAL/unknown.topic", Set.of("TENANT_ADMIN"), true))
+            .isInstanceOf(IllegalArgumentException.class);
+        assertThatThrownBy(() -> subscribe("/app/anything", Set.of("TENANT_ADMIN"), true))
+            .isInstanceOf(IllegalArgumentException.class);
+    }
+
+    @Test
+    void suppressesUnauthorizedOutboundRecipientWithoutBlockingAuthorizedRecipient() {
+        Message<?> authorized = message(
+            StompCommand.MESSAGE,
+            "/topic/tenant/ACCESS-BOUNDARY-REHEARSAL/alerts",
+            Set.of("TENANT_ADMIN"),
+            true
+        );
+        Message<?> scoped = message(
+            StompCommand.MESSAGE,
+            "/topic/tenant/ACCESS-BOUNDARY-REHEARSAL/alerts",
+            Set.of("INTEGRATION_OPERATOR"),
+            false
+        );
+
+        assertThat(authorized).isNotNull();
+        assertThat(scoped).isNull();
+    }
+
     private Message<?> subscribe(String destination, Set<String> roles, boolean tenantWide) {
-        return subscribe(interceptor, destination, roles, tenantWide, null);
+        return message(interceptor, StompCommand.SUBSCRIBE, destination, roles, tenantWide, null);
     }
 
     private Message<?> subscribe(WebSocketConfig.TenantSubscriptionChannelInterceptor target,
@@ -153,7 +214,23 @@ class WebSocketAccessBoundaryTest {
                                  Set<String> roles,
                                  boolean tenantWide,
                                  HttpSession httpSession) {
-        StompHeaderAccessor accessor = StompHeaderAccessor.create(StompCommand.SUBSCRIBE);
+        return message(target, StompCommand.SUBSCRIBE, destination, roles, tenantWide, httpSession);
+    }
+
+    private Message<?> message(StompCommand command,
+                               String destination,
+                               Set<String> roles,
+                               boolean tenantWide) {
+        return message(interceptor, command, destination, roles, tenantWide, null);
+    }
+
+    private Message<?> message(WebSocketConfig.TenantSubscriptionChannelInterceptor target,
+                               StompCommand command,
+                               String destination,
+                               Set<String> roles,
+                               boolean tenantWide,
+                               HttpSession httpSession) {
+        StompHeaderAccessor accessor = StompHeaderAccessor.create(command);
         accessor.setDestination(destination);
         Map<String, Object> attributes = new java.util.HashMap<>(Map.of(
             "synapsecoreTenantCode", "ACCESS-BOUNDARY-REHEARSAL",

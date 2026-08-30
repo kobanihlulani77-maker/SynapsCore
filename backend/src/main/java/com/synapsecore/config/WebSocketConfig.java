@@ -189,6 +189,26 @@ public class WebSocketConfig implements WebSocketMessageBrokerConfigurer {
             "/INTEGRATIONS.REPLAY"
         );
 
+        private static final Set<String> KNOWN_TENANT_DESTINATION_SUFFIXES = Set.of(
+            "/DASHBOARD.SUMMARY",
+            "/ALERTS",
+            "/ALERTS.CHANGED",
+            "/RECOMMENDATIONS",
+            "/RECOMMENDATIONS.CHANGED",
+            "/INVENTORY",
+            "/FULFILLMENT.OVERVIEW",
+            "/ORDERS.RECENT",
+            "/EVENTS.RECENT",
+            "/AUDIT.RECENT",
+            "/SYSTEM.INCIDENTS",
+            "/INTEGRATIONS.CONNECTORS",
+            "/INTEGRATIONS.IMPORTS",
+            "/INTEGRATIONS.REPLAY",
+            "/INTEGRATIONS.CHANGED",
+            "/SCENARIOS.NOTIFICATIONS",
+            "/SCENARIOS.ESCALATED"
+        );
+
         private final AuthSessionService authSessionService;
         private final RealtimeSessionRegistry realtimeSessionRegistry;
 
@@ -225,6 +245,10 @@ public class WebSocketConfig implements WebSocketMessageBrokerConfigurer {
                 return message;
             }
 
+            if (StompCommand.SEND.equals(accessor.getCommand())) {
+                throw new IllegalArgumentException("Client realtime SEND is not supported.");
+            }
+
             if (!StompCommand.SUBSCRIBE.equals(accessor.getCommand())
                 && !StompCommand.SEND.equals(accessor.getCommand())
                 && !StompCommand.MESSAGE.equals(accessor.getCommand())) {
@@ -253,7 +277,7 @@ public class WebSocketConfig implements WebSocketMessageBrokerConfigurer {
 
             String destination = accessor.getDestination();
             if (destination == null || destination.isBlank()) {
-                return message;
+                return rejectOrDrop(accessor.getCommand(), "A realtime destination is required.");
             }
 
             String expectedPrefix = "/topic/tenant/" + tenantCode.toUpperCase(Locale.ROOT) + "/";
@@ -263,35 +287,59 @@ public class WebSocketConfig implements WebSocketMessageBrokerConfigurer {
                 log.warn("Realtime subscription rejected for tenant {} because destination {} escaped the tenant scope.",
                     tenantCode,
                     destination);
-                throw new IllegalArgumentException(
+                return rejectOrDrop(
+                    accessor.getCommand(),
                     "Realtime subscriptions are limited to the signed-in tenant context."
                 );
             }
 
             if (!normalizedDestination.startsWith(expectedPrefix.toUpperCase(Locale.ROOT))) {
-                return message;
+                return rejectOrDrop(
+                    accessor.getCommand(),
+                    "Realtime destinations are limited to supported tenant topics."
+                );
             }
 
             String destinationSuffix = normalizedDestination.substring(expectedPrefix.length());
+            if (!KNOWN_TENANT_DESTINATION_SUFFIXES.contains("/" + destinationSuffix)) {
+                log.warn("Realtime destination rejected for tenant {} because topic {} is not supported.",
+                    tenantCode,
+                    destination);
+                return rejectOrDrop(
+                    accessor.getCommand(),
+                    "Realtime destinations are limited to supported tenant topics."
+                );
+            }
             Set<String> roles = readRoles(sessionAttributes);
             boolean integrationRole = roles.contains(SynapseAccessRole.INTEGRATION_ADMIN.name())
                 || roles.contains(SynapseAccessRole.INTEGRATION_OPERATOR.name());
             if (destinationSuffix.startsWith("INTEGRATIONS.") && !integrationRole) {
                 log.warn("Realtime integration subscription rejected for tenant {} because the session lacks an integration role.",
                     tenantCode);
-                throw new IllegalArgumentException("An integration role is required for integration realtime subscriptions.");
+                return rejectOrDrop(
+                    accessor.getCommand(),
+                    "An integration role is required for integration realtime subscriptions."
+                );
             }
 
             boolean tenantWide = Boolean.TRUE.equals(sessionAttributes.get(SESSION_TENANT_WIDE_ATTRIBUTE));
             String normalizedSuffix = "/" + destinationSuffix;
             if (TENANT_WIDE_RAW_SUFFIXES.contains(normalizedSuffix) && !tenantWide) {
                 log.warn("Realtime raw subscription rejected for tenant {} because the session is warehouse-scoped.", tenantCode);
-                throw new IllegalArgumentException(
+                return rejectOrDrop(
+                    accessor.getCommand(),
                     "Warehouse-scoped sessions must refresh filtered operational data through tenant APIs."
                 );
             }
 
             return message;
+        }
+
+        private Message<?> rejectOrDrop(StompCommand command, String reason) {
+            if (StompCommand.MESSAGE.equals(command)) {
+                return null;
+            }
+            throw new IllegalArgumentException(reason);
         }
 
         private void bindSession(StompHeaderAccessor accessor) {

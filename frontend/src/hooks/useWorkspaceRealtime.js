@@ -5,6 +5,7 @@ import SockJS from 'sockjs-client'
 const isSessionBootstrapError = (message = '') => /signed-in user session|session is missing or expired|sign in again/i.test(String(message))
 const realtimeDebugKey = '__SYNAPSE_REALTIME_DEBUG__'
 const degradedRefreshIntervalMs = 15_000
+const liveReconciliationIntervalMs = 60_000
 const hostedSockJsTransportCandidates = ['websocket', 'xhr-streaming', 'xhr-polling']
 const enableRealtimeConsoleLogs = Boolean(import.meta.env.DEV)
 
@@ -33,6 +34,7 @@ export default function useWorkspaceRealtime({
     let active = true
     let connectionMode = 'connecting'
     let degradedRefreshIntervalId = null
+    let liveReconciliationIntervalId = null
     let activeClient = null
     let decisionSurfaceRefreshTimeoutId = null
     let decisionSurfaceRefreshInFlight = false
@@ -121,6 +123,43 @@ export default function useWorkspaceRealtime({
       if (degradedRefreshIntervalId !== null) {
         globalThis.clearInterval(degradedRefreshIntervalId)
         degradedRefreshIntervalId = null
+      }
+    }
+
+    function startLiveReconciliationLoop() {
+      if (liveReconciliationIntervalId !== null) {
+        return
+      }
+
+      liveReconciliationIntervalId = globalThis.setInterval(() => {
+        void refreshWhileLive()
+      }, liveReconciliationIntervalMs)
+    }
+
+    function stopLiveReconciliationLoop() {
+      if (liveReconciliationIntervalId !== null) {
+        globalThis.clearInterval(liveReconciliationIntervalId)
+        liveReconciliationIntervalId = null
+      }
+    }
+
+    async function refreshWhileLive() {
+      if (!active || !signedInTenantCode || connectionMode !== 'live' || !fetchSnapshot) {
+        return
+      }
+
+      try {
+        await fetchSnapshot()
+        publishRealtimeDebug({
+          lastLiveReconciliationAt: new Date().toISOString(),
+          lastLiveReconciliationStatus: 'ok',
+        })
+      } catch (error) {
+        publishRealtimeDebug({
+          lastLiveReconciliationAt: new Date().toISOString(),
+          lastLiveReconciliationStatus: 'error',
+          lastLiveReconciliationError: error?.message || String(error),
+        })
       }
     }
 
@@ -343,8 +382,29 @@ export default function useWorkspaceRealtime({
       })
       logRealtime('warn', `transport moved to ${nextState}`, details)
       updateConnectionState(nextState)
+      stopLiveReconciliationLoop()
       startDegradedRefreshLoop()
       void refreshWhileDegraded()
+    }
+
+    function parseRealtimeBody(message, topicName) {
+      try {
+        return JSON.parse(message?.body || '')
+      } catch (error) {
+        publishRealtimeDebug({
+          lastMalformedMessageAt: new Date().toISOString(),
+          lastMalformedMessageTopic: topicName,
+          lastMalformedMessageSize: typeof message?.body === 'string' ? message.body.length : 0,
+          lastMalformedMessageError: error?.message || String(error),
+        })
+        logRealtime('warn', 'malformed realtime message ignored', {
+          topic: topicName,
+          size: typeof message?.body === 'string' ? message.body.length : 0,
+        })
+        scheduleDecisionSurfaceRefresh(`malformed-${topicName}`)
+        void loadSnapshot()
+        return null
+      }
     }
 
     function startClient(nextTransportMode) {
@@ -393,6 +453,7 @@ export default function useWorkspaceRealtime({
           }
 
           stopDegradedRefreshLoop()
+          startLiveReconciliationLoop()
           publishRealtimeDebug({
             connectionState: 'live',
             selectedTransport: nextTransportMode === 'native' ? 'native-stomp' : 'sockjs-stomp',
@@ -406,7 +467,9 @@ export default function useWorkspaceRealtime({
           })
           updateConnectionState('live')
           nextClient.subscribe(`${topicPrefix}/dashboard.summary`, (message) => {
-            mergeSnapshot({ summary: JSON.parse(message.body) })
+            const payload = parseRealtimeBody(message, 'dashboard.summary')
+            if (!payload) return
+            mergeSnapshot({ summary: payload })
             if (hasTenantWideWarehouseAccess) {
               scheduleDecisionSurfaceRefresh('dashboard-summary-topic')
             } else {
@@ -415,7 +478,9 @@ export default function useWorkspaceRealtime({
           })
           if (hasTenantWideWarehouseAccess) {
             nextClient.subscribe(`${topicPrefix}/alerts`, (message) => {
-              mergeSnapshot({ alerts: JSON.parse(message.body) })
+              const payload = parseRealtimeBody(message, 'alerts')
+              if (!payload) return
+              mergeSnapshot({ alerts: payload })
               scheduleDecisionSurfaceRefresh('alerts-topic')
             })
           } else {
@@ -425,7 +490,9 @@ export default function useWorkspaceRealtime({
           }
           if (hasTenantWideWarehouseAccess) {
             nextClient.subscribe(`${topicPrefix}/recommendations`, (message) => {
-              mergeSnapshot({ recommendations: JSON.parse(message.body) })
+              const payload = parseRealtimeBody(message, 'recommendations')
+              if (!payload) return
+              mergeSnapshot({ recommendations: payload })
               scheduleDecisionSurfaceRefresh('recommendations-topic')
             })
           } else {
@@ -435,31 +502,62 @@ export default function useWorkspaceRealtime({
           }
           if (hasTenantWideWarehouseAccess) {
             nextClient.subscribe(`${topicPrefix}/inventory`, (message) => {
-              mergeSnapshot({ inventory: JSON.parse(message.body) })
+              const payload = parseRealtimeBody(message, 'inventory')
+              if (!payload) return
+              mergeSnapshot({ inventory: payload })
               scheduleDecisionSurfaceRefresh('inventory-topic')
             })
-            nextClient.subscribe(`${topicPrefix}/fulfillment.overview`, (message) => mergeSnapshot({ fulfillment: JSON.parse(message.body) }))
-            nextClient.subscribe(`${topicPrefix}/orders.recent`, (message) => mergeSnapshot({ recentOrders: JSON.parse(message.body) }))
+            nextClient.subscribe(`${topicPrefix}/fulfillment.overview`, (message) => {
+              const payload = parseRealtimeBody(message, 'fulfillment.overview')
+              if (payload) mergeSnapshot({ fulfillment: payload })
+            })
+            nextClient.subscribe(`${topicPrefix}/orders.recent`, (message) => {
+              const payload = parseRealtimeBody(message, 'orders.recent')
+              if (payload) mergeSnapshot({ recentOrders: payload })
+            })
           }
           if (hasTenantWideWarehouseAccess) {
             nextClient.subscribe(`${topicPrefix}/events.recent`, (message) => {
-              mergeSnapshot({ recentEvents: JSON.parse(message.body) })
+              const payload = parseRealtimeBody(message, 'events.recent')
+              if (!payload) return
+              mergeSnapshot({ recentEvents: payload })
               scheduleDecisionSurfaceRefresh('events-recent-topic')
             })
-            nextClient.subscribe(`${topicPrefix}/audit.recent`, (message) => mergeSnapshot({ auditLogs: JSON.parse(message.body) }))
-            nextClient.subscribe(`${topicPrefix}/system.incidents`, (message) => mergeSnapshot({ systemIncidents: JSON.parse(message.body) }))
+            nextClient.subscribe(`${topicPrefix}/audit.recent`, (message) => {
+              const payload = parseRealtimeBody(message, 'audit.recent')
+              if (payload) mergeSnapshot({ auditLogs: payload })
+            })
+            nextClient.subscribe(`${topicPrefix}/system.incidents`, (message) => {
+              const payload = parseRealtimeBody(message, 'system.incidents')
+              if (payload) mergeSnapshot({ systemIncidents: payload })
+            })
           }
           if (hasIntegrationAccess) {
             nextClient.subscribe(`${topicPrefix}/integrations.changed`, () => void fetchSnapshot())
             if (hasTenantWideWarehouseAccess) {
-              nextClient.subscribe(`${topicPrefix}/integrations.connectors`, (message) => mergeSnapshot({ integrationConnectors: JSON.parse(message.body) }))
-              nextClient.subscribe(`${topicPrefix}/integrations.imports`, (message) => mergeSnapshot({ integrationImportRuns: JSON.parse(message.body) }))
-              nextClient.subscribe(`${topicPrefix}/integrations.replay`, (message) => mergeSnapshot({ integrationReplayQueue: JSON.parse(message.body) }))
+              nextClient.subscribe(`${topicPrefix}/integrations.connectors`, (message) => {
+                const payload = parseRealtimeBody(message, 'integrations.connectors')
+                if (payload) mergeSnapshot({ integrationConnectors: payload })
+              })
+              nextClient.subscribe(`${topicPrefix}/integrations.imports`, (message) => {
+                const payload = parseRealtimeBody(message, 'integrations.imports')
+                if (payload) mergeSnapshot({ integrationImportRuns: payload })
+              })
+              nextClient.subscribe(`${topicPrefix}/integrations.replay`, (message) => {
+                const payload = parseRealtimeBody(message, 'integrations.replay')
+                if (payload) mergeSnapshot({ integrationReplayQueue: payload })
+              })
             }
           }
           if (hasTenantWideWarehouseAccess) {
-            nextClient.subscribe(`${topicPrefix}/scenarios.notifications`, (message) => mergeSnapshot({ scenarioNotifications: JSON.parse(message.body) }))
-            nextClient.subscribe(`${topicPrefix}/scenarios.escalated`, (message) => mergeSnapshot({ slaEscalations: JSON.parse(message.body) }))
+            nextClient.subscribe(`${topicPrefix}/scenarios.notifications`, (message) => {
+              const payload = parseRealtimeBody(message, 'scenarios.notifications')
+              if (payload) mergeSnapshot({ scenarioNotifications: payload })
+            })
+            nextClient.subscribe(`${topicPrefix}/scenarios.escalated`, (message) => {
+              const payload = parseRealtimeBody(message, 'scenarios.escalated')
+              if (payload) mergeSnapshot({ slaEscalations: payload })
+            })
           }
           void loadSnapshot()
         },
@@ -498,6 +596,7 @@ export default function useWorkspaceRealtime({
     return () => {
       active = false
       stopDegradedRefreshLoop()
+      stopLiveReconciliationLoop()
       stopDecisionSurfaceRefreshTimer()
       publishRealtimeDebug({
         connectionState: 'disposed',
