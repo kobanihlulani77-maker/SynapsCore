@@ -7,6 +7,7 @@ selection safety, async request handling, session lifecycle, and the relationshi
 between warehouse options and existing tenant-level realtime delivery. It does not
 add a global warehouse selector or redesign the websocket topic model.
 
+Starting HEAD before Phase 2 changes: `198c236b9a9d7851630953f115a6b5184f90b347`
 Phase 1 revision: `198c236b9a9d7851630953f115a6b5184f90b347`
 Phase 2 revision: `cb352631bb98783c533cc5daccf5abdb2455f494`
 
@@ -97,7 +98,8 @@ new permission model.
 - Hosted proof preparation: not completed in this shell. The script reached healthy
   backend/auth/realtime/frontend warm-up, then stopped before mutation because the
   private bootstrap or platform-administration token was not present. No proof
-  tenant or database records were changed by this attempt.
+  tenant or database records were changed by this attempt. This is an execution
+  prerequisite and is not a Warehouse Context product defect or required product work.
 
 ## A/B/C/D Classification
 
@@ -105,13 +107,18 @@ new permission model.
 | --- | --- |
 | A: required authority capability | `0` identified after the Phase 2 implementation |
 | B: intentional boundary | No global selector, aggregate pages, page-local Scenario/Settings state, no URL or persisted warehouse authority, bounded REST convergence |
-| C: evidence gap | Hosted rendered scope removal/retirement timing, multi-tab timing, provider-outage observation, and full proof rerun pending the private preparation token |
+| C: evidence gap | Dedicated hosted scoped-user timing proof, destructive live scope-removal proof, destructive live warehouse-retirement proof, authenticated hosted realtime warehouse proof, and owner/browser walkthrough |
 | D: future extension | Global selector, favorites, URL context, recent locations, or comparison workspace only if pilot evidence requires them |
 
 ## Final Gate
 
-Phase 2 is implementation-complete and deployed with no identified Classification A
-authority defect. Live connection prerequisites are healthy, but final hosted/browser
-acceptance remains pending because proof preparation requires a private bootstrap or
-platform-administration token in the invoking shell. No Phase 3 or Activity/Audit work
-is included here.
+Classification A remaining: `0`
+Critical blockers: `0`
+High blockers: `0`
+
+Dedicated hosted timing/destructive evidence is Classification C and deferred. The
+private proof credential prerequisite is not classified as Warehouse Context product
+work. No Phase 3 or Activity/Audit work is included here.
+
+**WAREHOUSE CONTEXT LIFECYCLE VERIFIED AND OPERATIONALLY COMPLETE FOR CONTROLLED
+B2B PILOT — OWNER LIVE WALKTHROUGH DEFERRED**
