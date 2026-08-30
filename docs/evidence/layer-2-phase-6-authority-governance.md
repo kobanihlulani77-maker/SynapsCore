@@ -111,8 +111,8 @@ intelligence as live truth. `/api/scenarios/{id}/execute` remains compatibility
 71. **Frontend result:** No frontend files changed, so frontend verification was not required for this evidence-only phase; the previously accepted frontend baseline remains the applicable reference.
 72. **Docs/diff/secret scan:** Final repository checks are recorded below after this document is created: docs links, secret scan, and `git diff --check` must be green before commit.
 73. **Files changed:** Intended Phase 6 change is this evidence document only; unrelated `frontend/Dockerfile`, `.gitattributes`, and the two Scenario evidence files remain untouched and unstaged.
-74. **Commits:** The final evidence commit SHA is recorded after commit and push; no production, frontend, configuration, or deployment file is included.
-75. **GitHub Actions run:** Exact-main CI status is recorded after push; closure requires the run for the final evidence SHA to complete successfully.
+74. **Commits:** Evidence commit `94085abb99190d7a773cb16bff61dcc36cfe4acd` contains this document only; no production, frontend, configuration, or deployment file is included.
+75. **GitHub Actions run:** Exact-main CI run `33336268412` for commit `94085abb99190d7a773cb16bff61dcc36cfe4acd` completed with `success`.
 76. **Retained Phase 5 C:** Frontend realtime harness depth, dedicated cache/broker exercises, and after-commit publisher-failure execution remain the explicitly bounded Phase 5 C items.
 77. **Remaining B:** 0 known Phase 6 implementation blockers from the exercised authority and governance contracts.
 78. **Remaining C:** Dedicated hosted scoped-user timing, destructive live scope-removal and warehouse-retirement exercises, authenticated hosted warehouse realtime, owner/browser walkthrough, and any source-event correlation not executed by the local suites remain C evidence gaps.
