@@ -136,8 +136,8 @@ authority, keeps last-known values for stale state, and uses 60-second live and
 67. **Frontend build/verify result:** `npm.cmd run verify` passed; launch-readiness checked 71 source files and 3 frontend demo/QA documents. `npm.cmd run build` passed with 139 modules; no frontend source changed.
 68. **Docs/diff/secret scan:** Documentation link check passed with 778 local links and no missing links. Secret scan passed with 0 critical findings and 5 pre-existing classified fixture findings. `git diff --check` passed with no whitespace errors.
 69. **Files changed:** This evidence document only; unrelated local worktree files remain unmodified and unstaged.
-70. **Commits:** Evidence was committed as `2eae4d259fe96af5e48326130b47193f60639ea2`; no production or frontend commit was included.
-71. **GitHub Actions run:** Exact-main CI run `33334060668` completed with `success` for commit `2eae4d259fe96af5e48326130b47193f60639ea2`.
+70. **Commits:** Evidence was initially committed as `2eae4d259fe96af5e48326130b47193f60639ea2` and finalized as `dc63c1277a84d01d02181d74a18bef13270aaf0e`; no production or frontend commit was included.
+71. **GitHub Actions run:** Exact-main CI run `33334060668` passed the initial evidence commit, and run `33334273146` completed with `success` for the final evidence revision `dc63c1277a84d01d02181d74a18bef13270aaf0e`.
 72. **Remaining B:** 0 known implementation blockers in the reviewed source-driven intelligence and observation contracts.
 73. **Remaining C:** Frontend fake-timer/client-harness coverage, dedicated cache-isolation runtime proof, dedicated broker scope exercise, dedicated depletion-risk integrated trigger, backlog API recurrence ledger, and after-commit publisher-failure exercise remain evidence gaps.
 74. **Remaining D:** 0 new release blockers; broader distributed realtime, HA, and scale evolution remain outside this phase.
