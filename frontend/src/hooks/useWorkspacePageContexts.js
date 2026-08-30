@@ -86,6 +86,7 @@ export default function useWorkspacePageContexts({
     setWorkspaceSettingsForm,
     workspaceSecurityForm,
     setWorkspaceSecurityForm,
+    workspaceWarehouseCreateForm,
     workspaceWarehouseDrafts,
     setWorkspaceWarehouseDrafts,
     workspaceConnectorDrafts,
