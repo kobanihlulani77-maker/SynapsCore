@@ -6,16 +6,21 @@ import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicInteger;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Service;
 
 @Service
 @RequiredArgsConstructor
+@Slf4j
 public class SecurityRateLimitService {
+
+    private static final int MAX_IN_MEMORY_COUNTERS = 10_000;
 
     private final ObjectProvider<StringRedisTemplate> redisTemplateProvider;
     private final Map<String, WindowCounter> inMemoryCounters = new ConcurrentHashMap<>();
+    private volatile boolean inMemoryFallbackLogged;
 
     public boolean allow(String bucketName, String principalKey, int maxAttempts, int windowSeconds) {
         return evaluate(bucketName, principalKey, maxAttempts, windowSeconds).allowed();
@@ -30,7 +35,12 @@ public class SecurityRateLimitService {
 
         RateLimitDecision redisDecision = evaluateWithRedis(counterKey, maxAttempts, windowSeconds);
         if (redisDecision != null) {
+            inMemoryFallbackLogged = false;
             return redisDecision;
+        }
+        if (!inMemoryFallbackLogged) {
+            inMemoryFallbackLogged = true;
+            log.warn("Redis rate limiting is unavailable; using bounded process-local enforcement.");
         }
         return evaluateInMemory(counterKey, maxAttempts, windowSeconds);
     }
@@ -73,8 +83,16 @@ public class SecurityRateLimitService {
 
     private RateLimitDecision evaluateInMemory(String counterKey, int maxAttempts, int windowSeconds) {
         long nowMillis = currentTimeMillis();
-        WindowCounter counter = inMemoryCounters.computeIfAbsent(counterKey, key -> new WindowCounter(nowMillis));
-        synchronized (counter) {
+        synchronized (inMemoryCounters) {
+            removeExpiredCounters(nowMillis, windowSeconds);
+            WindowCounter counter = inMemoryCounters.get(counterKey);
+            if (counter == null) {
+                if (inMemoryCounters.size() >= MAX_IN_MEMORY_COUNTERS) {
+                    return new RateLimitDecision(false, maxAttempts, maxAttempts, 0, 1);
+                }
+                counter = new WindowCounter(nowMillis);
+                inMemoryCounters.put(counterKey, counter);
+            }
             if (nowMillis - counter.windowStartedAtMillis >= windowSeconds * 1000L) {
                 counter.windowStartedAtMillis = nowMillis;
                 counter.attempts.set(0);
@@ -90,6 +108,15 @@ public class SecurityRateLimitService {
                 retryAfterSeconds
             );
         }
+    }
+
+    private void removeExpiredCounters(long nowMillis, int windowSeconds) {
+        long windowMillis = windowSeconds * 1000L;
+        inMemoryCounters.entrySet().removeIf(entry -> nowMillis - entry.getValue().windowStartedAtMillis >= windowMillis);
+    }
+
+    int inMemoryCounterCount() {
+        return inMemoryCounters.size();
     }
 
     public record RateLimitDecision(

@@ -6,7 +6,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.synapsecore.config.SynapseRealtimeProperties;
 import com.synapsecore.observability.OperationalAlertHookService;
 import com.synapsecore.observability.OperationalMetricsService;
-import java.nio.charset.StandardCharsets;
+import java.util.Arrays;
 import java.util.Locale;
 import java.util.UUID;
 import lombok.extern.slf4j.Slf4j;
@@ -83,17 +83,17 @@ public class StompRealtimePublisher implements RealtimePublisher {
             publishLocally(envelope.destination(), payload);
             recordRealtimePublish(envelope.destination(), "DISTRIBUTED_FANOUT");
         } catch (Exception exception) {
-            String preview = new String(body, StandardCharsets.UTF_8);
+            String fingerprint = Integer.toHexString(Arrays.hashCode(body));
             recordRealtimeFailure(null, "REDIS_ENVELOPE");
             if (operationalAlertHookService != null) {
                 operationalAlertHookService.emit(
                     "REALTIME_FANOUT_FAILURE",
                     "HIGH",
                     "Realtime Redis fanout rejected a malformed envelope.",
-                    "Preview: " + preview
+                    "Envelope bytes: " + body.length + ", fingerprint: " + fingerprint
                 );
             }
-            log.warn("Ignoring malformed Redis realtime envelope: {}", preview, exception);
+            log.warn("Ignoring malformed Redis realtime envelope: size={} fingerprint={}", body.length, fingerprint, exception);
         }
     }
 

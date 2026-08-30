@@ -44,6 +44,9 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.availability.LivenessState;
 import org.springframework.boot.availability.ReadinessState;
 import org.springframework.boot.availability.ApplicationAvailability;
+import org.springframework.boot.actuate.health.HealthComponent;
+import org.springframework.boot.actuate.health.HealthEndpoint;
+import org.springframework.boot.actuate.health.Status;
 import org.springframework.core.env.Environment;
 import org.springframework.stereotype.Service;
 
@@ -55,6 +58,7 @@ public class SystemRuntimeService {
     private final SynapseAccessProperties accessProperties;
     private final SynapseCorsProperties corsProperties;
     private final ApplicationAvailability applicationAvailability;
+    private final HealthEndpoint healthEndpoint;
     private final AlertScopeService alertScopeService;
     private final AuditLogRepository auditLogRepository;
     private final BusinessEventRepository businessEventRepository;
@@ -229,10 +233,15 @@ public class SystemRuntimeService {
         if (livenessState != LivenessState.CORRECT) {
             return "DOWN";
         }
-        if (readinessState == ReadinessState.ACCEPTING_TRAFFIC) {
+        if (readinessState == ReadinessState.ACCEPTING_TRAFFIC && readinessHealthIsUp()) {
             return "UP";
         }
         return "DEGRADED";
+    }
+
+    private boolean readinessHealthIsUp() {
+        HealthComponent readinessHealth = healthEndpoint.healthForPath("readiness");
+        return readinessHealth != null && Status.UP.equals(readinessHealth.getStatus());
     }
 
     private String emptyToNull(String value) {

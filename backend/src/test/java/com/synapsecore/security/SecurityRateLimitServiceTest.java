@@ -35,6 +35,18 @@ class SecurityRateLimitServiceTest {
         assertThat(resetDecision.remainingAttempts()).isEqualTo(1);
     }
 
+    @Test
+    void processLocalFallbackRemainsBoundedAcrossUniquePrincipals() {
+        TestableSecurityRateLimitService service = new TestableSecurityRateLimitService();
+
+        service.setNowMillis(1_000L);
+        for (int index = 0; index < 10_500; index++) {
+            service.evaluate("AUTH_LOGIN", "principal-" + index, 2, 300);
+        }
+
+        assertThat(service.inMemoryCounterCount()).isLessThanOrEqualTo(10_000);
+    }
+
     private static final class TestableSecurityRateLimitService extends SecurityRateLimitService {
 
         private long nowMillis;

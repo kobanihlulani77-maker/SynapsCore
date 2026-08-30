@@ -1,4 +1,6 @@
 spring:
+  lifecycle:
+    timeout-per-shutdown-phase: 30s
   datasource:
     url: ${SPRING_DATASOURCE_URL:${DATABASE_URL:jdbc:postgresql://${DB_HOST}:${DB_PORT:5432}/${DB_NAME}}}
     username: ${SPRING_DATASOURCE_USERNAME:${DB_USER:}}
@@ -21,6 +23,7 @@ spring:
         enabled: false
 
 server:
+  shutdown: graceful
   servlet:
     session:
       cookie:

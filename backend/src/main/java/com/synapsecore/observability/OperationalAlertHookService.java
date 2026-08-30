@@ -3,16 +3,22 @@ package com.synapsecore.observability;
 import com.synapsecore.audit.RequestTraceContext;
 import com.synapsecore.config.SynapseObservabilityProperties;
 import java.time.Instant;
+import java.net.http.HttpClient;
+import java.time.Duration;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.MediaType;
 import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestClient;
+import org.springframework.http.client.JdkClientHttpRequestFactory;
 
 @Service
 @RequiredArgsConstructor
 @Slf4j
 public class OperationalAlertHookService {
+
+    private static final Duration ALERT_HOOK_CONNECT_TIMEOUT = Duration.ofSeconds(5);
+    private static final Duration ALERT_HOOK_READ_TIMEOUT = Duration.ofSeconds(10);
 
     private final RestClient.Builder restClientBuilder;
     private final SynapseObservabilityProperties observabilityProperties;
@@ -29,7 +35,9 @@ public class OperationalAlertHookService {
             return;
         }
         try {
-            restClientBuilder.build()
+            restClientBuilder
+                .requestFactory(alertHookRequestFactory())
+                .build()
                 .post()
                 .uri(observabilityProperties.getAlertHook().getWebhookUrl().trim())
                 .contentType(MediaType.APPLICATION_JSON)
@@ -50,6 +58,14 @@ public class OperationalAlertHookService {
             operationalMetricsService.recordAlertHookDelivery(tenantCode, false);
             log.warn("Operational alert hook delivery failed for {} [{}]: {}", alertType, requestTraceContext.getRequiredRequestId(), exception.getMessage());
         }
+    }
+
+    private JdkClientHttpRequestFactory alertHookRequestFactory() {
+        JdkClientHttpRequestFactory requestFactory = new JdkClientHttpRequestFactory(
+            HttpClient.newBuilder().connectTimeout(ALERT_HOOK_CONNECT_TIMEOUT).build()
+        );
+        requestFactory.setReadTimeout(ALERT_HOOK_READ_TIMEOUT);
+        return requestFactory;
     }
 
     private record AlertHookPayload(

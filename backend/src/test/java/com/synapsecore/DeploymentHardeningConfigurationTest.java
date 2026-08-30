@@ -46,6 +46,14 @@ class DeploymentHardeningConfigurationTest {
     }
 
     @Test
+    void productionProfileUsesBoundedGracefulShutdown() throws IOException {
+        String prodConfig = Files.readString(Path.of("src/main/resources/application-prod.yml"));
+
+        assertThat(prodConfig).contains("shutdown: graceful");
+        assertThat(prodConfig).contains("timeout-per-shutdown-phase: 30s");
+    }
+
+    @Test
     void dashboardSummaryCacheHasAConfiguredBoundedTtl() throws IOException {
         String baseConfig = Files.readString(Path.of("src/main/resources/application.yml"));
         String dashboardService = Files.readString(Path.of("src/main/java/com/synapsecore/domain/service/DashboardService.java"));
