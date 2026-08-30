@@ -162,6 +162,22 @@ The smallest correction was made in:
 
 ## 15. Verification record
 
+### Main CI diagnosis and correction
+
+GitHub Actions run `33327706093` for commit `7d7fba5e1e1c8b4595ae09f45de673a3e33c8b63` failed with 272 tests, one failure, and zero errors. The failure was the final Tenant A `ORDER_FLOW` assertion in `Layer2Phase2IntakeReservationIntegrationTest`: five items were `COMPLETED` and one item was still `PROCESSING` when the test read the repository.
+
+This was an asynchronous observation race, not permission to accept `PROCESSING`. The queue has an asynchronous after-commit listener, a scheduled drain, and an `AtomicBoolean` drainer guard. A test-side `processPendingWork()` call can return zero while another drainer owns the queue, so a single immediate read does not establish quiescence. The CI status-only output did not include the work-item identifier or source for the one item; it established that the item was a Tenant A `ORDER_FLOW` item, not that a failure-path replay item was operationally processed. No evidence showed that it remained stuck after the normal queue lifecycle.
+
+The correction is test-only. After the final Phase 2 operation, the test polls the dispatch repository for up to 5 seconds in 50 ms intervals. It invokes a manual drain only when `isDraining()` is false, and continues polling when another drainer owns the queue. It requires no `PENDING` or `PROCESSING` item and then asserts `COMPLETED` only. A timeout still fails the test; the assertion was not weakened to merely exclude `FAILED`.
+
+The corrected focused test passed three consecutive local runs after this change:
+
+```text
+Run 1: 1 test, 0 failures, 0 errors, BUILD SUCCESS
+Run 2: 1 test, 0 failures, 0 errors, BUILD SUCCESS
+Run 3: 1 test, 0 failures, 0 errors, BUILD SUCCESS
+```
+
 Focused Phase 2 result:
 
 ```text

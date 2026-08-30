@@ -72,6 +72,8 @@ import org.springframework.test.web.servlet.MvcResult;
 class Layer2Phase2IntakeReservationIntegrationTest {
 
     private static final String PLATFORM_ADMIN_TOKEN = "test-only-platform-admin-token";
+    private static final long DISPATCH_QUIESCENCE_TIMEOUT_MILLIS = 5000;
+    private static final long DISPATCH_POLL_INTERVAL_MILLIS = 50;
     private static final String TENANT_A = "L2-P2-TENANT-A";
     private static final String TENANT_B = "L2-P2-TENANT-B";
     private static final String WH_A = "L2-P2-WH-A";
@@ -345,16 +347,56 @@ class Layer2Phase2IntakeReservationIntegrationTest {
             .noneMatch(audit -> audit.getAction().equals("ORDER_PROCESSED")
                 && audit.getTargetRef().equals("L2-P2-ATOMIC-FAILURE"));
 
-        int dispatched = dispatchQueueService.processPendingWork();
-        assertThat(dispatched).isGreaterThanOrEqualTo(0);
-        List<OperationalDispatchStatus> tenantAOrderFlowStatuses = dispatchWorkItemRepository.findAll().stream()
-            .filter(item -> item.getTenantCode().equalsIgnoreCase(TENANT_A))
-            .filter(item -> item.getUpdateType() == OperationalUpdateType.ORDER_FLOW)
+        awaitTenantAOrderFlowQuiescence();
+        List<OperationalDispatchStatus> tenantAOrderFlowStatuses = tenantAOrderFlowItems().stream()
             .map(com.synapsecore.domain.entity.OperationalDispatchWorkItem::getStatus)
             .toList();
         assertThat(tenantAOrderFlowStatuses)
             .as("Tenant A ORDER_FLOW dispatch statuses")
             .containsOnly(OperationalDispatchStatus.COMPLETED);
+    }
+
+    private void awaitTenantAOrderFlowQuiescence() throws InterruptedException {
+        long deadline = System.nanoTime()
+            + TimeUnit.MILLISECONDS.toNanos(DISPATCH_QUIESCENCE_TIMEOUT_MILLIS);
+        while (true) {
+            List<com.synapsecore.domain.entity.OperationalDispatchWorkItem> observedItems = tenantAOrderFlowItems();
+            boolean inFlight = observedItems.stream()
+                .anyMatch(item -> item.getStatus() == OperationalDispatchStatus.PENDING
+                    || item.getStatus() == OperationalDispatchStatus.PROCESSING);
+            if (!inFlight && !dispatchQueueService.isDraining()) {
+                int observedCount = observedItems.size();
+                Thread.sleep(DISPATCH_POLL_INTERVAL_MILLIS);
+                List<com.synapsecore.domain.entity.OperationalDispatchWorkItem> settledItems = tenantAOrderFlowItems();
+                boolean settledInFlight = settledItems.stream()
+                    .anyMatch(item -> item.getStatus() == OperationalDispatchStatus.PENDING
+                        || item.getStatus() == OperationalDispatchStatus.PROCESSING);
+                if (observedCount == settledItems.size() && !settledInFlight && !dispatchQueueService.isDraining()) {
+                    return;
+                }
+                continue;
+            }
+            if (!dispatchQueueService.isDraining()) {
+                dispatchQueueService.processPendingWork();
+            }
+            if (System.nanoTime() >= deadline) {
+                assertThat(tenantAOrderFlowItems().stream()
+                    .filter(item -> item.getStatus() == OperationalDispatchStatus.PENDING
+                        || item.getStatus() == OperationalDispatchStatus.PROCESSING)
+                    .toList())
+                    .as("Tenant A ORDER_FLOW items after bounded queue quiescence wait")
+                    .isEmpty();
+                return;
+            }
+            Thread.sleep(DISPATCH_POLL_INTERVAL_MILLIS);
+        }
+    }
+
+    private List<com.synapsecore.domain.entity.OperationalDispatchWorkItem> tenantAOrderFlowItems() {
+        return dispatchWorkItemRepository.findAll().stream()
+            .filter(item -> item.getTenantCode().equalsIgnoreCase(TENANT_A))
+            .filter(item -> item.getUpdateType() == OperationalUpdateType.ORDER_FLOW)
+            .toList();
     }
 
     private void exerciseScheduledPull() throws Exception {
