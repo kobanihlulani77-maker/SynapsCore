@@ -6,7 +6,9 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.stream.Collectors;
+import jakarta.servlet.http.HttpSession;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.context.annotation.Configuration;
@@ -34,12 +36,14 @@ public class WebSocketConfig implements WebSocketMessageBrokerConfigurer {
     private static final String SESSION_TENANT_CODE_ATTRIBUTE = "synapsecoreTenantCode";
     static final String SESSION_ROLES_ATTRIBUTE = "synapsecoreRoles";
     static final String SESSION_TENANT_WIDE_ATTRIBUTE = "synapsecoreTenantWide";
+    static final String SESSION_HTTP_SESSION_ATTRIBUTE = "synapsecoreHttpSession";
     private static final Logger log = LoggerFactory.getLogger(WebSocketConfig.class);
 
     private final List<String> allowedOrigins;
     private final SynapseAccessProperties accessProperties;
     private final AuthSessionService authSessionService;
     private final SynapseRealtimeProperties realtimeProperties;
+    private final RealtimeSessionRegistry realtimeSessionRegistry = new RealtimeSessionRegistry();
 
     public WebSocketConfig(SynapseCorsProperties corsProperties,
                            SynapseAccessProperties accessProperties,
@@ -90,7 +94,14 @@ public class WebSocketConfig implements WebSocketMessageBrokerConfigurer {
     @Override
     public void configureClientInboundChannel(ChannelRegistration registration) {
         if (!accessProperties.isAllowHeaderFallback()) {
-            registration.interceptors(new TenantSubscriptionChannelInterceptor());
+            registration.interceptors(new TenantSubscriptionChannelInterceptor(authSessionService, realtimeSessionRegistry));
+        }
+    }
+
+    @Override
+    public void configureClientOutboundChannel(ChannelRegistration registration) {
+        if (!accessProperties.isAllowHeaderFallback()) {
+            registration.interceptors(new TenantSubscriptionChannelInterceptor(authSessionService, realtimeSessionRegistry));
         }
     }
 
@@ -139,6 +150,7 @@ public class WebSocketConfig implements WebSocketMessageBrokerConfigurer {
                         SESSION_TENANT_WIDE_ATTRIBUTE,
                         authenticatedSession.operator().getWarehouseScopes().isEmpty()
                     );
+                    attributes.put(SESSION_HTTP_SESSION_ATTRIBUTE, session);
                     return true;
                 })
                 .orElseGet(() -> {
@@ -177,6 +189,23 @@ public class WebSocketConfig implements WebSocketMessageBrokerConfigurer {
             "/INTEGRATIONS.REPLAY"
         );
 
+        private final AuthSessionService authSessionService;
+        private final RealtimeSessionRegistry realtimeSessionRegistry;
+
+        TenantSubscriptionChannelInterceptor() {
+            this(null, null);
+        }
+
+        TenantSubscriptionChannelInterceptor(AuthSessionService authSessionService) {
+            this(authSessionService, null);
+        }
+
+        TenantSubscriptionChannelInterceptor(AuthSessionService authSessionService,
+                                             RealtimeSessionRegistry realtimeSessionRegistry) {
+            this.authSessionService = authSessionService;
+            this.realtimeSessionRegistry = realtimeSessionRegistry;
+        }
+
         @Override
         public Message<?> preSend(Message<?> message, MessageChannel channel) {
             StompHeaderAccessor accessor = MessageHeaderAccessor.getAccessor(message, StompHeaderAccessor.class);
@@ -184,11 +213,35 @@ public class WebSocketConfig implements WebSocketMessageBrokerConfigurer {
                 return message;
             }
 
-            if (!StompCommand.SUBSCRIBE.equals(accessor.getCommand())) {
+            if (StompCommand.CONNECT.equals(accessor.getCommand())) {
+                bindSession(accessor);
+                return message;
+            }
+
+            if (StompCommand.DISCONNECT.equals(accessor.getCommand())) {
+                if (realtimeSessionRegistry != null) {
+                    realtimeSessionRegistry.remove(accessor.getSessionId());
+                }
+                return message;
+            }
+
+            if (!StompCommand.SUBSCRIBE.equals(accessor.getCommand())
+                && !StompCommand.SEND.equals(accessor.getCommand())
+                && !StompCommand.MESSAGE.equals(accessor.getCommand())) {
                 return message;
             }
 
             Map<String, Object> sessionAttributes = accessor.getSessionAttributes();
+            if (sessionAttributes == null) {
+                sessionAttributes = new java.util.HashMap<>();
+                accessor.setSessionAttributes(sessionAttributes);
+            }
+            if (!refreshCurrentAuthority(accessor, sessionAttributes)) {
+                if (StompCommand.MESSAGE.equals(accessor.getCommand())) {
+                    return null;
+                }
+                throw new IllegalArgumentException("A current signed-in tenant session is required for realtime use.");
+            }
             String tenantCode = sessionAttributes == null
                 ? null
                 : (String) sessionAttributes.get(SESSION_TENANT_CODE_ATTRIBUTE);
@@ -241,6 +294,55 @@ public class WebSocketConfig implements WebSocketMessageBrokerConfigurer {
             return message;
         }
 
+        private void bindSession(StompHeaderAccessor accessor) {
+            if (realtimeSessionRegistry == null) {
+                return;
+            }
+            Map<String, Object> sessionAttributes = accessor.getSessionAttributes();
+            if (sessionAttributes == null) {
+                return;
+            }
+            Object session = sessionAttributes.get(SESSION_HTTP_SESSION_ATTRIBUTE);
+            if (session instanceof HttpSession httpSession) {
+                realtimeSessionRegistry.bind(accessor.getSessionId(), httpSession);
+            }
+        }
+
+        private boolean refreshCurrentAuthority(StompHeaderAccessor accessor,
+                                                Map<String, Object> sessionAttributes) {
+            if (authSessionService == null) {
+                return true;
+            }
+            Object rawSession = sessionAttributes.get(SESSION_HTTP_SESSION_ATTRIBUTE);
+            HttpSession httpSession = rawSession instanceof HttpSession session
+                ? session
+                : realtimeSessionRegistry == null ? null : realtimeSessionRegistry.get(accessor.getSessionId());
+            if (httpSession == null) {
+                return false;
+            }
+
+            var authenticatedSession = authSessionService.resolveAuthenticatedSession(httpSession).orElse(null);
+            if (authenticatedSession == null) {
+                return false;
+            }
+
+            sessionAttributes.put(
+                SESSION_TENANT_CODE_ATTRIBUTE,
+                authenticatedSession.tenant().getCode().trim().toUpperCase(Locale.ROOT)
+            );
+            sessionAttributes.put(
+                SESSION_ROLES_ATTRIBUTE,
+                authenticatedSession.operator().getRoles().stream()
+                    .map(Enum::name)
+                    .collect(Collectors.toUnmodifiableSet())
+            );
+            sessionAttributes.put(
+                SESSION_TENANT_WIDE_ATTRIBUTE,
+                authenticatedSession.operator().getWarehouseScopes().isEmpty()
+            );
+            return true;
+        }
+
         private Set<String> readRoles(Map<String, Object> sessionAttributes) {
             Object value = sessionAttributes.get(SESSION_ROLES_ATTRIBUTE);
             if (!(value instanceof Set<?> values)) {
@@ -251,6 +353,27 @@ public class WebSocketConfig implements WebSocketMessageBrokerConfigurer {
                 .map(String.class::cast)
                 .map(role -> role.trim().toUpperCase(Locale.ROOT))
                 .collect(Collectors.toUnmodifiableSet());
+        }
+    }
+
+    private static final class RealtimeSessionRegistry {
+
+        private final Map<String, HttpSession> sessions = new ConcurrentHashMap<>();
+
+        private void bind(String realtimeSessionId, HttpSession httpSession) {
+            if (realtimeSessionId != null && httpSession != null) {
+                sessions.put(realtimeSessionId, httpSession);
+            }
+        }
+
+        private HttpSession get(String realtimeSessionId) {
+            return realtimeSessionId == null ? null : sessions.get(realtimeSessionId);
+        }
+
+        private void remove(String realtimeSessionId) {
+            if (realtimeSessionId != null) {
+                sessions.remove(realtimeSessionId);
+            }
         }
     }
 }

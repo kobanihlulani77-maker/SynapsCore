@@ -3701,6 +3701,13 @@ class MvpFlowIntegrationTest {
             .getRequest()
             .getSession(false);
 
+        mockMvc.perform(post("/api/auth/session/password")
+                .session(session)
+                .contentType(APPLICATION_JSON)
+                .content("{\"currentPassword\":\"north-lane-2026\",\"newPassword\":\"north-lane-rotated-2026\"}"))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.passwordChangeRequired").value(false));
+
         mockMvc.perform(get("/api/warehouses").session(session))
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.length()").value(1))

@@ -2,8 +2,14 @@ package com.synapsecore.config;
 
 import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
-
+import com.synapsecore.access.SynapseAccessRole;
+import com.synapsecore.auth.AuthSessionService;
+import com.synapsecore.domain.entity.AccessOperator;
+import com.synapsecore.domain.entity.Tenant;
+import jakarta.servlet.http.HttpSession;
+import java.time.Instant;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
 import org.junit.jupiter.api.Test;
 import org.springframework.messaging.Message;
@@ -86,15 +92,94 @@ class WebSocketAccessBoundaryTest {
         )).doesNotThrowAnyException();
     }
 
+    @Test
+    void revalidatesCurrentHttpAuthorityBeforeRealtimeUse() {
+        HttpSession httpSession = new org.springframework.mock.web.MockHttpSession();
+        Tenant tenant = Tenant.builder().code("ACCESS-BOUNDARY-REHEARSAL").build();
+        AccessOperator operator = AccessOperator.builder()
+            .tenant(tenant)
+            .actorName("boundary.integration.operator")
+            .displayName("Boundary Integration Operator")
+            .roles(Set.of(SynapseAccessRole.INTEGRATION_OPERATOR))
+            .warehouseScopes(Set.of("WH-NORTH"))
+            .active(true)
+            .build();
+        AuthSessionService authSessionService = new StubAuthSessionService(Optional.of(
+            new AuthSessionService.AuthenticatedSession(
+                null,
+                operator,
+                tenant,
+                Instant.now().minusSeconds(10),
+                Instant.now().plusSeconds(300),
+                Instant.now().plusSeconds(300),
+                false,
+                false
+            )
+        ));
+
+        WebSocketConfig.TenantSubscriptionChannelInterceptor currentInterceptor =
+            new WebSocketConfig.TenantSubscriptionChannelInterceptor(authSessionService);
+        assertThatThrownBy(() -> subscribe(
+            currentInterceptor,
+            "/topic/tenant/ACCESS-BOUNDARY-REHEARSAL/orders.recent",
+            Set.of("INTEGRATION_OPERATOR"),
+            true,
+            httpSession
+        )).isInstanceOf(IllegalArgumentException.class);
+    }
+
+    @Test
+    void rejectsRealtimeUseAfterHttpSessionAuthorityIsRevoked() {
+        HttpSession httpSession = new org.springframework.mock.web.MockHttpSession();
+        AuthSessionService authSessionService = new StubAuthSessionService(Optional.empty());
+        WebSocketConfig.TenantSubscriptionChannelInterceptor currentInterceptor =
+            new WebSocketConfig.TenantSubscriptionChannelInterceptor(authSessionService);
+
+        assertThatThrownBy(() -> subscribe(
+            currentInterceptor,
+            "/topic/tenant/ACCESS-BOUNDARY-REHEARSAL/integrations.changed",
+            Set.of("INTEGRATION_OPERATOR"),
+            false,
+            httpSession
+        )).isInstanceOf(IllegalArgumentException.class);
+    }
+
     private Message<?> subscribe(String destination, Set<String> roles, boolean tenantWide) {
+        return subscribe(interceptor, destination, roles, tenantWide, null);
+    }
+
+    private Message<?> subscribe(WebSocketConfig.TenantSubscriptionChannelInterceptor target,
+                                 String destination,
+                                 Set<String> roles,
+                                 boolean tenantWide,
+                                 HttpSession httpSession) {
         StompHeaderAccessor accessor = StompHeaderAccessor.create(StompCommand.SUBSCRIBE);
         accessor.setDestination(destination);
-        accessor.setSessionAttributes(Map.of(
+        Map<String, Object> attributes = new java.util.HashMap<>(Map.of(
             "synapsecoreTenantCode", "ACCESS-BOUNDARY-REHEARSAL",
             WebSocketConfig.SESSION_ROLES_ATTRIBUTE, roles,
             WebSocketConfig.SESSION_TENANT_WIDE_ATTRIBUTE, tenantWide
         ));
+        if (httpSession != null) {
+            attributes.put(WebSocketConfig.SESSION_HTTP_SESSION_ATTRIBUTE, httpSession);
+        }
+        accessor.setSessionAttributes(attributes);
         Message<byte[]> message = MessageBuilder.createMessage(new byte[0], accessor.getMessageHeaders());
-        return interceptor.preSend(message, null);
+        return target.preSend(message, null);
+    }
+
+    private static final class StubAuthSessionService extends AuthSessionService {
+
+        private final Optional<AuthenticatedSession> result;
+
+        private StubAuthSessionService(Optional<AuthenticatedSession> result) {
+            super(null, null, null, null, null, null);
+            this.result = result;
+        }
+
+        @Override
+        public Optional<AuthenticatedSession> resolveAuthenticatedSession(HttpSession session) {
+            return result;
+        }
     }
 }

@@ -102,7 +102,7 @@ public class AuthSessionService {
     public AuthSessionResponse changePassword(jakarta.servlet.http.HttpSession session,
                                               String currentPassword,
                                               String newPassword) {
-        AuthenticatedSession authenticatedSession = requireAuthenticatedSession(session, "change the current password");
+        AuthenticatedSession authenticatedSession = requirePasswordChangeSession(session);
         AccessUser user = authenticatedSession.user();
         if (!passwordEncoder.matches(currentPassword, user.getPasswordHash())) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Current password is incorrect.");
@@ -164,9 +164,20 @@ public class AuthSessionService {
 
     public AuthenticatedSession requireAuthenticatedSession(jakarta.servlet.http.HttpSession session,
                                                             String actionDescription) {
-        return validateSession(session, true, actionDescription)
+        AuthenticatedSession authenticatedSession = validateSession(session, true, actionDescription)
             .orElseThrow(() -> new ResponseStatusException(HttpStatus.UNAUTHORIZED,
                 "A signed-in user session is required to " + actionDescription + "."));
+        if (authenticatedSession.passwordChangeRequired()) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN,
+                "Password change is required before the user can " + actionDescription + ".");
+        }
+        return authenticatedSession;
+    }
+
+    public AuthenticatedSession requirePasswordChangeSession(jakarta.servlet.http.HttpSession session) {
+        return validateSession(session, true, "change the current password")
+            .orElseThrow(() -> new ResponseStatusException(HttpStatus.UNAUTHORIZED,
+                "A signed-in user session is required to change the current password."));
     }
 
     public void syncTenantSecurityPolicy(jakarta.servlet.http.HttpSession session,
@@ -237,6 +248,10 @@ public class AuthSessionService {
         }
 
         Instant authenticatedAt = readAuthenticatedAt(session);
+        if (authenticatedAt == null) {
+            return Optional.ofNullable(handleInvalidSession(session, strict,
+                "Signed-in session trust data is invalid. Please sign in again.", actionDescription));
+        }
         Instant sessionExpiresAt = authenticatedAt.plus(Duration.ofMinutes(tenant.getSessionTimeoutMinutes()));
         if (Instant.now().isAfter(sessionExpiresAt)) {
             return Optional.ofNullable(handleInvalidSession(session, strict,
@@ -325,12 +340,13 @@ public class AuthSessionService {
     private Instant readAuthenticatedAt(jakarta.servlet.http.HttpSession session) {
         String rawValue = readStringAttribute(session, SESSION_AUTHENTICATED_AT_KEY);
         if (rawValue == null) {
-            return Instant.now();
+            return null;
         }
         try {
-            return Instant.parse(rawValue);
+            Instant authenticatedAt = Instant.parse(rawValue);
+            return authenticatedAt.isAfter(Instant.now()) ? null : authenticatedAt;
         } catch (java.time.format.DateTimeParseException ignored) {
-            return Instant.now();
+            return null;
         }
     }
 

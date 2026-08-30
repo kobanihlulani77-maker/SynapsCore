@@ -62,7 +62,9 @@ export default function useWorkspaceSessionActions({
         password: '',
       }))
       setPasswordChangeState({ loading: false, error: '', success: '', form: createDefaultPasswordChangeForm() })
-      const nextPage = readPendingPostAuthPage() || 'dashboard'
+      const nextPage = payload.passwordChangeRequired
+        ? 'profile'
+        : (readPendingPostAuthPage() || 'dashboard')
       clearPendingPostAuthPage()
       navigateToPage(nextPage)
     } catch (error) {

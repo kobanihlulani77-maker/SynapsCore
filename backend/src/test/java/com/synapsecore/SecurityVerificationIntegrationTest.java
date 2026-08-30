@@ -11,6 +11,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import com.synapsecore.auth.StarterAccessUsers;
+import com.synapsecore.auth.AuthSessionService;
 import com.synapsecore.domain.repository.AccessUserRepository;
 import com.synapsecore.domain.repository.IntegrationReplayRecordRepository;
 import com.synapsecore.domain.repository.ScenarioRunRepository;
@@ -30,6 +31,7 @@ import org.springframework.transaction.annotation.Transactional;
     "spring.session.store-type=none",
     "spring.autoconfigure.exclude=org.springframework.boot.autoconfigure.session.SessionAutoConfiguration",
     "management.health.redis.enabled=false",
+    "synapsecore.access.allow-header-fallback=false",
     "synapsecore.integration.csv-import.max-bytes=1024"
 })
 @AutoConfigureMockMvc
@@ -47,6 +49,7 @@ class SecurityVerificationIntegrationTest {
     private static final String SECOND_TENANT_REPLAY_SOURCE = "acme_secure_csv";
     private static final String SECOND_TENANT_REPLAY_ORDER_ID = "ACME-RPL-SEC-1001";
     private static final String SECOND_TENANT_INTEGRATION_USERNAME = "acme.integration.lead";
+    private static final String SECOND_TENANT_INTEGRATION_TEMPORARY_PASSWORD = "Acme-Integration-Temporary-2026";
     private static final String SECOND_TENANT_INTEGRATION_PASSWORD = "Acme-Integration-2026";
 
     @Autowired
@@ -60,6 +63,9 @@ class SecurityVerificationIntegrationTest {
 
     @Autowired
     private ScenarioRunRepository scenarioRunRepository;
+
+    @Autowired
+    private AuthSessionService authSessionService;
 
     @Test
     void loginAuthenticatesAnonymousSessionAndLogoutClearsOldIdentity() throws Exception {
@@ -88,6 +94,94 @@ class SecurityVerificationIntegrationTest {
         mockMvc.perform(get("/api/auth/session").session(signedInSession))
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.signedIn").value(false));
+    }
+
+    @Test
+    void malformedSessionTrustAttributesFailClosed() throws Exception {
+        MockHttpSession malformedTimestamp = trustedStarterSession();
+        malformedTimestamp.setAttribute(
+            com.synapsecore.auth.AuthSessionService.SESSION_AUTHENTICATED_AT_KEY,
+            "not-an-instant"
+        );
+        assertThat(authSessionService.resolveAuthenticatedSession(malformedTimestamp)).isEmpty();
+        mockMvc.perform(get("/api/dashboard/summary").session(malformedTimestamp))
+            .andExpect(status().isForbidden());
+
+        MockHttpSession missingTimestamp = trustedStarterSession();
+        missingTimestamp.removeAttribute(com.synapsecore.auth.AuthSessionService.SESSION_AUTHENTICATED_AT_KEY);
+        assertThat(authSessionService.resolveAuthenticatedSession(missingTimestamp)).isEmpty();
+        mockMvc.perform(get("/api/dashboard/summary").session(missingTimestamp))
+            .andExpect(status().isForbidden());
+
+        MockHttpSession futureTimestamp = trustedStarterSession();
+        futureTimestamp.setAttribute(
+            com.synapsecore.auth.AuthSessionService.SESSION_AUTHENTICATED_AT_KEY,
+            java.time.Instant.now().plusSeconds(3600).toString()
+        );
+        assertThat(authSessionService.resolveAuthenticatedSession(futureTimestamp)).isEmpty();
+        mockMvc.perform(get("/api/dashboard/summary").session(futureTimestamp))
+            .andExpect(status().isForbidden());
+
+        MockHttpSession malformedVersion = trustedStarterSession();
+        malformedVersion.setAttribute(
+            com.synapsecore.auth.AuthSessionService.SESSION_USER_SESSION_VERSION_KEY,
+            "not-a-number"
+        );
+        assertThat(authSessionService.resolveAuthenticatedSession(malformedVersion)).isEmpty();
+        mockMvc.perform(get("/api/dashboard/summary").session(malformedVersion))
+            .andExpect(status().isForbidden());
+    }
+
+    @Test
+    void requiredPasswordChangeRestrictsWorkspaceUntilPasswordIsRotated() throws Exception {
+        var user = accessUserRepository
+            .findByTenant_CodeIgnoreCaseAndUsernameIgnoreCaseAndActiveTrue(
+                StarterAccessUsers.STARTER_TENANT_CODE,
+                "operations.lead"
+            )
+            .orElseThrow();
+        user.setPasswordChangeRequired(true);
+        accessUserRepository.saveAndFlush(user);
+
+        MockHttpSession temporarySession = signIn(
+            StarterAccessUsers.STARTER_TENANT_CODE,
+            "operations.lead",
+            "lead-2026"
+        );
+        mockMvc.perform(get("/api/auth/session").session(temporarySession))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.signedIn").value(true))
+            .andExpect(jsonPath("$.passwordChangeRequired").value(true));
+
+        for (String endpoint : new String[] {
+            "/api/dashboard/summary",
+            "/api/inventory",
+            "/api/orders/recent",
+            "/api/alerts",
+            "/api/recommendations"
+        }) {
+            mockMvc.perform(get(endpoint).session(temporarySession))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.message").value(Matchers.containsString("Password change is required")));
+        }
+
+        mockMvc.perform(post("/api/auth/session/password")
+                .session(temporarySession)
+                .contentType(APPLICATION_JSON)
+                .content("{\"currentPassword\":\"lead-2026\",\"newPassword\":\"lead-rotated-2026\"}"))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.passwordChangeRequired").value(false));
+
+        mockMvc.perform(get("/api/dashboard/summary").session(temporarySession))
+            .andExpect(status().isOk());
+        mockMvc.perform(post("/api/auth/session/login")
+                .contentType(APPLICATION_JSON)
+                .content("{\"tenantCode\":\"STARTER-OPS\",\"username\":\"operations.lead\",\"password\":\"lead-2026\"}"))
+            .andExpect(status().isUnauthorized());
+        mockMvc.perform(post("/api/auth/session/login")
+                .contentType(APPLICATION_JSON)
+                .content("{\"tenantCode\":\"STARTER-OPS\",\"username\":\"operations.lead\",\"password\":\"lead-rotated-2026\"}"))
+            .andExpect(status().isOk());
     }
 
     @Test
@@ -489,10 +583,26 @@ class SecurityVerificationIntegrationTest {
                     }
                     """.formatted(
                     SECOND_TENANT_INTEGRATION_USERNAME,
-                    SECOND_TENANT_INTEGRATION_PASSWORD
+                    SECOND_TENANT_INTEGRATION_TEMPORARY_PASSWORD
                 )))
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.username").value(SECOND_TENANT_INTEGRATION_USERNAME));
+
+        MockHttpSession temporaryIntegrationSession = signIn(
+            SECOND_TENANT_CODE,
+            SECOND_TENANT_INTEGRATION_USERNAME,
+            SECOND_TENANT_INTEGRATION_TEMPORARY_PASSWORD
+        );
+        mockMvc.perform(post("/api/auth/session/password")
+                .session(temporaryIntegrationSession)
+                .contentType(APPLICATION_JSON)
+                .content("{\"currentPassword\":\"%s\",\"newPassword\":\"%s\"}"
+                    .formatted(
+                        SECOND_TENANT_INTEGRATION_TEMPORARY_PASSWORD,
+                        SECOND_TENANT_INTEGRATION_PASSWORD
+                    )))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.passwordChangeRequired").value(false));
 
         MockHttpSession secondTenantIntegrationSession = signIn(
             SECOND_TENANT_CODE,
@@ -586,6 +696,33 @@ class SecurityVerificationIntegrationTest {
 
     private MockHttpSession signIn(String tenantCode, String username, String password) throws Exception {
         return signIn(tenantCode, username, password, null);
+    }
+
+    private MockHttpSession trustedStarterSession() {
+        var user = accessUserRepository
+            .findByTenant_CodeIgnoreCaseAndUsernameIgnoreCaseAndActiveTrue(
+                StarterAccessUsers.STARTER_TENANT_CODE,
+                "operations.lead"
+            )
+            .orElseThrow();
+        var tenant = user.getTenant();
+        var session = new MockHttpSession();
+        session.setAttribute(com.synapsecore.auth.AuthSessionService.SESSION_USERNAME_KEY, user.getUsername());
+        session.setAttribute(com.synapsecore.auth.AuthSessionService.SESSION_TENANT_CODE_KEY, tenant.getCode());
+        session.setAttribute(com.synapsecore.auth.AuthSessionService.SESSION_ACTOR_KEY, user.getOperator().getActorName());
+        session.setAttribute(
+            com.synapsecore.auth.AuthSessionService.SESSION_AUTHENTICATED_AT_KEY,
+            java.time.Instant.now().minusSeconds(30).toString()
+        );
+        session.setAttribute(
+            com.synapsecore.auth.AuthSessionService.SESSION_USER_SESSION_VERSION_KEY,
+            user.getSessionVersion()
+        );
+        session.setAttribute(
+            com.synapsecore.auth.AuthSessionService.SESSION_TENANT_SECURITY_POLICY_VERSION_KEY,
+            tenant.getSecurityPolicyVersion()
+        );
+        return session;
     }
 
     private MockHttpSession signIn(String tenantCode,

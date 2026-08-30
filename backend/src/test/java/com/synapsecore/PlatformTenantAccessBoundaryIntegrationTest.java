@@ -82,6 +82,7 @@ class PlatformTenantAccessBoundaryIntegrationTest {
     private static final String TENANT_ADMIN_USERNAME = "boundary.admin";
     private static final String TENANT_ADMIN_PASSWORD = "Boundary-Admin-2026!";
     private static final String ROLE_PASSWORD = "Boundary-Role-2026!";
+    private static final String ROLE_TEMPORARY_PASSWORD = "Boundary-Role-Temporary-2026!";
 
     @Autowired
     private MockMvc mockMvc;
@@ -3357,8 +3358,16 @@ class PlatformTenantAccessBoundaryIntegrationTest {
                 .contentType(APPLICATION_JSON)
                 .content("""
                     {"username":"%s","fullName":"%s","password":"%s","operatorActorName":"%s"}
-                    """.formatted(identity, identity, ROLE_PASSWORD, identity)))
+                    """.formatted(identity, identity, ROLE_TEMPORARY_PASSWORD, identity)))
             .andExpect(status().isOk());
+        MockHttpSession temporarySession = tenantLogin(REHEARSAL_TENANT, identity, ROLE_TEMPORARY_PASSWORD);
+        mockMvc.perform(post("/api/auth/session/password")
+                .session(temporarySession)
+                .contentType(APPLICATION_JSON)
+                .content("{\"currentPassword\":\"%s\",\"newPassword\":\"%s\"}"
+                    .formatted(ROLE_TEMPORARY_PASSWORD, ROLE_PASSWORD)))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.passwordChangeRequired").value(false));
     }
 
     private MockHttpSession tenantLogin(String tenantCode, String username, String password) throws Exception {
