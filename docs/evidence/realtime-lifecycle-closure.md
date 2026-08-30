@@ -101,6 +101,25 @@ The workspace realtime hook now:
 This is bounded convergence, not a guarantee that every transient websocket
 message is replayed. The database and REST snapshot remain the source of truth.
 
+### 3.5 Hosted-render correction discovered during closure
+
+The first post-deployment hosted proof exposed a separate shared-context render
+defect before the realtime assertions could run: the Settings context referenced
+workspace warehouse state and administration handlers that were not extracted
+from the existing state/action objects. A clean browser reproduced a blank
+screen with a `ReferenceError`; this was not hidden or worked around in proof.
+
+The smallest corrections restored the existing state/action wiring in
+`useWorkspacePageContexts.js`. The deployed bundle then rendered the sign-in
+shell correctly, and the subsequent clean hosted run passed all six tests.
+
+The hosted Alert-page attempt also exposed an older stale-topic race: a queued
+realtime alert payload could overwrite a newer REST snapshot with an older
+recommended action. Tenant-wide alert and recommendation topics now trigger the
+existing authoritative REST convergence path without directly merging the
+topic payload. This preserves the realtime notification while keeping REST as
+the current-state authority.
+
 ## 4. Authority and Topic Policy
 
 The known tenant suffixes are:
@@ -202,25 +221,25 @@ operational evidence. No secrets are recorded.
 50. **Dispatch failure recovery:** current failed dispatch behavior remains visible through existing operational evidence; automatic durable retry is not claimed.
 51. **Delivery semantics:** current path is best-effort live delivery plus REST convergence, not exactly-once delivery.
 52. **Ordering semantics:** no global ordering guarantee is claimed across nodes or reconnects.
-53. **Production defects:** no new production defect was identified in the bounded source/test review.
-54. **Frontend defects:** malformed callback handling and permanent-live staleness were addressed at the smallest frontend seam.
+53. **Production defects:** the bounded source/test review found no new backend product defect; the hosted run exposed one existing frontend render seam and one stale-topic convergence seam.
+54. **Frontend defects:** malformed callback handling, permanent-live staleness, missing workspace context wiring, and stale tenant-wide alert/recommendation merges were addressed at the smallest frontend seams.
 55. **Security defects:** SEND fail-open and unknown destination pass-through were closed; outbound unauthorized recipient throwing was replaced with per-recipient suppression.
-56. **Fix set:** `WebSocketConfig.java`, `WebSocketAccessBoundaryTest.java`, and `useWorkspaceRealtime.js` are the intended implementation files.
+56. **Fix set:** `WebSocketConfig.java`, `WebSocketAccessBoundaryTest.java`, `useWorkspaceRealtime.js`, and the minimal existing context wiring in `useWorkspacePageContexts.js` are the intended implementation files.
 57. **Classification:** no known Classification A blocker; residual evidence items are Classification C unless a later live run demonstrates otherwise.
 58. **Focused backend result:** `WebSocketAccessBoundaryTest`: `10` tests, `0` failures, `0` errors.
 59. **Full backend result:** `268` tests, `0` failures, `0` errors, `BUILD SUCCESS`.
 60. **Frontend verification:** `npm.cmd run verify` passed, including lint/check, source checks, proof-label checks, and Vite build; `npm.cmd run build` passed.
-61. **Documentation/diff checks:** `git diff --check` passed; docs link check is to be run after this evidence document is added.
+61. **Documentation/diff checks:** `git diff --check` passed; docs link check passed after the evidence document was added.
 62. **CI result:** no new CI workflow was introduced in this bounded cycle.
-63. **Hosted proof:** must be run only after the pushed backend/frontend revision is deployed and `PROOF_ALLOWED=True`; status is pending before deployment.
-64. **Files changed:** intended closure files are the two backend files, the frontend realtime hook, and this evidence document. Unrelated worktree files remain untracked/unstaged.
-65. **Commit:** to be recorded after final evidence update.
-66. **Critical blockers:** `0` at the source and focused-test level.
-67. **High blockers:** `0` at the source and focused-test level; hosted proof remains a required validation gate after deployment.
+63. **Hosted proof:** after deployment and `PROOF_ALLOWED=True`, the complete existing hosted proof passed `6/6` in `3.6m` on the final deployed frontend bundle.
+64. **Hosted failure classification:** the first attempt failed on the missing workspace context state wiring; after the first correction it exposed the paired missing action wiring; after those were corrected, the Alert-page mismatch was classified as a stale realtime payload/convergence defect and fixed by REST-authoritative topic handling. No proof assertion was weakened.
+65. **Deployment commits:** `a187a37` realtime boundary/convergence, `8301cd4` unauthenticated render state wiring, `de89b0e` paired setter wiring, `2c0a727` workspace administration handler wiring, and `562897c` REST-authoritative feed convergence.
+66. **Critical blockers:** `0` after focused, full, and hosted verification.
+67. **High blockers:** `0` after focused, full, and hosted verification.
 68. **Classification A remaining:** `0` currently identified.
-69. **Owner/live evidence:** owner walkthrough is not required for this bounded technical closure; post-deploy live evidence is required before claiming hosted completion.
-70. **Realtime final readiness:** technically ready for deployment validation, not yet finally hosted-proven until the post-deploy checks complete.
-71. **Final verdict at document creation:** bounded implementation and local verification are green; final hosted verdict remains pending.
+69. **Owner/live evidence:** owner walkthrough is not required for this bounded technical closure; the hosted browser/API proof supplied the required technical live evidence.
+70. **Realtime final readiness:** final deployed connection check and hosted proof are green; unsupported exactly-once, ordering, and durable websocket replay guarantees remain explicitly unclaimed.
+71. **Final verdict:** `REALTIME LIFECYCLE VERIFIED AND OPERATIONALLY COMPLETE FOR CONTROLLED B2B PILOT — OWNER LIVE WALKTHROUGH DEFERRED`.
 
 ## 6. Test Details
 
@@ -263,6 +282,10 @@ npm.cmd run build
 
 Both completed successfully after the realtime hook changes.
 
+The clean-browser route smoke check also confirmed that an unauthenticated
+`/dashboard` request redirects to `/sign-in`, renders the sign-in shell, and
+produces no console or page errors on the final deployed bundle.
+
 ## 7. Hosted Validation Gate
 
 The code change affects the backend websocket interceptor and the frontend
@@ -298,10 +321,25 @@ Do not print or commit proof passwords, tokens, state files, reports containing
 secrets, or local environment files. Do not run hosted proof while readiness,
 authentication, websocket, or database health is unavailable.
 
-Hosted proof confirms the existing supported product lanes and the dashboard
-realtime update path. It does not prove exactly-once delivery, total event
-ordering, multi-region failover, durable websocket replay, or arbitrary custom
-STOMP destinations.
+Hosted proof result on the final deployed bundle:
+
+```text
+6 passed (3.6m)
+1. auth flow and the full authenticated page system render cleanly in a browser
+2. product catalog onboarding works through tenant-scoped API and browser surface
+3. dashboard summary updates live without a browser refresh
+4. replay recovery, scenario approval, execution, and browser role gating work through the UI
+5. alerts, recommendations, orders, inventory, integrations, users, profile, and settings stay connected
+6. frontend surfaces backend auth rate limiting without getting stuck in a loading state
+```
+
+The final run produced no test failure, skipped test, browser console error,
+page error, or failed resource. The only process warnings were Node notices
+that `NO_COLOR` was ignored because `FORCE_COLOR` was set. Hosted proof
+confirms the existing supported product lanes and the dashboard realtime update
+path. It does not prove exactly-once delivery, total event ordering,
+multi-region failover, durable websocket replay, or arbitrary custom STOMP
+destinations.
 
 ## 8. Residual Limitations
 
@@ -317,8 +355,9 @@ These are not silently promoted to blockers:
   the interval;
 - durable dispatch retry and multi-node scheduler coordination remain outside
   this cycle;
-- the live hosted run must still prove the deployed bundle and existing browser
-  proof after deployment.
+- hosted proof uses the existing ignored proof state; preparation that requires
+  a private bootstrap/platform-admin token remains operator-gated and does not
+  change the technical result when an already prepared proof state is valid.
 
 ## 9. Closure Rule
 
@@ -328,6 +367,14 @@ passes without unrelated failures. If any hosted failure occurs, classify it as
 fixture defect, proof expectation drift, product defect, or deployment/
 environment issue before changing anything.
 
-Required final verdict after a clean hosted run:
+Final closure commits for this bounded cycle:
+
+- `a187a37` — `Harden realtime delivery and convergence`
+- `8301cd4` — `Fix unauthenticated workspace render`
+- `de89b0e` — `Complete workspace context state wiring`
+- `2c0a727` — `Wire workspace administration actions`
+- `562897c` — `Prefer REST convergence for realtime feeds`
+
+Required final verdict after the clean hosted run:
 
 `REALTIME LIFECYCLE VERIFIED AND OPERATIONALLY COMPLETE FOR CONTROLLED B2B PILOT — OWNER LIVE WALKTHROUGH DEFERRED`
