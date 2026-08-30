@@ -141,7 +141,7 @@ export default function useWorkspaceBootstrap({
     }
   }
 
-  async function fetchWarehouseContext({ quiet = false } = {}) {
+  async function fetchWarehouseContext({ quiet = false, signal, isCurrent = () => true } = {}) {
     if (!authSessionState.session?.tenantCode) {
       warehouseAccessStateSetter({ loading: false, error: '', items: [] })
       return []
@@ -153,9 +153,10 @@ export default function useWorkspaceBootstrap({
 
     try {
       const [session, warehouses] = await Promise.all([
-        fetchJson('/api/auth/session'),
-        fetchJson('/api/warehouses'),
+        fetchJson('/api/auth/session', signal ? { signal } : {}),
+        fetchJson('/api/warehouses', signal ? { signal } : {}),
       ])
+      if (!isCurrent()) return []
       if (session?.signedIn) {
         const currentSession = authSessionState.session
         const currentRoles = [...(currentSession?.roles || [])].sort().join('|')
@@ -186,6 +187,7 @@ export default function useWorkspaceBootstrap({
       warehouseAccessStateSetter({ loading: false, error: '', items: activeWarehouses })
       return activeWarehouses
     } catch (error) {
+      if (signal?.aborted || !isCurrent()) return []
       // Fail closed for operation targets until authoritative access can be read again.
       warehouseAccessStateSetter({ loading: false, error: error.message, items: [] })
       return []
@@ -348,18 +350,31 @@ export default function useWorkspaceBootstrap({
 
   useEffect(() => {
     let active = true
+    let requestVersion = 0
+    let refreshController = null
     if (!authSessionState.session?.tenantCode) {
       warehouseAccessStateSetter({ loading: false, error: '', items: [] })
       return () => { active = false }
     }
 
     const refreshWarehouseContext = () => {
-      if (active) void fetchWarehouseContext({ quiet: true })
+      if (!active) return
+      requestVersion += 1
+      refreshController?.abort()
+      refreshController = new AbortController()
+      const currentVersion = requestVersion
+      void fetchWarehouseContext({
+        quiet: true,
+        signal: refreshController.signal,
+        isCurrent: () => active && currentVersion === requestVersion,
+      })
     }
     refreshWarehouseContext()
     const refreshInterval = globalThis.setInterval(refreshWarehouseContext, 30_000)
     return () => {
       active = false
+      requestVersion += 1
+      refreshController?.abort()
       globalThis.clearInterval(refreshInterval)
     }
   }, [activeTenantCode, authSessionState.session?.tenantCode])
