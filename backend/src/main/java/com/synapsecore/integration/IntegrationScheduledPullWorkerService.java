@@ -100,7 +100,7 @@ public class IntegrationScheduledPullWorkerService {
     }
 
     private void processConnector(IntegrationConnector connector) {
-        markPullAttempt(connector);
+        connector = markPullAttempt(connector);
         try {
             String responseBody = fetchConnectorPayload(connector);
             List<ExternalOrderWebhookRequest> orders = parseOrders(responseBody, connector);
@@ -215,11 +215,11 @@ public class IntegrationScheduledPullWorkerService {
         }
     }
 
-    private void markPullAttempt(IntegrationConnector connector) {
+    private IntegrationConnector markPullAttempt(IntegrationConnector connector) {
         connector.setLastPullAttemptAt(Instant.now());
         connector.setLastPullStatus("RUNNING");
         connector.setLastPullMessage("Scheduled pull started.");
-        integrationConnectorRepository.save(connector);
+        return integrationConnectorRepository.save(connector);
     }
 
     private void markPullComplete(IntegrationConnector connector,
