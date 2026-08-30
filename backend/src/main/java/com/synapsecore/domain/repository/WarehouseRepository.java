@@ -18,4 +18,6 @@ public interface WarehouseRepository extends JpaRepository<Warehouse, Long> {
     List<Warehouse> findAllByTenant_CodeIgnoreCaseOrderByNameAsc(String tenantCode);
 
     long countByTenant_CodeIgnoreCase(String tenantCode);
+
+    long countByTenant_CodeIgnoreCaseAndActiveTrue(String tenantCode);
 }

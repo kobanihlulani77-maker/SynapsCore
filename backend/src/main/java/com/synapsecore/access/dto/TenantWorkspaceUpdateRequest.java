@@ -9,6 +9,8 @@ public record TenantWorkspaceUpdateRequest(
     String tenantName,
 
     @Size(max = 240)
-    String description
+    String description,
+
+    Long version
 ) {
 }

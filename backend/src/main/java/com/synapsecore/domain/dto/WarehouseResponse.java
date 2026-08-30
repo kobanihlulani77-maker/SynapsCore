@@ -4,6 +4,8 @@ public record WarehouseResponse(
     Long id,
     String code,
     String name,
-    String location
+    String location,
+    boolean active,
+    Long version
 ) {
 }

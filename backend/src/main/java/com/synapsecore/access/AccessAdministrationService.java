@@ -313,6 +313,7 @@ public class AccessAdministrationService {
             .collect(java.util.stream.Collectors.toCollection(LinkedHashSet::new));
 
         Set<String> validWarehouses = warehouseRepository.findAllByTenant_CodeIgnoreCaseOrderByNameAsc(tenantCode).stream()
+            .filter(Warehouse::isActive)
             .map(warehouse -> warehouse.getCode().trim().toUpperCase(Locale.ROOT))
             .collect(java.util.stream.Collectors.toSet());
         List<String> invalid = normalized.stream()
@@ -382,6 +383,7 @@ public class AccessAdministrationService {
             return;
         }
         List<Warehouse> warehouses = warehouseRepository.findAllByTenant_CodeIgnoreCaseOrderByNameAsc(tenant.getCode());
+        warehouses = warehouses.stream().filter(Warehouse::isActive).toList();
         List<AccessOperator> operators = accessOperatorRepository
             .findAllByTenant_CodeIgnoreCaseOrderByDisplayNameAsc(tenant.getCode());
         List<AccessUser> users = accessUserRepository

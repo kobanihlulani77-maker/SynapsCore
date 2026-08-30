@@ -26,6 +26,8 @@ public record TenantWorkspaceConnectorSupportUpdateRequest(
     Boolean allowDefaultWarehouseFallback,
 
     @Size(max = 240)
-    String notes
+    String notes,
+
+    Long version
 ) {
 }

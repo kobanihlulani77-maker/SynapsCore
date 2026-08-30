@@ -12,6 +12,8 @@ public record TenantWorkspaceSecuritySettingsRequest(
     @Max(1440)
     int sessionTimeoutMinutes,
 
-    boolean invalidateOtherSessions
+    boolean invalidateOtherSessions,
+
+    Long version
 ) {
 }

@@ -54,4 +54,8 @@ public interface ScenarioRunRepository extends JpaRepository<ScenarioRun, Long>,
     java.util.Optional<ScenarioRun> findByTenant_CodeIgnoreCaseAndId(String tenantCode, Long id);
 
     long countByTenant_CodeIgnoreCaseAndApprovalStatus(String tenantCode, ScenarioApprovalStatus approvalStatus);
+
+    boolean existsByTenant_CodeIgnoreCaseAndWarehouseCodeIgnoreCaseAndApprovalStatusIn(String tenantCode,
+                                                                                         String warehouseCode,
+                                                                                         List<ScenarioApprovalStatus> statuses);
 }

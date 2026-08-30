@@ -97,6 +97,8 @@ export default function useWorkspaceAppModel() {
     workspaceSettingsForm,
     workspaceSecurityForm,
     workspaceWarehouseDrafts,
+    workspaceWarehouseCreateForm,
+    setWorkspaceWarehouseCreateForm,
     workspaceConnectorDrafts,
     accessOperatorForm,
     setAccessOperatorForm,
@@ -293,6 +295,7 @@ export default function useWorkspaceAppModel() {
     workspaceSettingsFormSetter: workspaceState.setWorkspaceSettingsForm,
     workspaceSecurityFormSetter: workspaceState.setWorkspaceSecurityForm,
     workspaceWarehouseDraftsSetter: workspaceState.setWorkspaceWarehouseDrafts,
+    workspaceWarehouseCreateFormSetter: workspaceState.setWorkspaceWarehouseCreateForm,
     workspaceConnectorDraftsSetter: workspaceState.setWorkspaceConnectorDrafts,
     accessOperatorFormSetter: setAccessOperatorForm,
     catalogStateSetter: setCatalogState,
@@ -398,6 +401,8 @@ export default function useWorkspaceAppModel() {
     workspaceSecurityForm,
     workspaceSettingsForm,
     workspaceWarehouseDrafts,
+    workspaceWarehouseCreateForm,
+    setWorkspaceWarehouseCreateForm,
   })
 
   const scenarioActions = useScenarioActions({

@@ -112,8 +112,8 @@ export const defaultTenantOnboardingForm = {
   secondaryLocation: '',
 }
 
-export const createDefaultWorkspaceSettingsForm = () => ({ tenantName: '', description: '' })
-export const createDefaultWorkspaceSecurityForm = () => ({ passwordRotationDays: '90', sessionTimeoutMinutes: '480', invalidateOtherSessions: false })
+export const createDefaultWorkspaceSettingsForm = () => ({ tenantName: '', description: '', version: null })
+export const createDefaultWorkspaceSecurityForm = () => ({ passwordRotationDays: '90', sessionTimeoutMinutes: '480', invalidateOtherSessions: false, version: null })
 export const createDefaultAccessOperatorForm = () => ({ id: null, version: null, actorName: '', displayName: '', description: '', rolesText: 'REVIEW_OWNER', warehouseScopesText: '', tenantWide: true, active: true })
 export const createDefaultAccessUserForm = () => ({ id: null, version: null, username: '', fullName: '', password: '', operatorActorName: '', active: true })
 export const createDefaultPasswordChangeForm = () => ({ currentPassword: '', newPassword: '', confirmPassword: '' })
@@ -122,7 +122,7 @@ export const createDefaultCatalogForm = () => ({ id: null, sku: '', name: '', ca
 export const buildWorkspaceWarehouseDrafts = (workspace) => Object.fromEntries(
   (workspace?.warehouses || []).map((warehouse) => [
     warehouse.id,
-    { name: warehouse.name, location: warehouse.location },
+    { name: warehouse.name, location: warehouse.location, version: warehouse.version },
   ]),
 )
 
@@ -138,6 +138,7 @@ export const buildWorkspaceConnectorDrafts = (workspace) => Object.fromEntries(
       transformationPolicy: connector.transformationPolicy || 'NONE',
       allowDefaultWarehouseFallback: Boolean(connector.allowDefaultWarehouseFallback),
       notes: connector.notes || '',
+      version: connector.version,
     },
   ]),
 )

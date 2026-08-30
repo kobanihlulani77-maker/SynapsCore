@@ -9,6 +9,9 @@ import com.synapsecore.access.dto.TenantWorkspaceSecuritySettingsRequest;
 import com.synapsecore.access.dto.TenantWorkspaceSupportSummary;
 import com.synapsecore.access.dto.TenantWorkspaceUpdateRequest;
 import com.synapsecore.access.dto.TenantWorkspaceWarehouseUpdateRequest;
+import com.synapsecore.access.dto.TenantWorkspaceWarehouseCreateRequest;
+import com.synapsecore.access.dto.TenantWorkspaceWarehouseLifecycleRequest;
+import com.synapsecore.access.dto.TenantWorkspaceReadiness;
 import com.synapsecore.access.SynapseAccessRole;
 import com.synapsecore.audit.AuditLogService;
 import com.synapsecore.domain.dto.SystemIncidentResponse;
@@ -30,6 +33,9 @@ import com.synapsecore.domain.repository.AccessUserRepository;
 import com.synapsecore.domain.repository.AuditLogRepository;
 import com.synapsecore.domain.repository.IntegrationConnectorRepository;
 import com.synapsecore.domain.repository.IntegrationReplayRecordRepository;
+import com.synapsecore.domain.repository.CustomerOrderRepository;
+import com.synapsecore.domain.repository.FulfillmentTaskRepository;
+import com.synapsecore.domain.repository.InventoryRepository;
 import com.synapsecore.domain.repository.ScenarioRunRepository;
 import com.synapsecore.domain.repository.WarehouseRepository;
 import com.synapsecore.domain.service.SystemIncidentService;
@@ -41,9 +47,12 @@ import java.net.URISyntaxException;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.Comparator;
+import java.util.ArrayList;
+import java.util.Locale;
 import java.util.List;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
@@ -61,6 +70,9 @@ public class TenantWorkspaceAdministrationService {
     private final IntegrationConnectorRepository integrationConnectorRepository;
     private final IntegrationReplayRecordRepository integrationReplayRecordRepository;
     private final ScenarioRunRepository scenarioRunRepository;
+    private final CustomerOrderRepository customerOrderRepository;
+    private final FulfillmentTaskRepository fulfillmentTaskRepository;
+    private final InventoryRepository inventoryRepository;
     private final SystemIncidentService systemIncidentService;
     private final AuditLogService auditLogService;
     private final IntegrationConnectorService integrationConnectorService;
@@ -148,6 +160,8 @@ public class TenantWorkspaceAdministrationService {
             warehouses,
             connectors,
             tenant.getRequiredRoles().stream().sorted(Comparator.comparing(Enum::name)).toList(),
+            calculateReadiness(tenant, users),
+            tenant.getVersion(),
             tenant.getCreatedAt(),
             tenant.getUpdatedAt()
         );
@@ -156,6 +170,7 @@ public class TenantWorkspaceAdministrationService {
     @Transactional
     public TenantWorkspaceResponse updateWorkspace(TenantWorkspaceUpdateRequest request, String actorName) {
         Tenant tenant = tenantContextService.getCurrentTenantOrDefault();
+        requireCurrentVersion(request.version(), tenant.getVersion(), "workspace settings");
         tenant.setName(request.tenantName().trim());
         tenant.setDescription(normalizeOptional(request.description()));
 
@@ -175,6 +190,7 @@ public class TenantWorkspaceAdministrationService {
     public TenantWorkspaceResponse updateSecuritySettings(TenantWorkspaceSecuritySettingsRequest request,
                                                           String actorName) {
         Tenant tenant = tenantContextService.getCurrentTenantOrDefault();
+        requireCurrentVersion(request.version(), tenant.getVersion(), "security settings");
         tenant.setPasswordRotationDays(request.passwordRotationDays());
         tenant.setSessionTimeoutMinutes(request.sessionTimeoutMinutes());
         if (request.invalidateOtherSessions()) {
@@ -204,6 +220,7 @@ public class TenantWorkspaceAdministrationService {
         Warehouse warehouse = warehouseRepository.findByTenant_CodeIgnoreCaseAndId(tenantCode, warehouseId)
             .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND,
                 "Warehouse not found in current tenant: " + warehouseId));
+        requireCurrentVersion(request.version(), warehouse.getVersion(), "warehouse settings");
 
         warehouse.setName(request.name().trim());
         warehouse.setLocation(request.location().trim());
@@ -228,10 +245,12 @@ public class TenantWorkspaceAdministrationService {
         IntegrationConnector connector = integrationConnectorRepository.findByTenant_CodeIgnoreCaseAndId(tenantCode, connectorId)
             .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND,
                 "Connector not found in current tenant: " + connectorId));
+        requireCurrentVersion(request.version(), connector.getVersion(), "connector support settings");
 
         String supportOwnerActorName = normalizeOptional(request.supportOwnerActorName());
+        AccessOperator supportOwner = null;
         if (supportOwnerActorName != null) {
-            AccessOperator supportOwner = accessDirectoryService.requireActiveOperator(
+            supportOwner = accessDirectoryService.requireActiveOperator(
                 supportOwnerActorName,
                 tenantCode,
                 "own connector support lanes"
@@ -241,9 +260,6 @@ public class TenantWorkspaceAdministrationService {
                 connector.getDefaultWarehouseCode(),
                 "own connector support lanes"
             );
-            connector.setSupportOwnerActorName(supportOwner.getActorName());
-        } else {
-            connector.setSupportOwnerActorName(null);
         }
         IntegrationSyncMode nextSyncMode = request.syncMode() != null
             ? request.syncMode()
@@ -252,6 +268,11 @@ public class TenantWorkspaceAdministrationService {
             request.pullEndpointUrl() != null ? request.pullEndpointUrl() : connector.getPullEndpointUrl()
         );
         requireSupportedSyncMode(connector.getType(), nextSyncMode, pullEndpointUrl);
+        if (supportOwner != null) {
+            connector.setSupportOwnerActorName(supportOwner.getActorName());
+        } else {
+            connector.setSupportOwnerActorName(null);
+        }
         connector.setSyncMode(nextSyncMode);
         connector.setSyncIntervalMinutes(resolveSyncIntervalMinutes(
             nextSyncMode,
@@ -284,12 +305,166 @@ public class TenantWorkspaceAdministrationService {
         return integrationConnectorService.describeConnector(connector);
     }
 
+    @Transactional
+    public WarehouseResponse createWarehouse(TenantWorkspaceWarehouseCreateRequest request, String actorName) {
+        Tenant tenant = tenantContextService.getCurrentTenantOrDefault();
+        String code = request.code().trim().toUpperCase(Locale.ROOT);
+        if (warehouseRepository.findByTenant_CodeIgnoreCaseAndCode(tenant.getCode(), code).isPresent()) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT,
+                "Warehouse code already exists in current tenant: " + code);
+        }
+        Warehouse warehouse;
+        try {
+            warehouse = warehouseRepository.saveAndFlush(Warehouse.builder()
+                .tenant(tenant)
+                .code(code)
+                .name(request.name().trim())
+                .location(request.location().trim())
+                .active(true)
+                .build());
+        } catch (DataIntegrityViolationException exception) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT,
+                "Warehouse code already exists in current tenant: " + code, exception);
+        }
+        auditLogService.recordSuccess(
+            "TENANT_WAREHOUSE_CREATED", actorName, "tenant-admin", "Warehouse", code,
+            "Created warehouse " + code + " for tenant " + tenant.getCode() + "."
+        );
+        return toWarehouseResponse(warehouse);
+    }
+
+    @Transactional
+    public WarehouseResponse retireWarehouse(Long warehouseId, TenantWorkspaceWarehouseLifecycleRequest request,
+                                             String actorName) {
+        String tenantCode = tenantContextService.getCurrentTenantCodeOrDefault();
+        Warehouse warehouse = requireWarehouse(tenantCode, warehouseId);
+        requireCurrentVersion(request.version(), warehouse.getVersion(), "warehouse lifecycle");
+        if (!warehouse.isActive()) {
+            return toWarehouseResponse(warehouse);
+        }
+        if (warehouseRepository.countByTenant_CodeIgnoreCaseAndActiveTrue(tenantCode) <= 1) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT,
+                "The last active warehouse cannot be retired.");
+        }
+        String code = warehouse.getCode();
+        if (accessOperatorRepository.findAllByTenant_CodeIgnoreCaseAndActiveTrueOrderByDisplayNameAsc(tenantCode).stream()
+            .anyMatch(operator -> !accessDirectoryService.getWarehouseScopes(operator).isEmpty()
+                && accessDirectoryService.getWarehouseScopes(operator).stream().anyMatch(code::equalsIgnoreCase))) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT,
+                "Warehouse " + code + " has active scoped operators. Reassign or deactivate them before retirement.");
+        }
+        if (integrationConnectorRepository.existsByTenant_CodeIgnoreCaseAndEnabledTrueAndDefaultWarehouseCodeIgnoreCase(tenantCode, code)) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT,
+                "Warehouse " + code + " is the default lane for an enabled connector.");
+        }
+        if (inventoryRepository.existsByWarehouse_IdAndQuantityReservedGreaterThan(warehouseId, 0L)
+            || inventoryRepository.existsByWarehouse_IdAndQuantityInboundGreaterThan(warehouseId, 0L)) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT,
+                "Warehouse " + code + " has reserved or inbound inventory.");
+        }
+        if (customerOrderRepository.findAllByTenant_CodeIgnoreCaseAndWarehouse_CodeIgnoreCase(tenantCode, code).stream()
+            .anyMatch(order -> !isTerminal(order.getStatus()))) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT,
+                "Warehouse " + code + " has active orders.");
+        }
+        if (fulfillmentTaskRepository.findAllByTenant_CodeIgnoreCaseAndStatusInOrderByUpdatedAtDesc(
+                tenantCode, List.of(com.synapsecore.domain.entity.FulfillmentStatus.QUEUED,
+                    com.synapsecore.domain.entity.FulfillmentStatus.PICKING,
+                    com.synapsecore.domain.entity.FulfillmentStatus.PACKED,
+                    com.synapsecore.domain.entity.FulfillmentStatus.DISPATCHED,
+                    com.synapsecore.domain.entity.FulfillmentStatus.DELAYED,
+                    com.synapsecore.domain.entity.FulfillmentStatus.EXCEPTION)).stream()
+            .anyMatch(task -> task.getWarehouse() != null && code.equalsIgnoreCase(task.getWarehouse().getCode()))) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT,
+                "Warehouse " + code + " has active fulfillment work.");
+        }
+        if (scenarioRunRepository.existsByTenant_CodeIgnoreCaseAndWarehouseCodeIgnoreCaseAndApprovalStatusIn(
+                tenantCode, code, List.of(ScenarioApprovalStatus.PENDING_APPROVAL))) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT,
+                "Warehouse " + code + " has pending governed scenarios.");
+        }
+        warehouse.setActive(false);
+        warehouseRepository.save(warehouse);
+        auditLogService.recordSuccess(
+            "TENANT_WAREHOUSE_RETIRED", actorName, "tenant-admin", "Warehouse", code,
+            "Retired warehouse " + code + " for tenant " + tenantCode + "."
+        );
+        return toWarehouseResponse(warehouse);
+    }
+
+    @Transactional
+    public WarehouseResponse reactivateWarehouse(Long warehouseId, TenantWorkspaceWarehouseLifecycleRequest request,
+                                                 String actorName) {
+        String tenantCode = tenantContextService.getCurrentTenantCodeOrDefault();
+        Warehouse warehouse = requireWarehouse(tenantCode, warehouseId);
+        requireCurrentVersion(request.version(), warehouse.getVersion(), "warehouse lifecycle");
+        if (warehouse.isActive()) {
+            return toWarehouseResponse(warehouse);
+        }
+        warehouse.setActive(true);
+        warehouseRepository.save(warehouse);
+        auditLogService.recordSuccess(
+            "TENANT_WAREHOUSE_REACTIVATED", actorName, "tenant-admin", "Warehouse", warehouse.getCode(),
+            "Reactivated warehouse " + warehouse.getCode() + " for tenant " + tenantCode + "."
+        );
+        return toWarehouseResponse(warehouse);
+    }
+
+    private Warehouse requireWarehouse(String tenantCode, Long warehouseId) {
+        return warehouseRepository.findByTenant_CodeIgnoreCaseAndId(tenantCode, warehouseId)
+            .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND,
+                "Warehouse not found in current tenant: " + warehouseId));
+    }
+
+    private boolean isTerminal(com.synapsecore.domain.entity.OrderStatus status) {
+        return status == com.synapsecore.domain.entity.OrderStatus.CANCELLED
+            || status == com.synapsecore.domain.entity.OrderStatus.FAILED
+            || status == com.synapsecore.domain.entity.OrderStatus.RETURNED
+            || status == com.synapsecore.domain.entity.OrderStatus.DELIVERED;
+    }
+
+    private TenantWorkspaceReadiness calculateReadiness(Tenant tenant, List<AccessUser> users) {
+        List<String> reasons = new ArrayList<>();
+        if (!tenant.isActive()) reasons.add("Tenant workspace is inactive.");
+        if (warehouseRepository.countByTenant_CodeIgnoreCaseAndActiveTrue(tenant.getCode()) == 0) {
+            reasons.add("At least one active warehouse is required.");
+        }
+        if (users.stream().noneMatch(this::isUsableTenantAdminUser)) {
+            reasons.add("An active Tenant Admin user is required.");
+        }
+        List<Warehouse> activeWarehouses = warehouseRepository.findAllByTenant_CodeIgnoreCaseOrderByNameAsc(tenant.getCode()).stream()
+            .filter(Warehouse::isActive).toList();
+        List<AccessOperator> operators = accessOperatorRepository.findAllByTenant_CodeIgnoreCaseOrderByDisplayNameAsc(tenant.getCode());
+        for (SynapseAccessRole role : tenant.getRequiredRoles()) {
+            for (Warehouse warehouse : activeWarehouses) {
+                boolean covered = operators.stream().anyMatch(operator -> operator.isActive()
+                    && operator.getRoles().contains(role)
+                    && (accessDirectoryService.getWarehouseScopes(operator).isEmpty()
+                        || accessDirectoryService.getWarehouseScopes(operator).stream().anyMatch(warehouse.getCode()::equalsIgnoreCase))
+                    && users.stream().anyMatch(user -> isUsableUserForOperator(user, operator)));
+                if (!covered) reasons.add("Required " + role + " coverage is missing for " + warehouse.getCode() + ".");
+            }
+        }
+        return new TenantWorkspaceReadiness(reasons.isEmpty(), reasons.stream().distinct().toList());
+    }
+
+    private boolean isUsableTenantAdminUser(AccessUser user) {
+        return user.isActive() && user.getOperator() != null && user.getOperator().isActive()
+            && user.getOperator().getRoles().contains(SynapseAccessRole.TENANT_ADMIN);
+    }
+
+    private boolean isUsableUserForOperator(AccessUser user, AccessOperator operator) {
+        return user.isActive() && user.getOperator() != null && user.getOperator().getId().equals(operator.getId());
+    }
+
     private WarehouseResponse toWarehouseResponse(Warehouse warehouse) {
         return new WarehouseResponse(
             warehouse.getId(),
             warehouse.getCode(),
             warehouse.getName(),
-            warehouse.getLocation()
+            warehouse.getLocation(),
+            warehouse.isActive(),
+            warehouse.getVersion()
         );
     }
 
@@ -298,6 +473,13 @@ public class TenantWorkspaceAdministrationService {
             return null;
         }
         return value.trim();
+    }
+
+    private void requireCurrentVersion(Long requestedVersion, Long currentVersion, String subject) {
+        if (requestedVersion == null || currentVersion == null || !requestedVersion.equals(currentVersion)) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT,
+                "Administrative " + subject + " changed. Refresh and try again.");
+        }
     }
 
     private Integer resolveSyncIntervalMinutes(IntegrationSyncMode syncMode,

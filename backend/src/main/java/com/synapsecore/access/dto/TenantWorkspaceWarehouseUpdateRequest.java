@@ -10,6 +10,8 @@ public record TenantWorkspaceWarehouseUpdateRequest(
 
     @NotBlank
     @Size(max = 120)
-    String location
+    String location,
+
+    Long version
 ) {
 }

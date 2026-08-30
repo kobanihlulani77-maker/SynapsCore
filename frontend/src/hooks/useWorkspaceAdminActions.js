@@ -17,6 +17,8 @@ export default function useWorkspaceAdminActions({
   workspaceSecurityForm,
   workspaceSettingsForm,
   workspaceWarehouseDrafts,
+  workspaceWarehouseCreateForm,
+  setWorkspaceWarehouseCreateForm,
 }) {
   function resolveDefaultManagedOperator(preferredActorName = '') {
     if (preferredActorName && accessAdminOperators.some((operator) => operator.actorName === preferredActorName)) {
@@ -45,6 +47,7 @@ export default function useWorkspaceAdminActions({
         body: JSON.stringify({
           tenantName: workspaceSettingsForm.tenantName.trim(),
           description: workspaceSettingsForm.description.trim(),
+          version: workspaceSettingsForm.version,
         }),
       })
 
@@ -70,6 +73,7 @@ export default function useWorkspaceAdminActions({
           passwordRotationDays: Number.parseInt(workspaceSecurityForm.passwordRotationDays, 10),
           sessionTimeoutMinutes: Number.parseInt(workspaceSecurityForm.sessionTimeoutMinutes, 10),
           invalidateOtherSessions: workspaceSecurityForm.invalidateOtherSessions,
+          version: workspaceSecurityForm.version,
         }),
       })
 
@@ -98,6 +102,7 @@ export default function useWorkspaceAdminActions({
         body: JSON.stringify({
           name: draft.name.trim(),
           location: draft.location.trim(),
+          version: draft.version,
         }),
       })
 
@@ -130,6 +135,7 @@ export default function useWorkspaceAdminActions({
           transformationPolicy: draft.transformationPolicy,
           allowDefaultWarehouseFallback: draft.allowDefaultWarehouseFallback,
           notes: draft.notes,
+          version: draft.version,
         }),
       })
 
@@ -144,6 +150,46 @@ export default function useWorkspaceAdminActions({
       setAccessAdminState((current) => ({ ...current, loading: false, error: error.message, success: '' }))
     }
   }
+
+  async function createWorkspaceWarehouse() {
+    setAccessAdminState((current) => ({ ...current, loading: true, error: '', success: '' }))
+    try {
+      const payload = await fetchJson('/api/access/admin/workspace/warehouses', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          code: workspaceWarehouseCreateForm.code.trim().toUpperCase(),
+          name: workspaceWarehouseCreateForm.name.trim(),
+          location: workspaceWarehouseCreateForm.location.trim(),
+        }),
+      })
+      await fetchAccessAdminData()
+      setWorkspaceWarehouseCreateForm({ code: '', name: '', location: '' })
+      setAccessAdminState((current) => ({ ...current, loading: false, error: '', success: `${payload.code} warehouse was created.` }))
+    } catch (error) {
+      setAccessAdminState((current) => ({ ...current, loading: false, error: error.message, success: '' }))
+    }
+  }
+
+  async function changeWorkspaceWarehouseLifecycle(warehouseId, action) {
+    setAccessAdminState((state) => ({ ...state, loading: true, error: '', success: '' }))
+    try {
+      const workspace = await fetchJson('/api/access/admin/workspace')
+      const target = workspace.warehouses?.find((item) => item.id === warehouseId)
+      const payload = await fetchJson(`/api/access/admin/workspace/warehouses/${warehouseId}/${action}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ version: target?.version }),
+      })
+      await fetchAccessAdminData()
+      setAccessAdminState((state) => ({ ...state, loading: false, error: '', success: `${payload.code} warehouse is now ${payload.active ? 'active' : 'retired'}.` }))
+    } catch (error) {
+      setAccessAdminState((state) => ({ ...state, loading: false, error: error.message, success: '' }))
+    }
+  }
+
+  const retireWorkspaceWarehouse = (warehouseId) => changeWorkspaceWarehouseLifecycle(warehouseId, 'retire')
+  const reactivateWorkspaceWarehouse = (warehouseId) => changeWorkspaceWarehouseLifecycle(warehouseId, 'reactivate')
 
   async function saveTenantOperator() {
     setAccessAdminState((current) => ({ ...current, loading: true, error: '', success: '' }))
@@ -256,6 +302,9 @@ export default function useWorkspaceAdminActions({
     saveWorkspaceSecuritySettings,
     saveWorkspaceWarehouse,
     saveWorkspaceConnectorSupport,
+    createWorkspaceWarehouse,
+    retireWorkspaceWarehouse,
+    reactivateWorkspaceWarehouse,
     saveTenantOperator,
     saveTenantUser,
     resetTenantUserPassword,

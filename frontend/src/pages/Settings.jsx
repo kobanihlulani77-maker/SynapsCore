@@ -15,8 +15,13 @@ export default function SettingsPage({ context }) {
     setWorkspaceSettingsForm,
     workspaceSecurityForm,
     setWorkspaceSecurityForm,
+    workspaceWarehouseCreateForm,
+    setWorkspaceWarehouseCreateForm,
     saveWorkspaceSettings,
     saveWorkspaceSecuritySettings,
+    createWorkspaceWarehouse,
+    retireWorkspaceWarehouse,
+    reactivateWorkspaceWarehouse,
     selectedWorkspaceWarehouse,
     selectedWorkspaceWarehouseDraft,
     selectedWorkspaceConnector,
@@ -155,11 +160,17 @@ export default function SettingsPage({ context }) {
           <article className="stack-card section-card admin-form-panel">
             <div className="stack-title-row"><strong>Warehouse focus</strong><span className="scenario-type-tag">{selectedWorkspaceWarehouse?.code || 'Waiting'}</span></div>
             <p className="muted-text">Operational site identity. Save only updates the selected warehouse lane.</p>
+            <div className="session-control-row">
+              <label className="field planner-name-field"><span>New warehouse code</span><input value={workspaceWarehouseCreateForm.code} onChange={(event) => setWorkspaceWarehouseCreateForm((current) => ({ ...current, code: event.target.value }))} placeholder="WH-SOUTH" disabled={accessAdminState.loading || !canManageTenantAccess} /></label>
+              <label className="field planner-name-field"><span>Name</span><input value={workspaceWarehouseCreateForm.name} onChange={(event) => setWorkspaceWarehouseCreateForm((current) => ({ ...current, name: event.target.value }))} placeholder="South Hub" disabled={accessAdminState.loading || !canManageTenantAccess} /></label>
+              <label className="field planner-name-field"><span>Location</span><input value={workspaceWarehouseCreateForm.location} onChange={(event) => setWorkspaceWarehouseCreateForm((current) => ({ ...current, location: event.target.value }))} placeholder="South region" disabled={accessAdminState.loading || !canManageTenantAccess} /></label>
+            </div>
+            <div className="history-action-row"><button className="ghost-button" onClick={createWorkspaceWarehouse} disabled={accessAdminState.loading || !canManageTenantAccess || !workspaceWarehouseCreateForm.code.trim() || !workspaceWarehouseCreateForm.name.trim() || !workspaceWarehouseCreateForm.location.trim()} type="button">Add Warehouse</button></div>
             <div className="signal-list">
               {settingsDataLoading ? <LoadingState label="Loading warehouse lanes..." /> : settingsDataError ? <p className="error-text">Warehouse settings are unavailable because the tenant configuration read failed.</p> : workspaceAdmin?.warehouses?.length ? workspaceAdmin.warehouses.map((warehouse) => (
                   <button key={warehouse.id} className={`signal-list-item selectable-card system-select-card admin-subject-card ${selectedWorkspaceWarehouse?.id === warehouse.id ? 'is-selected' : ''}`} onClick={() => setSelectedWorkspaceWarehouseId(warehouse.id)} type="button">
                   <strong>{warehouse.name}</strong>
-                  <p>{warehouse.code}</p>
+                  <p>{warehouse.code} | {warehouse.active === false ? 'Retired' : 'Active'}</p>
                   <p className="muted-text">{warehouse.location || 'Location not defined yet'}</p>
                 </button>
               )) : <EmptyState>Warehouse and site defaults will appear here when the workspace is configured.</EmptyState>}
@@ -178,6 +189,7 @@ export default function SettingsPage({ context }) {
                 </div>
                 <div className="history-action-row">
                   <button className="ghost-button" onClick={() => saveWorkspaceWarehouse(selectedWorkspaceWarehouse.id)} disabled={accessAdminState.loading || !canManageTenantAccess} type="button">Save Warehouse</button>
+                  {selectedWorkspaceWarehouse.active === false ? <button className="secondary-button" onClick={() => reactivateWorkspaceWarehouse(selectedWorkspaceWarehouse.id)} disabled={accessAdminState.loading || !canManageTenantAccess} type="button">Reactivate Warehouse</button> : <button className="secondary-button" onClick={() => retireWorkspaceWarehouse(selectedWorkspaceWarehouse.id)} disabled={accessAdminState.loading || !canManageTenantAccess} type="button">Retire Warehouse</button>}
                 </div>
               </>
             ) : null}

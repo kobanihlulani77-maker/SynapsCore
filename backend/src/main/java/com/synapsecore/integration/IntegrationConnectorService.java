@@ -20,6 +20,7 @@ import com.synapsecore.domain.repository.IntegrationConnectorRepository;
 import com.synapsecore.domain.repository.IntegrationImportRunRepository;
 import com.synapsecore.domain.repository.IntegrationInboundRecordRepository;
 import com.synapsecore.domain.repository.IntegrationReplayRecordRepository;
+import com.synapsecore.domain.repository.WarehouseRepository;
 import com.synapsecore.event.OperationalStateChangePublisher;
 import com.synapsecore.event.OperationalUpdateType;
 import com.synapsecore.event.BusinessEventService;
@@ -63,6 +64,7 @@ public class IntegrationConnectorService {
     private final OperationalStateChangePublisher operationalStateChangePublisher;
     private final TenantContextService tenantContextService;
     private final SynapseStarterProperties starterProperties;
+    private final WarehouseRepository warehouseRepository;
 
     @org.springframework.beans.factory.annotation.Value("${synapsecore.integration.health-window-hours:24}")
     private long integrationHealthWindowHours;
@@ -107,6 +109,10 @@ public class IntegrationConnectorService {
         var tenant = tenantContextService.getCurrentTenantOrDefault();
         String normalizedSourceSystem = normalizeSourceSystem(request.sourceSystem());
         if (request.defaultWarehouseCode() != null && !request.defaultWarehouseCode().isBlank()) {
+            warehouseRepository.findByTenant_CodeIgnoreCaseAndCode(tenant.getCode(), request.defaultWarehouseCode().trim())
+                .filter(com.synapsecore.domain.entity.Warehouse::isActive)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.CONFLICT,
+                    "Default warehouse must be an active warehouse in the current tenant."));
             accessDirectoryService.requireOperatorWarehouseAccess(
                 actorName,
                 tenant.getCode(),
@@ -573,6 +579,7 @@ public class IntegrationConnectorService {
                                                              ConnectorTelemetry telemetry) {
         return new IntegrationConnectorResponse(
             connector.getId(),
+            connector.getVersion(),
             connector.getTenant() == null ? null : connector.getTenant().getCode(),
             connector.getSourceSystem(),
             connector.getType(),

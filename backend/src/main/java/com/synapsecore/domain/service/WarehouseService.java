@@ -2,6 +2,7 @@ package com.synapsecore.domain.service;
 
 import com.synapsecore.access.AccessDirectoryService;
 import com.synapsecore.domain.dto.WarehouseResponse;
+import com.synapsecore.domain.entity.Warehouse;
 import com.synapsecore.domain.repository.WarehouseRepository;
 import com.synapsecore.tenant.TenantContextService;
 import java.util.List;
@@ -21,6 +22,7 @@ public class WarehouseService {
         return warehouseRepository.findAllByTenant_CodeIgnoreCaseOrderByNameAsc(
                 tenantContextService.getCurrentTenantCodeOrDefault())
             .stream()
+            .filter(Warehouse::isActive)
             .filter(warehouse -> currentOperator.isEmpty()
                 || accessDirectoryService.hasWarehouseAccess(currentOperator.get(), warehouse.getCode()))
             .map(warehouse -> new WarehouseResponse(
@@ -28,6 +30,7 @@ public class WarehouseService {
                 warehouse.getCode(),
                 warehouse.getName(),
                 warehouse.getLocation()
+                ,warehouse.isActive(), warehouse.getVersion()
             ))
             .toList();
     }

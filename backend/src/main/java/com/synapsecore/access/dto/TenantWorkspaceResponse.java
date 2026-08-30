@@ -21,6 +21,8 @@ public record TenantWorkspaceResponse(
     List<WarehouseResponse> warehouses,
     List<IntegrationConnectorResponse> connectors,
     List<SynapseAccessRole> requiredRoles,
+    TenantWorkspaceReadiness readiness,
+    Long version,
     Instant createdAt,
     Instant updatedAt
 ) {

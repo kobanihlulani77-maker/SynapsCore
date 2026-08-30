@@ -4000,6 +4000,7 @@ class MvpFlowIntegrationTest {
             )
             .orElseThrow()
             .getId();
+        Long northConnectorVersion = integrationConnectorRepository.findById(northConnectorId).orElseThrow().getVersion();
 
         mockMvc.perform(put("/api/access/admin/workspace")
                 .with(accessHeaders("Operations Lead", "TENANT_ADMIN"))
@@ -4008,7 +4009,8 @@ class MvpFlowIntegrationTest {
                 .content("""
                     {
                       "tenantName": "Starter Operations Workspace Updated",
-                      "description": "Tenant admin support lane updated through workspace settings."
+                      "description": "Tenant admin support lane updated through workspace settings.",
+                      "version": 0
                     }
                     """))
             .andExpect(status().isOk())
@@ -4022,7 +4024,8 @@ class MvpFlowIntegrationTest {
                 .content("""
                     {
                       "name": "Warehouse North Prime",
-                      "location": "Johannesburg Prime"
+                      "location": "Johannesburg Prime",
+                      "version": 0
                     }
                     """))
             .andExpect(status().isOk())
@@ -4037,9 +4040,10 @@ class MvpFlowIntegrationTest {
                 .content("""
                     {
                       "supportOwnerActorName": "Coast Operations Director",
-                      "notes": "This should be blocked by warehouse scope."
+                      "notes": "This should be blocked by warehouse scope.",
+                      "version": %d
                     }
-                    """))
+                    """.formatted(northConnectorVersion)))
             .andExpect(status().isForbidden())
             .andExpect(jsonPath("$.message").value(org.hamcrest.Matchers.containsString("warehouse WH-NORTH")));
 
@@ -4055,9 +4059,10 @@ class MvpFlowIntegrationTest {
                       "validationPolicy": "STRICT",
                       "transformationPolicy": "NORMALIZE_CODES",
                       "allowDefaultWarehouseFallback": true,
-                      "notes": "North operations director now owns webhook support."
+                      "notes": "North operations director now owns webhook support.",
+                      "version": %d
                     }
-                    """))
+                    """.formatted(northConnectorVersion)))
             .andExpect(status().isBadRequest())
             .andExpect(jsonPath("$.message").value(org.hamcrest.Matchers.containsString("pullEndpointUrl is required")));
 
@@ -4072,9 +4077,10 @@ class MvpFlowIntegrationTest {
                       "validationPolicy": "STRICT",
                       "transformationPolicy": "NORMALIZE_CODES",
                       "allowDefaultWarehouseFallback": true,
-                      "notes": "North operations director now owns webhook support."
+                      "notes": "North operations director now owns webhook support.",
+                      "version": %d
                     }
-                    """))
+                    """.formatted(northConnectorVersion)))
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.supportOwnerActorName").value("North Operations Director"))
             .andExpect(jsonPath("$.supportOwnerDisplayName").value("North Operations Director"))
@@ -4202,7 +4208,8 @@ class MvpFlowIntegrationTest {
                     {
                       "passwordRotationDays": 45,
                       "sessionTimeoutMinutes": 120,
-                      "invalidateOtherSessions": true
+                      "invalidateOtherSessions": true,
+                      "version": 0
                     }
                     """))
             .andExpect(status().isOk())

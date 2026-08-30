@@ -54,6 +54,10 @@ public class ScenarioProjectionService {
             .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND,
                 "Warehouse not found: " + request.warehouseCode()));
         tenantScopeGuard.requireWarehouseForTenant(warehouse, tenantCode, "scenario order impact projection");
+        if (!warehouse.isActive()) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT,
+                "Warehouse " + warehouse.getCode() + " is retired and cannot receive new scenario work.");
+        }
 
         BigDecimal projectedOrderValue = BigDecimal.ZERO;
         int totalUnits = 0;

@@ -129,4 +129,8 @@ public interface InventoryRepository extends JpaRepository<Inventory, Long> {
         where upper(i.warehouse.tenant.code) = upper(:tenantCode)
         """)
     long countDistinctProductsByTenantCode(@Param("tenantCode") String tenantCode);
+
+    boolean existsByWarehouse_IdAndQuantityReservedGreaterThan(Long warehouseId, Long quantity);
+
+    boolean existsByWarehouse_IdAndQuantityInboundGreaterThan(Long warehouseId, Long quantity);
 }

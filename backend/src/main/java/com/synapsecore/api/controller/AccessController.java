@@ -20,6 +20,8 @@ import com.synapsecore.access.dto.TenantWorkspaceResponse;
 import com.synapsecore.access.dto.TenantWorkspaceSecuritySettingsRequest;
 import com.synapsecore.access.dto.TenantWorkspaceUpdateRequest;
 import com.synapsecore.access.dto.TenantWorkspaceWarehouseUpdateRequest;
+import com.synapsecore.access.dto.TenantWorkspaceWarehouseCreateRequest;
+import com.synapsecore.access.dto.TenantWorkspaceWarehouseLifecycleRequest;
 import com.synapsecore.access.dto.TenantResponse;
 import com.synapsecore.auth.AuthSessionService;
 import com.synapsecore.platform.PlatformOwnerSessionService;
@@ -149,6 +151,28 @@ public class AccessController {
                                                       @Valid @RequestBody TenantWorkspaceWarehouseUpdateRequest request) {
         String actorName = accessControlService.requireTenantAdmin("update tenant workspace warehouses").actorName();
         return tenantWorkspaceAdministrationService.updateWarehouse(warehouseId, request, actorName);
+    }
+
+    @PostMapping("/admin/workspace/warehouses")
+    public WarehouseResponse createWorkspaceWarehouse(@Valid @RequestBody TenantWorkspaceWarehouseCreateRequest request) {
+        String actorName = accessControlService.requireTenantAdmin("create tenant workspace warehouses").actorName();
+        return tenantWorkspaceAdministrationService.createWarehouse(request, actorName);
+    }
+
+    @PostMapping("/admin/workspace/warehouses/{warehouseId}/retire")
+    public WarehouseResponse retireWorkspaceWarehouse(@PathVariable Long warehouseId,
+                                                       @RequestBody(required = false) TenantWorkspaceWarehouseLifecycleRequest request) {
+        String actorName = accessControlService.requireTenantAdmin("retire tenant workspace warehouses").actorName();
+        return tenantWorkspaceAdministrationService.retireWarehouse(warehouseId,
+            request == null ? new TenantWorkspaceWarehouseLifecycleRequest(null) : request, actorName);
+    }
+
+    @PostMapping("/admin/workspace/warehouses/{warehouseId}/reactivate")
+    public WarehouseResponse reactivateWorkspaceWarehouse(@PathVariable Long warehouseId,
+                                                          @RequestBody(required = false) TenantWorkspaceWarehouseLifecycleRequest request) {
+        String actorName = accessControlService.requireTenantAdmin("reactivate tenant workspace warehouses").actorName();
+        return tenantWorkspaceAdministrationService.reactivateWarehouse(warehouseId,
+            request == null ? new TenantWorkspaceWarehouseLifecycleRequest(null) : request, actorName);
     }
 
     @PutMapping("/admin/workspace/connectors/{connectorId}")

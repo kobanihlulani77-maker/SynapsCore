@@ -102,4 +102,7 @@ public interface CustomerOrderRepository extends JpaRepository<CustomerOrder, Lo
     );
 
     long countByTenant_CodeIgnoreCaseAndWarehouse_IdAndCreatedAtAfter(String tenantCode, Long warehouseId, Instant createdAt);
+
+    @EntityGraph(attributePaths = {"warehouse"})
+    List<CustomerOrder> findAllByTenant_CodeIgnoreCaseAndWarehouse_CodeIgnoreCase(String tenantCode, String warehouseCode);
 }

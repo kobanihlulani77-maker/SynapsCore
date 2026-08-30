@@ -151,11 +151,13 @@ export default function useWorkspaceBootstrap({
     workspaceSettingsFormSetter({
       tenantName: workspace.tenantName || '',
       description: workspace.description || '',
+      version: workspace.version,
     })
     workspaceSecurityFormSetter({
       passwordRotationDays: String(workspace.securitySettings?.passwordRotationDays || 90),
       sessionTimeoutMinutes: String(workspace.securitySettings?.sessionTimeoutMinutes || 480),
       invalidateOtherSessions: false,
+      version: workspace.version,
     })
     workspaceWarehouseDraftsSetter(buildWorkspaceWarehouseDrafts(workspace))
     workspaceConnectorDraftsSetter(buildWorkspaceConnectorDrafts(workspace))

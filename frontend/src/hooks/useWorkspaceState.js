@@ -54,6 +54,7 @@ export default function useWorkspaceState({ initialPage }) {
   const [workspaceSettingsForm, setWorkspaceSettingsForm] = useState(createDefaultWorkspaceSettingsForm)
   const [workspaceSecurityForm, setWorkspaceSecurityForm] = useState(createDefaultWorkspaceSecurityForm)
   const [workspaceWarehouseDrafts, setWorkspaceWarehouseDrafts] = useState({})
+  const [workspaceWarehouseCreateForm, setWorkspaceWarehouseCreateForm] = useState({ code: '', name: '', location: '' })
   const [workspaceConnectorDrafts, setWorkspaceConnectorDrafts] = useState({})
   const [accessOperatorForm, setAccessOperatorForm] = useState(createDefaultAccessOperatorForm)
   const [accessUserForm, setAccessUserForm] = useState(createDefaultAccessUserForm)
@@ -233,6 +234,8 @@ export default function useWorkspaceState({ initialPage }) {
     setWorkspaceSecurityForm,
     workspaceWarehouseDrafts,
     setWorkspaceWarehouseDrafts,
+    workspaceWarehouseCreateForm,
+    setWorkspaceWarehouseCreateForm,
     workspaceConnectorDrafts,
     setWorkspaceConnectorDrafts,
     accessOperatorForm,

@@ -367,6 +367,10 @@ public class InventoryService {
             .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND,
                 "Warehouse not found: " + warehouseCode));
         tenantScopeGuard.requireWarehouseForTenant(warehouse, tenantCode, context);
+        if (!warehouse.isActive()) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT,
+                "Warehouse " + warehouse.getCode() + " is retired and cannot receive new operational work.");
+        }
         return warehouse;
     }
 
