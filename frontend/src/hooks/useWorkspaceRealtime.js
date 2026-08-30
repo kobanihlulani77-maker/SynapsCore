@@ -480,7 +480,7 @@ export default function useWorkspaceRealtime({
             nextClient.subscribe(`${topicPrefix}/alerts`, (message) => {
               const payload = parseRealtimeBody(message, 'alerts')
               if (!payload) return
-              mergeSnapshot({ alerts: payload })
+              // REST remains authoritative when a queued topic can be older than the current snapshot.
               scheduleDecisionSurfaceRefresh('alerts-topic')
             })
           } else {
@@ -492,7 +492,7 @@ export default function useWorkspaceRealtime({
             nextClient.subscribe(`${topicPrefix}/recommendations`, (message) => {
               const payload = parseRealtimeBody(message, 'recommendations')
               if (!payload) return
-              mergeSnapshot({ recommendations: payload })
+              // REST remains authoritative when a queued topic can be older than the current snapshot.
               scheduleDecisionSurfaceRefresh('recommendations-topic')
             })
           } else {
