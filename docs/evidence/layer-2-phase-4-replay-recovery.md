@@ -219,15 +219,15 @@ accepted from a client replay request.
 62. **Frontend result:** no frontend changes; frontend verification is not applicable to this backend-only phase.
 63. **Docs/diff/secret scan:** docs-link check clean with 778 local links checked; `git diff --check` clean; secret scan PASS with 0 critical findings and 5 pre-existing fixture findings.
 64. **Files changed:** the focused Phase 4 test and this evidence document only, excluding preserved unrelated worktree files.
-65. **Commits:** to be recorded after the intended Phase 4 files are committed.
-66. **GitHub Actions run ID/status:** to be recorded after push and exact-main CI completion.
+65. **Commits:** `1dffaaff49f5e7fcd22574ee75e9247537809ac2` (`Verify Layer 2 Phase 4 replay recovery`), followed by this evidence-only closure update.
+66. **GitHub Actions run ID/status:** run `33332237585` completed with `success` for exact-main SHA `1dffaaff49f5e7fcd22574ee75e9247537809ac2`.
 67. **Remaining B:** 0 unresolved Phase 4 implementation blockers.
 68. **Remaining C:** 0 unresolved Phase 4 evidence blockers.
 69. **Remaining D:** 0 release blockers; future scale evolution remains outside this phase.
 70. **Critical blockers:** 0.
 71. **High blockers:** 0.
 72. **Classification A remaining:** 0.
-73. **PHASE 4 FINAL VERDICT:** pending intended commit/push and exact-main GitHub Actions completion; all local Phase 4 verification gates pass.
+73. **PHASE 4 FINAL VERDICT:** `LAYER 2 PHASE 4 — FAILURE, REPLAY AND EXACTLY-ONCE RECOVERY VERIFIED CROSS-DOMAIN`.
 
 ## Verification Gate
 
