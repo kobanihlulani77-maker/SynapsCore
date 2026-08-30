@@ -190,6 +190,17 @@ BUILD SUCCESS
 
 The focused run covered webhook, CSV, direct API, scheduled pull, duplicate and concurrent duplicate safety, replayable failures, warehouse and tenant boundaries, atomic rollback, dashboard evidence, and dispatch completion.
 
+Post-correction main CI confirmation:
+
+```text
+GitHub Actions run: 33328648293
+Head commit: e30d8ceb2dec3c3311ddf3fa91da15a202976082
+Status: completed
+Conclusion: success
+```
+
+This exact-main workflow run passed after the bounded queue-quiescence correction was pushed. It supersedes the failed run recorded above. No production code was changed in this correction; the committed change is limited to test synchronization and its evidence.
+
 Required final checks:
 
 - full backend regression: `272` tests, `0` failures, `0` errors, `0` skipped, `BUILD SUCCESS`;
