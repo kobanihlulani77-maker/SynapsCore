@@ -149,6 +149,7 @@ export default function useWorkspaceAdminActions({
     setAccessAdminState((current) => ({ ...current, loading: true, error: '', success: '' }))
     try {
       const editing = Boolean(accessOperatorForm.id)
+      const warehouseScopes = parseCsvValues(accessOperatorForm.warehouseScopesText).map((scope) => scope.toUpperCase())
       const payload = await fetchJson(editing ? `/api/access/admin/operators/${accessOperatorForm.id}` : '/api/access/admin/operators', {
         method: editing ? 'PUT' : 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -158,7 +159,9 @@ export default function useWorkspaceAdminActions({
           description: accessOperatorForm.description.trim(),
           active: accessOperatorForm.active,
           roles: parseCsvValues(accessOperatorForm.rolesText).map((role) => role.toUpperCase()),
-          warehouseScopes: parseCsvValues(accessOperatorForm.warehouseScopesText).map((scope) => scope.toUpperCase()),
+          warehouseScopes,
+          tenantWide: warehouseScopes.length === 0 ? accessOperatorForm.tenantWide : false,
+          ...(editing ? { version: accessOperatorForm.version } : {}),
         }),
       })
 
@@ -195,6 +198,7 @@ export default function useWorkspaceAdminActions({
               fullName: accessUserForm.fullName.trim(),
               active: accessUserForm.active,
               operatorActorName: accessUserForm.operatorActorName,
+              version: accessUserForm.version,
             }
           : {
               username: accessUserForm.username.trim(),

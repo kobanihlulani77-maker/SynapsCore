@@ -21,6 +21,10 @@ public record AccessOperatorUpsertRequest(
 
     List<SynapseAccessRole> roles,
 
-    List<@Size(max = 40) String> warehouseScopes
+    List<@Size(max = 40) String> warehouseScopes,
+
+    Boolean tenantWide,
+
+    Long version
 ) {
 }

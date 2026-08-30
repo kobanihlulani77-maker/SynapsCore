@@ -15,6 +15,7 @@ public record AccessOperatorResponse(
     boolean active,
     String description,
     Instant createdAt,
-    Instant updatedAt
+    Instant updatedAt,
+    Long version
 ) {
 }

@@ -3794,9 +3794,10 @@ class MvpFlowIntegrationTest {
                     {
                       "fullName": "North Lifecycle Manager Updated",
                       "active": true,
-                      "operatorActorName": "North Final Manager"
+                      "operatorActorName": "North Final Manager",
+                      "version": %d
                     }
-                    """))
+                    """.formatted(accessUserRepository.findById(lifecycleUserId).orElseThrow().getVersion())))
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.fullName").value("North Lifecycle Manager Updated"))
             .andExpect(jsonPath("$.operatorActorName").value("North Final Manager"))
@@ -3855,9 +3856,10 @@ class MvpFlowIntegrationTest {
                       "description": "North final approval lane.",
                       "active": false,
                       "roles": ["FINAL_APPROVER"],
-                      "warehouseScopes": ["WH-NORTH"]
+                      "warehouseScopes": ["WH-NORTH"],
+                      "version": %d
                     }
-                    """))
+                    """.formatted(accessOperatorRepository.findById(finalManagerOperatorId).orElseThrow().getVersion())))
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.active").value(false));
 
@@ -3888,9 +3890,10 @@ class MvpFlowIntegrationTest {
                       "description": "North final approval lane restored.",
                       "active": true,
                       "roles": ["FINAL_APPROVER"],
-                      "warehouseScopes": ["WH-NORTH"]
+                      "warehouseScopes": ["WH-NORTH"],
+                      "version": %d
                     }
-                    """))
+                    """.formatted(accessOperatorRepository.findById(finalManagerOperatorId).orElseThrow().getVersion())))
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.active").value(true));
 
@@ -3902,9 +3905,10 @@ class MvpFlowIntegrationTest {
                     {
                       "fullName": "North Lifecycle Manager Updated",
                       "active": false,
-                      "operatorActorName": "North Final Manager"
+                      "operatorActorName": "North Final Manager",
+                      "version": %d
                     }
-                    """))
+                    """.formatted(accessUserRepository.findById(lifecycleUserId).orElseThrow().getVersion())))
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.active").value(false));
 
@@ -3928,9 +3932,10 @@ class MvpFlowIntegrationTest {
                     {
                       "fullName": "North Lifecycle Manager Updated",
                       "active": true,
-                      "operatorActorName": "North Final Manager"
+                      "operatorActorName": "North Final Manager",
+                      "version": %d
                     }
-                    """))
+                    """.formatted(accessUserRepository.findById(lifecycleUserId).orElseThrow().getVersion())))
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.active").value(true));
 

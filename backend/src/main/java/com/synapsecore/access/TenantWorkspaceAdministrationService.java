@@ -9,6 +9,7 @@ import com.synapsecore.access.dto.TenantWorkspaceSecuritySettingsRequest;
 import com.synapsecore.access.dto.TenantWorkspaceSupportSummary;
 import com.synapsecore.access.dto.TenantWorkspaceUpdateRequest;
 import com.synapsecore.access.dto.TenantWorkspaceWarehouseUpdateRequest;
+import com.synapsecore.access.SynapseAccessRole;
 import com.synapsecore.audit.AuditLogService;
 import com.synapsecore.domain.dto.SystemIncidentResponse;
 import com.synapsecore.domain.dto.WarehouseResponse;
@@ -146,6 +147,7 @@ public class TenantWorkspaceAdministrationService {
             recentSupportActivity,
             warehouses,
             connectors,
+            tenant.getRequiredRoles().stream().sorted(Comparator.comparing(Enum::name)).toList(),
             tenant.getCreatedAt(),
             tenant.getUpdatedAt()
         );

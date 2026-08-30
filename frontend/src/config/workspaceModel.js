@@ -114,8 +114,8 @@ export const defaultTenantOnboardingForm = {
 
 export const createDefaultWorkspaceSettingsForm = () => ({ tenantName: '', description: '' })
 export const createDefaultWorkspaceSecurityForm = () => ({ passwordRotationDays: '90', sessionTimeoutMinutes: '480', invalidateOtherSessions: false })
-export const createDefaultAccessOperatorForm = () => ({ id: null, actorName: '', displayName: '', description: '', rolesText: 'REVIEW_OWNER', warehouseScopesText: '', active: true })
-export const createDefaultAccessUserForm = () => ({ id: null, username: '', fullName: '', password: '', operatorActorName: '', active: true })
+export const createDefaultAccessOperatorForm = () => ({ id: null, version: null, actorName: '', displayName: '', description: '', rolesText: 'REVIEW_OWNER', warehouseScopesText: '', tenantWide: true, active: true })
+export const createDefaultAccessUserForm = () => ({ id: null, version: null, username: '', fullName: '', password: '', operatorActorName: '', active: true })
 export const createDefaultPasswordChangeForm = () => ({ currentPassword: '', newPassword: '', confirmPassword: '' })
 export const createDefaultCatalogForm = () => ({ id: null, sku: '', name: '', category: '' })
 
@@ -145,17 +145,20 @@ export const buildWorkspaceConnectorDrafts = (workspace) => Object.fromEntries(
 export const buildAccessOperatorForm = (operator) => ({
   ...createDefaultAccessOperatorForm(),
   id: operator.id,
+  version: operator.version,
   actorName: operator.actorName,
   displayName: operator.displayName,
   description: operator.description || '',
   rolesText: operator.roles.join(','),
   warehouseScopesText: operator.warehouseScopes.join(','),
+  tenantWide: operator.warehouseScopes.length === 0,
   active: operator.active,
 })
 
 export const buildAccessUserForm = (user) => ({
   ...createDefaultAccessUserForm(),
   id: user.id,
+  version: user.version,
   username: user.username,
   fullName: user.fullName,
   operatorActorName: user.operatorActorName,

@@ -85,6 +85,7 @@ public class TenantOnboardingService {
                 .name(request.tenantName().trim())
                 .description(normalizeOptional(request.description()))
                 .active(true)
+                .requiredRoles(normalizeRoles(request.requiredRoles()))
                 .build());
         } catch (DataIntegrityViolationException exception) {
             operationalMetricsService.recordTenantOperation(tenantCode, "TENANT_ONBOARDING", false);

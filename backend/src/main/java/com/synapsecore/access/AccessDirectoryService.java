@@ -197,7 +197,8 @@ public class AccessDirectoryService {
             operator.isActive(),
             operator.getDescription(),
             operator.getCreatedAt(),
-            operator.getUpdatedAt()
+            operator.getUpdatedAt(),
+            operator.getVersion()
         );
     }
 

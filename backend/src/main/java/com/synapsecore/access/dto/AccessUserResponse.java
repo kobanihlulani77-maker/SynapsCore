@@ -18,6 +18,7 @@ public record AccessUserResponse(
     boolean passwordChangeRequired,
     Instant passwordUpdatedAt,
     Instant createdAt,
-    Instant updatedAt
+    Instant updatedAt,
+    Long version
 ) {
 }

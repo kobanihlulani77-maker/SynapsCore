@@ -1454,8 +1454,9 @@ class PlatformTenantAccessBoundaryIntegrationTest {
                 .session(admin)
                 .contentType(APPLICATION_JSON)
                 .content("""
-                    {"fullName":"Boundary Integration Operator","active":%s,"operatorActorName":"%s"}
-                    """.formatted(active, operatorActorName)))
+                    {"fullName":"Boundary Integration Operator","active":%s,"operatorActorName":"%s","version":%d}
+                    """.formatted(active, operatorActorName,
+                        accessUserRepository.findById(userId).orElseThrow().getVersion())))
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.active").value(active));
     }
@@ -1465,8 +1466,9 @@ class PlatformTenantAccessBoundaryIntegrationTest {
                 .session(admin)
                 .contentType(APPLICATION_JSON)
                 .content("""
-                    {"actorName":"boundary.integration.operator","displayName":"Boundary Integration Operator","description":"Synthetic boundary rehearsal role","active":true,"roles":["INTEGRATION_OPERATOR"],"warehouseScopes":["%s"]}
-                    """.formatted(warehouseCode)))
+                    {"actorName":"boundary.integration.operator","displayName":"Boundary Integration Operator","description":"Synthetic boundary rehearsal role","active":true,"roles":["INTEGRATION_OPERATOR"],"warehouseScopes":["%s"],"version":%d}
+                    """.formatted(warehouseCode,
+                        accessOperatorRepository.findById(operatorId).orElseThrow().getVersion())))
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.warehouseScopes[0]").value(warehouseCode));
     }
@@ -2085,7 +2087,7 @@ class PlatformTenantAccessBoundaryIntegrationTest {
             warehouseA
         );
         inactiveReviewOperator.setActive(false);
-        accessOperatorRepository.save(inactiveReviewOperator);
+        inactiveReviewOperator = accessOperatorRepository.save(inactiveReviewOperator);
         try {
             mockMvc.perform(post("/api/scenarios/" + inactivePlanId + "/approve")
                     .session(inactiveReviewer)
@@ -2526,7 +2528,7 @@ class PlatformTenantAccessBoundaryIntegrationTest {
             .findByTenant_CodeIgnoreCaseAndActorNameIgnoreCase(REHEARSAL_TENANT, "boundary.final.inactive")
             .orElseThrow();
         inactiveFinalOperator.setActive(false);
-        accessOperatorRepository.save(inactiveFinalOperator);
+        inactiveFinalOperator = accessOperatorRepository.save(inactiveFinalOperator);
         try {
             mockMvc.perform(post("/api/scenarios/" + inactiveFinalPlanId + "/approve")
                     .session(inactiveFinalApprover)
@@ -3346,12 +3348,13 @@ class PlatformTenantAccessBoundaryIntegrationTest {
                                 List<String> warehouseScopes) throws Exception {
         String scopesJson = warehouseScopes.stream().map(scope -> "\"" + scope + "\"")
             .collect(java.util.stream.Collectors.joining(","));
+        boolean tenantWide = warehouseScopes.isEmpty();
         mockMvc.perform(post("/api/access/admin/operators")
                 .session(admin)
                 .contentType(APPLICATION_JSON)
                 .content("""
-                    {"actorName":"%s","displayName":"%s","description":"Synthetic boundary rehearsal role","active":true,"roles":["%s"],"warehouseScopes":[%s]}
-                    """.formatted(identity, identity, role, scopesJson)))
+                    {"actorName":"%s","displayName":"%s","description":"Synthetic boundary rehearsal role","active":true,"roles":["%s"],"warehouseScopes":[%s],"tenantWide":%s}
+                    """.formatted(identity, identity, role, scopesJson, tenantWide)))
             .andExpect(status().isOk());
         mockMvc.perform(post("/api/access/admin/users")
                 .session(admin)

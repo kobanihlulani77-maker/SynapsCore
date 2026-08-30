@@ -10,6 +10,7 @@ import com.synapsecore.audit.AuditLogService;
 import com.synapsecore.domain.entity.AccessOperator;
 import com.synapsecore.domain.entity.AccessUser;
 import com.synapsecore.domain.entity.Tenant;
+import com.synapsecore.domain.entity.Warehouse;
 import com.synapsecore.domain.repository.AccessOperatorRepository;
 import com.synapsecore.domain.repository.AccessUserRepository;
 import com.synapsecore.domain.repository.WarehouseRepository;
@@ -70,7 +71,7 @@ public class AccessAdministrationService {
             .description(normalizeOptional(request.description()))
             .active(request.active())
             .roles(normalizeRoles(request.roles()))
-            .warehouseScopes(normalizeWarehouseScopes(tenant.getCode(), request.warehouseScopes()))
+            .warehouseScopes(normalizeWarehouseScopesForCreate(tenant.getCode(), request))
             .build());
 
         auditLogService.recordSuccess(
@@ -94,6 +95,7 @@ public class AccessAdministrationService {
         AccessOperator operator = accessOperatorRepository.findByTenant_CodeIgnoreCaseAndId(tenant.getCode(), operatorId)
             .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND,
                 "Operator not found in current tenant: " + operatorId));
+        requireCurrentVersion(request.version(), operator.getVersion(), "operator");
 
         String normalizedActorName = normalizeActorName(request.actorName());
         Long existingOperatorId = operator.getId();
@@ -124,7 +126,8 @@ public class AccessAdministrationService {
         operator.setDescription(normalizeOptional(request.description()));
         operator.setActive(nextActive);
         operator.setRoles(nextRoles);
-        operator.setWarehouseScopes(normalizeWarehouseScopes(tenant.getCode(), request.warehouseScopes()));
+        operator.setWarehouseScopes(normalizeWarehouseScopesForUpdate(tenant.getCode(), operator, request));
+        assertRequiredRoleCoverage(tenant, operator, operator.getId(), null, null);
         operator = accessOperatorRepository.save(operator);
 
         auditLogService.recordSuccess(
@@ -184,6 +187,7 @@ public class AccessAdministrationService {
         AccessUser user = accessUserRepository.findByTenant_CodeIgnoreCaseAndId(tenant.getCode(), userId)
             .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND,
                 "User not found in current tenant: " + userId));
+        requireCurrentVersion(request.version(), user.getVersion(), "user");
 
         AccessOperator operator = accessDirectoryService.requireActiveOperator(
             request.operatorActorName().trim(),
@@ -208,6 +212,7 @@ public class AccessAdministrationService {
         if (invalidateActiveSessions) {
             user.setSessionVersion(user.getSessionVersion() + 1);
         }
+        assertRequiredRoleCoverage(tenant, operator, null, user.getId(), user);
         user = accessUserRepository.save(user);
 
         auditLogService.recordSuccess(
@@ -298,7 +303,12 @@ public class AccessAdministrationService {
             return new LinkedHashSet<>();
         }
         Set<String> normalized = warehouseScopes.stream()
-            .filter(value -> value != null && !value.isBlank())
+            .peek(value -> {
+                if (value == null || value.isBlank()) {
+                    throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                        "Warehouse scopes must contain only non-blank warehouse codes.");
+                }
+            })
             .map(value -> value.trim().toUpperCase(Locale.ROOT))
             .collect(java.util.stream.Collectors.toCollection(LinkedHashSet::new));
 
@@ -316,6 +326,95 @@ public class AccessAdministrationService {
         return normalized;
     }
 
+    private Set<String> normalizeWarehouseScopesForCreate(String tenantCode, AccessOperatorUpsertRequest request) {
+        if (request.tenantWide() == null && request.warehouseScopes() == null) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                "Explicit tenant-wide authority or warehouse scopes are required when creating an operator.");
+        }
+        if (Boolean.TRUE.equals(request.tenantWide())) {
+            if (request.warehouseScopes() != null && request.warehouseScopes().stream().anyMatch(value -> value != null && !value.isBlank())) {
+                throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                    "Tenant-wide authority cannot be combined with warehouse scopes.");
+            }
+            return new LinkedHashSet<>();
+        }
+        if (request.warehouseScopes() == null || request.warehouseScopes().isEmpty()) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                "Provide warehouse scopes or set tenantWide to true explicitly.");
+        }
+        return normalizeWarehouseScopes(tenantCode, request.warehouseScopes());
+    }
+
+    private Set<String> normalizeWarehouseScopesForUpdate(String tenantCode,
+                                                           AccessOperator operator,
+                                                           AccessOperatorUpsertRequest request) {
+        if (request.tenantWide() == null && request.warehouseScopes() == null) {
+            return accessDirectoryService.getWarehouseScopes(operator).stream()
+                .collect(java.util.stream.Collectors.toCollection(LinkedHashSet::new));
+        }
+        if (Boolean.TRUE.equals(request.tenantWide())) {
+            if (request.warehouseScopes() != null && request.warehouseScopes().stream().anyMatch(value -> value != null && !value.isBlank())) {
+                throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                    "Tenant-wide authority cannot be combined with warehouse scopes.");
+            }
+            return new LinkedHashSet<>();
+        }
+        if (request.warehouseScopes() == null || request.warehouseScopes().isEmpty()) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                "Provide warehouse scopes or set tenantWide to true explicitly.");
+        }
+        return normalizeWarehouseScopes(tenantCode, request.warehouseScopes());
+    }
+
+    private void requireCurrentVersion(Long requestedVersion, Long currentVersion, String subject) {
+        if (requestedVersion == null || !requestedVersion.equals(currentVersion)) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT,
+                "Administrative " + subject + " changed. Refresh and try again.");
+        }
+    }
+
+    private void assertRequiredRoleCoverage(Tenant tenant,
+                                            AccessOperator changedOperator,
+                                            Long changedOperatorId,
+                                            Long changedUserId,
+                                            AccessUser changedUser) {
+        if (tenant.getRequiredRoles() == null || tenant.getRequiredRoles().isEmpty()) {
+            return;
+        }
+        List<Warehouse> warehouses = warehouseRepository.findAllByTenant_CodeIgnoreCaseOrderByNameAsc(tenant.getCode());
+        List<AccessOperator> operators = accessOperatorRepository
+            .findAllByTenant_CodeIgnoreCaseOrderByDisplayNameAsc(tenant.getCode());
+        List<AccessUser> users = accessUserRepository
+            .findAllByTenant_CodeIgnoreCaseOrderByFullNameAscUsernameAsc(tenant.getCode());
+
+        for (SynapseAccessRole requiredRole : tenant.getRequiredRoles()) {
+            for (Warehouse warehouse : warehouses) {
+                boolean covered = operators.stream().anyMatch(operator -> {
+                    AccessOperator effectiveOperator = changedOperatorId != null
+                        && operator.getId().equals(changedOperatorId) ? changedOperator : operator;
+                    if (!effectiveOperator.isActive() || !effectiveOperator.getRoles().contains(requiredRole)) {
+                        return false;
+                    }
+                    List<String> scopes = accessDirectoryService.getWarehouseScopes(effectiveOperator);
+                    if (!scopes.isEmpty() && !scopes.contains(warehouse.getCode().toUpperCase(Locale.ROOT))) {
+                        return false;
+                    }
+                    return users.stream().anyMatch(user -> {
+                        AccessUser effectiveUser = changedUserId != null && user.getId().equals(changedUserId)
+                            ? changedUser : user;
+                        return effectiveUser.isActive()
+                            && effectiveUser.getOperator() != null
+                            && effectiveUser.getOperator().getId().equals(effectiveOperator.getId());
+                    });
+                });
+                if (!covered) {
+                    throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                        "Change would remove required " + requiredRole + " coverage for warehouse " + warehouse.getCode() + ".");
+                }
+            }
+        }
+    }
+
     private AccessOperatorResponse toOperatorResponse(AccessOperator operator) {
         return new AccessOperatorResponse(
             operator.getId(),
@@ -328,7 +427,8 @@ public class AccessAdministrationService {
             operator.isActive(),
             operator.getDescription(),
             operator.getCreatedAt(),
-            operator.getUpdatedAt()
+            operator.getUpdatedAt(),
+            operator.getVersion()
         );
     }
 
@@ -359,7 +459,8 @@ public class AccessAdministrationService {
             user.isPasswordChangeRequired(),
             user.getPasswordUpdatedAt(),
             user.getCreatedAt(),
-            user.getUpdatedAt()
+            user.getUpdatedAt(),
+            user.getVersion()
         );
     }
 }

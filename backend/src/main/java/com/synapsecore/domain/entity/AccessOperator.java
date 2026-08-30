@@ -17,6 +17,7 @@ import jakarta.persistence.PrePersist;
 import jakarta.persistence.PreUpdate;
 import jakarta.persistence.Table;
 import jakarta.persistence.UniqueConstraint;
+import jakarta.persistence.Version;
 import java.time.Instant;
 import java.util.EnumSet;
 import java.util.LinkedHashSet;
@@ -45,6 +46,10 @@ public class AccessOperator {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
+
+    @Version
+    @Column(nullable = false)
+    private Long version = 0L;
 
     @ManyToOne(fetch = FetchType.EAGER)
     @JoinColumn(name = "tenant_id")

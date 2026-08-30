@@ -12,6 +12,8 @@ public record AccessUserUpdateRequest(
 
     @NotBlank
     @Size(max = 80)
-    String operatorActorName
+    String operatorActorName,
+
+    Long version
 ) {
 }
