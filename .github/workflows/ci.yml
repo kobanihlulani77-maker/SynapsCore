@@ -42,10 +42,22 @@ jobs:
         working-directory: frontend
         run: npm run build
 
+      - name: Prepare Compose validation inputs
+        shell: bash
+        run: |
+          mkdir -p infrastructure/env/ci
+          : > infrastructure/env/backend.env
+          : > infrastructure/env/frontend.env
+          : > infrastructure/env/ci/backend.prod.selfhost.env
+          : > infrastructure/env/ci/frontend.prod.selfhost.env
+
       - name: Validate development Compose config
         working-directory: infrastructure
         run: docker compose config >/dev/null
 
       - name: Validate production Compose config
         working-directory: infrastructure
-        run: docker compose -f docker-compose.prod.yml config >/dev/null
+        run: >-
+          BACKEND_ENV_FILE=./env/ci/backend.prod.selfhost.env
+          FRONTEND_ENV_FILE=./env/ci/frontend.prod.selfhost.env
+          docker compose -f docker-compose.prod.yml config >/dev/null
