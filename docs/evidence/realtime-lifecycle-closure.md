@@ -328,7 +328,7 @@ Hosted proof result on the final deployed bundle:
 1. auth flow and the full authenticated page system render cleanly in a browser
 2. product catalog onboarding works through tenant-scoped API and browser surface
 3. dashboard summary updates live without a browser refresh
-4. replay recovery, scenario approval, execution, and browser role gating work through the UI
+4. replay recovery, scenario governance approval, legacy execution-compatibility rejection, and browser role gating work through the UI
 5. alerts, recommendations, orders, inventory, integrations, users, profile, and settings stay connected
 6. frontend surfaces backend auth rate limiting without getting stuck in a loading state
 ```
