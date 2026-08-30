@@ -1,6 +1,6 @@
 # Domain 11: Controlled Provisioning and Public Entry Closure
 
-Status: implemented and deployed proof verified
+Status: fresh explicit provisioning implemented and locally verified; deployment proof pending
 
 ## Product contract
 
@@ -26,10 +26,11 @@ The protected request supports an explicit approved configuration:
 
 The service validates unique warehouse codes and user/operator identities,
 rejects scopes that reference unknown warehouses, rejects `PLATFORM_OWNER` in a
-tenant payload, and requires a tenant administrator plus review-owner and
-final-approver coverage for every configured warehouse. Empty warehouse scope is
-the established tenant-wide convention; a non-empty scope is explicit site
-authority.
+tenant payload, and requires a tenant administrator plus any roles explicitly
+listed in `requiredRoles`. When a required role is declared, its authority must
+cover every configured warehouse; an undeclared role is not manufactured merely
+to make the tenant appear ready. Empty warehouse scope is the established
+tenant-wide convention; a non-empty scope is explicit site authority.
 
 The transaction creates the tenant, warehouses, operators, and users atomically.
 Duplicate tenant codes return HTTP 409, including the database uniqueness race.
@@ -38,15 +39,41 @@ are returned only in the protected provisioning response, stored only as a
 BCrypt hash, and marked for password change; hashes and secrets are never
 returned.
 
-Starter inventory and connector seeding are disabled by the safe application
-default. Test/demo compatibility fixtures may explicitly enable them through
-test configuration. A fresh controlled company therefore does not receive fake
-products, inventory, orders, alerts, recommendations, replay records, or
-scenario activity merely because it was provisioned.
+Production and the default application configuration require explicit tenant
+provisioning and disable starter inventory and connector seeding. Test/demo
+compatibility fixtures may explicitly enable legacy fallback behavior through
+test configuration; that compatibility path is not the production onboarding
+contract. A fresh controlled company therefore does not receive fake products,
+inventory, orders, alerts, recommendations, replay records, or scenario
+activity merely because it was provisioned.
+
+## Fresh-tenant invariant closure
+
+The new focused coverage verifies that a clean controlled tenant can be
+provisioned with exactly the supplied configuration:
+
+- one configured warehouse is persisted as exactly one warehouse
+- three configured warehouses are persisted as exactly three warehouses
+- warehouse codes, names, and locations are taken from the request rather than
+  the `WH-NORTH`/`WH-COAST` examples
+- a Review Owner with `ALPHA-DC` scope is not granted `BETA-DC` authority
+- a minimal request containing only explicit `TENANT_ADMIN` and
+  `INTEGRATION_ADMIN` users creates no synthetic Review Owner, Final Approver,
+  or Escalation Owner
+- a missing role named in `requiredRoles` fails the request before the tenant
+  is persisted
+- the new tenant has zero products, inventory rows, connectors, orders,
+  fulfillment tasks, alerts, recommendations, scenarios, inbound records, and
+  replay records
+
+The production path now requires callers to supply the actual company users,
+roles, warehouse scopes, and any workflow roles needed for readiness. It does
+not generate a generic Operations Lead, Operations Planner, Executive, or
+warehouse governance identities for a real tenant.
 
 ## Focused verification
 
-`Domain11ControlledProvisioningIntegrationTest` covers:
+`Domain11ControlledProvisioningIntegrationTest` covers 9 tests:
 
 - anonymous provisioning denial
 - custom warehouse creation without the WH-NORTH/WH-COAST production assumption
@@ -56,6 +83,11 @@ scenario activity merely because it was provisioned.
 - duplicate tenant conflict behavior
 - invalid warehouse scope rejection
 - `PLATFORM_OWNER` rejection from the tenant role model
+- exact one-warehouse and three-warehouse configuration
+- explicit warehouse-scoped Review Owner authority
+- minimal explicit user creation without synthetic governance identities
+- failure when an explicitly required role has no warehouse coverage
+- zero operational state after fresh provisioning
 
 The existing public control test now verifies contact navigation and the absence
 of the public Create Workspace CTA/form. The removed `CreateWorkspace.jsx` page
@@ -63,10 +95,20 @@ and route are no longer part of the public application registry.
 
 Local verification recorded for this closure:
 
-- `Domain11ControlledProvisioningIntegrationTest`: 4 tests, 0 failures, 0 errors
-- full backend Maven suite: 248 tests across 29 suites, 0 failures, 0 errors
+- `Domain11ControlledProvisioningIntegrationTest`: 9 tests, 0 failures, 0 errors
+- full backend Maven suite: 253 tests, 0 failures, 0 errors
 - frontend lint, build, and verify: passed
 - documentation link check: 777 links checked, none missing
+
+The first full-suite attempt exposed a timing-sensitive failure in the existing
+inventory concurrency test and an expected compatibility fixture assertion after
+the planner fallback was removed. The planner fixture was restored only behind
+the non-explicit test compatibility setting; the concurrency test passed in an
+isolated rerun, and the complete suite then passed 253/253.
+
+This fresh-provisioning change has not yet been deployed or live-proven. The
+post-deployment evidence below remains valid for the earlier deployed revision;
+a new live proof run is required after deployment of this change.
 
 ## Post-deployment closure evidence
 

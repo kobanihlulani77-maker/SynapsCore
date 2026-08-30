@@ -66,7 +66,7 @@ public class TenantOnboardingService {
         String secondaryLocation = normalizeOptional(request.secondaryLocation());
         List<TenantWarehouseProvisioningRequest> warehouseRequests = resolveWarehouses(request, tenantCode, primaryLocation, secondaryLocation);
         List<TenantUserProvisioningRequest> userRequests = resolveUsers(request, tenantCode, adminUsername);
-        validateProvisioningPlan(tenantCode, adminUsername, warehouseRequests, userRequests);
+        validateProvisioningPlan(tenantCode, adminUsername, warehouseRequests, userRequests, request.requiredRoles());
 
         if (tenantRepository.findByCodeIgnoreCase(tenantCode).isPresent()) {
             operationalMetricsService.recordTenantOperation(tenantCode, "TENANT_ONBOARDING", false);
@@ -142,7 +142,10 @@ public class TenantOnboardingService {
                 .build()));
         }
 
-        if (request.users() == null || request.users().isEmpty()) {
+        // Keep the legacy planner fixture only for the non-explicit compatibility profile.
+        // Production onboarding requires every role holder to be supplied explicitly.
+        if (!starterProperties.isRequireExplicitTenantProvisioning()
+            && (request.users() == null || request.users().isEmpty())) {
             accessOperatorRepository.save(AccessOperator.builder()
                 .tenant(tenant)
                 .actorName("Operations Planner")
@@ -264,7 +267,8 @@ public class TenantOnboardingService {
     private void validateProvisioningPlan(String tenantCode,
                                           String adminUsername,
                                           List<TenantWarehouseProvisioningRequest> warehouses,
-                                          List<TenantUserProvisioningRequest> users) {
+                                          List<TenantUserProvisioningRequest> users,
+                                          List<SynapseAccessRole> requestedRequiredRoles) {
         if (warehouses.isEmpty() || users.isEmpty()) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
                 "Controlled provisioning requires warehouses and initial users.");
@@ -304,11 +308,12 @@ public class TenantOnboardingService {
                 }
             }
         }
+        Set<SynapseAccessRole> requiredRoles = normalizeRoles(requestedRequiredRoles);
         if (!usernames.contains(adminUsername) || !tenantAdmin
-            || !hasAuthorityForEveryWarehouse(users, warehouseCodes, SynapseAccessRole.REVIEW_OWNER)
-            || !hasAuthorityForEveryWarehouse(users, warehouseCodes, SynapseAccessRole.FINAL_APPROVER)) {
+            || requiredRoles.stream().anyMatch(requiredRole ->
+                !hasAuthorityForEveryWarehouse(users, warehouseCodes, requiredRole))) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
-                "Initial provisioning requires the admin identity and review/final-approval coverage for every warehouse.");
+                "Initial provisioning is missing the admin identity or required role coverage for every warehouse.");
         }
     }
 

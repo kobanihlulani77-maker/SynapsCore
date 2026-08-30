@@ -338,6 +338,7 @@ $onboarding = Invoke-JsonRequest -Method Post -Url "$BackendUrl/api/access/tenan
             warehouseScopes = @()
         }
     )
+    requiredRoles    = @("REVIEW_OWNER", "FINAL_APPROVER")
 }
 Assert-True ($onboarding.StatusCode -eq 200) "Tenant onboarding did not succeed."
 Assert-True ($onboarding.Json.tenantCode -eq $tenantCode) "Tenant onboarding response returned the wrong tenant code."

@@ -3,6 +3,7 @@ package com.synapsecore.access.dto;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Pattern;
 import jakarta.validation.constraints.Size;
+import com.synapsecore.access.SynapseAccessRole;
 import jakarta.validation.Valid;
 import java.util.List;
 
@@ -41,7 +42,9 @@ public record TenantOnboardingRequest(
 
     List<@Valid TenantWarehouseProvisioningRequest> warehouses,
 
-    List<@Valid TenantUserProvisioningRequest> users
+    List<@Valid TenantUserProvisioningRequest> users,
+
+    List<SynapseAccessRole> requiredRoles
 ) {
 
     public TenantOnboardingRequest(String tenantCode,
@@ -53,6 +56,6 @@ public record TenantOnboardingRequest(
                                    String primaryLocation,
                                    String secondaryLocation) {
         this(tenantCode, tenantName, description, adminFullName, adminUsername, adminPassword,
-            primaryLocation, secondaryLocation, null, null);
+            primaryLocation, secondaryLocation, null, null, null);
     }
 }

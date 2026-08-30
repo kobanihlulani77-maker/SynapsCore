@@ -226,6 +226,7 @@ export default function PlatformApplication({ initialPage }) {
             warehouseScopes: [],
           },
         ],
+        requiredRoles: ['REVIEW_OWNER', 'FINAL_APPROVER'],
       }) })
       await loadOverview()
       setTenantForm(emptyTenantForm)

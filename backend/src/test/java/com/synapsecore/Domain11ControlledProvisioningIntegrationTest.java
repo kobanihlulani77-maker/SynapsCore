@@ -5,6 +5,23 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+import static org.assertj.core.api.Assertions.assertThat;
+import com.synapsecore.access.SynapseAccessRole;
+import com.synapsecore.domain.entity.AccessOperator;
+import com.synapsecore.domain.repository.AccessOperatorRepository;
+import com.synapsecore.domain.repository.AccessUserRepository;
+import com.synapsecore.domain.repository.AlertRepository;
+import com.synapsecore.domain.repository.CustomerOrderRepository;
+import com.synapsecore.domain.repository.FulfillmentTaskRepository;
+import com.synapsecore.domain.repository.IntegrationConnectorRepository;
+import com.synapsecore.domain.repository.IntegrationInboundRecordRepository;
+import com.synapsecore.domain.repository.IntegrationReplayRecordRepository;
+import com.synapsecore.domain.repository.InventoryRepository;
+import com.synapsecore.domain.repository.ProductRepository;
+import com.synapsecore.domain.repository.RecommendationRepository;
+import com.synapsecore.domain.repository.ScenarioRunRepository;
+import com.synapsecore.domain.repository.TenantRepository;
+import com.synapsecore.domain.repository.WarehouseRepository;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -26,6 +43,48 @@ class Domain11ControlledProvisioningIntegrationTest {
 
     @Autowired
     private MockMvc mockMvc;
+
+    @Autowired
+    private AccessOperatorRepository accessOperatorRepository;
+
+    @Autowired
+    private AccessUserRepository accessUserRepository;
+
+    @Autowired
+    private AlertRepository alertRepository;
+
+    @Autowired
+    private CustomerOrderRepository customerOrderRepository;
+
+    @Autowired
+    private FulfillmentTaskRepository fulfillmentTaskRepository;
+
+    @Autowired
+    private IntegrationConnectorRepository integrationConnectorRepository;
+
+    @Autowired
+    private IntegrationInboundRecordRepository integrationInboundRecordRepository;
+
+    @Autowired
+    private IntegrationReplayRecordRepository integrationReplayRecordRepository;
+
+    @Autowired
+    private InventoryRepository inventoryRepository;
+
+    @Autowired
+    private ProductRepository productRepository;
+
+    @Autowired
+    private RecommendationRepository recommendationRepository;
+
+    @Autowired
+    private ScenarioRunRepository scenarioRunRepository;
+
+    @Autowired
+    private TenantRepository tenantRepository;
+
+    @Autowired
+    private WarehouseRepository warehouseRepository;
 
     @Test
     void anonymousProvisioningIsDenied() throws Exception {
@@ -90,6 +149,106 @@ class Domain11ControlledProvisioningIntegrationTest {
             .andExpect(status().isBadRequest());
     }
 
+    @Test
+    void oneWarehouseProvisioningCreatesExactlyRequestedConfigurationAndNoOperationalState() throws Exception {
+        String tenantCode = uniqueCode();
+        String payload = simplePayload(tenantCode,
+            "{\"code\":\"ALPHA-DC\",\"name\":\"Alpha Distribution Centre\",\"location\":\"Pretoria\"}",
+            minimalUsers(), "");
+
+        mockMvc.perform(post("/api/access/tenants")
+                .header("X-Synapse-Platform-Admin-Token", PLATFORM_ADMIN_TOKEN)
+                .contentType(APPLICATION_JSON)
+                .content(payload))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.starterWarehouseCodes").value(org.hamcrest.Matchers.contains("ALPHA-DC")))
+            .andExpect(jsonPath("$.provisionedUsers", org.hamcrest.Matchers.hasSize(2)));
+
+        assertExactConfiguration(tenantCode, new String[] {"ALPHA-DC"}, new String[] {"fresh.admin", "fresh.integration"});
+        assertNoOperationalState(tenantCode);
+    }
+
+    @Test
+    void threeWarehouseProvisioningCreatesExactlyRequestedWarehouses() throws Exception {
+        String tenantCode = uniqueCode();
+        String payload = simplePayload(tenantCode,
+            "{\"code\":\"ALPHA-DC\",\"name\":\"Alpha\",\"location\":\"Pretoria\"},"
+                + "{\"code\":\"BETA-DC\",\"name\":\"Beta\",\"location\":\"Durban\"},"
+                + "{\"code\":\"GAMMA-DC\",\"name\":\"Gamma\",\"location\":\"Gqeberha\"}",
+            minimalUsers(), "");
+
+        mockMvc.perform(post("/api/access/tenants")
+                .header("X-Synapse-Platform-Admin-Token", PLATFORM_ADMIN_TOKEN)
+                .contentType(APPLICATION_JSON)
+                .content(payload))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.starterWarehouseCodes", org.hamcrest.Matchers.containsInAnyOrder("ALPHA-DC", "BETA-DC", "GAMMA-DC")));
+
+        assertExactConfiguration(tenantCode, new String[] {"ALPHA-DC", "BETA-DC", "GAMMA-DC"},
+            new String[] {"fresh.admin", "fresh.integration"});
+    }
+
+    @Test
+    void explicitReviewOwnerScopeIsStoredOnlyForAssignedWarehouse() throws Exception {
+        String tenantCode = uniqueCode();
+        String payload = simplePayload(tenantCode,
+            "{\"code\":\"ALPHA-DC\",\"name\":\"Alpha\",\"location\":\"Pretoria\"},"
+                + "{\"code\":\"BETA-DC\",\"name\":\"Beta\",\"location\":\"Durban\"}",
+            """
+            {"username":"fresh.admin","fullName":"Fresh Admin","operatorActorName":"Fresh Admin","roles":["TENANT_ADMIN"],"warehouseScopes":[],"initialPassword":"FreshAdmin!123"},
+            {"username":"fresh.review","fullName":"Alpha Review Owner","operatorActorName":"Alpha Review Owner","roles":["REVIEW_OWNER"],"warehouseScopes":["ALPHA-DC"]}
+            """, "");
+
+        mockMvc.perform(post("/api/access/tenants")
+                .header("X-Synapse-Platform-Admin-Token", PLATFORM_ADMIN_TOKEN)
+                .contentType(APPLICATION_JSON)
+                .content(payload))
+            .andExpect(status().isOk());
+
+        AccessOperator reviewOwner = accessOperatorRepository
+            .findByTenant_CodeIgnoreCaseAndActorNameIgnoreCaseAndActiveTrue(tenantCode, "Alpha Review Owner")
+            .orElseThrow();
+        assertThat(reviewOwner.getWarehouseScopes()).containsExactly("ALPHA-DC");
+    }
+
+    @Test
+    void onlyExplicitTenantAdminAndIntegrationAdminUsersAreCreated() throws Exception {
+        String tenantCode = uniqueCode();
+        String payload = simplePayload(tenantCode,
+            "{\"code\":\"ALPHA-DC\",\"name\":\"Alpha\",\"location\":\"Pretoria\"}",
+            minimalUsers(), "");
+
+        mockMvc.perform(post("/api/access/tenants")
+                .header("X-Synapse-Platform-Admin-Token", PLATFORM_ADMIN_TOKEN)
+                .contentType(APPLICATION_JSON)
+                .content(payload))
+            .andExpect(status().isOk());
+
+        assertThat(accessUserRepository.findAllByTenant_CodeIgnoreCaseOrderByFullNameAscUsernameAsc(tenantCode))
+            .extracting("username")
+            .containsExactlyInAnyOrder("fresh.admin", "fresh.integration");
+        assertThat(accessOperatorRepository.findAllByTenant_CodeIgnoreCaseAndActiveTrueOrderByDisplayNameAsc(tenantCode))
+            .noneMatch(operator -> operator.getRoles().stream().anyMatch(role -> role == SynapseAccessRole.REVIEW_OWNER
+                || role == SynapseAccessRole.FINAL_APPROVER || role == SynapseAccessRole.ESCALATION_OWNER));
+    }
+
+    @Test
+    void missingExplicitlyRequiredRoleFailsReadinessWithoutCreatingSyntheticUser() throws Exception {
+        String tenantCode = uniqueCode();
+        String payload = simplePayload(tenantCode,
+            "{\"code\":\"ALPHA-DC\",\"name\":\"Alpha\",\"location\":\"Pretoria\"}",
+            "{\"username\":\"fresh.admin\",\"fullName\":\"Fresh Admin\",\"operatorActorName\":\"Fresh Admin\",\"roles\":[\"TENANT_ADMIN\"],\"warehouseScopes\":[],\"initialPassword\":\"FreshAdmin!123\"}",
+            "FINAL_APPROVER");
+
+        mockMvc.perform(post("/api/access/tenants")
+                .header("X-Synapse-Platform-Admin-Token", PLATFORM_ADMIN_TOKEN)
+                .contentType(APPLICATION_JSON)
+                .content(payload))
+            .andExpect(status().isBadRequest());
+
+        assertThat(tenantRepository.findByCodeIgnoreCase(tenantCode)).isEmpty();
+    }
+
     private String uniqueCode() {
         return "D11-" + UUID.randomUUID().toString().replace("-", "").substring(0, 12).toUpperCase();
     }
@@ -147,9 +306,66 @@ class Domain11ControlledProvisioningIntegrationTest {
                   "roles": ["FINAL_APPROVER"],
                   "warehouseScopes": ["BETA-DC"]
                 }
-              ]
+              ],
+              "requiredRoles": ["REVIEW_OWNER", "FINAL_APPROVER"]
             }
             """.formatted(tenantCode, reviewScope);
+    }
+
+    private String minimalUsers() {
+        return """
+            {"username":"fresh.admin","fullName":"Fresh Admin","operatorActorName":"Fresh Admin","roles":["TENANT_ADMIN"],"warehouseScopes":[],"initialPassword":"FreshAdmin!123"},
+            {"username":"fresh.integration","fullName":"Fresh Integration Admin","operatorActorName":"Fresh Integration Admin","roles":["INTEGRATION_ADMIN"],"warehouseScopes":["ALPHA-DC"]}
+            """;
+    }
+
+    private String simplePayload(String tenantCode, String warehouseJson, String userJson, String requiredRolesJson) {
+        return """
+            {
+              "tenantCode": "%s",
+              "tenantName": "Fresh Controlled Company",
+              "description": "Synthetic fresh provisioning fixture.",
+              "adminFullName": "Fresh Admin",
+              "adminUsername": "fresh.admin",
+              "adminPassword": "FreshAdmin!123",
+              "primaryLocation": "Pretoria",
+              "warehouses": [%s],
+              "users": [%s],
+              "requiredRoles": [%s]
+            }
+            """.formatted(tenantCode, warehouseJson, userJson, requiredRolesJson);
+    }
+
+    private void assertExactConfiguration(String tenantCode, String[] warehouseCodes, String[] usernames) {
+        assertThat(warehouseRepository.findAllByTenant_CodeIgnoreCaseOrderByNameAsc(tenantCode))
+            .extracting("code")
+            .containsExactlyInAnyOrder(warehouseCodes);
+        assertThat(accessUserRepository.findAllByTenant_CodeIgnoreCaseOrderByFullNameAscUsernameAsc(tenantCode))
+            .extracting("username")
+            .containsExactlyInAnyOrder(usernames);
+    }
+
+    private void assertNoOperationalState(String tenantCode) {
+        assertThat(productRepository.findAllByTenant_CodeIgnoreCaseOrderByNameAsc(tenantCode)).isEmpty();
+        assertThat(inventoryRepository.countByTenantCode(tenantCode)).isZero();
+        assertThat(integrationConnectorRepository.countByTenant_CodeIgnoreCase(tenantCode)).isZero();
+        assertThat(customerOrderRepository.findAll().stream()
+            .filter(order -> order.getTenant() != null && tenantCode.equalsIgnoreCase(order.getTenant().getCode())))
+            .isEmpty();
+        assertThat(fulfillmentTaskRepository.findAll().stream()
+            .filter(task -> task.getTenant() != null && tenantCode.equalsIgnoreCase(task.getTenant().getCode())))
+            .isEmpty();
+        assertThat(alertRepository.findAllByTenant_CodeIgnoreCaseOrderByUpdatedAtDesc(tenantCode)).isEmpty();
+        assertThat(recommendationRepository.findAll().stream()
+            .filter(recommendation -> recommendation.getTenant() != null && tenantCode.equalsIgnoreCase(recommendation.getTenant().getCode())))
+            .isEmpty();
+        assertThat(scenarioRunRepository.findTop12ByTenant_CodeIgnoreCaseOrderByCreatedAtDesc(tenantCode)).isEmpty();
+        assertThat(integrationInboundRecordRepository.findAll().stream()
+            .filter(record -> tenantCode.equalsIgnoreCase(record.getTenantCode())))
+            .isEmpty();
+        assertThat(integrationReplayRecordRepository.findAll().stream()
+            .filter(record -> tenantCode.equalsIgnoreCase(record.getTenantCode())))
+            .isEmpty();
     }
 
     private String platformOwnerPayload(String tenantCode) {

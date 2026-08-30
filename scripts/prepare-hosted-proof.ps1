@@ -908,6 +908,7 @@ if ($null -eq $tenant) {
                     warehouseScopes = @()
                 }
             )
+            requiredRoles = @("REVIEW_OWNER", "FINAL_APPROVER")
         } | Out-Null
 } else {
     Write-Host "Tenant workspace $script:TenantCodeValue already exists; reusing it."
