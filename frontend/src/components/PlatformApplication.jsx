@@ -19,15 +19,27 @@ import SystemConfigPage from '../pages/SystemConfig'
 import TenantsPage from '../pages/Tenants'
 
 const emptySession = { signedIn: false }
-const emptyTenantForm = {
+const createBlankWarehouse = () => ({ code: '', name: '', location: '' })
+const createBlankUser = () => ({
+  username: '',
+  fullName: '',
+  operatorActorName: '',
+  operatorDisplayName: '',
+  operatorDescription: '',
+  roles: [],
+  warehouseScopes: [],
+  tenantWide: false,
+  initialPassword: '',
+})
+const createEmptyTenantForm = () => ({
   tenantCode: '',
   tenantName: '',
-  description: 'Controlled pilot workspace.',
-  adminFullName: '',
-  adminUsername: '',
-  adminPassword: '',
-  primaryLocation: '',
-}
+  description: '',
+  warehouses: [createBlankWarehouse()],
+  users: [createBlankUser()],
+  requiredRoles: [],
+  requiredRolesConfigured: false,
+})
 
 const platformFetch = async (path, init = {}) => {
   let response
@@ -107,7 +119,7 @@ export default function PlatformApplication({ initialPage }) {
   const [form, setForm] = useState({ username: '', password: '' })
   const [overview, setOverview] = useState(null)
   const [activityState, setActivityState] = useState({ items: [], loading: false, error: '' })
-  const [tenantForm, setTenantForm] = useState(emptyTenantForm)
+  const [tenantForm, setTenantForm] = useState(createEmptyTenantForm)
   const [tenantOnboardingState, setTenantOnboardingState] = useState({ loading: false, success: '', error: '', result: null })
   const [selectedTenantPortfolioCode, setSelectedTenantPortfolioCode] = useState('')
   const [authSessionState, setAuthSessionState] = useState({ loading: false, action: '', username: '', tenantCode: '' })
@@ -197,40 +209,38 @@ export default function PlatformApplication({ initialPage }) {
     try {
       const tenantCode = tenantForm.tenantCode.trim().toUpperCase()
       const tenantName = tenantForm.tenantName.trim()
+      const warehouses = tenantForm.warehouses.map((warehouse) => ({
+        code: warehouse.code.trim().toUpperCase(),
+        name: warehouse.name.trim(),
+        location: warehouse.location.trim(),
+      }))
+      const users = tenantForm.users.map((user) => ({
+        username: user.username.trim().toLowerCase(),
+        fullName: user.fullName.trim(),
+        operatorActorName: user.operatorActorName.trim(),
+        operatorDisplayName: user.operatorDisplayName.trim() || null,
+        operatorDescription: user.operatorDescription.trim() || null,
+        roles: user.roles,
+        warehouseScopes: user.tenantWide ? [] : user.warehouseScopes,
+        initialPassword: user.initialPassword.trim() || null,
+      }))
+      const adminUser = users.find((user) => user.roles.includes('TENANT_ADMIN'))
       const result = await platformFetch('/api/access/tenants', { method: 'POST', body: JSON.stringify({
-        ...tenantForm,
         tenantCode,
         tenantName,
-        warehouses: [
-          { code: 'WH-NORTH', name: `${tenantName} North Hub`, location: tenantForm.primaryLocation.trim() },
-          { code: 'WH-COAST', name: `${tenantName} Coast Hub`, location: tenantForm.secondaryLocation?.trim() || `${tenantForm.primaryLocation.trim()} Reserve` },
-        ],
-        users: [
-          {
-            username: tenantForm.adminUsername.trim(),
-            fullName: tenantForm.adminFullName.trim(),
-            operatorActorName: 'Operations Lead',
-            operatorDisplayName: 'Operations Lead',
-            operatorDescription: 'Controlled platform bootstrap administrator.',
-            roles: ['TENANT_ADMIN', 'REVIEW_OWNER', 'ESCALATION_OWNER', 'INTEGRATION_ADMIN', 'INTEGRATION_OPERATOR'],
-            warehouseScopes: [],
-            initialPassword: tenantForm.adminPassword,
-          },
-          {
-            username: `${tenantCode.toLowerCase().replaceAll('-', '.')}.executive`,
-            fullName: `${tenantName} Executive Approver`,
-            operatorActorName: 'Executive Operations Director',
-            operatorDisplayName: 'Executive Operations Director',
-            operatorDescription: 'Controlled platform bootstrap final approver.',
-            roles: ['FINAL_APPROVER'],
-            warehouseScopes: [],
-          },
-        ],
-        requiredRoles: ['REVIEW_OWNER', 'FINAL_APPROVER'],
+        description: tenantForm.description.trim() || null,
+        adminFullName: adminUser.fullName,
+        adminUsername: adminUser.username,
+        adminPassword: adminUser.initialPassword,
+        primaryLocation: warehouses[0].location,
+        secondaryLocation: warehouses[1]?.location || null,
+        warehouses,
+        users,
+        requiredRoles: tenantForm.requiredRoles,
       }) })
       await loadOverview()
-      setTenantForm(emptyTenantForm)
-      setTenantOnboardingState({ loading: false, success: 'Tenant workspace created through the platform-owner session.', error: '', result })
+      setTenantForm(createEmptyTenantForm())
+      setTenantOnboardingState({ loading: false, success: 'Provisioning complete. The explicit configuration was accepted; this does not imply operational data readiness.', error: '', result })
     } catch (requestError) {
       setTenantOnboardingState({ loading: false, success: '', error: requestError.message, result: null })
     }

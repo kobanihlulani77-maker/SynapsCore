@@ -24,6 +24,7 @@ import com.synapsecore.access.dto.TenantWorkspaceWarehouseCreateRequest;
 import com.synapsecore.access.dto.TenantWorkspaceWarehouseLifecycleRequest;
 import com.synapsecore.access.dto.TenantResponse;
 import com.synapsecore.auth.AuthSessionService;
+import com.synapsecore.config.SynapseCorsProperties;
 import com.synapsecore.platform.PlatformOwnerSessionService;
 import com.synapsecore.domain.dto.WarehouseResponse;
 import com.synapsecore.integration.dto.IntegrationConnectorResponse;
@@ -31,7 +32,9 @@ import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 import java.util.List;
 import lombok.RequiredArgsConstructor;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
+import org.springframework.web.cors.CorsConfiguration;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
@@ -56,6 +59,7 @@ public class AccessController {
     private final TenantOnboardingService tenantOnboardingService;
     private final AuthSessionService authSessionService;
     private final PlatformOwnerSessionService platformOwnerSessionService;
+    private final SynapseCorsProperties corsProperties;
 
     @GetMapping("/tenants")
     public List<TenantResponse> getActiveTenants(HttpServletRequest httpRequest) {
@@ -84,6 +88,7 @@ public class AccessController {
             platformAdministrationAccessService.requirePlatformAdministration(httpRequest);
             actorName = "platform-admin";
         } else if (platformOwnerSessionService.hasSessionIdentity(httpRequest.getSession(false))) {
+            requireTrustedCookieOrigin(httpRequest);
             actorName = platformOwnerSessionService.requirePlatformOwner(
                 httpRequest.getSession(false),
                 "create tenant workspaces"
@@ -93,6 +98,21 @@ public class AccessController {
                 "Tenant workspace creation requires platform administration in this environment.");
         }
         return tenantOnboardingService.onboardTenant(request, actorName);
+    }
+
+    private void requireTrustedCookieOrigin(HttpServletRequest request) {
+        String origin = request.getHeader(HttpHeaders.ORIGIN);
+        if (origin == null || origin.isBlank()) {
+            return;
+        }
+
+        CorsConfiguration configuration = new CorsConfiguration();
+        configuration.setAllowedOriginPatterns(corsProperties.getAllowedOrigins());
+        configuration.setAllowCredentials(true);
+        if (configuration.checkOrigin(origin) == null) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN,
+                "Tenant provisioning requires a trusted application origin.");
+        }
     }
 
     @GetMapping("/operators")

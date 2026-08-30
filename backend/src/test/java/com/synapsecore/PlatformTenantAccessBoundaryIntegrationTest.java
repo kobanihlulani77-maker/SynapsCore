@@ -31,6 +31,7 @@ import com.synapsecore.domain.repository.OperationalDispatchWorkItemRepository;
 import com.synapsecore.domain.repository.RecommendationRepository;
 import com.synapsecore.domain.repository.WarehouseRepository;
 import com.synapsecore.domain.repository.ScenarioRunRepository;
+import com.synapsecore.domain.repository.TenantRepository;
 import com.synapsecore.domain.entity.ScenarioRunType;
 import com.synapsecore.config.SynapsePlatformOwnerProperties;
 import java.nio.charset.StandardCharsets;
@@ -95,6 +96,9 @@ class PlatformTenantAccessBoundaryIntegrationTest {
 
     @Autowired
     private AccessUserRepository accessUserRepository;
+
+    @Autowired
+    private TenantRepository tenantRepository;
 
     @Autowired
     private ScenarioRunRepository scenarioRunRepository;
@@ -790,6 +794,22 @@ class PlatformTenantAccessBoundaryIntegrationTest {
             mockMvc.perform(get(endpoint))
                 .andExpect(status().isForbidden());
         }
+    }
+
+    @Test
+    void cookieBackedPlatformProvisioningRequiresTrustedOriginWhenOriginIsProvided() throws Exception {
+        String tenantCode = "ORIGIN-BOUNDARY";
+        String payload = tenantPayload(tenantCode, "Origin Boundary", "origin.admin", "Origin-Admin-2026!");
+
+        mockMvc.perform(post("/api/access/tenants")
+                .session(platformLogin())
+                .header("Origin", "https://evil.example")
+                .contentType(APPLICATION_JSON)
+                .content(payload))
+            .andExpect(status().isForbidden())
+            .andExpect(content().string("Invalid CORS request"));
+
+        assertThat(tenantRepository.findByCodeIgnoreCase(tenantCode)).isEmpty();
     }
 
     @Test
