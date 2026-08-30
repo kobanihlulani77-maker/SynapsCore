@@ -178,20 +178,27 @@ export const createScenarioForm = (productSku = '') => ({
   items: [createScenarioLine(productSku)],
 })
 
-export const buildWarehouseOptions = (inventory = [], configuredWarehouses = [], scopedWarehouseCodes = []) => {
+export const buildWarehouseOptions = (inventory = [], configuredWarehouses = [], scopedWarehouseCodes = [], authoritativeWarehouses = null) => {
   const options = new Map()
-  inventory.forEach((item) => {
-    const code = String(item.warehouseCode || '').trim()
-    if (code) options.set(code.toUpperCase(), { code, name: item.warehouseName || code })
-  })
-  configuredWarehouses.forEach((warehouse) => {
-    const code = String(warehouse.code || '').trim()
-    if (code) options.set(code.toUpperCase(), { code, name: warehouse.name || code })
-  })
-  scopedWarehouseCodes.forEach((warehouseCode) => {
-    const code = String(warehouseCode).trim()
-    if (code && !options.has(code.toUpperCase())) options.set(code.toUpperCase(), { code, name: code })
-  })
+  const activeWarehouseMap = Array.isArray(authoritativeWarehouses)
+    ? new Map(authoritativeWarehouses
+      .filter((warehouse) => warehouse && warehouse.active !== false && String(warehouse.code || '').trim())
+      .map((warehouse) => [String(warehouse.code).trim().toUpperCase(), warehouse]))
+    : null
+  const addOption = (warehouse, fallbackName) => {
+    const code = String(warehouse?.code || '').trim()
+    if (!code || warehouse?.active === false) return
+    const normalizedCode = code.toUpperCase()
+    if (activeWarehouseMap && !activeWarehouseMap.has(normalizedCode)) return
+    const authoritativeWarehouse = activeWarehouseMap?.get(normalizedCode)
+    options.set(normalizedCode, {
+      code: authoritativeWarehouse?.code || code,
+      name: authoritativeWarehouse?.name || warehouse?.name || fallbackName || code,
+    })
+  }
+  inventory.forEach((item) => addOption({ code: item.warehouseCode, name: item.warehouseName }, item.warehouseCode))
+  configuredWarehouses.forEach((warehouse) => addOption(warehouse, warehouse.code))
+  scopedWarehouseCodes.forEach((warehouseCode) => addOption({ code: warehouseCode }, warehouseCode))
   return [...options.values()]
 }
 

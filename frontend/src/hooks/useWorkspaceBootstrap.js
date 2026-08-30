@@ -54,6 +54,7 @@ export default function useWorkspaceBootstrap({
   passwordChangeStateSetter,
   operatorDirectoryStateSetter,
   scenarioHistoryStateSetter,
+  warehouseAccessStateSetter,
   scenarioForm,
   scenarioRequestedBy,
   scenarioRequestedBySetter,
@@ -140,6 +141,57 @@ export default function useWorkspaceBootstrap({
     }
   }
 
+  async function fetchWarehouseContext({ quiet = false } = {}) {
+    if (!authSessionState.session?.tenantCode) {
+      warehouseAccessStateSetter({ loading: false, error: '', items: [] })
+      return []
+    }
+
+    if (!quiet) {
+      warehouseAccessStateSetter((current) => ({ ...current, loading: true, error: '' }))
+    }
+
+    try {
+      const [session, warehouses] = await Promise.all([
+        fetchJson('/api/auth/session'),
+        fetchJson('/api/warehouses'),
+      ])
+      if (session?.signedIn) {
+        const currentSession = authSessionState.session
+        const currentRoles = [...(currentSession?.roles || [])].sort().join('|')
+        const nextRoles = [...(session.roles || [])].sort().join('|')
+        const currentScopes = [...(currentSession?.warehouseScopes || [])].sort().join('|')
+        const nextScopes = [...(session.warehouseScopes || [])].sort().join('|')
+        if (
+          currentSession?.tenantCode !== session.tenantCode
+          || currentSession?.username !== session.username
+          || currentRoles !== nextRoles
+          || currentScopes !== nextScopes
+        ) {
+          authSessionStateSetter((current) => ({
+            ...current,
+            loading: false,
+            error: '',
+            action: '',
+            session,
+            tenantCode: session.tenantCode || current.tenantCode,
+            username: session.username || current.username,
+            password: '',
+          }))
+        }
+      }
+      const activeWarehouses = Array.isArray(warehouses)
+        ? warehouses.filter((warehouse) => warehouse?.active !== false)
+        : []
+      warehouseAccessStateSetter({ loading: false, error: '', items: activeWarehouses })
+      return activeWarehouses
+    } catch (error) {
+      // Fail closed for operation targets until authoritative access can be read again.
+      warehouseAccessStateSetter({ loading: false, error: error.message, items: [] })
+      return []
+    }
+  }
+
   async function fetchAccessAdminData() {
     const [workspace, operators, users] = await Promise.all([
       fetchJson('/api/access/admin/workspace'),
@@ -167,6 +219,7 @@ export default function useWorkspaceBootstrap({
         ? current.operatorActorName
         : defaultOperatorActorName,
     }))
+    await fetchWarehouseContext({ quiet: true })
   }
 
   async function fetchSnapshot() {
@@ -292,6 +345,24 @@ export default function useWorkspaceBootstrap({
     loadTenants()
     return () => { active = false }
   }, [activeTenantCode, authSessionState.session])
+
+  useEffect(() => {
+    let active = true
+    if (!authSessionState.session?.tenantCode) {
+      warehouseAccessStateSetter({ loading: false, error: '', items: [] })
+      return () => { active = false }
+    }
+
+    const refreshWarehouseContext = () => {
+      if (active) void fetchWarehouseContext({ quiet: true })
+    }
+    refreshWarehouseContext()
+    const refreshInterval = globalThis.setInterval(refreshWarehouseContext, 30_000)
+    return () => {
+      active = false
+      globalThis.clearInterval(refreshInterval)
+    }
+  }, [activeTenantCode, authSessionState.session?.tenantCode])
 
   useEffect(() => {
     let active = true

@@ -48,6 +48,7 @@ export default function useWorkspaceState({ initialPage }) {
   const [actionState, setActionState] = useState({ loading: false, error: '' })
   const [systemRuntimeState, setSystemRuntimeState] = useState({ loading: true, error: '', runtime: null })
   const [tenantDirectoryState, setTenantDirectoryState] = useState({ loading: true, error: '', items: [] })
+  const [warehouseAccessState, setWarehouseAccessState] = useState({ loading: true, error: '', items: [] })
   const [tenantOnboardingForm, setTenantOnboardingForm] = useState(defaultTenantOnboardingForm)
   const [tenantOnboardingState, setTenantOnboardingState] = useState({ loading: false, error: '', success: '', result: null })
   const [accessAdminState, setAccessAdminState] = useState({ loading: false, error: '', success: '', workspace: null, operators: [], users: [] })
@@ -104,6 +105,7 @@ export default function useWorkspaceState({ initialPage }) {
     setScenarioHistoryState({ loading: false, error: '', items: [] })
     setOperatorDirectoryState({ loading: false, error: '', items: [] })
     setSystemRuntimeState({ loading: false, error: '', runtime: null })
+    setWarehouseAccessState({ loading: false, error: '', items: [] })
     setAccessAdminState({ loading: false, error: '', success: '', workspace: null, operators: [], users: [] })
     setCatalogState({ loading: false, error: '', success: '', products: [], importResult: null })
     setCatalogForm(createDefaultCatalogForm())
@@ -222,6 +224,8 @@ export default function useWorkspaceState({ initialPage }) {
     setSystemRuntimeState,
     tenantDirectoryState,
     setTenantDirectoryState,
+    warehouseAccessState,
+    setWarehouseAccessState,
     tenantOnboardingForm,
     setTenantOnboardingForm,
     tenantOnboardingState,

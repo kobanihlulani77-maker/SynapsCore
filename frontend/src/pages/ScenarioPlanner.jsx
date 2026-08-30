@@ -46,6 +46,7 @@ export default function ScenarioPlannerPage({ context }) {
     updateScenarioField,
     updateScenarioLine,
     removeScenarioLine,
+    warehouseAccessState,
   } = context
 
   if (!isAuthenticated || !isScenariosPage) {
@@ -57,8 +58,17 @@ export default function ScenarioPlannerPage({ context }) {
       ? 'Previewed'
       : scenarioRevisionSource
         ? 'Revision'
-        : 'Draft'
-  const plannerNextStep = !primaryContext.inputValid
+      : 'Draft'
+  const hasActiveWarehouse = (warehouseCode) => warehouseOptions.some((warehouse) => (
+    warehouse.code.trim().toUpperCase() === warehouseCode?.trim().toUpperCase()
+  ))
+  const primaryScenarioValid = primaryContext.inputValid && hasActiveWarehouse(scenarioForm.warehouseCode)
+  const comparisonScenarioValid = alternativeContext.inputValid && hasActiveWarehouse(comparisonForm.warehouseCode)
+  const plannerNextStep = warehouseAccessState.loading
+    ? 'Loading active warehouse access before planning can begin.'
+    : !warehouseOptions.length
+      ? 'No active warehouse is currently available to this account. Resolve warehouse access before planning new work.'
+      : !primaryScenarioValid
     ? 'Complete Scenario A inputs before preview or save.'
     : scenarioState.result
       ? 'Review preview evidence, compare alternatives if needed, then save for governance.'
@@ -66,7 +76,11 @@ export default function ScenarioPlannerPage({ context }) {
   const previewBoundary = scenarioState.result
     ? 'PREVIEW ONLY — NOT EXECUTABLE. Review projected impact, then save the plan if it should enter governance.'
     : 'PREVIEW is analysis only. It never represents an executed operation or bypasses approval.'
-  const saveBlockedReason = !primaryContext.inputValid
+  const saveBlockedReason = warehouseAccessState.loading
+    ? 'Waiting for active warehouse access.'
+    : !warehouseOptions.length
+      ? 'No active warehouse is available for this account.'
+      : !primaryScenarioValid
     ? 'Scenario A inputs are incomplete.'
     : !scenarioPlanName.trim()
       ? 'Plan name is required before saving.'
@@ -77,7 +91,7 @@ export default function ScenarioPlannerPage({ context }) {
           : !hasWarehouseScope(signedInWarehouseScopes, scenarioForm.warehouseCode)
             ? 'This operator does not have scope for the selected warehouse.'
             : 'Ready to save for approval routing.'
-  const compareBlockedReason = !primaryContext.inputValid || !alternativeContext.inputValid
+  const compareBlockedReason = !primaryScenarioValid || !comparisonScenarioValid
     ? 'Both Scenario A and Scenario B need valid inputs before comparison.'
     : 'Ready to compare Scenario A against Scenario B.'
 
@@ -120,9 +134,9 @@ export default function ScenarioPlannerPage({ context }) {
               <strong>{saveBlockedReason}</strong>
               <p>{compareBlockedReason}</p>
             </div>
-            <button className="secondary-button" onClick={analyzeScenario} disabled={scenarioState.loading || !primaryContext.inputValid}>{scenarioState.loading ? 'Analyzing...' : 'Preview Scenario A'}</button>
-            <button className="compare-button" onClick={compareScenarios} disabled={comparisonState.loading || !primaryContext.inputValid || !alternativeContext.inputValid}>{comparisonState.loading ? 'Comparing...' : 'Compare A vs B'}</button>
-            <button className="ghost-button" onClick={saveScenarioPlan} disabled={scenarioSaveState.loading || !primaryContext.inputValid || !scenarioPlanName.trim() || !scenarioRequestedBy || !scenarioReviewOwner || !signedInSession || !hasWarehouseScope(signedInWarehouseScopes, scenarioForm.warehouseCode)}>{scenarioSaveState.loading ? 'Saving...' : 'Save Scenario A'}</button>
+            <button className="secondary-button" onClick={analyzeScenario} disabled={scenarioState.loading || !primaryScenarioValid}>{scenarioState.loading ? 'Analyzing...' : 'Preview Scenario A'}</button>
+            <button className="compare-button" onClick={compareScenarios} disabled={comparisonState.loading || !primaryScenarioValid || !comparisonScenarioValid}>{comparisonState.loading ? 'Comparing...' : 'Compare A vs B'}</button>
+            <button className="ghost-button" onClick={saveScenarioPlan} disabled={scenarioSaveState.loading || !primaryScenarioValid || !scenarioPlanName.trim() || !scenarioRequestedBy || !scenarioReviewOwner || !signedInSession || !hasWarehouseScope(signedInWarehouseScopes, scenarioForm.warehouseCode)}>{scenarioSaveState.loading ? 'Saving...' : 'Save Scenario A'}</button>
           </div>
         </div>
         <div className="planner-action-bar scenario-planner-workflow">
@@ -251,6 +265,7 @@ export default function ScenarioPlannerPage({ context }) {
             setter={setScenarioForm}
             context={primaryContext}
             warehouseOptions={warehouseOptions}
+            warehouseAccessState={warehouseAccessState}
             addScenarioLine={addScenarioLine}
             updateScenarioField={updateScenarioField}
             updateScenarioLine={updateScenarioLine}
@@ -262,6 +277,7 @@ export default function ScenarioPlannerPage({ context }) {
             setter={setComparisonForm}
             context={alternativeContext}
             warehouseOptions={warehouseOptions}
+            warehouseAccessState={warehouseAccessState}
             addScenarioLine={addScenarioLine}
             updateScenarioField={updateScenarioField}
             updateScenarioLine={updateScenarioLine}

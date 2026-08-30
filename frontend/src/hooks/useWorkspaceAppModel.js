@@ -304,6 +304,7 @@ export default function useWorkspaceAppModel() {
     pageStateSetter: setPageState,
     systemRuntimeStateSetter: setSystemRuntimeState,
     tenantDirectoryStateSetter: setTenantDirectoryState,
+    warehouseAccessStateSetter: workspaceState.setWarehouseAccessState,
     authSessionStateSetter: setAuthSessionState,
     passwordChangeStateSetter: setPasswordChangeState,
     operatorDirectoryStateSetter: setOperatorDirectoryState,

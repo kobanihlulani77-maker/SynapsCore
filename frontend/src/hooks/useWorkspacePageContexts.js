@@ -81,6 +81,7 @@ export default function useWorkspacePageContexts({
     setTenantOnboardingForm,
     tenantOnboardingState,
     accessAdminState,
+    warehouseAccessState,
     workspaceSettingsForm,
     setWorkspaceSettingsForm,
     workspaceSecurityForm,
@@ -206,7 +207,7 @@ export default function useWorkspacePageContexts({
   const workspaceAdmin = accessAdminState.workspace
   const accessAdminOperators = accessAdminState.operators
   const accessAdminUsers = accessAdminState.users
-  const warehouseOptions = buildWarehouseOptions(snapshot.inventory, workspaceAdmin?.warehouses, signedInWarehouseScopes)
+  const warehouseOptions = buildWarehouseOptions(snapshot.inventory, workspaceAdmin?.warehouses, signedInWarehouseScopes, warehouseAccessState.items)
   const scenarioWarehouseCode = scenarioForm.warehouseCode?.trim() || ''
   const requesterOperators = scenarioWarehouseCode
     ? operators.filter((operator) => operator.active !== false && hasWarehouseScope(operator.warehouseScopes, scenarioWarehouseCode))
@@ -450,6 +451,7 @@ export default function useWorkspacePageContexts({
     updateScenarioField,
     updateScenarioLine,
     removeScenarioLine,
+    warehouseAccessState,
   }
 
   return {

@@ -4,6 +4,7 @@ export default function ScenarioEditor({
   setter,
   context,
   warehouseOptions,
+  warehouseAccessState,
   addScenarioLine,
   updateScenarioField,
   updateScenarioLine,
@@ -17,16 +18,27 @@ export default function ScenarioEditor({
           <h2>{title}</h2>
           <p className="muted-text planner-note">Set the warehouse, product mix, quantity, and unit price before previewing operational impact.</p>
         </div>
-        <button className="ghost-button" onClick={() => addScenarioLine(setter, form.warehouseCode)} disabled={!context.productOptions.length} type="button">Add Line</button>
+        <button className="ghost-button" onClick={() => addScenarioLine(setter, form.warehouseCode)} disabled={!warehouseOptions.length || !context.productOptions.length} type="button">Add Line</button>
       </div>
       <div className="planner-controls">
         <label className="field">
           <span>Warehouse</span>
-          <select value={form.warehouseCode} onChange={(event) => updateScenarioField(setter, 'warehouseCode', event.target.value)}>
-            {warehouseOptions.map((warehouse) => <option key={warehouse.code} value={warehouse.code}>{warehouse.name}</option>)}
+          <select
+            value={warehouseOptions.some((warehouse) => warehouse.code === form.warehouseCode) ? form.warehouseCode : ''}
+            onChange={(event) => updateScenarioField(setter, 'warehouseCode', event.target.value)}
+            disabled={!warehouseOptions.length}
+          >
+            {warehouseOptions.length
+              ? warehouseOptions.map((warehouse) => <option key={warehouse.code} value={warehouse.code}>{warehouse.name}</option>)
+              : <option value="">No active warehouse available</option>}
           </select>
         </label>
       </div>
+      {!warehouseOptions.length ? <p className="muted-text planner-note">{warehouseAccessState?.error
+        ? 'Warehouse access could not be confirmed. Planning is paused until the authoritative warehouse list is available.'
+        : warehouseAccessState?.loading
+          ? 'Loading the authoritative warehouse list before planning can begin.'
+          : 'No active warehouse is currently available to this account. Ask a Tenant Admin to create, reactivate, or assign an active warehouse before planning new work.'}</p> : null}
       <div className="planner-lines">
         {context.lines.map((item, index) => (
           <div key={item.id} className="planner-line-card">
