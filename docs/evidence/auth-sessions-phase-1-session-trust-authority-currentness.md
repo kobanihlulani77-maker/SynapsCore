@@ -6,6 +6,11 @@ This evidence record covers Domain 12 Phase 1: session trust, authority
 currentness, and invalidation. It does not reopen completed product domains and
 does not cover the later Redis, browser, CORS, or hosted-proof phases.
 
+Phase 1 closed with **Classification A remaining = 0**. Redis, browser,
+deployed CORS, and hosted websocket checks were Classification C evidence gaps,
+not unimplemented application capabilities. Phase 2 records the subsequent
+production-shaped and hosted evidence without reopening Phase 1 authority work.
+
 Starting repository revision: `4ba4a1cb1e2db1eed0ee4258b8b43c51546c4dc8`.
 
 ## Session Trust Contract
@@ -108,8 +113,7 @@ two pre-existing scenario evidence files remain outside this phase.
 ## Limitations And Next Gate
 
 This phase proves the application-layer session validator and websocket
-currentness behavior against the local Spring test context. It does not claim
+currentness behavior against the local Spring test context. It did not claim
 that Redis failover, browser-level cookie behavior, deployed CORS, or hosted
-realtime behavior have been re-proven here. Those checks remain subsequent
-verification work. No hosted proof was run because this phase introduced no
-hosted deployment change and explicitly stops before the later phases.
+realtime behavior were re-proven here. Those were Classification C evidence
+gaps carried into Auth / Sessions Phase 2, not Classification A product gaps.

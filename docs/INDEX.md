@@ -118,6 +118,7 @@ This index links the main product, architecture, runbook, proof, and operator do
 ## Technical Review
 
 - [technical-reviewer-guide.md](technical-reviewer-guide.md)
+- [Auth / Sessions Phase 2 evidence](evidence/auth-sessions-phase-2-production-browser-infrastructure-completeness.md)
 - [operations-reliability.md](operations-reliability.md)
 - [infrastructure-communication-map.md](infrastructure-communication-map.md)
 - [known-operational-risks.md](known-operational-risks.md)
