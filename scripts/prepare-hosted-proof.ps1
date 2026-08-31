@@ -601,6 +601,7 @@ function Ensure-User {
                 fullName = $FullName
                 active = $true
                 operatorActorName = $OperatorActorName
+                version = Get-PropertyValue -Object $existing -PropertyName "version"
             } | Out-Null
 
         Invoke-SynapseJson `
