@@ -1,6 +1,7 @@
 package com.synapsecore.domain.service;
 
 import com.synapsecore.audit.AuditLogService;
+import com.synapsecore.audit.RequestTraceContext;
 import com.synapsecore.domain.dto.ProductImportResponse;
 import com.synapsecore.domain.dto.ProductImportRowResult;
 import com.synapsecore.domain.dto.ProductResponse;
@@ -33,6 +34,8 @@ import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 import org.springframework.web.multipart.MultipartFile;
 import org.springframework.web.server.ResponseStatusException;
 
@@ -51,6 +54,7 @@ public class ProductService {
     private final IdentitySequenceMigrationService identitySequenceMigrationService;
     private final CatalogWriteConflictResolver catalogWriteConflictResolver;
     private final OperationalMetricsService operationalMetricsService;
+    private final RequestTraceContext requestTraceContext;
 
     @Transactional(readOnly = true)
     public List<ProductResponse> getProducts() {
@@ -64,46 +68,66 @@ public class ProductService {
 
     @Transactional
     public ProductResponse createProduct(ProductUpsertRequest request, String actorName) {
+        long startedAtNanos = System.nanoTime();
+        String traceTenantCode = requestTraceContext.getCurrentTenantOrDefault();
+        logProductWriteStage("PRODUCT_CREATE_ENTER", startedAtNanos, traceTenantCode);
+        registerProductTransactionDiagnostics(startedAtNanos, traceTenantCode);
+
+        logProductWriteStage("SEQUENCE_SYNC_START", startedAtNanos, traceTenantCode);
         identitySequenceMigrationService.synchronizeCoreIdentitySequences();
+        logProductWriteStage("SEQUENCE_SYNC_COMPLETE", startedAtNanos, traceTenantCode);
         Tenant tenant = tenantContextService.getCurrentTenantOrDefault();
+        logProductWriteStage("AUTHORITY_TENANT_RESOLUTION_COMPLETE", startedAtNanos, tenant.getCode());
         String catalogSku = normalizeCatalogSku(request.sku());
         String normalizedName = normalizeRequiredText(request.name(), "Product name", 120);
         String normalizedCategory = normalizeRequiredText(request.category(), "Product category", 120);
         ensureSkuIsAvailable(tenant.getCode(), catalogSku);
+        logProductWriteStage("SKU_CHECK_COMPLETE", startedAtNanos, tenant.getCode());
         try {
             Product adoptedProduct = adoptOrphanedProductIfPresent(tenant, catalogSku, normalizedName, normalizedCategory);
             if (adoptedProduct != null) {
+                logProductWriteStage("PRODUCT_SAVE_RETURNED", startedAtNanos, tenant.getCode());
+                logProductWriteStage("PRODUCT_FLUSH_START", startedAtNanos, tenant.getCode());
                 flushProductWritePath();
+                logProductWriteStage("PRODUCT_FLUSH_COMPLETE", startedAtNanos, tenant.getCode());
                 recordCatalogChange(
                     tenant.getCode(),
                     actorName,
                     "PRODUCT_CREATED",
                     adoptedProduct.resolveCatalogSku(),
-                    "Adopted orphan catalog product " + adoptedProduct.resolveCatalogSku() + " (" + adoptedProduct.getName() + ") into tenant " + tenant.getCode() + "."
+                    "Adopted orphan catalog product " + adoptedProduct.resolveCatalogSku() + " (" + adoptedProduct.getName() + ") into tenant " + tenant.getCode() + ".",
+                    startedAtNanos
                 );
                 operationalMetricsService.recordCatalogWrite(tenant.getCode(), "PRODUCT_CREATED", true);
                 log.info("Catalog product {} adopted into tenant {}.", adoptedProduct.resolveCatalogSku(), tenant.getCode());
+                logProductWriteStage("PRODUCT_CREATE_RETURN", startedAtNanos, tenant.getCode());
                 return toResponse(adoptedProduct);
             }
             ensureInternalSkuIsAvailable(tenant.getCode(), catalogSku);
 
+            logProductWriteStage("PRODUCT_SAVE_START", startedAtNanos, tenant.getCode());
             Product product = productRepository.save(Product.builder()
                 .tenant(tenant)
                 .catalogSku(catalogSku)
                 .name(normalizedName)
                 .category(normalizedCategory)
                 .build());
+            logProductWriteStage("PRODUCT_SAVE_RETURNED", startedAtNanos, tenant.getCode());
+            logProductWriteStage("PRODUCT_FLUSH_START", startedAtNanos, tenant.getCode());
             flushProductWritePath();
+            logProductWriteStage("PRODUCT_FLUSH_COMPLETE", startedAtNanos, tenant.getCode());
 
             recordCatalogChange(
                 tenant.getCode(),
                 actorName,
                 "PRODUCT_CREATED",
                 product.resolveCatalogSku(),
-                "Created catalog product " + product.resolveCatalogSku() + " (" + product.getName() + ")."
+                "Created catalog product " + product.resolveCatalogSku() + " (" + product.getName() + ").",
+                startedAtNanos
             );
             operationalMetricsService.recordCatalogWrite(tenant.getCode(), "PRODUCT_CREATED", true);
             log.info("Catalog product {} created for tenant {} by {}.", product.resolveCatalogSku(), tenant.getCode(), actorName);
+            logProductWriteStage("PRODUCT_CREATE_RETURN", startedAtNanos, tenant.getCode());
             return toResponse(product);
         } catch (DataIntegrityViolationException exception) {
             operationalMetricsService.recordCatalogWrite(tenant.getCode(), "PRODUCT_CREATED", false);
@@ -401,13 +425,33 @@ public class ProductService {
                                      String action,
                                      String targetRef,
                                      String details) {
+        recordCatalogChange(tenantCode, actorName, action, targetRef, details, null);
+    }
+
+    private void recordCatalogChange(String tenantCode,
+                                     String actorName,
+                                     String action,
+                                     String targetRef,
+                                     String details,
+                                     Long startedAtNanos) {
+        if (startedAtNanos != null) {
+            logProductWriteStage("BUSINESS_EVENT_START", startedAtNanos, tenantCode);
+        }
         businessEventService.recordForTenant(
             tenantCode,
             BusinessEventType.PRODUCT_CATALOG_UPDATED,
             "product-catalog",
             details
         );
+        if (startedAtNanos != null) {
+            logProductWriteStage("BUSINESS_EVENT_COMPLETE", startedAtNanos, tenantCode);
+            logProductWriteStage("DISPATCH_ENQUEUE_START", startedAtNanos, tenantCode);
+        }
         operationalStateChangePublisher.publish(OperationalUpdateType.INVENTORY_UPDATE, "product-catalog");
+        if (startedAtNanos != null) {
+            logProductWriteStage("DISPATCH_ENQUEUE_COMPLETE", startedAtNanos, tenantCode);
+            logProductWriteStage("AUDIT_START", startedAtNanos, tenantCode);
+        }
         auditLogService.recordSuccessForTenant(
             tenantCode,
             action,
@@ -417,6 +461,40 @@ public class ProductService {
             targetRef,
             details
         );
+        if (startedAtNanos != null) {
+            logProductWriteStage("AUDIT_COMPLETE", startedAtNanos, tenantCode);
+        }
+    }
+
+    private void registerProductTransactionDiagnostics(long startedAtNanos, String tenantCode) {
+        if (!TransactionSynchronizationManager.isSynchronizationActive()) {
+            return;
+        }
+        TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+            @Override
+            public void beforeCommit(boolean readOnly) {
+                logProductWriteStage("TRANSACTION_BEFORE_COMMIT", startedAtNanos, tenantCode);
+            }
+
+            @Override
+            public void afterCommit() {
+                logProductWriteStage("TRANSACTION_AFTER_COMMIT", startedAtNanos, tenantCode);
+            }
+
+            @Override
+            public void afterCompletion(int status) {
+                logProductWriteStage("TRANSACTION_AFTER_COMPLETION_" + status, startedAtNanos, tenantCode);
+            }
+        });
+    }
+
+    private void logProductWriteStage(String stage, long startedAtNanos, String tenantCode) {
+        long elapsedMs = (System.nanoTime() - startedAtNanos) / 1_000_000;
+        log.info("Product write stage={} requestId={} tenant={} elapsedMs={}",
+            stage,
+            requestTraceContext.getRequiredRequestId(),
+            tenantCode,
+            elapsedMs);
     }
 
     private void flushProductWritePath() {

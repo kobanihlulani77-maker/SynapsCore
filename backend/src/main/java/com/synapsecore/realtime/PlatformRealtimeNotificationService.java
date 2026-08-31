@@ -19,6 +19,8 @@ public class PlatformRealtimeNotificationService {
 
     @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT, fallbackExecution = true)
     public void publishPlatformChange(PlatformMetadataChangedEvent event) {
+        long startedAtNanos = System.nanoTime();
+        log.info("Product write stage=PLATFORM_NOTIFICATION_START elapsedMs=0");
         try {
             realtimePublisher.publish(
                 PLATFORM_ACTIVITY_CHANGED_DESTINATION,
@@ -28,6 +30,8 @@ public class PlatformRealtimeNotificationService {
                     "PLATFORM"
                 )
             );
+            log.info("Product write stage=PLATFORM_NOTIFICATION_COMPLETE elapsedMs={}",
+                (System.nanoTime() - startedAtNanos) / 1_000_000);
         } catch (RuntimeException exception) {
             // Durable audit/business evidence remains authoritative when delivery is unavailable.
             log.warn("Platform metadata notification could not be delivered after commit: {}", exception.getMessage());
