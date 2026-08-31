@@ -14,7 +14,7 @@ const statusTone = (value, classification) => {
     : ['FAILURE', 'FAILED', 'ERROR'].includes(String(value).toUpperCase()) ? 'critical' : 'warning'
 }
 
-export default function PlatformActivityPage({ activity = [], loading = false, error = '', navigateToPage }) {
+export default function PlatformActivityPage({ activity = [], loading = false, error = '', navigateToPage, realtimeState = 'connecting' }) {
   return (
     <section className="content-grid">
       <Panel wide kicker="Platform activity" title="Platform activity and evidence" badge={<span className="panel-badge">Metadata only</span>}>
@@ -28,6 +28,7 @@ export default function PlatformActivityPage({ activity = [], loading = false, e
             <div className="ops-pill-row">
               <span className="workspace-meta-pill">{loading ? 'Loading activity' : `${activity.length} signals reported`}</span>
               <span className="workspace-meta-pill">Platform Owner scope</span>
+              <span className="workspace-meta-pill">Platform realtime: {realtimeState}</span>
               <span className="workspace-meta-pill">No raw payloads</span>
             </div>
           </div>

@@ -5,9 +5,11 @@ import com.synapsecore.domain.entity.BusinessEventType;
 import com.synapsecore.domain.repository.BusinessEventRepository;
 import com.synapsecore.audit.RequestTraceContext;
 import com.synapsecore.domain.service.CoreIdentityWriteIsolationService;
+import com.synapsecore.platform.PlatformMetadataChangedEvent;
 import com.synapsecore.tenant.TenantContextService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 
 @Service
@@ -19,6 +21,7 @@ public class BusinessEventService {
     private final RequestTraceContext requestTraceContext;
     private final TenantContextService tenantContextService;
     private final CoreIdentityWriteIsolationService coreIdentityWriteIsolationService;
+    private final ApplicationEventPublisher applicationEventPublisher;
 
     public void record(BusinessEventType eventType, String source, String payloadSummary) {
         recordForTenant(null, eventType, source, payloadSummary);
@@ -38,6 +41,7 @@ public class BusinessEventService {
             "Business event persistence",
             () -> businessEventRepository.save(event)
         );
+        applicationEventPublisher.publishEvent(new PlatformMetadataChangedEvent(event.getCreatedAt()));
     }
 
     private String resolveTenantCode(String explicitTenantCode) {

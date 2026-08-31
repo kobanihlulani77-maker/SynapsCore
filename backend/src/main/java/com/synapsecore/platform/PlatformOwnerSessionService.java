@@ -1,11 +1,8 @@
 package com.synapsecore.platform;
 
-import com.synapsecore.audit.RequestTraceContext;
+import com.synapsecore.audit.AuditLogPersistenceService;
 import com.synapsecore.config.SynapsePlatformOwnerProperties;
-import com.synapsecore.domain.entity.AuditLog;
 import com.synapsecore.domain.entity.AuditStatus;
-import com.synapsecore.domain.repository.AuditLogRepository;
-import com.synapsecore.domain.service.CoreIdentityWriteIsolationService;
 import com.synapsecore.platform.dto.PlatformSessionResponse;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpSession;
@@ -28,9 +25,7 @@ public class PlatformOwnerSessionService {
 
     private final SynapsePlatformOwnerProperties properties;
     private final PasswordEncoder passwordEncoder;
-    private final AuditLogRepository auditLogRepository;
-    private final CoreIdentityWriteIsolationService coreIdentityWriteIsolationService;
-    private final RequestTraceContext requestTraceContext;
+    private final AuditLogPersistenceService auditLogPersistenceService;
 
     public PlatformSessionResponse signIn(HttpServletRequest request, String username, String password) {
         if (!properties.isConfigured()) {
@@ -95,6 +90,10 @@ public class PlatformOwnerSessionService {
 
     public boolean hasSessionIdentity(HttpSession session) {
         return readString(session, SESSION_USERNAME_KEY) != null;
+    }
+
+    public boolean hasAuthenticatedSession(HttpSession session) {
+        return resolveAuthenticatedAt(session).isPresent();
     }
 
     public void clearSessionIdentity(HttpSession session) {
@@ -169,19 +168,15 @@ public class PlatformOwnerSessionService {
     }
 
     private void recordAudit(String action, String actor, AuditStatus status, String details) {
-        coreIdentityWriteIsolationService.persistWithSequenceRepair(
-            "Platform session audit persistence",
-            () -> auditLogRepository.save(AuditLog.builder()
-                .tenantCode(PLATFORM_AUDIT_TENANT)
-                .action(action)
-                .actor(actor)
-                .source("platform-session")
-                .targetType("PlatformControlPlane")
-                .targetRef("session")
-                .status(status)
-                .details(details)
-                .requestId(requestTraceContext.getRequiredRequestId())
-                .build())
+        auditLogPersistenceService.recordForTenant(
+            PLATFORM_AUDIT_TENANT,
+            action,
+            actor,
+            "platform-session",
+            "PlatformControlPlane",
+            "session",
+            status,
+            details
         );
     }
 }

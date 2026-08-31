@@ -2,6 +2,7 @@ package com.synapsecore.config;
 
 import com.synapsecore.auth.AuthSessionService;
 import com.synapsecore.access.SynapseAccessRole;
+import com.synapsecore.platform.PlatformOwnerSessionService;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
@@ -33,25 +34,31 @@ import org.springframework.web.socket.server.HandshakeInterceptor;
 @EnableWebSocketMessageBroker
 public class WebSocketConfig implements WebSocketMessageBrokerConfigurer {
 
-    private static final String SESSION_TENANT_CODE_ATTRIBUTE = "synapsecoreTenantCode";
+    static final String SESSION_TENANT_CODE_ATTRIBUTE = "synapsecoreTenantCode";
     static final String SESSION_ROLES_ATTRIBUTE = "synapsecoreRoles";
     static final String SESSION_TENANT_WIDE_ATTRIBUTE = "synapsecoreTenantWide";
     static final String SESSION_HTTP_SESSION_ATTRIBUTE = "synapsecoreHttpSession";
+    static final String SESSION_AUTHORITY_ATTRIBUTE = "synapsecoreAuthority";
+    static final String TENANT_AUTHORITY = "TENANT";
+    static final String PLATFORM_AUTHORITY = "PLATFORM";
     private static final Logger log = LoggerFactory.getLogger(WebSocketConfig.class);
 
     private final List<String> allowedOrigins;
     private final SynapseAccessProperties accessProperties;
     private final AuthSessionService authSessionService;
+    private final PlatformOwnerSessionService platformOwnerSessionService;
     private final SynapseRealtimeProperties realtimeProperties;
     private final RealtimeSessionRegistry realtimeSessionRegistry = new RealtimeSessionRegistry();
 
     public WebSocketConfig(SynapseCorsProperties corsProperties,
                            SynapseAccessProperties accessProperties,
                            AuthSessionService authSessionService,
+                           PlatformOwnerSessionService platformOwnerSessionService,
                            SynapseRealtimeProperties realtimeProperties) {
         this.allowedOrigins = corsProperties.getAllowedOrigins();
         this.accessProperties = accessProperties;
         this.authSessionService = authSessionService;
+        this.platformOwnerSessionService = platformOwnerSessionService;
         this.realtimeProperties = realtimeProperties;
     }
 
@@ -82,7 +89,7 @@ public class WebSocketConfig implements WebSocketMessageBrokerConfigurer {
             .setAllowedOriginPatterns(allowedOrigins.toArray(String[]::new));
 
         if (!accessProperties.isAllowHeaderFallback()) {
-            endpoint.addInterceptors(new AuthenticatedTenantHandshakeInterceptor(authSessionService));
+            endpoint.addInterceptors(new AuthenticatedSessionHandshakeInterceptor(authSessionService, platformOwnerSessionService));
         }
 
         var sockJsRegistration = endpoint.withSockJS();
@@ -94,23 +101,26 @@ public class WebSocketConfig implements WebSocketMessageBrokerConfigurer {
     @Override
     public void configureClientInboundChannel(ChannelRegistration registration) {
         if (!accessProperties.isAllowHeaderFallback()) {
-            registration.interceptors(new TenantSubscriptionChannelInterceptor(authSessionService, realtimeSessionRegistry));
+            registration.interceptors(new TenantSubscriptionChannelInterceptor(authSessionService, platformOwnerSessionService, realtimeSessionRegistry));
         }
     }
 
     @Override
     public void configureClientOutboundChannel(ChannelRegistration registration) {
         if (!accessProperties.isAllowHeaderFallback()) {
-            registration.interceptors(new TenantSubscriptionChannelInterceptor(authSessionService, realtimeSessionRegistry));
+            registration.interceptors(new TenantSubscriptionChannelInterceptor(authSessionService, platformOwnerSessionService, realtimeSessionRegistry));
         }
     }
 
-    private static final class AuthenticatedTenantHandshakeInterceptor implements HandshakeInterceptor {
+    private static final class AuthenticatedSessionHandshakeInterceptor implements HandshakeInterceptor {
 
         private final AuthSessionService authSessionService;
+        private final PlatformOwnerSessionService platformOwnerSessionService;
 
-        private AuthenticatedTenantHandshakeInterceptor(AuthSessionService authSessionService) {
+        private AuthenticatedSessionHandshakeInterceptor(AuthSessionService authSessionService,
+                                                         PlatformOwnerSessionService platformOwnerSessionService) {
             this.authSessionService = authSessionService;
+            this.platformOwnerSessionService = platformOwnerSessionService;
         }
 
         @Override
@@ -125,8 +135,23 @@ public class WebSocketConfig implements WebSocketMessageBrokerConfigurer {
             }
 
             var session = servletRequest.getServletRequest().getSession(false);
-            if (session == null || !authSessionService.hasSessionIdentity(session)) {
+            if (session == null) {
                 log.warn("Realtime handshake rejected because no authenticated HTTP session was available for {}", request.getURI());
+                response.setStatusCode(HttpStatus.FORBIDDEN);
+                return false;
+            }
+
+            if (platformOwnerSessionService.hasAuthenticatedSession(session)) {
+                attributes.put(SESSION_AUTHORITY_ATTRIBUTE, PLATFORM_AUTHORITY);
+                attributes.put(SESSION_TENANT_CODE_ATTRIBUTE, "");
+                attributes.put(SESSION_ROLES_ATTRIBUTE, Set.of());
+                attributes.put(SESSION_TENANT_WIDE_ATTRIBUTE, false);
+                attributes.put(SESSION_HTTP_SESSION_ATTRIBUTE, session);
+                return true;
+            }
+
+            if (!authSessionService.hasSessionIdentity(session)) {
+                log.warn("Realtime handshake rejected because no authenticated tenant or platform session was available for {}", request.getURI());
                 response.setStatusCode(HttpStatus.FORBIDDEN);
                 return false;
             }
@@ -136,6 +161,10 @@ public class WebSocketConfig implements WebSocketMessageBrokerConfigurer {
                     log.info("Realtime handshake accepted for tenant {} from origin {}",
                         authenticatedSession.tenant().getCode(),
                         servletRequest.getHeaders().getOrigin());
+                    attributes.put(
+                        SESSION_AUTHORITY_ATTRIBUTE,
+                        TENANT_AUTHORITY
+                    );
                     attributes.put(
                         SESSION_TENANT_CODE_ATTRIBUTE,
                         authenticatedSession.tenant().getCode().trim().toUpperCase(Locale.ROOT)
@@ -172,6 +201,8 @@ public class WebSocketConfig implements WebSocketMessageBrokerConfigurer {
     }
 
     static final class TenantSubscriptionChannelInterceptor implements ChannelInterceptor {
+
+        private static final String PLATFORM_ACTIVITY_CHANGED_DESTINATION = "/TOPIC/PLATFORM/ACTIVITY.CHANGED";
 
         private static final Set<String> TENANT_WIDE_RAW_SUFFIXES = Set.of(
             "/INVENTORY",
@@ -210,19 +241,27 @@ public class WebSocketConfig implements WebSocketMessageBrokerConfigurer {
         );
 
         private final AuthSessionService authSessionService;
+        private final PlatformOwnerSessionService platformOwnerSessionService;
         private final RealtimeSessionRegistry realtimeSessionRegistry;
 
         TenantSubscriptionChannelInterceptor() {
-            this(null, null);
+            this(null, null, null);
         }
 
         TenantSubscriptionChannelInterceptor(AuthSessionService authSessionService) {
-            this(authSessionService, null);
+            this(authSessionService, null, null);
         }
 
         TenantSubscriptionChannelInterceptor(AuthSessionService authSessionService,
                                              RealtimeSessionRegistry realtimeSessionRegistry) {
+            this(authSessionService, null, realtimeSessionRegistry);
+        }
+
+        TenantSubscriptionChannelInterceptor(AuthSessionService authSessionService,
+                                             PlatformOwnerSessionService platformOwnerSessionService,
+                                             RealtimeSessionRegistry realtimeSessionRegistry) {
             this.authSessionService = authSessionService;
+            this.platformOwnerSessionService = platformOwnerSessionService;
             this.realtimeSessionRegistry = realtimeSessionRegistry;
         }
 
@@ -271,6 +310,15 @@ public class WebSocketConfig implements WebSocketMessageBrokerConfigurer {
                 : (String) sessionAttributes.get(SESSION_TENANT_CODE_ATTRIBUTE);
 
             if (tenantCode == null || tenantCode.isBlank()) {
+                if (PLATFORM_AUTHORITY.equals(readAuthority(sessionAttributes))) {
+                    if (!isPlatformDestination(accessor.getDestination())) {
+                        return rejectOrDrop(
+                            accessor.getCommand(),
+                            "Platform-owner realtime is limited to the supported platform topic."
+                        );
+                    }
+                    return message;
+                }
                 log.warn("Realtime subscription rejected because no signed-in tenant was attached to the STOMP session.");
                 throw new IllegalArgumentException("A signed-in tenant session is required for realtime subscriptions.");
             }
@@ -278,6 +326,13 @@ public class WebSocketConfig implements WebSocketMessageBrokerConfigurer {
             String destination = accessor.getDestination();
             if (destination == null || destination.isBlank()) {
                 return rejectOrDrop(accessor.getCommand(), "A realtime destination is required.");
+            }
+
+            if (isPlatformDestination(destination)) {
+                return rejectOrDrop(
+                    accessor.getCommand(),
+                    "Platform-owner realtime is limited to a dedicated platform session."
+                );
             }
 
             String expectedPrefix = "/topic/tenant/" + tenantCode.toUpperCase(Locale.ROOT) + "/";
@@ -358,7 +413,7 @@ public class WebSocketConfig implements WebSocketMessageBrokerConfigurer {
 
         private boolean refreshCurrentAuthority(StompHeaderAccessor accessor,
                                                 Map<String, Object> sessionAttributes) {
-            if (authSessionService == null) {
+            if (authSessionService == null && platformOwnerSessionService == null) {
                 return true;
             }
             Object rawSession = sessionAttributes.get(SESSION_HTTP_SESSION_ATTRIBUTE);
@@ -369,11 +424,22 @@ public class WebSocketConfig implements WebSocketMessageBrokerConfigurer {
                 return false;
             }
 
+            String authority = readAuthority(sessionAttributes);
+            if (PLATFORM_AUTHORITY.equals(authority)) {
+                return platformOwnerSessionService != null
+                    && platformOwnerSessionService.hasAuthenticatedSession(httpSession);
+            }
+
+            if (authSessionService == null) {
+                return false;
+            }
+
             var authenticatedSession = authSessionService.resolveAuthenticatedSession(httpSession).orElse(null);
             if (authenticatedSession == null) {
                 return false;
             }
 
+            sessionAttributes.put(SESSION_AUTHORITY_ATTRIBUTE, TENANT_AUTHORITY);
             sessionAttributes.put(
                 SESSION_TENANT_CODE_ATTRIBUTE,
                 authenticatedSession.tenant().getCode().trim().toUpperCase(Locale.ROOT)
@@ -389,6 +455,16 @@ public class WebSocketConfig implements WebSocketMessageBrokerConfigurer {
                 authenticatedSession.operator().getWarehouseScopes().isEmpty()
             );
             return true;
+        }
+
+        private String readAuthority(Map<String, Object> sessionAttributes) {
+            Object value = sessionAttributes.get(SESSION_AUTHORITY_ATTRIBUTE);
+            return value instanceof String authority ? authority.trim().toUpperCase(Locale.ROOT) : "";
+        }
+
+        private boolean isPlatformDestination(String destination) {
+            return destination != null
+                && PLATFORM_ACTIVITY_CHANGED_DESTINATION.equals(destination.trim().toUpperCase(Locale.ROOT));
         }
 
         private Set<String> readRoles(Map<String, Object> sessionAttributes) {

@@ -1,6 +1,7 @@
 package com.synapsecore.auth;
 
 import com.synapsecore.audit.RequestTraceContext;
+import com.synapsecore.audit.AuditLogPersistenceService;
 import com.synapsecore.auth.dto.AuthSessionResponse;
 import com.synapsecore.domain.entity.AuditLog;
 import com.synapsecore.domain.entity.AuditStatus;
@@ -42,8 +43,9 @@ public class AuthSessionService {
     private final RequestTraceContext requestTraceContext;
     private final OperationalMetricsService operationalMetricsService;
     private final PlatformOwnerSessionService platformOwnerSessionService;
+    private final AuditLogPersistenceService auditLogPersistenceService;
 
-    @Transactional(readOnly = true)
+    @Transactional
     public AuthSessionResponse signIn(jakarta.servlet.http.HttpServletRequest request,
                                       String tenantCode,
                                       String username,
@@ -85,6 +87,16 @@ public class AuthSessionService {
         jakarta.servlet.http.HttpSession session = request.getSession(true);
         writeSession(session, user, operator, tenant, authenticatedAt);
         operationalMetricsService.recordAuthAttempt(tenant.getCode(), true);
+        auditLogPersistenceService.recordForTenant(
+            tenant.getCode(),
+            "AUTH_LOGIN",
+            operator.getActorName(),
+            "user-session",
+            "AccessUser",
+            "session",
+            AuditStatus.SUCCESS,
+            "Tenant authentication succeeded."
+        );
         log.info("Signed in user {} for tenant {} as operator {}.", user.getUsername(), tenant.getCode(), operator.getActorName());
         return toResponse(buildSessionState(user, operator, tenant, authenticatedAt));
     }

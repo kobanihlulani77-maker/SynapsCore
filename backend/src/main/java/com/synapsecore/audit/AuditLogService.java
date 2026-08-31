@@ -6,11 +6,13 @@ import com.synapsecore.domain.entity.AuditLog;
 import com.synapsecore.domain.entity.AuditStatus;
 import com.synapsecore.domain.repository.AuditLogRepository;
 import com.synapsecore.domain.service.CoreIdentityWriteIsolationService;
+import com.synapsecore.platform.PlatformMetadataChangedEvent;
 import com.synapsecore.tenant.TenantContextService;
 import java.util.List;
 import java.util.Optional;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 
 @Service
@@ -23,6 +25,7 @@ public class AuditLogService {
     private final TenantContextService tenantContextService;
     private final CoreIdentityWriteIsolationService coreIdentityWriteIsolationService;
     private final AccessDirectoryService accessDirectoryService;
+    private final ApplicationEventPublisher applicationEventPublisher;
 
     public void recordSuccess(String action,
                               String actor,
@@ -134,6 +137,7 @@ public class AuditLogService {
             "Audit log persistence",
             () -> auditLogRepository.save(logEntry)
         );
+        applicationEventPublisher.publishEvent(new PlatformMetadataChangedEvent(logEntry.getCreatedAt()));
     }
 
     private String resolveTenantCode(String explicitTenantCode) {

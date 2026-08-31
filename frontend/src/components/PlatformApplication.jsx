@@ -17,6 +17,7 @@ import PlatformAdminPage from '../pages/PlatformAdmin'
 import ReleasesPage from '../pages/Releases'
 import SystemConfigPage from '../pages/SystemConfig'
 import TenantsPage from '../pages/Tenants'
+import usePlatformRealtime from '../hooks/usePlatformRealtime'
 
 const emptySession = { signedIn: false }
 const createBlankWarehouse = () => ({ code: '', name: '', location: '' })
@@ -101,8 +102,8 @@ function PlatformDataState({ loading, error, onRetry }) {
   return <section className="content-grid"><Panel wide kicker="Platform evidence unavailable" title="The control plane could not load current evidence"><div className="notice notice-error" role="alert"><strong>Do not interpret this as an empty or healthy platform.</strong><p>{error}</p><div className="history-action-row"><button className="secondary-button" onClick={onRetry} type="button">Retry platform evidence</button></div></div></Panel></section>
 }
 
-function PlatformApplicationContent({ page, context, activityState, navigate, platformDataLoading, platformDataError }) {
-  if (page === 'platform-activity') return <PlatformActivityPage activity={activityState.items} loading={activityState.loading || platformDataLoading} error={activityState.error || platformDataError} navigateToPage={navigate} />
+function PlatformApplicationContent({ page, context, activityState, navigate, platformDataLoading, platformDataError, platformRealtimeState }) {
+  if (page === 'platform-activity') return <PlatformActivityPage activity={activityState.items} loading={activityState.loading || platformDataLoading} error={activityState.error || platformDataError} navigateToPage={navigate} realtimeState={platformRealtimeState} />
   if (page === 'platform') return <PlatformAdminPage context={context.platformAdminContext} />
   if (page === 'tenants') return <TenantsPage context={context.tenantsContext} />
   if (page === 'system-config') return <SystemConfigPage context={context.systemConfigContext} />
@@ -202,6 +203,17 @@ export default function PlatformApplication({ initialPage }) {
       navigate('platform-sign-in')
     }
   }
+
+  const [platformRealtimeState, setPlatformRealtimeState] = useState('connecting')
+
+  usePlatformRealtime({
+    signedIn: session.signedIn,
+    websocketBrokerUrl: '',
+    sockJsUrl: `${apiUrl}/ws`,
+    fetchActivity: loadActivity,
+    fetchOverview: loadOverview,
+    onStateChange: setPlatformRealtimeState,
+  })
 
   const createTenant = async (event) => {
     event.preventDefault()
@@ -308,6 +320,6 @@ export default function PlatformApplication({ initialPage }) {
     topbar={<header className="workspace-topbar"><div><p className="panel-kicker">Platform authority</p><strong>{pageLookup[activePage]?.label || 'Platform Overview'}</strong></div><span className="workspace-status-pill status-live">Metadata-first control plane</span></header>}
     utilityRail={null}
   >
-    {dataError && activePage !== 'platform-activity' ? <PlatformDataState loading={dataLoading} error={dataError} onRetry={loadOverview} /> : dataLoading && !overview && activePage !== 'platform-activity' ? <PlatformDataState loading error="" /> : <PlatformApplicationContent page={activePage} context={context} activityState={activityState} navigate={navigate} platformDataLoading={dataLoading && !overview} platformDataError={dataError} />}
+    {dataError && activePage !== 'platform-activity' ? <PlatformDataState loading={dataLoading} error={dataError} onRetry={loadOverview} /> : dataLoading && !overview && activePage !== 'platform-activity' ? <PlatformDataState loading error="" /> : <PlatformApplicationContent page={activePage} context={context} activityState={activityState} navigate={navigate} platformDataLoading={dataLoading && !overview} platformDataError={dataError} platformRealtimeState={platformRealtimeState} />}
   </AppShell>
 }
