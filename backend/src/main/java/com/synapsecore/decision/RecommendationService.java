@@ -21,6 +21,7 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.locks.ReentrantLock;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 @Service
 @RequiredArgsConstructor
@@ -32,6 +33,7 @@ public class RecommendationService {
     private final TenantOperationalPolicyService tenantOperationalPolicyService;
     private static final ConcurrentHashMap<String, ReentrantLock> CONDITION_LOCKS = new ConcurrentHashMap<>();
 
+    @Transactional
     public Recommendation createForInventory(Inventory inventory, InventoryInsight insight, StockPrediction prediction, String source) {
         String conditionKey = inventoryConditionKey(inventory);
         ReentrantLock lock = CONDITION_LOCKS.computeIfAbsent(conditionKey, ignored -> new ReentrantLock());
