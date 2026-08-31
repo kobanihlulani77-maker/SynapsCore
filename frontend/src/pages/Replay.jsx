@@ -59,7 +59,10 @@ export default function ReplayPage({ context }) {
       try {
         const connectorPayload = await fetchJson(
           `/api/integrations/orders/connectors?sourceSystem=${encodeURIComponent(selectedRecord.sourceSystem)}&type=${encodeURIComponent(selectedRecord.connectorType)}`,
-          globalThis.AbortSignal?.timeout ? { signal: globalThis.AbortSignal.timeout(8_000) } : {},
+          {
+            cache: 'no-store',
+            ...(globalThis.AbortSignal?.timeout ? { signal: globalThis.AbortSignal.timeout(8_000) } : {}),
+          },
         )
         const exactConnector = Array.isArray(connectorPayload)
           ? connectorPayload.find((connector) => connector.sourceSystem === selectedRecord.sourceSystem && connector.type === selectedRecord.connectorType) || null
