@@ -559,6 +559,7 @@ function Ensure-Operator {
     }
 
     $operatorId = Get-PropertyValue -Object $existing -PropertyName "id"
+    $body.version = Get-PropertyValue -Object $existing -PropertyName "version"
     return Invoke-SynapseJson `
         -Method PUT `
         -Url "$script:ApiBaseUrlValue/api/access/admin/operators/$operatorId" `
