@@ -222,7 +222,6 @@ test('BATCH 2 shell navigation search and shared controls execute', async ({ pag
     ['/fulfillment', 'Fulfillment and logistics pressure'],
     ['/scenarios', 'Decision lab and scenario planning'],
     ['/scenario-history', 'Scenario history and compare'],
-    ['/approvals', 'Approvals center'],
     ['/escalations', 'Operational escalation inbox'],
     ['/integrations', 'Connector management and telemetry'],
     ['/replay-queue', 'Failed inbound recovery'],
@@ -237,6 +236,10 @@ test('BATCH 2 shell navigation search and shared controls execute', async ({ pag
     await page.goto(route)
     await expect(page.getByRole('heading', { name: heading })).toBeVisible()
   }
+
+  await page.goto('/approvals')
+  await expect(page).toHaveURL(/\/dashboard$/)
+  await expect(page.getByRole('heading', { name: 'Live operational command center' })).toBeVisible()
 
   await page.goto('/dashboard')
   await page.getByPlaceholder('Search pages, orders, alerts, or incidents').fill('runtime')

@@ -2425,12 +2425,24 @@ test('auth flow and the full authenticated page system render cleanly in a brows
   await expect(page.getByRole('heading', { level: 1, name: 'Live operational command center' })).toBeVisible()
   await waitForDashboardSnapshotReady(page)
 
-  for (const [route, title] of appPages) {
+  const operationsLeadPages = appPages.filter(([route]) => route !== '/approvals')
+  for (const [route, title] of operationsLeadPages) {
     await navigateWithinApp(page, route)
     await expect(page.getByRole('heading', { level: 1, name: title })).toBeVisible()
     await expect(page.locator('.workspace-topbar')).toBeVisible()
     await expectNoFatalUiErrors(page)
   }
+
+  await navigateWithinApp(page, '/approvals')
+  await expect(page).toHaveURL(/\/dashboard$/)
+  await expect(page.getByRole('heading', { level: 1, name: 'Live operational command center' })).toBeVisible()
+
+  await signOutViaUi(page)
+  await loginViaUi(page, users.reviewOwner)
+  await navigateWithinApp(page, '/approvals')
+  await expect(page.getByRole('heading', { level: 1, name: 'Approvals center' })).toBeVisible()
+  await expect(page.locator('.workspace-topbar')).toBeVisible()
+  await expectNoFatalUiErrors(page)
 
   const tenantPlatformResponse = await page.request.get(`${backendUrl}/api/platform/overview`)
   expect(tenantPlatformResponse.status()).toBe(403)
