@@ -9,6 +9,7 @@ import java.util.concurrent.locks.ReentrantLock;
 import java.util.function.Supplier;
 import javax.sql.DataSource;
 import lombok.RequiredArgsConstructor;
+import org.springframework.dao.CannotAcquireLockException;
 import org.springframework.jdbc.datasource.DataSourceUtils;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.support.TransactionSynchronization;
@@ -20,6 +21,8 @@ import org.springframework.transaction.support.TransactionSynchronizationManager
 @Service
 @RequiredArgsConstructor
 public class AlertConditionLockService {
+
+    private static final String ADVISORY_LOCK_TIMEOUT = "1000ms";
 
     private final DataSource dataSource;
     private final ConcurrentMap<String, ReentrantLock> locks = new ConcurrentHashMap<>();
@@ -62,12 +65,19 @@ public class AlertConditionLockService {
                 return;
             }
             try (PreparedStatement statement = connection.prepareStatement(
+                "set local lock_timeout = '" + ADVISORY_LOCK_TIMEOUT + "'")) {
+                statement.execute();
+            }
+            try (PreparedStatement statement = connection.prepareStatement(
                 "select pg_advisory_xact_lock(hashtext(?))")) {
                 statement.setString(1, conditionKey);
                 statement.executeQuery();
             }
         } catch (SQLException exception) {
-            throw new IllegalStateException("Could not lock the Alert condition for safe synchronization.", exception);
+            throw new CannotAcquireLockException(
+                "Could not lock the Alert condition for safe synchronization within the bounded timeout.",
+                exception
+            );
         } finally {
             DataSourceUtils.releaseConnection(connection, dataSource);
         }
