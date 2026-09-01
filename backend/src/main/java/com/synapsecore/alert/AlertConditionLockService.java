@@ -36,9 +36,8 @@ public class AlertConditionLockService {
         lock.lock();
 
         boolean releaseAfterTransaction = TransactionSynchronizationManager.isSynchronizationActive();
+        boolean releaseRegistered = false;
         try {
-            acquirePostgresLock(conditionKey);
-            T result = action.get();
             if (releaseAfterTransaction) {
                 TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
                     @Override
@@ -46,12 +45,16 @@ public class AlertConditionLockService {
                         release(conditionKey, lock);
                     }
                 });
-            } else {
+                releaseRegistered = true;
+            }
+            acquirePostgresLock(conditionKey);
+            T result = action.get();
+            if (!releaseAfterTransaction) {
                 release(conditionKey, lock);
             }
             return result;
         } catch (RuntimeException | Error exception) {
-            if (!releaseAfterTransaction) {
+            if (!releaseAfterTransaction || !releaseRegistered) {
                 release(conditionKey, lock);
             }
             throw exception;
