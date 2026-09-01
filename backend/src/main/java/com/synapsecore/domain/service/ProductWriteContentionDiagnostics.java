@@ -50,7 +50,9 @@ public class ProductWriteContentionDiagnostics {
         log.info("Product write PostgreSQL session requestId={} tenant={} backendPid={} stage=PRODUCT_SAVE_START elapsedMs={}",
             requestId, tenantCode, backendPid, elapsedMs(startedAtNanos));
 
-        TaskScheduler scheduler = taskSchedulerProvider.getIfAvailable();
+        // The application exposes several scheduler beans; diagnostics must not
+        // turn that normal configuration into a product-write failure.
+        TaskScheduler scheduler = taskSchedulerProvider.getIfUnique();
         if (scheduler == null) {
             return ProductWriteWatch.NO_OP;
         }
