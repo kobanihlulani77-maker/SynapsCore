@@ -25,6 +25,8 @@ import java.math.BigDecimal;
 import java.time.Instant;
 import java.util.EnumSet;
 import java.util.List;
+import java.util.Objects;
+import java.util.concurrent.atomic.AtomicReference;
 import lombok.extern.slf4j.Slf4j;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.PageRequest;
@@ -32,7 +34,12 @@ import org.springframework.http.HttpStatus;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.dao.PessimisticLockingFailureException;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.UnexpectedRollbackException;
+import org.springframework.transaction.TransactionStatus;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
+import org.springframework.transaction.support.TransactionTemplate;
 import org.springframework.web.server.ResponseStatusException;
 
 @Service
@@ -58,6 +65,7 @@ public class IntegrationReplayService {
     private final IntegrationInboundRecordService integrationInboundRecordService;
     private final RequestTraceContext requestTraceContext;
     private final OperationalAlertHookService operationalAlertHookService;
+    private final TransactionTemplate transactionTemplate;
 
     @Value("${synapsecore.integration.replay.max-attempts:3}")
     private int maxReplayAttempts;
@@ -176,8 +184,53 @@ public class IntegrationReplayService {
             .toList();
     }
 
-    @Transactional
     public IntegrationReplayResultResponse replay(Long replayRecordId, String actorName) {
+        AtomicReference<ReplayRecordState> initialState = new AtomicReference<>();
+        AtomicReference<IntegrationFailureCodes.IntegrationFailureExceptionDetails> failureDetails =
+            new AtomicReference<>();
+        AtomicReference<ResponseStatusException> failureException = new AtomicReference<>();
+        IntegrationReplayResultResponse replayed;
+
+        try {
+            replayed = transactionTemplate.execute(status -> replayManualInTransaction(
+                replayRecordId,
+                actorName,
+                status,
+                initialState,
+                failureDetails,
+                failureException
+            ));
+        } catch (UnexpectedRollbackException exception) {
+            if (failureDetails.get() == null) {
+                throw exception;
+            }
+            replayed = null;
+        }
+
+        if (failureDetails.get() != null) {
+            if (initialState.get() != null) {
+                recordReplayFailureInFreshTransaction(
+                    replayRecordId,
+                    Instant.now(),
+                    initialState.get(),
+                    failureDetails.get(),
+                    actorName,
+                    false
+                );
+            }
+            throw failureException.get();
+        }
+        return replayed;
+    }
+
+    private IntegrationReplayResultResponse replayManualInTransaction(
+        Long replayRecordId,
+        String actorName,
+        TransactionStatus transactionStatus,
+        AtomicReference<ReplayRecordState> initialState,
+        AtomicReference<IntegrationFailureCodes.IntegrationFailureExceptionDetails> failureDetails,
+        AtomicReference<ResponseStatusException> failureException
+    ) {
         String tenantCode = tenantContextService.getCurrentTenantCodeOrDefault();
         IntegrationReplayRecord record = integrationReplayRecordRepository.findByTenantCodeIgnoreCaseAndIdForUpdate(
                 tenantCode,
@@ -190,6 +243,7 @@ public class IntegrationReplayService {
             record.getWarehouseCode(),
             "replay failed inbound orders for warehouse " + record.getWarehouseCode()
         );
+        initialState.set(ReplayRecordState.from(record));
 
         if (record.getStatus() == IntegrationReplayStatus.REPLAYED) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
@@ -231,10 +285,16 @@ public class IntegrationReplayService {
                 "Integration replay record " + replayRecordId + " is not eligible for replay until " + record.getNextEligibleAt() + ".");
         }
 
-        return replayRecord(record, request, attemptedAt, actorName, true);
+        try {
+            return replayRecord(record, request, attemptedAt, actorName, true, false);
+        } catch (ResponseStatusException exception) {
+            failureException.set(exception);
+            failureDetails.set(IntegrationFailureCodes.extract(exception));
+            transactionStatus.setRollbackOnly();
+            return null;
+        }
     }
 
-    @Transactional
     public int processAutomatedReplayBatch(int batchSize) {
         Instant now = Instant.now();
         return integrationReplayRecordRepository.findEligibleIdsForAutomatedReplay(
@@ -248,16 +308,77 @@ public class IntegrationReplayService {
     }
 
     private int attemptAutomatedReplayById(Long replayRecordId, Instant attemptedAt) {
+        AtomicReference<ReplayRecordState> initialState = new AtomicReference<>();
+        AtomicReference<IntegrationFailureCodes.IntegrationFailureExceptionDetails> failureDetails =
+            new AtomicReference<>();
+        AtomicReference<Boolean> contentionFailure = new AtomicReference<>(false);
+        Integer replayed;
+
+        try {
+            replayed = transactionTemplate.execute(status -> {
+                try {
+                    int result = attemptAutomatedReplayInTransaction(
+                        replayRecordId,
+                        attemptedAt,
+                        initialState,
+                        failureDetails
+                    );
+                    if (failureDetails.get() != null) {
+                        status.setRollbackOnly();
+                    }
+                    return result;
+                } catch (ResponseStatusException exception) {
+                    failureDetails.set(IntegrationFailureCodes.extract(exception));
+                    status.setRollbackOnly();
+                    return 0;
+                } catch (PessimisticLockingFailureException exception) {
+                    failureDetails.set(contentionFailureDetails());
+                    contentionFailure.set(true);
+                    status.setRollbackOnly();
+                    return 0;
+                }
+            });
+        } catch (UnexpectedRollbackException exception) {
+            if (failureDetails.get() == null) {
+                throw exception;
+            }
+            replayed = 0;
+        }
+
+        if (failureDetails.get() != null) {
+            recordReplayFailureInFreshTransaction(
+                replayRecordId,
+                attemptedAt,
+                initialState.get(),
+                failureDetails.get(),
+                AUTO_REPLAY_ACTOR,
+                contentionFailure.get()
+            );
+            return 0;
+        }
+        return replayed == null ? 0 : replayed;
+    }
+
+    private int attemptAutomatedReplayInTransaction(
+        Long replayRecordId,
+        Instant attemptedAt,
+        AtomicReference<ReplayRecordState> initialState,
+        AtomicReference<IntegrationFailureCodes.IntegrationFailureExceptionDetails> failureDetails
+    ) {
         IntegrationReplayRecord record = integrationReplayRecordRepository.findByIdForUpdate(replayRecordId)
             .orElse(null);
         if (record == null) {
             return 0;
         }
+        initialState.set(ReplayRecordState.from(record));
         if (!isEligibleForAutomatedReplay(record, attemptedAt)) {
             return 0;
         }
         if (record.getTenantCode() == null || record.getTenantCode().isBlank()) {
-            orphanReplayRecord(record, attemptedAt);
+            failureDetails.set(new IntegrationFailureCodes.IntegrationFailureExceptionDetails(
+                IntegrationFailureCode.UNKNOWN,
+                "Replay record is missing tenant context and cannot be processed automatically."
+            ));
             return 0;
         }
         if (isManualOnlyAutomatedReplayRecord(record)) {
@@ -267,7 +388,7 @@ public class IntegrationReplayService {
         IntegrationFailureCodes.IntegrationFailureExceptionDetails validationFailure =
             validateAutomatedReplayRequest(request);
         if (validationFailure != null) {
-            recordAutomatedReplayFailure(record, attemptedAt, validationFailure);
+            failureDetails.set(validationFailure);
             return 0;
         }
         String previousRequestId = requestTraceContext.getCurrentRequestId().orElse(null);
@@ -277,16 +398,94 @@ public class IntegrationReplayService {
             requestTraceContext.setCurrentRequestId("auto-replay-" + record.getId());
             requestTraceContext.setCurrentActor(AUTO_REPLAY_ACTOR);
             requestTraceContext.setCurrentTenant(record.getTenantCode());
-            replayRecord(record, request, attemptedAt, AUTO_REPLAY_ACTOR, false);
+            replayRecord(record, request, attemptedAt, AUTO_REPLAY_ACTOR, false, false);
             return 1;
-        } catch (ResponseStatusException exception) {
-            return 0;
         } finally {
             requestTraceContext.clear();
             restoreTraceValue(previousRequestId, requestTraceContext::setCurrentRequestId);
             restoreTraceValue(previousActor, requestTraceContext::setCurrentActor);
             restoreTraceValue(previousTenant, requestTraceContext::setCurrentTenant);
         }
+    }
+
+    private void recordReplayFailureInFreshTransaction(
+        Long replayRecordId,
+        Instant attemptedAt,
+        ReplayRecordState expectedState,
+        IntegrationFailureCodes.IntegrationFailureExceptionDetails failure,
+        String actorName,
+        boolean contention
+    ) {
+        transactionTemplate.executeWithoutResult(status -> {
+            IntegrationReplayRecord record = integrationReplayRecordRepository.findByIdForUpdate(replayRecordId)
+                .orElse(null);
+            if (!isCurrentFailureCandidate(record, expectedState)) {
+                return;
+            }
+
+            if (record.getTenantCode() == null || record.getTenantCode().isBlank()) {
+                orphanReplayRecord(record, attemptedAt);
+                return;
+            }
+
+            String previousRequestId = requestTraceContext.getCurrentRequestId().orElse(null);
+            String previousActor = requestTraceContext.getCurrentActor().orElse(null);
+            String previousTenant = requestTraceContext.getCurrentTenant().orElse(null);
+            try {
+                requestTraceContext.setCurrentRequestId("auto-replay-" + replayRecordId);
+                requestTraceContext.setCurrentActor(actorName);
+                requestTraceContext.setCurrentTenant(record.getTenantCode());
+                persistReplayFailure(record, attemptedAt, failure, actorName, contention);
+            } finally {
+                requestTraceContext.clear();
+                restoreTraceValue(previousRequestId, requestTraceContext::setCurrentRequestId);
+                restoreTraceValue(previousActor, requestTraceContext::setCurrentActor);
+                restoreTraceValue(previousTenant, requestTraceContext::setCurrentTenant);
+            }
+        });
+    }
+
+    private boolean isCurrentFailureCandidate(IntegrationReplayRecord record, ReplayRecordState expectedState) {
+        if (record == null || !List.of(IntegrationReplayStatus.PENDING, IntegrationReplayStatus.REPLAY_FAILED,
+                IntegrationReplayStatus.DEAD_LETTERED)
+            .contains(record.getStatus())) {
+            return false;
+        }
+        if (expectedState == null) {
+            return true;
+        }
+        return record.getStatus() == expectedState.status()
+            && record.getReplayAttemptCount() == expectedState.replayAttemptCount()
+            && Objects.equals(record.getNextEligibleAt(), expectedState.nextEligibleAt());
+    }
+
+    private ResponseStatusException contentionFailure() {
+        return IntegrationFailureCodes.status(
+            HttpStatus.CONFLICT,
+            IntegrationFailureCode.UNKNOWN,
+            "Inventory is currently under conflicting reservation pressure. Retry once the active order write completes."
+        );
+    }
+
+    private IntegrationFailureCodes.IntegrationFailureExceptionDetails contentionFailureDetails() {
+        return IntegrationFailureCodes.extract(contentionFailure());
+    }
+
+    private void emitDeadLetterHookAfterCommit(String alertType,
+                                               String severity,
+                                               String summary,
+                                               String detail) {
+        Runnable emit = () -> operationalAlertHookService.emit(alertType, severity, summary, detail);
+        if (!TransactionSynchronizationManager.isSynchronizationActive()) {
+            emit.run();
+            return;
+        }
+        TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+            @Override
+            public void afterCommit() {
+                emit.run();
+            }
+        });
     }
 
     private IntegrationFailureCodes.IntegrationFailureExceptionDetails validateAutomatedReplayRequest(
@@ -327,9 +526,11 @@ public class IntegrationReplayService {
         return null;
     }
 
-    private void recordAutomatedReplayFailure(IntegrationReplayRecord record,
-                                              Instant attemptedAt,
-                                              IntegrationFailureCodes.IntegrationFailureExceptionDetails failure) {
+    private void persistReplayFailure(IntegrationReplayRecord record,
+                                      Instant attemptedAt,
+                                      IntegrationFailureCodes.IntegrationFailureExceptionDetails failure,
+                                      String actorName,
+                                      boolean contention) {
         String tenantCode = record.getTenantCode();
         int nextAttemptCount = record.getReplayAttemptCount() + 1;
         record.setReplayAttemptCount(nextAttemptCount);
@@ -340,7 +541,10 @@ public class IntegrationReplayService {
             record.setStatus(IntegrationReplayStatus.DEAD_LETTERED);
             record.setDeadLetteredAt(attemptedAt);
             record.setNextEligibleAt(null);
-            record.setLastReplayMessage(limit(failure.failureMessage() + " Dead-lettered after " + nextAttemptCount + " attempts."));
+            record.setLastReplayMessage(limit(failure.failureMessage()
+                + (contention
+                    ? " Dead-lettered after " + nextAttemptCount + " contention retries."
+                    : " Dead-lettered after " + nextAttemptCount + " attempts.")));
         } else {
             record.setStatus(IntegrationReplayStatus.REPLAY_FAILED);
             record.setNextEligibleAt(nextEligibleAt(attemptedAt, nextAttemptCount));
@@ -348,11 +552,13 @@ public class IntegrationReplayService {
         }
         record = integrationReplayRecordRepository.save(record);
         if (exhausted) {
-            operationalAlertHookService.emit(
+            emitDeadLetterHookAfterCommit(
                 "INTEGRATION_REPLAY_DEAD_LETTERED",
                 "HIGH",
-                "Integration replay " + record.getId() + " was dead-lettered.",
-                "Tenant " + tenantCode + " source " + record.getSourceSystem() + " order " + record.getExternalOrderId() + " failed with " + failure.failureCode() + "."
+                "Integration replay " + record.getId() + (contention ? " was dead-lettered after contention retries." : " was dead-lettered."),
+                contention
+                    ? "Tenant " + tenantCode + " source " + record.getSourceSystem() + " order " + record.getExternalOrderId() + " exhausted contention retries."
+                    : "Tenant " + tenantCode + " source " + record.getSourceSystem() + " order " + record.getExternalOrderId() + " failed with " + failure.failureCode() + "."
             );
         }
 
@@ -361,11 +567,11 @@ public class IntegrationReplayService {
             BusinessEventType.INTEGRATION_REPLAY_FAILED,
             "integration-replay",
             "Replay failed for " + record.getExternalOrderId() + " from " + record.getSourceSystem()
-                + " by " + AUTO_REPLAY_ACTOR + ". Reason: " + failure.failureMessage()
+                + " by " + actorName + ". Reason: " + failure.failureMessage()
         );
         auditLogService.recordFailure(
             "INTEGRATION_REPLAY_FAILED",
-            AUTO_REPLAY_ACTOR,
+            actorName,
             "integration-replay",
             "IntegrationReplayRecord",
             String.valueOf(record.getId()),
@@ -374,8 +580,8 @@ public class IntegrationReplayService {
         );
         operationalMetricsService.recordReplayAttempt(tenantCode, false);
         operationalStateChangePublisher.publish(OperationalUpdateType.INTEGRATION_STATE, "integration-replay");
-        log.warn("Integration replay {} failed automated preflight for tenant {} source {}: {}",
-            record.getId(), tenantCode, record.getSourceSystem(), failure.failureMessage());
+        log.warn("Integration replay {} {} for tenant {} source {}: {}",
+            record.getId(), contention ? "hit contention" : "failed", tenantCode, record.getSourceSystem(), failure.failureMessage());
     }
 
     private boolean isEligibleForAutomatedReplay(IntegrationReplayRecord record, Instant attemptedAt) {
@@ -408,7 +614,8 @@ public class IntegrationReplayService {
                                                          OrderCreateRequest request,
                                                          Instant attemptedAt,
                                                          String actorName,
-                                                         boolean enforceWarehouseAccess) {
+                                                         boolean enforceWarehouseAccess,
+                                                         boolean persistFailure) {
         String tenantCode = record.getTenantCode();
         if (enforceWarehouseAccess) {
             accessDirectoryService.requireOperatorWarehouseAccess(
@@ -471,102 +678,15 @@ public class IntegrationReplayService {
             return new IntegrationReplayResultResponse(toResponse(record), order, attemptedAt);
         } catch (ResponseStatusException exception) {
             var failure = IntegrationFailureCodes.extract(exception);
-            int nextAttemptCount = record.getReplayAttemptCount() + 1;
-            record.setReplayAttemptCount(nextAttemptCount);
-            record.setLastAttemptedAt(attemptedAt);
-            record.setFailureCode(failure.failureCode());
-            boolean exhausted = nextAttemptCount >= Math.max(maxReplayAttempts, 1);
-            if (exhausted) {
-                record.setStatus(IntegrationReplayStatus.DEAD_LETTERED);
-                record.setDeadLetteredAt(attemptedAt);
-                record.setNextEligibleAt(null);
-                record.setLastReplayMessage(limit(failure.failureMessage() + " Dead-lettered after " + nextAttemptCount + " attempts."));
-            } else {
-                record.setStatus(IntegrationReplayStatus.REPLAY_FAILED);
-                record.setNextEligibleAt(nextEligibleAt(attemptedAt, nextAttemptCount));
-                record.setLastReplayMessage(limit(failure.failureMessage()));
+            if (persistFailure) {
+                persistReplayFailure(record, attemptedAt, failure, actorName, false);
             }
-            record = integrationReplayRecordRepository.save(record);
-            if (exhausted) {
-                operationalAlertHookService.emit(
-                    "INTEGRATION_REPLAY_DEAD_LETTERED",
-                    "HIGH",
-                    "Integration replay " + record.getId() + " was dead-lettered.",
-                    "Tenant " + tenantCode + " source " + record.getSourceSystem() + " order " + record.getExternalOrderId() + " failed with " + failure.failureCode() + "."
-                );
-            }
-
-            businessEventService.recordForTenant(
-                tenantCode,
-                BusinessEventType.INTEGRATION_REPLAY_FAILED,
-                "integration-replay",
-                "Replay failed for " + record.getExternalOrderId() + " from " + record.getSourceSystem()
-                    + " by " + actorName + ". Reason: " + failure.failureMessage()
-            );
-            auditLogService.recordFailure(
-                "INTEGRATION_REPLAY_FAILED",
-                actorName,
-                "integration-replay",
-                "IntegrationReplayRecord",
-                String.valueOf(record.getId()),
-                "Replay failed for inbound order " + record.getExternalOrderId() + ". Reason: "
-                    + failure.failureMessage()
-            );
-            operationalMetricsService.recordReplayAttempt(tenantCode, false);
-            operationalStateChangePublisher.publish(OperationalUpdateType.INTEGRATION_STATE, "integration-replay");
-            log.warn("Integration replay {} failed for tenant {} source {}: {}", record.getId(), tenantCode, record.getSourceSystem(), failure.failureMessage());
             throw exception;
         } catch (PessimisticLockingFailureException exception) {
-            ResponseStatusException contention = IntegrationFailureCodes.status(
-                HttpStatus.CONFLICT,
-                IntegrationFailureCode.UNKNOWN,
-                "Inventory is currently under conflicting reservation pressure. Retry once the active order write completes."
-            );
-            var failure = IntegrationFailureCodes.extract(contention);
-            int nextAttemptCount = record.getReplayAttemptCount() + 1;
-            record.setReplayAttemptCount(nextAttemptCount);
-            record.setLastAttemptedAt(attemptedAt);
-            record.setFailureCode(failure.failureCode());
-            boolean exhausted = nextAttemptCount >= Math.max(maxReplayAttempts, 1);
-            if (exhausted) {
-                record.setStatus(IntegrationReplayStatus.DEAD_LETTERED);
-                record.setDeadLetteredAt(attemptedAt);
-                record.setNextEligibleAt(null);
-                record.setLastReplayMessage(limit(failure.failureMessage() + " Dead-lettered after " + nextAttemptCount + " attempts."));
-            } else {
-                record.setStatus(IntegrationReplayStatus.REPLAY_FAILED);
-                record.setNextEligibleAt(nextEligibleAt(attemptedAt, nextAttemptCount));
-                record.setLastReplayMessage(limit(failure.failureMessage()));
+            ResponseStatusException contention = contentionFailure();
+            if (persistFailure) {
+                persistReplayFailure(record, attemptedAt, IntegrationFailureCodes.extract(contention), actorName, true);
             }
-            record = integrationReplayRecordRepository.save(record);
-            if (exhausted) {
-                operationalAlertHookService.emit(
-                    "INTEGRATION_REPLAY_DEAD_LETTERED",
-                    "HIGH",
-                    "Integration replay " + record.getId() + " was dead-lettered after contention retries.",
-                    "Tenant " + tenantCode + " source " + record.getSourceSystem() + " order " + record.getExternalOrderId() + " exhausted contention retries."
-                );
-            }
-
-            businessEventService.recordForTenant(
-                tenantCode,
-                BusinessEventType.INTEGRATION_REPLAY_FAILED,
-                "integration-replay",
-                "Replay failed for " + record.getExternalOrderId() + " from " + record.getSourceSystem()
-                    + " by " + actorName + ". Reason: " + failure.failureMessage()
-            );
-            auditLogService.recordFailure(
-                "INTEGRATION_REPLAY_FAILED",
-                actorName,
-                "integration-replay",
-                "IntegrationReplayRecord",
-                String.valueOf(record.getId()),
-                "Replay failed for inbound order " + record.getExternalOrderId() + ". Reason: "
-                    + failure.failureMessage()
-            );
-            operationalMetricsService.recordReplayAttempt(tenantCode, false);
-            operationalStateChangePublisher.publish(OperationalUpdateType.INTEGRATION_STATE, "integration-replay");
-            log.warn("Integration replay {} hit contention for tenant {} source {}: {}", record.getId(), tenantCode, record.getSourceSystem(), failure.failureMessage());
             throw contention;
         }
     }
@@ -586,7 +706,7 @@ public class IntegrationReplayService {
         record.setNextEligibleAt(null);
         record.setLastReplayMessage(limit("Replay record is missing tenant context and cannot be processed automatically."));
         integrationReplayRecordRepository.save(record);
-        operationalAlertHookService.emit(
+        emitDeadLetterHookAfterCommit(
             "INTEGRATION_REPLAY_ORPHANED",
             "HIGH",
             "Integration replay " + record.getId() + " is missing tenant context.",
@@ -660,5 +780,18 @@ public class IntegrationReplayService {
             return value;
         }
         return value.substring(0, 317) + "...";
+    }
+
+    private record ReplayRecordState(IntegrationReplayStatus status,
+                                     int replayAttemptCount,
+                                     Instant nextEligibleAt) {
+
+        private static ReplayRecordState from(IntegrationReplayRecord record) {
+            return new ReplayRecordState(
+                record.getStatus(),
+                record.getReplayAttemptCount(),
+                record.getNextEligibleAt()
+            );
+        }
     }
 }

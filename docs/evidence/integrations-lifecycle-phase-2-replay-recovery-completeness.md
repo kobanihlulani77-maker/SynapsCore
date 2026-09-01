@@ -81,7 +81,7 @@ The operator's warehouse scope is checked again at replay time. A record cannot 
 
 ### Concurrency and transactions
 
-Manual replay uses a pessimistic row lock for the replay record. Automated replay uses a locked record lookup and processes a bounded batch in one transaction boundary per record. The new repository lookup and PostgreSQL partial unique index prevent duplicate active replay identities for a tenant and external order ID.
+Manual replay uses a pessimistic row lock for the replay record and an independent transaction for each business attempt. Automated replay selects a bounded batch, but each `IntegrationReplayRecord` executes as an independent transactional recovery unit rather than sharing one batch transaction. If a replayable business attempt fails, its order, reservation, fulfillment, and success evidence roll back together; the replay failure state, audit, and metrics are then committed in a fresh transaction after the record is re-locked and re-checked. The new repository lookup and PostgreSQL partial unique index prevent duplicate active replay identities for a tenant and external order ID.
 
 The current Render topology has one backend web service with the scheduled pull worker enabled. Therefore scheduled-worker overlap across multiple application instances is a controlled-pilot boundary, not a claimed horizontally scaled guarantee. Do not scale scheduled pull or realtime consumers horizontally until a lease/claim or equivalent distributed coordination mechanism exists.
 
