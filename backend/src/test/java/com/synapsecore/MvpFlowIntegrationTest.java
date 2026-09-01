@@ -5582,7 +5582,7 @@ class MvpFlowIntegrationTest {
     }
 
     private com.synapsecore.domain.entity.ScenarioRun latestPreviewRun() {
-        return scenarioRunRepository.findTop12ByOrderByCreatedAtDesc().stream()
+        return scenarioRunRepository.findTop12ByOrderByCreatedAtDescIdDesc().stream()
             .filter(run -> run.getType() == ScenarioRunType.PREVIEW)
             .findFirst()
             .orElseThrow();

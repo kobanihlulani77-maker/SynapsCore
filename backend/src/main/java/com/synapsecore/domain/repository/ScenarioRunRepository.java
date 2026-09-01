@@ -12,9 +12,21 @@ import org.springframework.data.jpa.repository.JpaSpecificationExecutor;
 
 public interface ScenarioRunRepository extends JpaRepository<ScenarioRun, Long>, JpaSpecificationExecutor<ScenarioRun> {
 
+    List<ScenarioRun> findTop12ByOrderByCreatedAtDescIdDesc();
+
     List<ScenarioRun> findTop12ByOrderByCreatedAtDesc();
 
+    List<ScenarioRun> findTop12ByTenant_CodeIgnoreCaseOrderByCreatedAtDescIdDesc(String tenantCode);
+
     List<ScenarioRun> findTop12ByTenant_CodeIgnoreCaseOrderByCreatedAtDesc(String tenantCode);
+
+    List<ScenarioRun> findTop20ByTenant_CodeIgnoreCaseAndApprovalStatusAndApprovalPolicyAndApprovalStageAndApprovalDueAtLessThanEqualAndSlaEscalatedAtIsNullOrderByCreatedAtDescIdDesc(
+        String tenantCode,
+        ScenarioApprovalStatus approvalStatus,
+        ScenarioApprovalPolicy approvalPolicy,
+        ScenarioApprovalStage approvalStage,
+        Instant approvalDueAt
+    );
 
     List<ScenarioRun> findTop20ByApprovalStatusAndApprovalPolicyAndApprovalStageAndApprovalDueAtLessThanEqualAndSlaEscalatedAtIsNullOrderByCreatedAtDesc(
         ScenarioApprovalStatus approvalStatus,

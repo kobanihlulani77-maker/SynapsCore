@@ -168,7 +168,7 @@ public class TenantWorkspaceAdministrationService {
     }
 
     @Transactional
-    public TenantWorkspaceResponse updateWorkspace(TenantWorkspaceUpdateRequest request, String actorName) {
+    public void updateWorkspace(TenantWorkspaceUpdateRequest request, String actorName) {
         Tenant tenant = tenantContextService.getCurrentTenantOrDefault();
         requireCurrentVersion(request.version(), tenant.getVersion(), "workspace settings");
         tenant.setName(request.tenantName().trim());
@@ -183,12 +183,11 @@ public class TenantWorkspaceAdministrationService {
             "Updated tenant workspace metadata for " + tenant.getCode() + "."
         );
 
-        return getWorkspace();
     }
 
     @Transactional
-    public TenantWorkspaceResponse updateSecuritySettings(TenantWorkspaceSecuritySettingsRequest request,
-                                                          String actorName) {
+    public void updateSecuritySettings(TenantWorkspaceSecuritySettingsRequest request,
+                                       String actorName) {
         Tenant tenant = tenantContextService.getCurrentTenantOrDefault();
         requireCurrentVersion(request.version(), tenant.getVersion(), "security settings");
         tenant.setPasswordRotationDays(request.passwordRotationDays());
@@ -209,7 +208,6 @@ public class TenantWorkspaceAdministrationService {
                 + (request.invalidateOtherSessions() ? " while invalidating other active sessions." : ".")
         );
 
-        return getWorkspace();
     }
 
     @Transactional

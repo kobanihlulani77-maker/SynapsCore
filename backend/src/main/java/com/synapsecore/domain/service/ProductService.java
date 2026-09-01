@@ -31,6 +31,7 @@ import java.util.regex.Pattern;
 import lombok.extern.slf4j.Slf4j;
 import lombok.RequiredArgsConstructor;
 import org.springframework.dao.DataIntegrityViolationException;
+import org.springframework.dao.DataAccessException;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -55,6 +56,7 @@ public class ProductService {
     private final CatalogWriteConflictResolver catalogWriteConflictResolver;
     private final OperationalMetricsService operationalMetricsService;
     private final RequestTraceContext requestTraceContext;
+    private final ProductWriteContentionDiagnostics productWriteContentionDiagnostics;
 
     @Transactional(readOnly = true)
     public List<ProductResponse> getProducts() {
@@ -83,6 +85,7 @@ public class ProductService {
         String normalizedCategory = normalizeRequiredText(request.category(), "Product category", 120);
         ensureSkuIsAvailable(tenant.getCode(), catalogSku);
         logProductWriteStage("SKU_CHECK_COMPLETE", startedAtNanos, tenant.getCode());
+        ProductWriteContentionDiagnostics.ProductWriteWatch writeWatch = ProductWriteContentionDiagnostics.ProductWriteWatch.NO_OP;
         try {
             Product adoptedProduct = adoptOrphanedProductIfPresent(tenant, catalogSku, normalizedName, normalizedCategory);
             if (adoptedProduct != null) {
@@ -106,6 +109,8 @@ public class ProductService {
             ensureInternalSkuIsAvailable(tenant.getCode(), catalogSku);
 
             logProductWriteStage("PRODUCT_SAVE_START", startedAtNanos, tenant.getCode());
+            writeWatch = productWriteContentionDiagnostics.begin(
+                requestTraceContext.getRequiredRequestId(), tenant.getCode(), startedAtNanos);
             Product product = productRepository.save(Product.builder()
                 .tenant(tenant)
                 .catalogSku(catalogSku)
@@ -133,6 +138,16 @@ public class ProductService {
             operationalMetricsService.recordCatalogWrite(tenant.getCode(), "PRODUCT_CREATED", false);
             log.warn("Catalog product create failed for tenant {} sku {}: {}", tenant.getCode(), catalogSku, exception.getMostSpecificCause() == null ? exception.getMessage() : exception.getMostSpecificCause().getMessage());
             throw catalogWriteConflictResolver.toResponseStatus(exception, catalogSku);
+        } catch (DataAccessException exception) {
+            operationalMetricsService.recordCatalogWrite(tenant.getCode(), "PRODUCT_CREATED", false);
+            log.warn("Catalog product create could not obtain database availability for tenant {} sku {}: {}",
+                tenant.getCode(), catalogSku, exception.getMostSpecificCause() == null
+                    ? exception.getClass().getSimpleName()
+                    : exception.getMostSpecificCause().getClass().getSimpleName());
+            throw new ResponseStatusException(HttpStatus.SERVICE_UNAVAILABLE,
+                "Catalog write could not obtain database availability before the bounded wait expired.");
+        } finally {
+            writeWatch.close();
         }
     }
 

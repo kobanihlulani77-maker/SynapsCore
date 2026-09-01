@@ -1025,7 +1025,7 @@ public class ScenarioHistoryService {
     private void applyPendingSlaEscalations() {
         Instant now = Instant.now();
         scenarioRunRepository
-            .findTop20ByTenant_CodeIgnoreCaseAndApprovalStatusAndApprovalPolicyAndApprovalStageAndApprovalDueAtLessThanEqualAndSlaEscalatedAtIsNullOrderByCreatedAtDesc(
+            .findTop20ByTenant_CodeIgnoreCaseAndApprovalStatusAndApprovalPolicyAndApprovalStageAndApprovalDueAtLessThanEqualAndSlaEscalatedAtIsNullOrderByCreatedAtDescIdDesc(
                 tenantContextService.getCurrentTenantCodeOrDefault(),
                 ScenarioApprovalStatus.PENDING_APPROVAL,
                 ScenarioApprovalPolicy.ESCALATED,

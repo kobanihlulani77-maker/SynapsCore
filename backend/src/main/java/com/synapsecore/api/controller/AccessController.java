@@ -149,14 +149,16 @@ public class AccessController {
     @PutMapping("/admin/workspace")
     public TenantWorkspaceResponse updateWorkspace(@Valid @RequestBody TenantWorkspaceUpdateRequest request) {
         String actorName = accessControlService.requireTenantAdmin("update tenant workspace settings").actorName();
-        return tenantWorkspaceAdministrationService.updateWorkspace(request, actorName);
+        tenantWorkspaceAdministrationService.updateWorkspace(request, actorName);
+        return tenantWorkspaceAdministrationService.getWorkspace();
     }
 
     @PutMapping("/admin/workspace/security")
     public TenantWorkspaceResponse updateWorkspaceSecurity(@Valid @RequestBody TenantWorkspaceSecuritySettingsRequest request,
                                                            HttpServletRequest httpRequest) {
         String actorName = accessControlService.requireTenantAdmin("update tenant security settings").actorName();
-        TenantWorkspaceResponse workspace = tenantWorkspaceAdministrationService.updateSecuritySettings(request, actorName);
+        tenantWorkspaceAdministrationService.updateSecuritySettings(request, actorName);
+        TenantWorkspaceResponse workspace = tenantWorkspaceAdministrationService.getWorkspace();
         authSessionService.syncTenantSecurityPolicy(
             httpRequest.getSession(false),
             workspace.tenantCode(),
