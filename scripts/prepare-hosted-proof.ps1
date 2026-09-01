@@ -545,6 +545,7 @@ function Ensure-Operator {
         active = $true
         roles = @($Roles)
         warehouseScopes = @($WarehouseScopes)
+        tenantWide = ($WarehouseScopes.Count -eq 0)
     }
 
     $operators = @(Get-JsonArray -Url "$script:ApiBaseUrlValue/api/access/admin/operators" -Session $AdminSession)
