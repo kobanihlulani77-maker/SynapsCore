@@ -1,4 +1,4 @@
-import { useEffect } from 'react'
+import { useEffect, useRef } from 'react'
 
 export default function useWorkspaceBootstrap({
   activeTenantCode,
@@ -70,6 +70,8 @@ export default function useWorkspaceBootstrap({
   scenarioHistoryFilters,
   normalizeSnapshot,
 }) {
+  const catalogProductsRequestRef = useRef(0)
+
   function mergeReplaySurfaceSnapshot(replaySurfaceData) {
     snapshotSetter((current) => {
       const previousSnapshot = current || emptySnapshot
@@ -284,15 +286,22 @@ export default function useWorkspaceBootstrap({
   }
 
   async function fetchCatalogProducts(options = {}) {
+    const requestId = ++catalogProductsRequestRef.current
     if (!options.quiet) {
       catalogStateSetter((current) => ({ ...current, loading: true, error: '', success: '' }))
     }
     try {
       const products = await fetchJson('/api/products')
+      if (requestId !== catalogProductsRequestRef.current) {
+        return products
+      }
       catalogStateSetter((current) => ({ ...current, loading: false, error: '', products, success: options.success || current.success }))
       selectedCatalogProductIdSetter((currentId) => (products.some((product) => product.id === currentId) ? currentId : products[0]?.id || null))
       return products
     } catch (error) {
+      if (requestId !== catalogProductsRequestRef.current) {
+        return []
+      }
       catalogStateSetter((current) => ({ ...current, loading: false, error: error.message }))
       if (!options.quiet) throw error
       return []
