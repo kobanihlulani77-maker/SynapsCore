@@ -6,6 +6,7 @@ import java.util.Map;
 import java.util.concurrent.ScheduledFuture;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.BeansException;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.dao.DataAccessException;
 import org.springframework.jdbc.core.ConnectionCallback;
@@ -50,9 +51,14 @@ public class ProductWriteContentionDiagnostics {
         log.info("Product write PostgreSQL session requestId={} tenant={} backendPid={} stage=PRODUCT_SAVE_START elapsedMs={}",
             requestId, tenantCode, backendPid, elapsedMs(startedAtNanos));
 
-        // The application exposes several scheduler beans; diagnostics must not
-        // turn that normal configuration into a product-write failure.
-        TaskScheduler scheduler = taskSchedulerProvider.getIfUnique();
+        TaskScheduler scheduler;
+        try {
+            scheduler = taskSchedulerProvider.getIfUnique();
+        } catch (BeansException exception) {
+            log.warn("Product write watchdog scheduler unavailable requestId={} tenant={} reason={}",
+                requestId, tenantCode, exception.getClass().getSimpleName());
+            return ProductWriteWatch.NO_OP;
+        }
         if (scheduler == null) {
             return ProductWriteWatch.NO_OP;
         }
