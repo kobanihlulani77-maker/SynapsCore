@@ -438,7 +438,7 @@ class Layer2Phase7FullOperationalAcceptanceIntegrationTest {
     }
 
     private ScenarioRun latestScenario(ScenarioRunType type) {
-        return scenarioRunRepository.findTop12ByOrderByCreatedAtDesc().stream()
+        return scenarioRunRepository.findTop12ByOrderByCreatedAtDescIdDesc().stream()
             .filter(run -> run.getType() == type).findFirst().orElseThrow();
     }
 

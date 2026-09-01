@@ -549,7 +549,7 @@ class SecurityVerificationIntegrationTest {
                     """.formatted(SECOND_TENANT_PRODUCT_SKU)))
             .andExpect(status().isOk());
         Long secondTenantScenarioRunId = scenarioRunRepository
-            .findTop12ByTenant_CodeIgnoreCaseOrderByCreatedAtDesc(SECOND_TENANT_CODE)
+            .findTop12ByTenant_CodeIgnoreCaseOrderByCreatedAtDescIdDesc(SECOND_TENANT_CODE)
             .stream()
             .findFirst()
             .orElseThrow()

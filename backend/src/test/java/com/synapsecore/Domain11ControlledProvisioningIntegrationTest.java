@@ -359,7 +359,7 @@ class Domain11ControlledProvisioningIntegrationTest {
         assertThat(recommendationRepository.findAll().stream()
             .filter(recommendation -> recommendation.getTenant() != null && tenantCode.equalsIgnoreCase(recommendation.getTenant().getCode())))
             .isEmpty();
-        assertThat(scenarioRunRepository.findTop12ByTenant_CodeIgnoreCaseOrderByCreatedAtDesc(tenantCode)).isEmpty();
+        assertThat(scenarioRunRepository.findTop12ByTenant_CodeIgnoreCaseOrderByCreatedAtDescIdDesc(tenantCode)).isEmpty();
         assertThat(integrationInboundRecordRepository.findAll().stream()
             .filter(record -> tenantCode.equalsIgnoreCase(record.getTenantCode())))
             .isEmpty();

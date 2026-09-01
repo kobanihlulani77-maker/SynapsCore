@@ -446,7 +446,7 @@ public class ScenarioHistoryService {
         int effectiveLimit = limit <= 0 ? DEFAULT_NOTIFICATION_LIMIT : Math.min(limit, 12);
 
         List<ScenarioNotificationResponse> activeEscalations = scenarioRunRepository
-            .findTop12ByTenant_CodeIgnoreCaseAndTypeAndApprovalStatusAndSlaEscalatedAtIsNotNullAndSlaAcknowledgedAtIsNullOrderBySlaEscalatedAtDesc(
+            .findTop12ByTenant_CodeIgnoreCaseAndTypeAndApprovalStatusAndSlaEscalatedAtIsNotNullAndSlaAcknowledgedAtIsNullOrderBySlaEscalatedAtDescIdDesc(
                 tenantContextService.getCurrentTenantCodeOrDefault(),
                 ScenarioRunType.SAVED_PLAN,
                 ScenarioApprovalStatus.PENDING_APPROVAL)
@@ -455,7 +455,7 @@ public class ScenarioHistoryService {
             .toList();
 
         List<ScenarioNotificationResponse> acknowledgedEscalations = scenarioRunRepository
-            .findTop12ByTenant_CodeIgnoreCaseAndTypeAndSlaAcknowledgedAtIsNotNullOrderBySlaAcknowledgedAtDesc(
+            .findTop12ByTenant_CodeIgnoreCaseAndTypeAndSlaAcknowledgedAtIsNotNullOrderBySlaAcknowledgedAtDescIdDesc(
                 tenantContextService.getCurrentTenantCodeOrDefault(),
                 ScenarioRunType.SAVED_PLAN)
             .stream()
@@ -463,7 +463,8 @@ public class ScenarioHistoryService {
             .toList();
 
         return java.util.stream.Stream.concat(activeEscalations.stream(), acknowledgedEscalations.stream())
-            .sorted(Comparator.comparing(ScenarioNotificationResponse::createdAt).reversed())
+            .sorted(Comparator.comparing(ScenarioNotificationResponse::createdAt).reversed()
+                .thenComparing(ScenarioNotificationResponse::scenarioRunId, Comparator.reverseOrder()))
             .filter(notification -> isVisibleToWarehouseScopes(notification.warehouseCode(), warehouseScopes))
             .limit(effectiveLimit)
             .toList();
@@ -500,7 +501,9 @@ public class ScenarioHistoryService {
         applyPendingSlaEscalations();
         return scenarioRunRepository.findAll(
                 buildSpecification(effectiveFilter),
-                PageRequest.of(0, effectiveFilter.resolvedLimit(), Sort.by(Sort.Direction.DESC, "createdAt")))
+                PageRequest.of(0, effectiveFilter.resolvedLimit(), Sort.by(
+                    Sort.Order.desc("createdAt"),
+                    Sort.Order.desc("id"))))
             .stream()
             .map(this::toScenarioRunResponse)
             .toList();

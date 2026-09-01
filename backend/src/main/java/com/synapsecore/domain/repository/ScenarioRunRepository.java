@@ -48,7 +48,7 @@ public interface ScenarioRunRepository extends JpaRepository<ScenarioRun, Long>,
         ScenarioApprovalStatus approvalStatus
     );
 
-    List<ScenarioRun> findTop12ByTenant_CodeIgnoreCaseAndTypeAndApprovalStatusAndSlaEscalatedAtIsNotNullAndSlaAcknowledgedAtIsNullOrderBySlaEscalatedAtDesc(
+    List<ScenarioRun> findTop12ByTenant_CodeIgnoreCaseAndTypeAndApprovalStatusAndSlaEscalatedAtIsNotNullAndSlaAcknowledgedAtIsNullOrderBySlaEscalatedAtDescIdDesc(
         String tenantCode,
         ScenarioRunType type,
         ScenarioApprovalStatus approvalStatus
@@ -58,7 +58,7 @@ public interface ScenarioRunRepository extends JpaRepository<ScenarioRun, Long>,
         ScenarioRunType type
     );
 
-    List<ScenarioRun> findTop12ByTenant_CodeIgnoreCaseAndTypeAndSlaAcknowledgedAtIsNotNullOrderBySlaAcknowledgedAtDesc(
+    List<ScenarioRun> findTop12ByTenant_CodeIgnoreCaseAndTypeAndSlaAcknowledgedAtIsNotNullOrderBySlaAcknowledgedAtDescIdDesc(
         String tenantCode,
         ScenarioRunType type
     );

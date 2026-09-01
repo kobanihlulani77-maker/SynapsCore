@@ -1371,7 +1371,7 @@ class MvpFlowIntegrationTest {
                 .content(previewBody))
             .andExpect(status().isOk());
 
-        Long scenarioRunId = scenarioRunRepository.findTop12ByOrderByCreatedAtDesc().stream()
+        Long scenarioRunId = scenarioRunRepository.findTop12ByOrderByCreatedAtDescIdDesc().stream()
             .filter(run -> run.getType() == ScenarioRunType.PREVIEW)
             .findFirst()
             .orElseThrow()
@@ -1434,7 +1434,7 @@ class MvpFlowIntegrationTest {
                 .content(previewBody))
             .andExpect(status().isOk());
 
-        Long scenarioRunId = scenarioRunRepository.findTop12ByOrderByCreatedAtDesc().stream()
+        Long scenarioRunId = scenarioRunRepository.findTop12ByOrderByCreatedAtDescIdDesc().stream()
             .filter(run -> run.getType() == ScenarioRunType.PREVIEW)
             .findFirst()
             .orElseThrow()
@@ -1480,7 +1480,7 @@ class MvpFlowIntegrationTest {
                 .content(saveBody))
             .andExpect(status().isCreated());
 
-        Long savedPlanId = scenarioRunRepository.findTop12ByOrderByCreatedAtDesc().stream()
+        Long savedPlanId = scenarioRunRepository.findTop12ByOrderByCreatedAtDescIdDesc().stream()
             .filter(run -> run.getType() == ScenarioRunType.SAVED_PLAN)
             .findFirst()
             .orElseThrow()
@@ -1561,7 +1561,7 @@ class MvpFlowIntegrationTest {
                 .content(saveBody))
             .andExpect(status().isCreated());
 
-        Long savedPlanId = scenarioRunRepository.findTop12ByOrderByCreatedAtDesc().stream()
+        Long savedPlanId = scenarioRunRepository.findTop12ByOrderByCreatedAtDescIdDesc().stream()
             .filter(run -> run.getType() == ScenarioRunType.SAVED_PLAN)
             .findFirst()
             .orElseThrow()
@@ -1657,7 +1657,7 @@ class MvpFlowIntegrationTest {
             .andExpect(status().isCreated())
             .andExpect(jsonPath("$.revisionNumber").value(1));
 
-        Long rejectedPlanId = scenarioRunRepository.findTop12ByOrderByCreatedAtDesc().stream()
+        Long rejectedPlanId = scenarioRunRepository.findTop12ByOrderByCreatedAtDescIdDesc().stream()
             .filter(run -> run.getType() == ScenarioRunType.SAVED_PLAN)
             .findFirst()
             .orElseThrow()
@@ -1761,7 +1761,7 @@ class MvpFlowIntegrationTest {
                 .content(approvedNorthPlan))
             .andExpect(status().isCreated());
 
-        Long approvedPlanId = scenarioRunRepository.findTop12ByOrderByCreatedAtDesc().stream()
+        Long approvedPlanId = scenarioRunRepository.findTop12ByOrderByCreatedAtDescIdDesc().stream()
             .filter(run -> run.getType() == ScenarioRunType.SAVED_PLAN)
             .findFirst()
             .orElseThrow()
@@ -1960,7 +1960,7 @@ class MvpFlowIntegrationTest {
             .andExpect(jsonPath("$.overdue").value(false))
             .andExpect(jsonPath("$.finalApprovalOwner").value("North Operations Director"));
 
-        Long scenarioId = scenarioRunRepository.findTop12ByOrderByCreatedAtDesc().stream()
+        Long scenarioId = scenarioRunRepository.findTop12ByOrderByCreatedAtDescIdDesc().stream()
             .filter(run -> run.getType() == ScenarioRunType.SAVED_PLAN)
             .findFirst()
             .orElseThrow()
@@ -2244,12 +2244,12 @@ class MvpFlowIntegrationTest {
             .andExpect(status().isCreated())
             .andExpect(jsonPath("$.finalApprovalOwner").value("Coast Operations Director"));
 
-        Long northScenarioId = scenarioRunRepository.findTop12ByOrderByCreatedAtDesc().stream()
+        Long northScenarioId = scenarioRunRepository.findTop12ByOrderByCreatedAtDescIdDesc().stream()
             .filter(run -> "North scoped final approval".equals(run.getTitle()))
             .findFirst()
             .orElseThrow()
             .getId();
-        Long coastScenarioId = scenarioRunRepository.findTop12ByOrderByCreatedAtDesc().stream()
+        Long coastScenarioId = scenarioRunRepository.findTop12ByOrderByCreatedAtDescIdDesc().stream()
             .filter(run -> "Coast scoped final approval".equals(run.getTitle()))
             .findFirst()
             .orElseThrow()
@@ -2363,7 +2363,7 @@ class MvpFlowIntegrationTest {
                 .content(comparisonBody))
             .andExpect(status().isOk());
 
-        Long comparisonScenarioId = scenarioRunRepository.findTop12ByOrderByCreatedAtDesc().stream()
+        Long comparisonScenarioId = scenarioRunRepository.findTop12ByOrderByCreatedAtDescIdDesc().stream()
             .filter(run -> run.getType() == ScenarioRunType.COMPARISON)
             .findFirst()
             .orElseThrow()
@@ -2409,7 +2409,7 @@ class MvpFlowIntegrationTest {
                 .content(comparisonBody))
             .andExpect(status().isOk());
 
-        Long comparisonScenarioId = scenarioRunRepository.findTop12ByOrderByCreatedAtDesc().stream()
+        Long comparisonScenarioId = scenarioRunRepository.findTop12ByOrderByCreatedAtDescIdDesc().stream()
             .filter(run -> run.getType() == ScenarioRunType.COMPARISON)
             .findFirst()
             .orElseThrow()
@@ -3678,7 +3678,7 @@ class MvpFlowIntegrationTest {
             .andExpect(status().isForbidden())
             .andExpect(jsonPath("$.message").value(org.hamcrest.Matchers.containsString("warehouse WH-COAST")));
 
-        Long scenarioId = scenarioRunRepository.findTop12ByOrderByCreatedAtDesc().stream()
+        Long scenarioId = scenarioRunRepository.findTop12ByOrderByCreatedAtDescIdDesc().stream()
             .filter(run -> "North tenant-admin lane test".equals(run.getTitle()))
             .findFirst()
             .orElseThrow()

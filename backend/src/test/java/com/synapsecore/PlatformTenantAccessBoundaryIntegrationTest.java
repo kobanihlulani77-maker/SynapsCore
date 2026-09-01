@@ -949,7 +949,7 @@ class PlatformTenantAccessBoundaryIntegrationTest {
                 .content(orderPayload(null, warehouseA)))
             .andExpect(status().isOk());
 
-        long reviewScenarioId = scenarioRunRepository.findTop12ByOrderByCreatedAtDesc().stream()
+        long reviewScenarioId = scenarioRunRepository.findTop12ByOrderByCreatedAtDescIdDesc().stream()
             .filter(run -> run.getType() == ScenarioRunType.PREVIEW)
             .filter(run -> warehouseA.equalsIgnoreCase(run.getWarehouseCode()))
             .findFirst()
@@ -1319,7 +1319,7 @@ class PlatformTenantAccessBoundaryIntegrationTest {
                 .content(orderPayload(null, warehouseB)))
             .andExpect(status().isOk());
 
-        long warehouseBScenarioId = scenarioRunRepository.findTop12ByOrderByCreatedAtDesc().stream()
+        long warehouseBScenarioId = scenarioRunRepository.findTop12ByOrderByCreatedAtDescIdDesc().stream()
             .filter(run -> run.getType() == ScenarioRunType.PREVIEW)
             .filter(run -> warehouseB.equalsIgnoreCase(run.getWarehouseCode()))
             .findFirst()
@@ -1572,7 +1572,7 @@ class PlatformTenantAccessBoundaryIntegrationTest {
             .andExpect(status().isCreated())
             .andExpect(jsonPath("$.requestedBy").value("boundary.integration.operator"));
 
-        var saved = scenarioRunRepository.findTop12ByOrderByCreatedAtDesc().stream()
+        var saved = scenarioRunRepository.findTop12ByOrderByCreatedAtDescIdDesc().stream()
             .filter(run -> "Session-bound requester".equals(run.getTitle()))
             .findFirst()
             .orElseThrow();
@@ -2132,7 +2132,7 @@ class PlatformTenantAccessBoundaryIntegrationTest {
                 .contentType(APPLICATION_JSON)
                 .content(orderPayload(null, warehouseA)))
             .andExpect(status().isOk());
-        long previewId = scenarioRunRepository.findTop12ByOrderByCreatedAtDesc().stream()
+        long previewId = scenarioRunRepository.findTop12ByOrderByCreatedAtDescIdDesc().stream()
             .filter(run -> run.getType() == ScenarioRunType.PREVIEW)
             .filter(run -> warehouseA.equalsIgnoreCase(run.getWarehouseCode()))
             .findFirst()
@@ -3200,7 +3200,7 @@ class PlatformTenantAccessBoundaryIntegrationTest {
             .andExpect(jsonPath("$.requestedBy").value("boundary.tenant.admin"))
             .andExpect(jsonPath("$.reviewOwner").value("boundary.review.alt"))
             .andExpect(jsonPath("$.approvalStatus").value("PENDING_APPROVAL"));
-        ScenarioRun northRevision = scenarioRunRepository.findTop12ByOrderByCreatedAtDesc().stream()
+        ScenarioRun northRevision = scenarioRunRepository.findTop12ByOrderByCreatedAtDescIdDesc().stream()
             .filter(run -> "Phase 8 North revision".equals(run.getTitle()))
             .findFirst()
             .orElseThrow();
@@ -3464,7 +3464,7 @@ class PlatformTenantAccessBoundaryIntegrationTest {
             .andExpect(status().isCreated())
             .andExpect(jsonPath("$.title").value(title))
             .andExpect(jsonPath("$.reviewOwner").value(reviewOwner));
-        return scenarioRunRepository.findTop12ByOrderByCreatedAtDesc().stream()
+        return scenarioRunRepository.findTop12ByOrderByCreatedAtDescIdDesc().stream()
             .filter(run -> run.getType() == ScenarioRunType.SAVED_PLAN)
             .filter(run -> title.equals(run.getTitle()))
             .findFirst()
@@ -3495,7 +3495,7 @@ class PlatformTenantAccessBoundaryIntegrationTest {
                 .contentType(APPLICATION_JSON)
                 .content(orderPayload(null, warehouseCode)))
             .andExpect(status().isOk());
-        return scenarioRunRepository.findTop12ByOrderByCreatedAtDesc().stream()
+        return scenarioRunRepository.findTop12ByOrderByCreatedAtDescIdDesc().stream()
             .filter(run -> run.getType() == ScenarioRunType.PREVIEW)
             .filter(run -> warehouseCode.equalsIgnoreCase(run.getWarehouseCode()))
             .findFirst()

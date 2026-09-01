@@ -382,7 +382,7 @@ class Layer2Phase1OperationalFoundationIntegrationTest {
             tenantCode, com.synapsecore.domain.entity.AlertStatus.ACTIVE)).isZero();
         assertThat(recommendationRepository.countByTenant_CodeIgnoreCaseAndStatus(
             tenantCode, com.synapsecore.domain.entity.RecommendationStatus.CURRENT)).isZero();
-        assertThat(scenarioRunRepository.findTop12ByTenant_CodeIgnoreCaseOrderByCreatedAtDesc(tenantCode)).isEmpty();
+        assertThat(scenarioRunRepository.findTop12ByTenant_CodeIgnoreCaseOrderByCreatedAtDescIdDesc(tenantCode)).isEmpty();
         assertThat(integrationInboundRecordRepository.countByTenantCodeIgnoreCaseAndStatusIn(
             tenantCode, Set.of(com.synapsecore.domain.entity.IntegrationInboundStatus.RECEIVED,
                 com.synapsecore.domain.entity.IntegrationInboundStatus.ACCEPTED,
