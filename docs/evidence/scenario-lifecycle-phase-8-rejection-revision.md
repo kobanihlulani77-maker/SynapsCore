@@ -1,8 +1,8 @@
 # Scenario Lifecycle Phase 8: Rejection and Revision Evidence
 
-Status: implementation and local verification complete; post-deployment live verification remains required.
+Status: Phase 4C implementation and focused local verification complete; deployment and hosted verification remain required for final closure.
 
-This evidence records the rejection and revision boundary without claiming that a local H2 test is the same as deployed proof. It covers saved-plan rejection, immutable rejected history, revision lineage, authority enforcement, and the requirement that hypothetical scenario work does not create operational truth.
+This evidence records the rejection and revision boundary without claiming that a local H2 test is the same as deployed proof. It covers saved-plan rejection, immutable rejected history, linear revision lineage, authority enforcement, and the requirement that hypothetical scenario work does not create operational truth.
 
 ## Scope
 
@@ -15,6 +15,33 @@ Phase 8 covers:
 - denial of approval or execution after rejection;
 - rejection authority across tenant, role, warehouse, requester, and session boundaries;
 - no order, inventory, fulfillment, dispatch, alert, or recommendation side effects from rejection, revision, or PREVIEW checks.
+
+## Linear Revision Contract
+
+Scenario revision semantics are **LINEAR**:
+
+```text
+Rejected ScenarioRun N
+  -> at most one immediate child
+  -> child is a new SAVED_PLAN with revisionNumber N+1
+  -> child is reviewed under fresh governance assignment
+```
+
+The same rejected parent cannot be resubmitted twice. The application locks the
+tenant-scoped source row only after projection work has completed, checks for an
+existing child while holding that lock, and keeps the lock through child
+persistence and the `SCENARIO_RESUBMITTED` event. A duplicate successor returns
+`409 CONFLICT`, identifies the existing child when available, creates no second
+ScenarioRun, and creates no second resubmission event.
+
+`revisionNumber` is not globally unique: independent root families may each
+have a revision 2. The database constraint is only on the nullable
+`revision_of_scenario_run_id`; multiple root rows remain valid because SQL
+unique constraints allow multiple `NULL` values.
+
+Revisioning must remain in the source warehouse. A cross-warehouse request is
+rejected; an operator may instead create a new independent root Scenario in the
+other warehouse.
 
 The phase does not execute a positive business order flow, perform CSV recovery, or claim hosted proof for this runtime change.
 
@@ -114,11 +141,12 @@ The duplicate rejection path now fails before it can perform authority-dependent
 
 ## 5. Revision Model
 
-Revision is append-only history, not in-place editing:
+Revision is append-only history, not in-place editing or branching:
 
 ```text
 Rejected revision N
   -> save with revisionOfScenarioRunId=N
+  -> only if N has no existing immediate child
   -> new scenario id
   -> revisionNumber=N+1
   -> new request payload and projection
@@ -136,7 +164,13 @@ The rejected source retains its original:
 - rejected state;
 - audit/business-event history.
 
-The test proves a revised quantity is stored on the new revision while the original quantity remains unchanged. Revision lineage is represented by `revisionOfScenarioRunId` and `revisionNumber`.
+The Phase 4C regression test proves a revised quantity is stored on the new
+revision while the original quantity remains unchanged. It also proves
+sequential duplicate rejection, concurrent same-parent submission safety,
+direct database uniqueness protection, revision 1 -> 2 -> 3 chaining,
+independent revision families, same-warehouse enforcement, and independent
+cross-warehouse root creation. Revision lineage is represented by
+`revisionOfScenarioRunId` and `revisionNumber`.
 
 ## 6. Final-Stage Rejection Evidence
 
@@ -170,6 +204,19 @@ Rejection and revision are planning/governance operations. They do not execute a
 
 ## 8. Automated Results
 
+Phase 4C focused lineage suite:
+
+```text
+cmd /c mvnw.cmd -Dtest=ScenarioRevisionLineageEvidenceIntegrationTest test
+Tests run: 6, Failures: 0, Errors: 0, Skipped: 0
+BUILD SUCCESS
+```
+
+The suite runs Flyway through migration v14 in the H2 test profile and verifies
+the unique parent constraint through a direct JDBC insert attempt. Existing
+tenant and cross-tenant authority coverage remains in the Phase 8/11 focused
+suites; it is not replaced by the lineage test.
+
 Focused authority/rejection suite:
 
 ```text
@@ -178,11 +225,20 @@ Tests run: 28, Failures: 0, Errors: 0, Skipped: 0
 BUILD SUCCESS
 ```
 
-Full backend suite:
+Earlier full backend baseline (before Phase 4C):
 
 ```text
 cmd /c mvnw.cmd test
 Tests run: 169, Failures: 0, Errors: 0, Skipped: 0
+BUILD SUCCESS
+```
+
+The current full backend regression after the Phase 4C implementation also
+passed:
+
+```text
+cmd /c mvnw.cmd test
+Tests run: 312, Failures: 0, Errors: 0, Skipped: 0
 BUILD SUCCESS
 ```
 
@@ -218,7 +274,8 @@ Rejection now explicitly validates standard and escalated workflow stages before
 
 ## 10. Scope and Limitations
 
-- The focused and full backend evidence runs against the repository test profile and H2, not the deployed PostgreSQL instance.
+- The Phase 4C focused evidence runs against the repository test profile and H2, not the deployed PostgreSQL instance.
+- Migration `V14__scenario_revision_lineage_uniqueness` fails safely when existing duplicate parent links are found; it does not delete or merge rows. The hosted PostgreSQL census supplied for this phase returned zero duplicate parent groups.
 - Post-deployment live readiness must confirm that the deployed revision is serving the change.
 - This phase intentionally does not rerun the full hosted proof because its positive flows create operational fixtures and the Phase 8 acceptance boundary excludes positive execution, CSV recovery, and inventory mutation.
 - The existing frontend proof remains the authority for browser behavior; no frontend runtime code was changed in Phase 8.
@@ -246,6 +303,9 @@ PROOF_ALLOWED=True
 
 This check confirms connection and readiness prerequisites. It does not replace the Phase 8 automated authority evidence above.
 
-## 12. Phase 8 Closure Position
+## 12. Phase 4C Closure Position
 
-The rejection/revision implementation is locally verified and the full backend regression suite is green. The evidence supports closing the implementation gate with post-deployment live readiness still required before claiming the deployed revision is live-proven.
+The linear revision implementation is locally verified by the focused suite and
+the full backend regression suite. Final Phase 4C closure still requires exact
+main CI, deployment readiness, and disposable hosted sequential/concurrent
+proof. No hosted claim is made by this local evidence alone.

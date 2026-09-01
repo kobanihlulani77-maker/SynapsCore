@@ -7,6 +7,10 @@ import com.synapsecore.domain.entity.ScenarioApprovalStatus;
 import com.synapsecore.domain.entity.ScenarioRunType;
 import java.time.Instant;
 import java.util.List;
+import jakarta.persistence.LockModeType;
+import org.springframework.data.jpa.repository.Lock;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.JpaSpecificationExecutor;
 
@@ -64,6 +68,13 @@ public interface ScenarioRunRepository extends JpaRepository<ScenarioRun, Long>,
     );
 
     java.util.Optional<ScenarioRun> findByTenant_CodeIgnoreCaseAndId(String tenantCode, Long id);
+
+    java.util.Optional<ScenarioRun> findFirstByTenant_CodeIgnoreCaseAndRevisionOfScenarioRunIdOrderByIdAsc(
+        String tenantCode, Long revisionOfScenarioRunId);
+
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("select run from ScenarioRun run where upper(run.tenant.code) = upper(:tenantCode) and run.id = :id")
+    java.util.Optional<ScenarioRun> findForRevisionUpdate(@Param("tenantCode") String tenantCode, @Param("id") Long id);
 
     long countByTenant_CodeIgnoreCaseAndApprovalStatus(String tenantCode, ScenarioApprovalStatus approvalStatus);
 

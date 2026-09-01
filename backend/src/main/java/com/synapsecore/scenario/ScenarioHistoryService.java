@@ -38,12 +38,16 @@ import java.time.Instant;
 import java.util.Comparator;
 import java.util.Arrays;
 import java.util.List;
+import java.util.Locale;
 import lombok.RequiredArgsConstructor;
+import org.hibernate.exception.ConstraintViolationException;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Sort;
 import org.springframework.data.jpa.domain.Specification;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
 
 @Service
@@ -66,17 +70,30 @@ public class ScenarioHistoryService {
     private static final ScenarioHistoryFilter DEFAULT_HISTORY_FILTER =
         new ScenarioHistoryFilter(null, null, null, null, null, null, null, null, null, null, null, null, null);
 
+    @Transactional
     public ScenarioSaveResponse savePlan(ScenarioSaveRequest request, String authenticatedActorName) {
         var tenant = tenantContextService.getCurrentTenantOrDefault();
         ScenarioRun revisionSource = resolveRevisionSource(request.revisionOfScenarioRunId());
+        String warehouseCode = request.request().warehouseCode().trim();
+        requireSameRevisionWarehouse(revisionSource, warehouseCode);
         ScenarioOrderImpactResponse projectedImpact = scenarioProjectionService.projectOrderImpact(request.request());
         ScenarioRiskAssessment riskAssessment = scenarioRiskPolicyService.assess(projectedImpact);
         ScenarioApprovalPolicy approvalPolicy = determineApprovalPolicy(riskAssessment.reviewPriority());
-        String warehouseCode = request.request().warehouseCode().trim();
         String requestedBy = resolveRequestedBy(request.requestedBy(), warehouseCode, authenticatedActorName);
         String reviewOwner = resolveReviewOwner(request.reviewOwner(), warehouseCode, requestedBy);
         requireDistinctRequesterAndReviewer(requestedBy, reviewOwner, "save");
-        ScenarioRun scenarioRun = scenarioRunRepository.save(ScenarioRun.builder()
+        if (revisionSource != null) {
+            revisionSource = lockRevisionSource(tenant.getCode(), revisionSource.getId());
+            requireSameRevisionWarehouse(revisionSource, warehouseCode);
+            Long revisionSourceId = revisionSource.getId();
+            scenarioRunRepository.findFirstByTenant_CodeIgnoreCaseAndRevisionOfScenarioRunIdOrderByIdAsc(
+                    tenant.getCode(), revisionSourceId)
+                .ifPresent(existingChild -> {
+                    throw revisionConflict(revisionSourceId, existingChild.getId());
+                });
+        }
+
+        ScenarioRun plannedRun = ScenarioRun.builder()
             .tenant(tenant)
             .type(ScenarioRunType.SAVED_PLAN)
             .title(request.title().trim())
@@ -95,7 +112,8 @@ public class ScenarioHistoryService {
             .approvalDueAt(resolveApprovalDueAt(approvalPolicy, ScenarioApprovalStage.PENDING_REVIEW, riskAssessment.reviewPriority()))
             .revisionOfScenarioRunId(revisionSource == null ? null : revisionSource.getId())
             .revisionNumber(revisionSource == null ? 1 : nextRevisionNumber(revisionSource))
-            .build());
+            .build();
+        ScenarioRun scenarioRun = savePlanRecord(plannedRun, revisionSource);
 
         if (revisionSource == null) {
             businessEventService.record(
@@ -139,6 +157,22 @@ public class ScenarioHistoryService {
             isOverdue(scenarioRun),
             scenarioRun.getCreatedAt()
         );
+    }
+
+    private ScenarioRun savePlanRecord(ScenarioRun plannedRun, ScenarioRun revisionSource) {
+        try {
+            return scenarioRunRepository.saveAndFlush(plannedRun);
+        } catch (DataIntegrityViolationException exception) {
+            if (revisionSource == null || !isRevisionLineageConstraint(exception)) {
+                throw exception;
+            }
+            Long existingChildId = scenarioRunRepository
+                .findFirstByTenant_CodeIgnoreCaseAndRevisionOfScenarioRunIdOrderByIdAsc(
+                    revisionSource.getTenant().getCode(), revisionSource.getId())
+                .map(ScenarioRun::getId)
+                .orElse(null);
+            throw revisionConflict(revisionSource.getId(), existingChildId);
+        }
     }
 
     public ScenarioRun recordPreview(OrderCreateRequest request, ScenarioOrderImpactResponse response) {
@@ -695,6 +729,17 @@ public class ScenarioHistoryService {
         }
 
         ScenarioRun source = getScenarioRun(revisionOfScenarioRunId);
+        return validateRevisionSource(source);
+    }
+
+    private ScenarioRun lockRevisionSource(String tenantCode, Long revisionOfScenarioRunId) {
+        ScenarioRun source = scenarioRunRepository.findForRevisionUpdate(tenantCode, revisionOfScenarioRunId)
+            .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND,
+                "Scenario not found: " + revisionOfScenarioRunId));
+        return validateRevisionSource(source);
+    }
+
+    private ScenarioRun validateRevisionSource(ScenarioRun source) {
         if (source.getType() != ScenarioRunType.SAVED_PLAN) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
                 "Scenario " + source.getId() + " cannot be revised. Only saved plans can become revision sources.");
@@ -704,6 +749,38 @@ public class ScenarioHistoryService {
                 "Scenario " + source.getId() + " cannot be revised yet. Only rejected saved plans can be resubmitted as revisions.");
         }
         return source;
+    }
+
+    private void requireSameRevisionWarehouse(ScenarioRun revisionSource, String warehouseCode) {
+        if (revisionSource != null && (revisionSource.getWarehouseCode() == null
+            || !revisionSource.getWarehouseCode().equalsIgnoreCase(warehouseCode))) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT,
+                "Scenario " + revisionSource.getId() + " can only be revised for warehouse "
+                    + revisionSource.getWarehouseCode() + ". Create a new scenario for another warehouse.");
+        }
+    }
+
+    private ResponseStatusException revisionConflict(Long parentId, Long childId) {
+        String childDescription = childId == null ? "an existing revision" : "revision " + childId;
+        return new ResponseStatusException(HttpStatus.CONFLICT,
+            "Scenario " + parentId + " has already been revised as " + childDescription
+                + ". Revise the latest rejected revision instead.");
+    }
+
+    private boolean isRevisionLineageConstraint(Throwable exception) {
+        Throwable current = exception;
+        while (current != null) {
+            if (current instanceof ConstraintViolationException violation
+                && "uk_scenario_revision_parent".equalsIgnoreCase(violation.getConstraintName())) {
+                return true;
+            }
+            String message = current.getMessage();
+            if (message != null && message.toLowerCase(Locale.ROOT).contains("uk_scenario_revision_parent")) {
+                return true;
+            }
+            current = current.getCause();
+        }
+        return false;
     }
 
     private int nextRevisionNumber(ScenarioRun revisionSource) {

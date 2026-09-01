@@ -12,6 +12,7 @@ import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
 import jakarta.persistence.PrePersist;
 import jakarta.persistence.Table;
+import jakarta.persistence.UniqueConstraint;
 import java.time.Instant;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -20,7 +21,8 @@ import lombok.NoArgsConstructor;
 import lombok.Setter;
 
 @Entity
-@Table(name = "scenario_runs")
+@Table(name = "scenario_runs",
+    uniqueConstraints = @UniqueConstraint(name = "uk_scenario_revision_parent", columnNames = "revision_of_scenario_run_id"))
 @Getter
 @Setter
 @NoArgsConstructor
