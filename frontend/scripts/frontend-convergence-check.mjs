@@ -2,7 +2,8 @@ import assert from 'node:assert/strict'
 import fs from 'node:fs/promises'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { createLatestRequestGate } from '../src/services/latestRequest.js'
+import { createLatestRequestGate, createSingleFlightRequest } from '../src/services/latestRequest.js'
+import { emptySnapshot, normalizeSnapshot } from '../src/config/workspaceModel.js'
 
 const scriptDir = path.dirname(fileURLToPath(import.meta.url))
 const frontendRoot = path.resolve(scriptDir, '..')
@@ -32,6 +33,44 @@ olderResponse.resolve('old-stale-state')
 await olderApplyPromise
 assert.equal(state.value, 'new-authoritative-state')
 
+const replayRecord = {
+  id: 82,
+  externalOrderId: 'UI-RPL-A11934C3',
+  sourceSystem: 'ui_replay_a11934c3',
+  connectorType: 'CSV_ORDER_IMPORT',
+  status: 'PENDING',
+  warehouseCode: 'WH-NORTH',
+}
+const replaySnapshot = normalizeSnapshot({
+  ...emptySnapshot,
+  integrationReplayQueue: [replayRecord],
+}, emptySnapshot)
+assert.equal(replaySnapshot.integrationReplayQueue[0].externalOrderId, replayRecord.externalOrderId)
+assert.equal(replaySnapshot.integrationReplayQueue.length, 1)
+
+const singleFlight = createSingleFlightRequest()
+let releaseSnapshot
+let snapshotCallCount = 0
+const pendingSnapshot = singleFlight.run('tenant|integration-admin', () => {
+  snapshotCallCount += 1
+  return new Promise((resolve) => {
+    releaseSnapshot = resolve
+  })
+})
+const refreshStormSnapshot = singleFlight.run('tenant|integration-admin', () => {
+  snapshotCallCount += 1
+  return Promise.resolve({ integrationReplayQueue: [] })
+})
+assert.strictEqual(refreshStormSnapshot, pendingSnapshot)
+await Promise.resolve()
+assert.equal(snapshotCallCount, 1)
+releaseSnapshot(replaySnapshot)
+assert.strictEqual(await refreshStormSnapshot, replaySnapshot)
+
+const replaySource = await fs.readFile(path.join(frontendRoot, 'src', 'pages', 'Replay.jsx'), 'utf8')
+assert.match(replaySource, /const queuedRecords = snapshot\.integrationReplayQueue/)
+assert.match(replaySource, /queuedRecords\.length \? queuedRecords\.map/)
+
 const realtimeSource = await fs.readFile(path.join(frontendRoot, 'src', 'hooks', 'useWorkspaceRealtime.js'), 'utf8')
 for (const topic of [
   'inventory-topic',
@@ -51,6 +90,8 @@ assert.doesNotMatch(realtimeSource, /refreshDecisionSurface/)
 const bootstrapSource = await fs.readFile(path.join(frontendRoot, 'src', 'hooks', 'useWorkspaceBootstrap.js'), 'utf8')
 assert.match(bootstrapSource, /replaySurfaceRequestGateRef/)
 assert.match(bootstrapSource, /orderSurfaceRequestGateRef/)
+assert.match(bootstrapSource, /snapshotSingleFlightRef/)
+assert.match(bootstrapSource, /snapshotSingleFlightRef\.current\.run\(sessionContextKey/)
 assert.match(bootstrapSource, /requestContextKey === sessionContextKeyRef\.current/)
 
 console.log('Frontend convergence regression check passed.')

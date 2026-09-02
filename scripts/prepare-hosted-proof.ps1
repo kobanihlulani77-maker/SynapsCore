@@ -752,6 +752,8 @@ $IntegrationAdminUsernameValue = Require-Username -Name "PLAYWRIGHT_INTEGRATION_
 $IntegrationAdminPasswordValue = Require-Password -Name "PLAYWRIGHT_INTEGRATION_ADMIN_PASSWORD" -Value (Get-FirstValue -Values @($IntegrationAdminPassword, $env:PLAYWRIGHT_INTEGRATION_ADMIN_PASSWORD, $env:PLAYWRIGHT_INTEGRATION_LEAD_PASSWORD, (Get-HostedProofStateValue -Names @("PLAYWRIGHT_INTEGRATION_ADMIN_PASSWORD", "PLAYWRIGHT_INTEGRATION_LEAD_PASSWORD")), (New-ProofPassword -Purpose "integration")))
 $ReviewOwnerUsernameValue = Require-Username -Name "PLAYWRIGHT_REVIEW_OWNER_USERNAME" -Value (Get-FirstValue -Values @($ReviewOwnerUsername, $env:PLAYWRIGHT_REVIEW_OWNER_USERNAME, (Get-HostedProofStateValue -Names @("PLAYWRIGHT_REVIEW_OWNER_USERNAME")), "hosted.proof.review"))
 $ReviewOwnerPasswordValue = Require-Password -Name "PLAYWRIGHT_REVIEW_OWNER_PASSWORD" -Value (Get-FirstValue -Values @($ReviewOwnerPassword, $env:PLAYWRIGHT_REVIEW_OWNER_PASSWORD, (Get-HostedProofStateValue -Names @("PLAYWRIGHT_REVIEW_OWNER_PASSWORD")), (New-ProofPassword -Purpose "review")))
+$CoastReviewOwnerUsernameValue = Require-Username -Name "PLAYWRIGHT_COAST_REVIEW_OWNER_USERNAME" -Value (Get-FirstValue -Values @($env:PLAYWRIGHT_COAST_REVIEW_OWNER_USERNAME, (Get-HostedProofStateValue -Names @("PLAYWRIGHT_COAST_REVIEW_OWNER_USERNAME")), "hosted.proof.coast.review"))
+$CoastReviewOwnerPasswordValue = Require-Password -Name "PLAYWRIGHT_COAST_REVIEW_OWNER_PASSWORD" -Value (Get-FirstValue -Values @($env:PLAYWRIGHT_COAST_REVIEW_OWNER_PASSWORD, (Get-HostedProofStateValue -Names @("PLAYWRIGHT_COAST_REVIEW_OWNER_PASSWORD")), (New-ProofPassword -Purpose "coast-review")))
 $ProofProductSkuValue = Normalize-ProofSku -Name "PLAYWRIGHT_PROOF_PRODUCT_SKU" -Value (Get-FirstValue -Values @($ProofProductSku, $env:PLAYWRIGHT_PROOF_PRODUCT_SKU, (Get-HostedProofStateValue -Names @("PLAYWRIGHT_PROOF_PRODUCT_SKU")), (Get-DefaultProofProductSku -TenantCode $script:TenantCodeValue)))
 $PlatformAdminTokenValue = Get-FirstValue -Values @($PlatformAdminToken, $env:SYNAPSECORE_PLATFORM_ADMIN_TOKEN)
 $BootstrapInitialTokenValue = Get-FirstValue -Values @($BootstrapInitialToken, $env:SYNAPSECORE_BOOTSTRAP_INITIAL_TOKEN)
@@ -766,9 +768,9 @@ if ($script:TenantCodeValue -ieq "SYNAPSE-DEMO") {
     throw "SYNAPSE-DEMO is blocked for hosted proof. Use a real verification tenant created through /api/access/tenants."
 }
 
-$distinctUsernames = @($TenantAdminUsernameValue, $PlannerUsernameValue, $IntegrationAdminUsernameValue, $ReviewOwnerUsernameValue) | Select-Object -Unique
-if ($distinctUsernames.Count -ne 4) {
-    throw "Hosted proof requires four distinct sign-in accounts: tenant admin, planner/operator, integration admin, and review owner."
+$distinctUsernames = @($TenantAdminUsernameValue, $PlannerUsernameValue, $IntegrationAdminUsernameValue, $ReviewOwnerUsernameValue, $CoastReviewOwnerUsernameValue) | Select-Object -Unique
+if ($distinctUsernames.Count -ne 5) {
+    throw "Hosted proof requires five distinct fixture accounts, including one Review Owner per warehouse."
 }
 
 Write-HostedProofState -Values @{
@@ -784,6 +786,8 @@ Write-HostedProofState -Values @{
     PLAYWRIGHT_INTEGRATION_ADMIN_PASSWORD = $IntegrationAdminPasswordValue
     PLAYWRIGHT_REVIEW_OWNER_USERNAME = $ReviewOwnerUsernameValue
     PLAYWRIGHT_REVIEW_OWNER_PASSWORD = $ReviewOwnerPasswordValue
+    PLAYWRIGHT_COAST_REVIEW_OWNER_USERNAME = $CoastReviewOwnerUsernameValue
+    PLAYWRIGHT_COAST_REVIEW_OWNER_PASSWORD = $CoastReviewOwnerPasswordValue
     PLAYWRIGHT_PROOF_PRODUCT_SKU = $ProofProductSkuValue
 }
 
@@ -933,13 +937,6 @@ if ([bool](Get-PropertyValue -Object $adminLogin.Response -PropertyName "passwor
 Write-Host "Ensuring proof operators and users..."
 Ensure-Operator `
     -AdminSession $adminSession `
-    -ActorName "Operations Lead" `
-    -DisplayName "Operations Lead" `
-    -Description "Hosted proof tenant administrator." `
-    -Roles @("TENANT_ADMIN", "ESCALATION_OWNER", "INTEGRATION_ADMIN", "INTEGRATION_OPERATOR") | Out-Null
-
-Ensure-Operator `
-    -AdminSession $adminSession `
     -ActorName "Operations Planner" `
     -DisplayName "Operations Planner" `
     -Description "Hosted proof planner/operator with non-admin access." `
@@ -959,6 +956,14 @@ Ensure-Operator `
     -Description "Hosted proof review owner for the north warehouse lane." `
     -Roles @("REVIEW_OWNER") `
     -WarehouseScopes @("WH-NORTH") | Out-Null
+
+Ensure-Operator `
+    -AdminSession $adminSession `
+    -ActorName "Coast Review Owner" `
+    -DisplayName "Coast Review Owner" `
+    -Description "Hosted proof review owner for the coast warehouse lane." `
+    -Roles @("REVIEW_OWNER") `
+    -WarehouseScopes @("WH-COAST") | Out-Null
 
 Ensure-User `
     -AdminSession $adminSession `
@@ -980,6 +985,20 @@ Ensure-User `
     -FullName "Hosted Verification North Review Owner" `
     -OperatorActorName "North Review Owner" `
     -FinalPassword $ReviewOwnerPasswordValue
+
+Ensure-User `
+    -AdminSession $adminSession `
+    -Username $CoastReviewOwnerUsernameValue `
+    -FullName "Hosted Verification Coast Review Owner" `
+    -OperatorActorName "Coast Review Owner" `
+    -FinalPassword $CoastReviewOwnerPasswordValue
+
+Ensure-Operator `
+    -AdminSession $adminSession `
+    -ActorName "Operations Lead" `
+    -DisplayName "Operations Lead" `
+    -Description "Hosted proof tenant administrator." `
+    -Roles @("TENANT_ADMIN", "ESCALATION_OWNER", "INTEGRATION_ADMIN", "INTEGRATION_OPERATOR") | Out-Null
 
 Write-Host "Preparing real catalog and inventory baseline for proof flows..."
 Ensure-ProofCatalogAndInventory -AdminSession $adminSession -Sku $ProofProductSkuValue

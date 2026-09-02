@@ -1,5 +1,5 @@
 import { useEffect, useRef } from 'react'
-import { createLatestRequestGate } from '../services/latestRequest'
+import { createLatestRequestGate, createSingleFlightRequest } from '../services/latestRequest'
 
 export default function useWorkspaceBootstrap({
   activeTenantCode,
@@ -82,6 +82,7 @@ export default function useWorkspaceBootstrap({
   const sessionContextKeyRef = useRef(sessionContextKey)
   sessionContextKeyRef.current = sessionContextKey
   const snapshotRequestGateRef = useRef(createLatestRequestGate())
+  const snapshotSingleFlightRef = useRef(createSingleFlightRequest())
   const catalogProductsRequestGateRef = useRef(createLatestRequestGate())
   const runtimeRequestGateRef = useRef(createLatestRequestGate())
   const scenarioHistoryRequestGateRef = useRef(createLatestRequestGate())
@@ -259,70 +260,72 @@ export default function useWorkspaceBootstrap({
   }
 
   async function fetchSnapshot() {
-    const requestId = snapshotRequestGateRef.current.begin()
-    const requestContextKey = sessionContextKey
-    const isCurrentRequest = () => snapshotRequestGateRef.current.isCurrent(requestId)
-      && requestContextKey === sessionContextKeyRef.current
-    const pageAtRequest = currentPageRef.current
-    const shouldHydrateReplaySurface = pageAtRequest === 'replay' || pageAtRequest === 'integrations'
-    const shouldHydrateOrderSurface = pageAtRequest === 'orders'
-    const [snapshotResult, replaySurfaceResult, orderSurfaceResult] = await Promise.allSettled([
-      fetchJson('/api/dashboard/snapshot'),
-      shouldHydrateReplaySurface ? fetchReplaySurfaceData() : Promise.resolve(null),
-      shouldHydrateOrderSurface ? fetchOrderSurfaceData() : Promise.resolve(null),
-    ])
+    return snapshotSingleFlightRef.current.run(sessionContextKey, async () => {
+      const requestId = snapshotRequestGateRef.current.begin()
+      const requestContextKey = sessionContextKey
+      const isCurrentRequest = () => snapshotRequestGateRef.current.isCurrent(requestId)
+        && requestContextKey === sessionContextKeyRef.current
+      const pageAtRequest = currentPageRef.current
+      const shouldHydrateReplaySurface = pageAtRequest === 'replay' || pageAtRequest === 'integrations'
+      const shouldHydrateOrderSurface = pageAtRequest === 'orders'
+      const [snapshotResult, replaySurfaceResult, orderSurfaceResult] = await Promise.allSettled([
+        fetchJson('/api/dashboard/snapshot'),
+        shouldHydrateReplaySurface ? fetchReplaySurfaceData() : Promise.resolve(null),
+        shouldHydrateOrderSurface ? fetchOrderSurfaceData() : Promise.resolve(null),
+      ])
 
-    if (
-      snapshotResult.status !== 'fulfilled'
-      && (!shouldHydrateReplaySurface || replaySurfaceResult.status !== 'fulfilled')
-      && (!shouldHydrateOrderSurface || orderSurfaceResult.status !== 'fulfilled')
-    ) {
+      if (
+        snapshotResult.status !== 'fulfilled'
+        && (!shouldHydrateReplaySurface || replaySurfaceResult.status !== 'fulfilled')
+        && (!shouldHydrateOrderSurface || orderSurfaceResult.status !== 'fulfilled')
+      ) {
+        if (!isCurrentRequest()) return null
+        throw snapshotResult.reason || replaySurfaceResult.reason || orderSurfaceResult.reason || new Error('Workspace snapshot could not be loaded.')
+      }
+
       if (!isCurrentRequest()) return null
-      throw snapshotResult.reason || replaySurfaceResult.reason || orderSurfaceResult.reason || new Error('Workspace snapshot could not be loaded.')
-    }
 
-    if (!isCurrentRequest()) return null
+      const nextSnapshot = snapshotResult.status === 'fulfilled' ? snapshotResult.value : null
+      const replaySurfaceData = replaySurfaceResult.status === 'fulfilled' ? replaySurfaceResult.value : null
+      const orderSurfaceData = orderSurfaceResult.status === 'fulfilled' ? orderSurfaceResult.value : null
+      const failedSources = []
+      if (snapshotResult.status !== 'fulfilled') failedSources.push('Dashboard snapshot')
+      if (shouldHydrateReplaySurface && replaySurfaceResult.status !== 'fulfilled') failedSources.push('Replay and integration surface')
+      if (shouldHydrateOrderSurface && orderSurfaceResult.status !== 'fulfilled') failedSources.push('Order surface')
 
-    const nextSnapshot = snapshotResult.status === 'fulfilled' ? snapshotResult.value : null
-    const replaySurfaceData = replaySurfaceResult.status === 'fulfilled' ? replaySurfaceResult.value : null
-    const orderSurfaceData = orderSurfaceResult.status === 'fulfilled' ? orderSurfaceResult.value : null
-    const failedSources = []
-    if (snapshotResult.status !== 'fulfilled') failedSources.push('Dashboard snapshot')
-    if (shouldHydrateReplaySurface && replaySurfaceResult.status !== 'fulfilled') failedSources.push('Replay and integration surface')
-    if (shouldHydrateOrderSurface && orderSurfaceResult.status !== 'fulfilled') failedSources.push('Order surface')
-
-    snapshotSetter((current) => {
-      const previousSnapshot = current || emptySnapshot
-      const baseSnapshot = nextSnapshot || previousSnapshot
-      return normalizeSnapshot({
-        ...emptySnapshot,
-        ...previousSnapshot,
-        ...baseSnapshot,
-        recentEvents: baseSnapshot.recentEvents ?? previousSnapshot.recentEvents ?? [],
-        auditLogs: baseSnapshot.auditLogs ?? previousSnapshot.auditLogs ?? [],
-        systemIncidents: baseSnapshot.systemIncidents ?? previousSnapshot.systemIncidents ?? [],
-        recentOrders: orderSurfaceData?.recentOrders ?? baseSnapshot.recentOrders ?? previousSnapshot.recentOrders ?? [],
-        integrationConnectors: replaySurfaceData?.integrationConnectors ?? baseSnapshot.integrationConnectors ?? previousSnapshot.integrationConnectors ?? [],
-        integrationImportRuns: baseSnapshot.integrationImportRuns ?? previousSnapshot.integrationImportRuns ?? [],
-        integrationReplayQueue: replaySurfaceData?.integrationReplayQueue ?? baseSnapshot.integrationReplayQueue ?? previousSnapshot.integrationReplayQueue ?? [],
-        scenarioNotifications: baseSnapshot.scenarioNotifications ?? previousSnapshot.scenarioNotifications ?? [],
-        slaEscalations: baseSnapshot.slaEscalations ?? previousSnapshot.slaEscalations ?? [],
-        recentScenarios: baseSnapshot.recentScenarios ?? previousSnapshot.recentScenarios ?? [],
-        generatedAt: baseSnapshot.generatedAt ?? previousSnapshot.generatedAt ?? new Date().toISOString(),
-      }, previousSnapshot)
+      snapshotSetter((current) => {
+        const previousSnapshot = current || emptySnapshot
+        const baseSnapshot = nextSnapshot || previousSnapshot
+        return normalizeSnapshot({
+          ...emptySnapshot,
+          ...previousSnapshot,
+          ...baseSnapshot,
+          recentEvents: baseSnapshot.recentEvents ?? previousSnapshot.recentEvents ?? [],
+          auditLogs: baseSnapshot.auditLogs ?? previousSnapshot.auditLogs ?? [],
+          systemIncidents: baseSnapshot.systemIncidents ?? previousSnapshot.systemIncidents ?? [],
+          recentOrders: orderSurfaceData?.recentOrders ?? baseSnapshot.recentOrders ?? previousSnapshot.recentOrders ?? [],
+          integrationConnectors: replaySurfaceData?.integrationConnectors ?? baseSnapshot.integrationConnectors ?? previousSnapshot.integrationConnectors ?? [],
+          integrationImportRuns: baseSnapshot.integrationImportRuns ?? previousSnapshot.integrationImportRuns ?? [],
+          integrationReplayQueue: replaySurfaceData?.integrationReplayQueue ?? baseSnapshot.integrationReplayQueue ?? previousSnapshot.integrationReplayQueue ?? [],
+          scenarioNotifications: baseSnapshot.scenarioNotifications ?? previousSnapshot.scenarioNotifications ?? [],
+          slaEscalations: baseSnapshot.slaEscalations ?? previousSnapshot.slaEscalations ?? [],
+          recentScenarios: baseSnapshot.recentScenarios ?? previousSnapshot.recentScenarios ?? [],
+          generatedAt: baseSnapshot.generatedAt ?? previousSnapshot.generatedAt ?? new Date().toISOString(),
+        }, previousSnapshot)
+      })
+      pageStateSetter((current) => ({
+        ...current,
+        loading: false,
+        error: failedSources.length
+          ? `${failedSources.join(', ')} unavailable. Retained values may be stale.`
+          : '',
+        freshness: failedSources.length ? (current.lastSuccessfulAt ? 'stale' : 'unknown') : 'current',
+        lastSuccessfulAt: snapshotResult.status === 'fulfilled'
+          ? (nextSnapshot?.generatedAt || nextSnapshot?.summary?.lastUpdatedAt || new Date().toISOString())
+          : current.lastSuccessfulAt,
+        degradedSources: failedSources,
+      }))
     })
-    pageStateSetter((current) => ({
-      ...current,
-      loading: false,
-      error: failedSources.length
-        ? `${failedSources.join(', ')} unavailable. Retained values may be stale.`
-        : '',
-      freshness: failedSources.length ? (current.lastSuccessfulAt ? 'stale' : 'unknown') : 'current',
-      lastSuccessfulAt: snapshotResult.status === 'fulfilled'
-        ? (nextSnapshot?.generatedAt || nextSnapshot?.summary?.lastUpdatedAt || new Date().toISOString())
-        : current.lastSuccessfulAt,
-      degradedSources: failedSources,
-    }))
   }
 
   async function fetchCatalogProducts(options = {}) {
