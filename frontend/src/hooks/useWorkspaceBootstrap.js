@@ -1,4 +1,5 @@
 import { useEffect, useRef } from 'react'
+import { createLatestRequestGate } from '../services/latestRequest'
 
 export default function useWorkspaceBootstrap({
   activeTenantCode,
@@ -70,7 +71,22 @@ export default function useWorkspaceBootstrap({
   scenarioHistoryFilters,
   normalizeSnapshot,
 }) {
-  const catalogProductsRequestRef = useRef(0)
+  const currentPageRef = useRef(currentPage)
+  currentPageRef.current = currentPage
+  const sessionContextKey = [
+    activeTenantCode,
+    authSessionState.session?.username || '',
+    ...(authSessionState.session?.roles || []).slice().sort(),
+    ...(authSessionState.session?.warehouseScopes || []).slice().sort(),
+  ].join('|')
+  const sessionContextKeyRef = useRef(sessionContextKey)
+  sessionContextKeyRef.current = sessionContextKey
+  const snapshotRequestGateRef = useRef(createLatestRequestGate())
+  const catalogProductsRequestGateRef = useRef(createLatestRequestGate())
+  const runtimeRequestGateRef = useRef(createLatestRequestGate())
+  const scenarioHistoryRequestGateRef = useRef(createLatestRequestGate())
+  const replaySurfaceRequestGateRef = useRef(createLatestRequestGate())
+  const orderSurfaceRequestGateRef = useRef(createLatestRequestGate())
 
   function mergeReplaySurfaceSnapshot(replaySurfaceData) {
     snapshotSetter((current) => {
@@ -98,6 +114,10 @@ export default function useWorkspaceBootstrap({
   }
 
   async function fetchReplaySurfaceData() {
+    const requestId = replaySurfaceRequestGateRef.current.begin()
+    const requestContextKey = sessionContextKey
+    const isCurrentRequest = () => replaySurfaceRequestGateRef.current.isCurrent(requestId)
+      && requestContextKey === sessionContextKeyRef.current
     const replayQueueRequest = fetchJson(
       '/api/integrations/orders/replay-queue',
       globalThis.AbortSignal?.timeout
@@ -117,8 +137,11 @@ export default function useWorkspaceBootstrap({
     ])
 
     if (integrationReplayQueueResult.status !== 'fulfilled' && integrationConnectorsResult.status !== 'fulfilled') {
+      if (!isCurrentRequest()) return null
       throw integrationReplayQueueResult.reason || integrationConnectorsResult.reason || new Error('Replay surface data could not be loaded.')
     }
+
+    if (!isCurrentRequest()) return null
 
     return {
       integrationReplayQueue: integrationReplayQueueResult.status === 'fulfilled' && Array.isArray(integrationReplayQueueResult.value)
@@ -131,12 +154,21 @@ export default function useWorkspaceBootstrap({
   }
 
   async function fetchOrderSurfaceData() {
+    const requestId = orderSurfaceRequestGateRef.current.begin()
+    const requestContextKey = sessionContextKey
     const recentOrders = await fetchJson(
       '/api/orders/recent',
       globalThis.AbortSignal?.timeout
         ? { signal: globalThis.AbortSignal.timeout(8_000) }
-        : {},
+      : {},
     )
+
+    if (
+      !orderSurfaceRequestGateRef.current.isCurrent(requestId)
+      || requestContextKey !== sessionContextKeyRef.current
+    ) {
+      return null
+    }
 
     return {
       recentOrders: Array.isArray(recentOrders) ? recentOrders : null,
@@ -227,8 +259,13 @@ export default function useWorkspaceBootstrap({
   }
 
   async function fetchSnapshot() {
-    const shouldHydrateReplaySurface = currentPage === 'replay' || currentPage === 'integrations'
-    const shouldHydrateOrderSurface = currentPage === 'orders'
+    const requestId = snapshotRequestGateRef.current.begin()
+    const requestContextKey = sessionContextKey
+    const isCurrentRequest = () => snapshotRequestGateRef.current.isCurrent(requestId)
+      && requestContextKey === sessionContextKeyRef.current
+    const pageAtRequest = currentPageRef.current
+    const shouldHydrateReplaySurface = pageAtRequest === 'replay' || pageAtRequest === 'integrations'
+    const shouldHydrateOrderSurface = pageAtRequest === 'orders'
     const [snapshotResult, replaySurfaceResult, orderSurfaceResult] = await Promise.allSettled([
       fetchJson('/api/dashboard/snapshot'),
       shouldHydrateReplaySurface ? fetchReplaySurfaceData() : Promise.resolve(null),
@@ -240,8 +277,11 @@ export default function useWorkspaceBootstrap({
       && (!shouldHydrateReplaySurface || replaySurfaceResult.status !== 'fulfilled')
       && (!shouldHydrateOrderSurface || orderSurfaceResult.status !== 'fulfilled')
     ) {
+      if (!isCurrentRequest()) return null
       throw snapshotResult.reason || replaySurfaceResult.reason || orderSurfaceResult.reason || new Error('Workspace snapshot could not be loaded.')
     }
+
+    if (!isCurrentRequest()) return null
 
     const nextSnapshot = snapshotResult.status === 'fulfilled' ? snapshotResult.value : null
     const replaySurfaceData = replaySurfaceResult.status === 'fulfilled' ? replaySurfaceResult.value : null
@@ -286,20 +326,23 @@ export default function useWorkspaceBootstrap({
   }
 
   async function fetchCatalogProducts(options = {}) {
-    const requestId = ++catalogProductsRequestRef.current
+    const requestId = catalogProductsRequestGateRef.current.begin()
+    const requestContextKey = sessionContextKey
+    const isCurrentRequest = () => catalogProductsRequestGateRef.current.isCurrent(requestId)
+      && requestContextKey === sessionContextKeyRef.current
     if (!options.quiet) {
       catalogStateSetter((current) => ({ ...current, loading: true, error: '', success: '' }))
     }
     try {
       const products = await fetchJson('/api/products')
-      if (requestId !== catalogProductsRequestRef.current) {
+      if (!isCurrentRequest()) {
         return products
       }
       catalogStateSetter((current) => ({ ...current, loading: false, error: '', products, success: options.success || current.success }))
       selectedCatalogProductIdSetter((currentId) => (products.some((product) => product.id === currentId) ? currentId : products[0]?.id || null))
       return products
     } catch (error) {
-      if (requestId !== catalogProductsRequestRef.current) {
+      if (!isCurrentRequest()) {
         return []
       }
       catalogStateSetter((current) => ({ ...current, loading: false, error: error.message }))
@@ -309,8 +352,14 @@ export default function useWorkspaceBootstrap({
   }
 
   async function fetchSystemRuntime() {
+    const requestId = runtimeRequestGateRef.current.begin()
+    const requestContextKey = sessionContextKey
     const runtime = await fetchJson('/api/system/runtime')
+    if (!runtimeRequestGateRef.current.isCurrent(requestId) || requestContextKey !== sessionContextKeyRef.current) {
+      return null
+    }
     systemRuntimeStateSetter({ loading: false, error: '', runtime })
+    return runtime
   }
 
   async function refreshSystemRuntimeQuietly() {
@@ -331,10 +380,19 @@ export default function useWorkspaceBootstrap({
   }
 
   async function refreshScenarioHistoryQuietly(filters = scenarioHistoryFilters) {
+    const requestId = scenarioHistoryRequestGateRef.current.begin()
+    const requestContextKey = sessionContextKey
     try {
       const history = await fetchJson(buildScenarioHistoryPath(filters))
+      if (!scenarioHistoryRequestGateRef.current.isCurrent(requestId) || requestContextKey !== sessionContextKeyRef.current) {
+        return null
+      }
       scenarioHistoryStateSetter({ loading: false, error: '', items: history })
+      return history
     } catch (error) {
+      if (!scenarioHistoryRequestGateRef.current.isCurrent(requestId) || requestContextKey !== sessionContextKeyRef.current) {
+        return null
+      }
       scenarioHistoryStateSetter((current) => current.items.length
         ? { ...current, loading: false }
         : { loading: false, error: error.message, items: [] })

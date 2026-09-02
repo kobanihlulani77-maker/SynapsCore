@@ -7,6 +7,7 @@
   "scripts": {
     "dev": "vite --host 0.0.0.0 --port 5173",
     "check": "node scripts/frontend-check.mjs",
+    "test:convergence": "node scripts/frontend-convergence-check.mjs",
     "build": "vite build",
     "lint": "npm run check",
     "preview": "vite preview --host 0.0.0.0 --port 4173",

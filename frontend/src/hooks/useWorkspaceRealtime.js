@@ -17,7 +17,6 @@ export default function useWorkspaceRealtime({
   websocketBrokerUrl,
   sockJsUrl,
   buildTenantTopicPrefix,
-  fetchJson,
   fetchSnapshot,
   fetchCatalogProducts,
   mergeSnapshot,
@@ -36,9 +35,9 @@ export default function useWorkspaceRealtime({
     let degradedRefreshIntervalId = null
     let liveReconciliationIntervalId = null
     let activeClient = null
-    let decisionSurfaceRefreshTimeoutId = null
-    let decisionSurfaceRefreshInFlight = false
-    let decisionSurfaceRefreshQueued = false
+    let authoritativeSnapshotRefreshTimeoutId = null
+    let authoritativeSnapshotRefreshInFlight = false
+    let authoritativeSnapshotRefreshQueued = false
 
     const publishRealtimeDebug = (partial) => {
       const nextDebugState = {
@@ -74,7 +73,7 @@ export default function useWorkspaceRealtime({
           setPageState({ loading: false, error: '' })
           setCatalogState({ loading: false, error: '', success: '', products: [], importResult: null })
         }
-        return
+        return true
       }
 
       try {
@@ -83,6 +82,7 @@ export default function useWorkspaceRealtime({
           lastSnapshotSyncAt: new Date().toISOString(),
           lastSnapshotSyncStatus: 'ok',
         })
+        return true
       } catch (error) {
         publishRealtimeDebug({
           lastSnapshotSyncAt: new Date().toISOString(),
@@ -98,6 +98,7 @@ export default function useWorkspaceRealtime({
             degradedSources: current.degradedSources?.length ? current.degradedSources : ['Dashboard snapshot'],
           }))
         }
+        return false
       }
     }
 
@@ -175,112 +176,47 @@ export default function useWorkspaceRealtime({
       }
     }
 
-    function stopDecisionSurfaceRefreshTimer() {
-      if (decisionSurfaceRefreshTimeoutId !== null) {
-        globalThis.clearTimeout(decisionSurfaceRefreshTimeoutId)
-        decisionSurfaceRefreshTimeoutId = null
+    function stopAuthoritativeSnapshotRefreshTimer() {
+      if (authoritativeSnapshotRefreshTimeoutId !== null) {
+        globalThis.clearTimeout(authoritativeSnapshotRefreshTimeoutId)
+        authoritativeSnapshotRefreshTimeoutId = null
       }
     }
 
-    async function refreshDecisionSurface(reason = 'realtime-surface-refresh') {
-      if (!active || !signedInTenantCode || !fetchJson) {
+    async function refreshAuthoritativeSnapshot(reason = 'realtime-snapshot-refresh') {
+      if (!active || !signedInTenantCode) {
         return
       }
-      if (decisionSurfaceRefreshInFlight) {
-        decisionSurfaceRefreshQueued = true
+      if (authoritativeSnapshotRefreshInFlight) {
+        authoritativeSnapshotRefreshQueued = true
         return
       }
 
-      decisionSurfaceRefreshInFlight = true
+      authoritativeSnapshotRefreshInFlight = true
       try {
-        const timeoutInit = (timeoutMs) => (
-          globalThis.AbortSignal?.timeout ? { signal: globalThis.AbortSignal.timeout(timeoutMs) } : {}
-        )
-
-        const [summaryResult, inventoryResult, alertsResult, recommendationsResult] = await Promise.allSettled([
-          fetchJson('/api/dashboard/summary', timeoutInit(8_000)),
-          fetchJson('/api/inventory', timeoutInit(8_000)),
-          fetchJson('/api/alerts', timeoutInit(8_000)),
-          fetchJson('/api/recommendations', timeoutInit(8_000)),
-        ])
-
-        const failedSources = [
-          ['summary', 'Dashboard summary', summaryResult],
-          ['inventory', 'Inventory', inventoryResult],
-          ['alerts', 'Alerts', alertsResult],
-          ['recommendations', 'Recommendations', recommendationsResult],
-        ]
-          .filter(([, , result]) => result.status === 'rejected')
-          .map(([, label]) => label)
-
-        const nextPartial = {}
-        if (summaryResult.status === 'fulfilled' && summaryResult.value) {
-          nextPartial.summary = summaryResult.value
-        }
-        if (inventoryResult.status === 'fulfilled' && Array.isArray(inventoryResult.value)) {
-          nextPartial.inventory = inventoryResult.value
-        }
-        if (alertsResult.status === 'fulfilled' && alertsResult.value) {
-          nextPartial.alerts = alertsResult.value
-        }
-        if (recommendationsResult.status === 'fulfilled' && Array.isArray(recommendationsResult.value)) {
-          nextPartial.recommendations = recommendationsResult.value
-        }
-
-        if (Object.keys(nextPartial).length) {
-          mergeSnapshot(nextPartial)
-          setPageState((current) => ({
-            ...current,
-            error: failedSources.length
-              ? `${failedSources.join(', ')} unavailable. Retained values may be stale.`
-              : '',
-            freshness: failedSources.length ? 'degraded' : 'current',
-            lastSuccessfulAt: new Date().toISOString(),
-            degradedSources: failedSources,
-          }))
-          publishRealtimeDebug({
-            lastDecisionSurfaceRefreshAt: new Date().toISOString(),
-            lastDecisionSurfaceRefreshReason: reason,
-            lastDecisionSurfaceRefreshStatus: 'ok',
-            lastDecisionSurfaceRefreshKeys: Object.keys(nextPartial),
-          })
-        } else {
-          setPageState((current) => ({
-            ...current,
-            error: `${failedSources.length ? failedSources.join(', ') : 'Dashboard sources'} unavailable. Retained values may be stale.`,
-            freshness: current.lastSuccessfulAt ? 'stale' : 'unknown',
-            degradedSources: failedSources.length ? failedSources : ['Dashboard sources'],
-          }))
-          publishRealtimeDebug({
-            lastDecisionSurfaceRefreshAt: new Date().toISOString(),
-            lastDecisionSurfaceRefreshReason: reason,
-            lastDecisionSurfaceRefreshStatus: 'empty',
-          })
-        }
-      } catch (error) {
+        const synchronized = await loadSnapshot()
         publishRealtimeDebug({
-          lastDecisionSurfaceRefreshAt: new Date().toISOString(),
-          lastDecisionSurfaceRefreshReason: reason,
-          lastDecisionSurfaceRefreshStatus: 'error',
-          lastDecisionSurfaceRefreshError: error?.message || String(error),
+          lastAuthoritativeSnapshotRefreshAt: new Date().toISOString(),
+          lastAuthoritativeSnapshotRefreshReason: reason,
+          lastAuthoritativeSnapshotRefreshStatus: synchronized ? 'ok' : 'error',
         })
       } finally {
-        decisionSurfaceRefreshInFlight = false
-        if (decisionSurfaceRefreshQueued) {
-          decisionSurfaceRefreshQueued = false
-          void refreshDecisionSurface(`${reason}:queued`)
+        authoritativeSnapshotRefreshInFlight = false
+        if (authoritativeSnapshotRefreshQueued) {
+          authoritativeSnapshotRefreshQueued = false
+          void refreshAuthoritativeSnapshot(`${reason}:queued`)
         }
       }
     }
 
-    function scheduleDecisionSurfaceRefresh(reason, delayMs = 750) {
-      if (!active || !signedInTenantCode || !fetchJson) {
+    function scheduleAuthoritativeSnapshotRefresh(reason, delayMs = 750) {
+      if (!active || !signedInTenantCode) {
         return
       }
-      stopDecisionSurfaceRefreshTimer()
-      decisionSurfaceRefreshTimeoutId = globalThis.setTimeout(() => {
-        decisionSurfaceRefreshTimeoutId = null
-        void refreshDecisionSurface(reason)
+      stopAuthoritativeSnapshotRefreshTimer()
+      authoritativeSnapshotRefreshTimeoutId = globalThis.setTimeout(() => {
+        authoritativeSnapshotRefreshTimeoutId = null
+        void refreshAuthoritativeSnapshot(reason)
       }, delayMs)
     }
 
@@ -401,8 +337,7 @@ export default function useWorkspaceRealtime({
           topic: topicName,
           size: typeof message?.body === 'string' ? message.body.length : 0,
         })
-        scheduleDecisionSurfaceRefresh(`malformed-${topicName}`)
-        void loadSnapshot()
+        scheduleAuthoritativeSnapshotRefresh(`malformed-${topicName}`)
         return null
       }
     }
@@ -470,93 +405,85 @@ export default function useWorkspaceRealtime({
             const payload = parseRealtimeBody(message, 'dashboard.summary')
             if (!payload) return
             mergeSnapshot({ summary: payload })
-            if (hasTenantWideWarehouseAccess) {
-              scheduleDecisionSurfaceRefresh('dashboard-summary-topic')
-            } else {
-              void fetchSnapshot()
-            }
+            scheduleAuthoritativeSnapshotRefresh('dashboard-summary-topic')
           })
           if (hasTenantWideWarehouseAccess) {
             nextClient.subscribe(`${topicPrefix}/alerts`, (message) => {
               const payload = parseRealtimeBody(message, 'alerts')
               if (!payload) return
-              // REST remains authoritative when a queued topic can be older than the current snapshot.
-              scheduleDecisionSurfaceRefresh('alerts-topic')
+              scheduleAuthoritativeSnapshotRefresh('alerts-topic')
             })
           } else {
             nextClient.subscribe(`${topicPrefix}/alerts.changed`, () => {
-              scheduleDecisionSurfaceRefresh('alerts-changed-topic')
+              scheduleAuthoritativeSnapshotRefresh('alerts-changed-topic')
             })
           }
           if (hasTenantWideWarehouseAccess) {
             nextClient.subscribe(`${topicPrefix}/recommendations`, (message) => {
               const payload = parseRealtimeBody(message, 'recommendations')
               if (!payload) return
-              // REST remains authoritative when a queued topic can be older than the current snapshot.
-              scheduleDecisionSurfaceRefresh('recommendations-topic')
+              scheduleAuthoritativeSnapshotRefresh('recommendations-topic')
             })
           } else {
             nextClient.subscribe(`${topicPrefix}/recommendations.changed`, () => {
-              scheduleDecisionSurfaceRefresh('recommendations-changed-topic')
+              scheduleAuthoritativeSnapshotRefresh('recommendations-changed-topic')
             })
           }
           if (hasTenantWideWarehouseAccess) {
             nextClient.subscribe(`${topicPrefix}/inventory`, (message) => {
               const payload = parseRealtimeBody(message, 'inventory')
               if (!payload) return
-              mergeSnapshot({ inventory: payload })
-              scheduleDecisionSurfaceRefresh('inventory-topic')
+              scheduleAuthoritativeSnapshotRefresh('inventory-topic')
             })
             nextClient.subscribe(`${topicPrefix}/fulfillment.overview`, (message) => {
               const payload = parseRealtimeBody(message, 'fulfillment.overview')
-              if (payload) mergeSnapshot({ fulfillment: payload })
+              if (payload) scheduleAuthoritativeSnapshotRefresh('fulfillment-topic')
             })
             nextClient.subscribe(`${topicPrefix}/orders.recent`, (message) => {
               const payload = parseRealtimeBody(message, 'orders.recent')
-              if (payload) mergeSnapshot({ recentOrders: payload })
+              if (payload) scheduleAuthoritativeSnapshotRefresh('orders-topic')
             })
           }
           if (hasTenantWideWarehouseAccess) {
             nextClient.subscribe(`${topicPrefix}/events.recent`, (message) => {
               const payload = parseRealtimeBody(message, 'events.recent')
               if (!payload) return
-              mergeSnapshot({ recentEvents: payload })
-              scheduleDecisionSurfaceRefresh('events-recent-topic')
+              scheduleAuthoritativeSnapshotRefresh('events-recent-topic')
             })
             nextClient.subscribe(`${topicPrefix}/audit.recent`, (message) => {
               const payload = parseRealtimeBody(message, 'audit.recent')
-              if (payload) mergeSnapshot({ auditLogs: payload })
+              if (payload) scheduleAuthoritativeSnapshotRefresh('audit-topic')
             })
             nextClient.subscribe(`${topicPrefix}/system.incidents`, (message) => {
               const payload = parseRealtimeBody(message, 'system.incidents')
-              if (payload) mergeSnapshot({ systemIncidents: payload })
+              if (payload) scheduleAuthoritativeSnapshotRefresh('incidents-topic')
             })
           }
           if (hasIntegrationAccess) {
-            nextClient.subscribe(`${topicPrefix}/integrations.changed`, () => void fetchSnapshot())
+            nextClient.subscribe(`${topicPrefix}/integrations.changed`, () => scheduleAuthoritativeSnapshotRefresh('integrations-changed-topic'))
             if (hasTenantWideWarehouseAccess) {
               nextClient.subscribe(`${topicPrefix}/integrations.connectors`, (message) => {
                 const payload = parseRealtimeBody(message, 'integrations.connectors')
-                if (payload) mergeSnapshot({ integrationConnectors: payload })
+                if (payload) scheduleAuthoritativeSnapshotRefresh('integrations-connectors-topic')
               })
               nextClient.subscribe(`${topicPrefix}/integrations.imports`, (message) => {
                 const payload = parseRealtimeBody(message, 'integrations.imports')
-                if (payload) mergeSnapshot({ integrationImportRuns: payload })
+                if (payload) scheduleAuthoritativeSnapshotRefresh('integrations-imports-topic')
               })
               nextClient.subscribe(`${topicPrefix}/integrations.replay`, (message) => {
                 const payload = parseRealtimeBody(message, 'integrations.replay')
-                if (payload) mergeSnapshot({ integrationReplayQueue: payload })
+                if (payload) scheduleAuthoritativeSnapshotRefresh('integrations-replay-topic')
               })
             }
           }
           if (hasTenantWideWarehouseAccess) {
             nextClient.subscribe(`${topicPrefix}/scenarios.notifications`, (message) => {
               const payload = parseRealtimeBody(message, 'scenarios.notifications')
-              if (payload) mergeSnapshot({ scenarioNotifications: payload })
+              if (payload) scheduleAuthoritativeSnapshotRefresh('scenario-notifications-topic')
             })
             nextClient.subscribe(`${topicPrefix}/scenarios.escalated`, (message) => {
               const payload = parseRealtimeBody(message, 'scenarios.escalated')
-              if (payload) mergeSnapshot({ slaEscalations: payload })
+              if (payload) scheduleAuthoritativeSnapshotRefresh('scenario-escalated-topic')
             })
           }
           void loadSnapshot()
@@ -597,7 +524,7 @@ export default function useWorkspaceRealtime({
       active = false
       stopDegradedRefreshLoop()
       stopLiveReconciliationLoop()
-      stopDecisionSurfaceRefreshTimer()
+      stopAuthoritativeSnapshotRefreshTimer()
       publishRealtimeDebug({
         connectionState: 'disposed',
         disposedAt: new Date().toISOString(),

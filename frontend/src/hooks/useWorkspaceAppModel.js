@@ -332,7 +332,6 @@ export default function useWorkspaceAppModel() {
     websocketBrokerUrl,
     sockJsUrl,
     buildTenantTopicPrefix,
-    fetchJson,
     fetchSnapshot,
     fetchCatalogProducts,
     mergeSnapshot,
