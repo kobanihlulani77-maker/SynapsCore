@@ -14,6 +14,8 @@ import org.springframework.transaction.annotation.Transactional;
 @Slf4j
 public class IdentitySequenceMigrationService {
 
+    private static final String CORE_IDENTITY_WRITE_LOCK_KEY = "synapsecore.core-identity-writes";
+
     private static final List<String> CORE_IDENTITY_TABLES = List.of(
         "products",
         "business_events",
@@ -27,6 +29,7 @@ public class IdentitySequenceMigrationService {
     public synchronized void synchronizeCoreIdentitySequences() {
         String databaseProductName = databaseProductName();
         if (databaseProductName.contains("postgresql")) {
+            acquirePostgresCoreIdentityWriteLock();
             for (String tableName : CORE_IDENTITY_TABLES) {
                 synchronizePostgresIdentitySequence(tableName);
             }
@@ -41,6 +44,18 @@ public class IdentitySequenceMigrationService {
         }
 
         log.info("Skipping identity-sequence migration for unsupported database product {}.", databaseProductName);
+    }
+
+    public void acquireCoreIdentityWriteLock() {
+        if (databaseProductName().contains("postgresql")) {
+            acquirePostgresCoreIdentityWriteLock();
+        }
+    }
+
+    private void acquirePostgresCoreIdentityWriteLock() {
+        jdbcTemplate.execute(
+            "select pg_advisory_xact_lock(hashtext('" + CORE_IDENTITY_WRITE_LOCK_KEY + "'))"
+        );
     }
 
     private void synchronizePostgresIdentitySequence(String tableName) {
