@@ -31,10 +31,10 @@ public interface FulfillmentTaskRepository extends JpaRepository<FulfillmentTask
         @Param("externalOrderId") String externalOrderId
     );
 
-    @EntityGraph(attributePaths = {"tenant", "customerOrder", "warehouse"})
+    @EntityGraph(attributePaths = {"tenant", "customerOrder", "customerOrder.items", "warehouse"})
     List<FulfillmentTask> findAllByTenant_CodeIgnoreCaseAndStatusInOrderByUpdatedAtDesc(String tenantCode, Collection<FulfillmentStatus> statuses);
 
-    @EntityGraph(attributePaths = {"tenant", "customerOrder", "warehouse"})
+    @EntityGraph(attributePaths = {"tenant", "customerOrder", "customerOrder.items", "warehouse"})
     List<FulfillmentTask> findAllByStatusInOrderByUpdatedAtDesc(Collection<FulfillmentStatus> statuses);
 
     @EntityGraph(attributePaths = {"tenant", "customerOrder", "warehouse"})

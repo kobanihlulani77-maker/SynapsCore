@@ -326,7 +326,6 @@ public class FulfillmentService {
         }
     }
 
-    @Transactional(readOnly = true)
     public FulfillmentOverviewResponse getOverview() {
         String tenantCode = tenantContextService.getCurrentTenantCodeOrDefault();
         List<FulfillmentTask> allActiveTasks = fulfillmentTaskRepository
