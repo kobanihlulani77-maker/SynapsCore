@@ -16,6 +16,7 @@ import com.synapsecore.domain.entity.CustomerOrder;
 import com.synapsecore.domain.entity.FulfillmentStatus;
 import com.synapsecore.domain.entity.FulfillmentTask;
 import com.synapsecore.domain.entity.Recommendation;
+import com.synapsecore.domain.entity.TenantOperationalPolicy;
 import com.synapsecore.domain.repository.CustomerOrderRepository;
 import com.synapsecore.domain.repository.FulfillmentTaskRepository;
 import com.synapsecore.domain.repository.AuditLogRepository;
@@ -35,6 +36,7 @@ import java.time.temporal.ChronoUnit;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
+import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Comparator;
 import java.util.LinkedHashMap;
@@ -327,9 +329,9 @@ public class FulfillmentService {
     @Transactional(readOnly = true)
     public FulfillmentOverviewResponse getOverview() {
         String tenantCode = tenantContextService.getCurrentTenantCodeOrDefault();
-        List<FulfillmentTask> activeTasks = fulfillmentTaskRepository
+        List<FulfillmentTask> allActiveTasks = fulfillmentTaskRepository
             .findAllByTenant_CodeIgnoreCaseAndStatusInOrderByUpdatedAtDesc(tenantCode, ACTIVE_STATUSES);
-        activeTasks = activeTasks.stream()
+        List<FulfillmentTask> activeTasks = allActiveTasks.stream()
             .filter(task -> !isTerminalOrder(task.getCustomerOrder().getStatus()))
             .toList();
         var currentOperator = accessDirectoryService.getCurrentOperator();
@@ -346,9 +348,24 @@ public class FulfillmentService {
         }
 
         Instant now = Instant.now();
+        TenantOperationalPolicy policy = tenantOperationalPolicyService.getPolicy(tenantCode);
+        Map<Long, List<FulfillmentTask>> tasksByWarehouse = new LinkedHashMap<>();
+        for (FulfillmentTask task : allActiveTasks) {
+            tasksByWarehouse.computeIfAbsent(task.getWarehouse().getId(), ignored -> new ArrayList<>()).add(task);
+        }
+        Map<Long, WarehouseAssessmentMetrics> metricsByWarehouse = new LinkedHashMap<>();
         Map<Long, FulfillmentAssessment> assessmentByTaskId = new LinkedHashMap<>();
         for (FulfillmentTask task : activeTasks) {
-            assessmentByTaskId.put(task.getId(), buildWarehouseAssessment(task, now));
+            WarehouseAssessmentMetrics metrics = metricsByWarehouse.computeIfAbsent(
+                task.getWarehouse().getId(),
+                ignored -> buildWarehouseAssessmentMetrics(
+                    tenantCode,
+                    task.getWarehouse().getId(),
+                    tasksByWarehouse.get(task.getWarehouse().getId()),
+                    now
+                )
+            );
+            assessmentByTaskId.put(task.getId(), buildWarehouseAssessment(task, now, policy, metrics));
         }
 
         long backlogCount = activeTasks.stream().filter(task -> BACKLOG_STATUSES.contains(task.getStatus())).count();
@@ -481,13 +498,28 @@ public class FulfillmentService {
 
     private FulfillmentAssessment buildWarehouseAssessment(FulfillmentTask task, Instant now) {
         String tenantCode = task.getTenant().getCode();
-        var policy = tenantOperationalPolicyService.getPolicy(tenantCode);
+        TenantOperationalPolicy policy = tenantOperationalPolicyService.getPolicy(tenantCode);
         Long warehouseId = task.getWarehouse().getId();
         List<FulfillmentTask> warehouseTasks = fulfillmentTaskRepository
             .findAllByTenant_CodeIgnoreCaseAndStatusInOrderByUpdatedAtDesc(tenantCode, ACTIVE_STATUSES)
             .stream()
             .filter(candidate -> candidate.getWarehouse().getId().equals(warehouseId))
             .toList();
+
+        return buildWarehouseAssessment(
+            task,
+            now,
+            policy,
+            buildWarehouseAssessmentMetrics(tenantCode, warehouseId, warehouseTasks, now)
+        );
+    }
+
+    private WarehouseAssessmentMetrics buildWarehouseAssessmentMetrics(
+        String tenantCode,
+        Long warehouseId,
+        List<FulfillmentTask> warehouseTasks,
+        Instant now
+    ) {
 
         long backlogCount = warehouseTasks.stream().filter(candidate -> BACKLOG_STATUSES.contains(candidate.getStatus())).count();
         long overdueDispatchCount = warehouseTasks.stream()
@@ -508,6 +540,27 @@ public class FulfillmentService {
             BACKLOG_CLEARING_STATUSES,
             analysisStart
         );
+
+        return new WarehouseAssessmentMetrics(
+            backlogCount,
+            overdueDispatchCount,
+            delayedShipmentCount,
+            recentOrderIntake,
+            recentThroughput
+        );
+    }
+
+    private FulfillmentAssessment buildWarehouseAssessment(
+        FulfillmentTask task,
+        Instant now,
+        TenantOperationalPolicy policy,
+        WarehouseAssessmentMetrics metrics
+    ) {
+        long backlogCount = metrics.backlogCount();
+        long overdueDispatchCount = metrics.overdueDispatchCount();
+        long delayedShipmentCount = metrics.delayedShipmentCount();
+        long recentOrderIntake = metrics.recentOrderIntake();
+        long recentThroughput = metrics.recentThroughput();
 
         double backlogGrowthPerHour = ((double) recentOrderIntake - recentThroughput) / Math.max(analysisWindowHours, 1);
         Double estimatedBacklogClearHours = null;
@@ -590,6 +643,15 @@ public class FulfillmentService {
             riskLevel,
             impactSummary
         );
+    }
+
+    private record WarehouseAssessmentMetrics(
+        long backlogCount,
+        long overdueDispatchCount,
+        long delayedShipmentCount,
+        long recentOrderIntake,
+        long recentThroughput
+    ) {
     }
 
     private FulfillmentStatusResponse toResponse(FulfillmentTask task, FulfillmentAssessment assessment) {

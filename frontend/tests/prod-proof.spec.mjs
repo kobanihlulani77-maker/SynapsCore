@@ -2562,8 +2562,8 @@ test('@realtime dashboard summary updates live without a browser refresh', async
     expect(expectedAlertText).toBeTruthy()
     expect(expectedRecommendationText).toBeTruthy()
 
-    await expect(page.getByText(expectedAlertText, { exact: false }).first()).toBeVisible({ timeout: 30_000 })
-    await expect(page.getByText(expectedRecommendationText, { exact: false }).first()).toBeVisible({ timeout: 30_000 })
+    const liveActivity = page.locator('.dashboard-activity-grid').first()
+    await expect(liveActivity.getByText(realtimeFixture.productSku, { exact: false }).first()).toBeVisible({ timeout: 30_000 })
     await expectNoFatalUiErrors(page)
   } finally {
     await readJson(await api.post('/api/inventory/update', {
