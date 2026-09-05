@@ -3,6 +3,33 @@ import { appPages, canAccessWorkspacePage, pageSectionMap } from '../config/page
 
 const currency = new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 })
 
+const inventoryRiskRank = { critical: 3, high: 2, stable: 1 }
+
+const compareInventoryAttention = (left, right) => {
+  const riskDelta = (inventoryRiskRank[right.riskLevel] || 0) - (inventoryRiskRank[left.riskLevel] || 0)
+  if (riskDelta !== 0) {
+    return riskDelta
+  }
+
+  const lowStockDelta = Number(Boolean(right.lowStock)) - Number(Boolean(left.lowStock))
+  if (lowStockDelta !== 0) {
+    return lowStockDelta
+  }
+
+  const leftHours = Number.isFinite(Number(left.hoursToStockout)) ? Number(left.hoursToStockout) : Number.POSITIVE_INFINITY
+  const rightHours = Number.isFinite(Number(right.hoursToStockout)) ? Number(right.hoursToStockout) : Number.POSITIVE_INFINITY
+  if (leftHours !== rightHours) {
+    return leftHours - rightHours
+  }
+
+  const updatedDelta = Date.parse(right.updatedAt || '') - Date.parse(left.updatedAt || '')
+  if (Number.isFinite(updatedDelta) && updatedDelta !== 0) {
+    return updatedDelta
+  }
+
+  return String(right.id || '').localeCompare(String(left.id || ''))
+}
+
 export default function useWorkspaceChrome({
   currentPage,
   isAuthenticated,
@@ -211,8 +238,10 @@ export default function useWorkspaceChrome({
   ]
 
   const activeAlerts = snapshot.alerts.activeAlerts
-  const lowStockInventory = snapshot.inventory.filter((item) => item.lowStock)
-  const highRiskInventory = snapshot.inventory.filter((item) => item.riskLevel === 'critical' || item.riskLevel === 'high')
+  const lowStockInventory = snapshot.inventory.filter((item) => item.lowStock).sort(compareInventoryAttention)
+  const highRiskInventory = snapshot.inventory
+    .filter((item) => item.riskLevel === 'critical' || item.riskLevel === 'high')
+    .sort(compareInventoryAttention)
   const fastMovingInventory = [...snapshot.inventory].sort((left, right) => (right.unitsPerHour || 0) - (left.unitsPerHour || 0)).slice(0, 5)
   const delayedFulfillments = fulfillmentOverview.activeFulfillments.filter((task) => task.fulfillmentStatus === 'DELAYED' || task.riskLevel === 'critical' || task.riskLevel === 'high')
   const pendingApprovalScenarios = scenarioHistoryItems.filter((scenario) => scenario.approvalStatus === 'PENDING_APPROVAL')
