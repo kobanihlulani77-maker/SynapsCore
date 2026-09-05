@@ -73,9 +73,16 @@ public class IdentitySequenceMigrationService {
             return;
         }
 
-        long nextId = nextIdentityValue(tableName);
-        jdbcTemplate.execute("select setval('" + escapeSqlLiteral(sequenceName) + "', " + nextId + ", false)");
-        log.info("Synchronized PostgreSQL identity sequence {} for table {} to next id {}.", sequenceName, tableName, nextId);
+        long maxId = maxIdentityValue(tableName);
+        long nextId = jdbcTemplate.queryForObject(
+            "select case when is_called then last_value + 1 else last_value end from " + sequenceName,
+            Long.class
+        );
+        if (nextId <= maxId) {
+            long repairedNextId = maxId + 1;
+            jdbcTemplate.execute("select setval('" + escapeSqlLiteral(sequenceName) + "', " + repairedNextId + ", false)");
+            log.info("Repaired PostgreSQL identity sequence {} for table {} to next id {}.", sequenceName, tableName, repairedNextId);
+        }
     }
 
     private void synchronizeH2IdentitySequence(String tableName) {
@@ -83,17 +90,31 @@ public class IdentitySequenceMigrationService {
             return;
         }
 
-        long nextId = nextIdentityValue(tableName);
-        jdbcTemplate.execute("alter table " + tableName + " alter column id restart with " + nextId);
-        log.info("Synchronized H2 identity for table {} to next id {}.", tableName, nextId);
+        long maxId = maxIdentityValue(tableName);
+        Long nextId = jdbcTemplate.queryForObject(
+            """
+            select identity_base
+            from information_schema.columns
+            where upper(table_name) = upper(?)
+              and upper(column_name) = 'ID'
+              and is_identity = 'YES'
+            """,
+            Long.class,
+            tableName
+        );
+        if (nextId == null || nextId <= maxId) {
+            long repairedNextId = maxId + 1;
+            jdbcTemplate.execute("alter table " + tableName + " alter column id restart with " + repairedNextId);
+            log.info("Repaired H2 identity for table {} to next id {}.", tableName, repairedNextId);
+        }
     }
 
-    private long nextIdentityValue(String tableName) {
-        Long nextId = jdbcTemplate.queryForObject(
-            "select coalesce(max(id), 0) + 1 from " + tableName,
+    private long maxIdentityValue(String tableName) {
+        Long maxId = jdbcTemplate.queryForObject(
+            "select coalesce(max(id), 0) from " + tableName,
             Long.class
         );
-        return nextId == null ? 1L : nextId;
+        return maxId == null ? 0L : maxId;
     }
 
     private boolean tableExists(String tableName) {
