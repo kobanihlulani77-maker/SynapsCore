@@ -42,6 +42,8 @@ import com.synapsecore.tenant.TenantContextService;
 import java.time.Instant;
 import java.util.Comparator;
 import java.util.List;
+import java.util.Locale;
+import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.PageRequest;
@@ -70,6 +72,7 @@ public class OperationalViewService {
     private final FulfillmentService fulfillmentService;
     private final TenantContextService tenantContextService;
     private final AccessDirectoryService accessDirectoryService;
+    private final InFlightRequestCoordinator<DashboardSnapshotResponse> snapshotRequests = new InFlightRequestCoordinator<>();
 
     public AlertFeedResponse getAlertFeed() {
         String tenantCode = tenantContextService.getCurrentTenantCodeOrDefault();
@@ -180,6 +183,10 @@ public class OperationalViewService {
     }
 
     public DashboardSnapshotResponse getSnapshot() {
+        return snapshotRequests.execute(snapshotRequestKey(), this::buildSnapshot);
+    }
+
+    private DashboardSnapshotResponse buildSnapshot() {
         return new DashboardSnapshotResponse(
             dashboardService.getSummary(),
             getAlertFeed(),
@@ -198,6 +205,21 @@ public class OperationalViewService {
             getRecentScenarios(),
             Instant.now()
         );
+    }
+
+    private String snapshotRequestKey() {
+        String tenantCode = tenantContextService.getCurrentTenantCodeOrDefault()
+            .trim()
+            .toUpperCase(Locale.ROOT);
+        String actorKey = accessDirectoryService.getCurrentOperator()
+            .map(operator -> String.join(
+                "|",
+                operator.getActorName(),
+                operator.getRoles().stream().map(Enum::name).sorted().collect(Collectors.joining(",")),
+                accessDirectoryService.getWarehouseScopes(operator).stream().sorted().collect(Collectors.joining(","))
+            ))
+            .orElse("anonymous");
+        return tenantCode + "|" + actorKey;
     }
 
     private boolean isCurrentOperatorWarehouseScoped() {
