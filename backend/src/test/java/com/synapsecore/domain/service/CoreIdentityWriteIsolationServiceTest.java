@@ -16,7 +16,7 @@ import org.springframework.transaction.support.TransactionTemplate;
 class CoreIdentityWriteIsolationServiceTest {
 
     @Test
-    void acquiresCoreIdentityLockBeforeWriteInExistingTransaction() {
+    void doesNotAcquireGlobalIdentityLockForWriteInExistingTransaction() {
         DataSource dataSource = new DriverManagerDataSource(
             "jdbc:h2:mem:coreidentityactive;MODE=PostgreSQL;DB_CLOSE_DELAY=-1;DB_CLOSE_ON_EXIT=FALSE",
             "sa",
@@ -44,12 +44,12 @@ class CoreIdentityWriteIsolationServiceTest {
             () -> jdbcTemplate.update("insert into proof_rows (id, note) values (?, ?)", 1L, "active-transaction-row")
         ));
 
-        assertThat(trackingSequenceService.lockAcquisitionCount()).isEqualTo(1);
+        assertThat(trackingSequenceService.lockAcquisitionCount()).isZero();
         assertThat(jdbcTemplate.queryForObject("select count(*) from proof_rows", Long.class)).isEqualTo(1L);
     }
 
     @Test
-    void retriesConflictedWriteInFreshTransactionWithoutPoisoningOuterTransaction() {
+    void retriesConflictedWriteWithoutHoldingGlobalIdentityLock() {
         DataSource dataSource = new DriverManagerDataSource(
             "jdbc:h2:mem:coreidentitywrite;MODE=PostgreSQL;DB_CLOSE_DELAY=-1;DB_CLOSE_ON_EXIT=FALSE",
             "sa",
@@ -82,7 +82,7 @@ class CoreIdentityWriteIsolationServiceTest {
 
         assertThat(attempts.get()).isEqualTo(2);
         assertThat(trackingSequenceService.synchronizationCount()).isEqualTo(1);
-        assertThat(trackingSequenceService.lockAcquisitionCount()).isEqualTo(2);
+        assertThat(trackingSequenceService.lockAcquisitionCount()).isZero();
         assertThat(jdbcTemplate.queryForObject("select count(*) from proof_rows", Long.class)).isEqualTo(2L);
     }
 

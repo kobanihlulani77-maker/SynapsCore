@@ -36,7 +36,6 @@ public class CoreIdentityWriteIsolationService {
     public void persistWithSequenceRepair(String writeDescription, Runnable writeAction) {
         if (entityManager != null && TransactionSynchronizationManager.isActualTransactionActive()) {
             // Catalog writes must keep events, dispatch work, and audit rows in the same commit.
-            identitySequenceMigrationService.acquireCoreIdentityWriteLock();
             writeAction.run();
             entityManager.flush();
             return;
@@ -51,10 +50,7 @@ public class CoreIdentityWriteIsolationService {
     }
 
     private void executeRequiresNew(Runnable writeAction) {
-        requiresNewTransactionTemplate.executeWithoutResult(status -> {
-            identitySequenceMigrationService.acquireCoreIdentityWriteLock();
-            writeAction.run();
-        });
+        requiresNewTransactionTemplate.executeWithoutResult(status -> writeAction.run());
     }
 
     private void synchronizeCoreIdentitySequencesSafely() {

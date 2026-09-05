@@ -7,6 +7,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.jdbc.core.ConnectionCallback;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
 @Service
@@ -25,7 +26,7 @@ public class IdentitySequenceMigrationService {
 
     private final JdbcTemplate jdbcTemplate;
 
-    @Transactional
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
     public synchronized void synchronizeCoreIdentitySequences() {
         String databaseProductName = databaseProductName();
         if (databaseProductName.contains("postgresql")) {
