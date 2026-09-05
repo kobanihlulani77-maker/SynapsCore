@@ -93,6 +93,13 @@ synapsecore:
   queue:
     dispatch-interval-ms: ${DISPATCH_INTERVAL_MS:1500}
     batch-size: ${DISPATCH_BATCH_SIZE:16}
+  scheduling:
+    pool-size: ${SYNAPSECORE_SCHEDULING_POOL_SIZE:1}
+  async:
+    operational-dispatch:
+      core-pool-size: ${SYNAPSECORE_DISPATCH_CORE_POOL_SIZE:1}
+      max-pool-size: ${SYNAPSECORE_DISPATCH_MAX_POOL_SIZE:2}
+      queue-capacity: ${SYNAPSECORE_DISPATCH_QUEUE_CAPACITY:64}
   inventory:
     contention:
       retry:
