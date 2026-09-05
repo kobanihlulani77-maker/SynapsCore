@@ -4,8 +4,10 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import com.synapsecore.config.AsyncExecutionConfig;
 import com.synapsecore.config.SchedulingConfig;
+import com.synapsecore.decision.RecommendationReconciliationService;
 import java.util.concurrent.Executor;
 import org.junit.jupiter.api.Test;
+import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.scheduling.concurrent.ThreadPoolTaskExecutor;
 import org.springframework.scheduling.concurrent.ThreadPoolTaskScheduler;
 
@@ -18,6 +20,22 @@ class BackgroundConcurrencyConfigTest {
 
         try {
             assertThat(scheduler.getScheduledThreadPoolExecutor().getCorePoolSize()).isEqualTo(1);
+        } finally {
+            scheduler.shutdown();
+        }
+    }
+
+    @Test
+    void recommendationReconciliationUsesItsOwnBoundedScheduler() throws NoSuchMethodException {
+        SchedulingConfig configuration = new SchedulingConfig();
+        ThreadPoolTaskScheduler scheduler = configuration.synapseRecommendationTaskScheduler();
+
+        try {
+            assertThat(scheduler.getScheduledThreadPoolExecutor().getCorePoolSize()).isEqualTo(1);
+            Scheduled scheduled = RecommendationReconciliationService.class
+                .getMethod("reconcileOnSchedule")
+                .getAnnotation(Scheduled.class);
+            assertThat(scheduled.scheduler()).isEqualTo("synapseRecommendationTaskScheduler");
         } finally {
             scheduler.shutdown();
         }

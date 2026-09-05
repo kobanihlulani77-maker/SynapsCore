@@ -31,6 +31,18 @@ public class SchedulingConfig implements SchedulingConfigurer {
         return scheduler;
     }
 
+    @Bean(name = "synapseRecommendationTaskScheduler", destroyMethod = "shutdown")
+    public ThreadPoolTaskScheduler synapseRecommendationTaskScheduler() {
+        ThreadPoolTaskScheduler scheduler = new ThreadPoolTaskScheduler();
+        scheduler.setPoolSize(1);
+        scheduler.setThreadNamePrefix("SynapseRecommendationScheduled-");
+        scheduler.setWaitForTasksToCompleteOnShutdown(true);
+        scheduler.setAwaitTerminationSeconds(30);
+        scheduler.setErrorHandler(throwable -> log.error("Unexpected error occurred in recommendation scheduled task", throwable));
+        scheduler.initialize();
+        return scheduler;
+    }
+
     @Override
     public void configureTasks(ScheduledTaskRegistrar taskRegistrar) {
         taskRegistrar.setTaskScheduler(synapseScheduledTaskScheduler());

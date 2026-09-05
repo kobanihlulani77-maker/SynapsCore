@@ -60,6 +60,7 @@ public class RecommendationReconciliationService {
     private boolean enabled;
 
     @Scheduled(
+        scheduler = "synapseRecommendationTaskScheduler",
         initialDelayString = "${synapsecore.recommendation.reconciliation.initial-delay-ms:60000}",
         fixedDelayString = "${synapsecore.recommendation.reconciliation.interval-ms:60000}"
     )
