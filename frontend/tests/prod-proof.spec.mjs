@@ -1410,6 +1410,7 @@ async function waitForAlertPageAlertVisible(page, alertRecord, testInfo) {
     const alertButton = page.locator('#alerts-feed').getByRole('button', {
       name: new RegExp(escapeRegExp(alertRecord.title), 'i'),
     }).first()
+    let selectedQueueTitle = ''
     if (await alertButton.isVisible().catch(() => false)) {
       await alertButton.scrollIntoViewIfNeeded().catch(() => {})
       await alertButton.click({ timeout: 1_500 }).catch(async () => {
@@ -1420,27 +1421,41 @@ async function waitForAlertPageAlertVisible(page, alertRecord, testInfo) {
           exactAlertButton?.click?.()
         }, alertRecord.title).catch(() => {})
       })
+    } else {
+      const visibleQueueButton = page.locator('#alerts-feed .attention-queue-card').first()
+      if (await visibleQueueButton.isVisible().catch(() => false)) {
+        selectedQueueTitle = (await visibleQueueButton.locator('strong').first().textContent().catch(() => ''))?.trim() || ''
+        await activateSelectableButton(visibleQueueButton).catch(() => {})
+      }
     }
 
-    lastState = await page.evaluate(({ title, recommendedAction }) => {
+    lastState = await page.evaluate(({ title, recommendedAction, selectedQueueTitle }) => {
       const normalizeText = (value) => value?.replace?.(/\s+/g, ' ')?.trim?.() || ''
       const alertButtons = [...(globalThis.document?.querySelectorAll?.('#alerts-feed button') || [])]
       const exactAlertButton = alertButtons.find((button) => normalizeText(button.textContent).includes(title)) || null
       const selectedAlert = globalThis.document?.querySelector?.('#alerts-response') || null
       const selectedText = normalizeText(selectedAlert?.textContent)
+      const queueCount = alertButtons.filter((button) => button.classList.contains('attention-queue-card')).length
       return {
         pageUrl: globalThis.location?.href || '',
         alertButtonFound: Boolean(exactAlertButton),
         alertButtonText: normalizeText(exactAlertButton?.textContent),
+        queueCount,
         selectedText,
         selectedMatches: selectedText.includes(title) && selectedText.includes(recommendedAction),
+        selectedQueueMatches: Boolean(selectedQueueTitle) && selectedText.includes(selectedQueueTitle),
       }
     }, {
       title: alertRecord.title,
       recommendedAction: alertRecord.recommendedAction,
+      selectedQueueTitle,
     })
 
     if (lastState.alertButtonFound && lastState.selectedMatches) {
+      return lastState
+    }
+
+    if (!lastState.alertButtonFound && lastState.queueCount > 0 && lastState.selectedQueueMatches) {
       return lastState
     }
 
