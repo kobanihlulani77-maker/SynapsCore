@@ -76,6 +76,10 @@ public interface ScenarioRunRepository extends JpaRepository<ScenarioRun, Long>,
     @Query("select run from ScenarioRun run where upper(run.tenant.code) = upper(:tenantCode) and run.id = :id")
     java.util.Optional<ScenarioRun> findForRevisionUpdate(@Param("tenantCode") String tenantCode, @Param("id") Long id);
 
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("select run from ScenarioRun run where upper(run.tenant.code) = upper(:tenantCode) and run.id = :id")
+    java.util.Optional<ScenarioRun> findForSlaUpdate(@Param("tenantCode") String tenantCode, @Param("id") Long id);
+
     long countByTenant_CodeIgnoreCaseAndApprovalStatus(String tenantCode, ScenarioApprovalStatus approvalStatus);
 
     boolean existsByTenant_CodeIgnoreCaseAndWarehouseCodeIgnoreCaseAndApprovalStatusIn(String tenantCode,

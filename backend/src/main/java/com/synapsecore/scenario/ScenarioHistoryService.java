@@ -66,6 +66,7 @@ public class ScenarioHistoryService {
     private final TenantContextService tenantContextService;
     private final TenantOperationalPolicyService tenantOperationalPolicyService;
     private final SynapseStarterProperties starterProperties;
+    private final ScenarioSlaEscalationService scenarioSlaEscalationService;
 
     private static final ScenarioHistoryFilter DEFAULT_HISTORY_FILTER =
         new ScenarioHistoryFilter(null, null, null, null, null, null, null, null, null, null, null, null, null);
@@ -1122,19 +1123,9 @@ public class ScenarioHistoryService {
         String previousFinalApprovalOwner = run.getFinalApprovalOwner();
         String escalatedFinalApprovalOwner = resolveSlaEscalatedFinalApprovalOwner(run);
         String escalationOwner = resolveSlaEscalationOwner(run);
-        run.setFinalApprovalOwner(escalatedFinalApprovalOwner);
-        run.setSlaEscalatedTo(escalationOwner);
-        run.setSlaEscalatedAt(Instant.now());
-        run = scenarioRunRepository.save(run);
-
-        businessEventService.record(
-            BusinessEventType.SCENARIO_SLA_ESCALATED,
-            "scenario-planner",
-            "Escalated overdue plan " + run.getTitle() + " from final approver "
-                + previousFinalApprovalOwner + " to " + escalatedFinalApprovalOwner
-                + " with escalation owner " + escalationOwner + "."
-        );
-        return run;
+        return scenarioSlaEscalationService.escalateIfEligible(
+            tenantContextService.getCurrentTenantCodeOrDefault(), run.getId(), run.getWarehouseCode(),
+            previousFinalApprovalOwner, escalatedFinalApprovalOwner, escalationOwner);
     }
 
     private boolean isEligibleForSlaEscalation(ScenarioRun run) {

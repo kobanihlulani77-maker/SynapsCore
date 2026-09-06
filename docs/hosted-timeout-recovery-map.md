@@ -265,11 +265,15 @@ waiters using the real Spring JPA transaction proxy. The redundant repair
 wrapper is corrected locally: six focused tests and the full 322-test backend
 suite pass, and the backend package builds. The correction was pushed in
 `cda37614259fc36b8495ecde315b33b63434dd97`. CI passed the six focused tests but
-failed an existing Scenario SLA event-count assertion (322 tests, one failure);
-the discrepancy is unresolved, not dismissed as a flake. A bounded hosted
+failed an existing Scenario SLA event-count assertion (322 tests, one failure).
+The subsequent documentation-only CI run passed, but a controlled three-reader
+test reproduced three SLA events instead of one. The bounded atomic transition
+correction and its verification are recorded in
+[SLA escalation race evidence](evidence/timeout-recovery-sla-escalation-race.md).
+A bounded hosted
 readback received readiness and login responses, then timed out on runtime
 before confirming the served revision. Traffic stopped. CI and hosted
-acceptance remain blocked as recorded in the evidence document.
+acceptance require the corrected commit's verification as recorded in the evidence documents.
 
 This is partial progress through the holder analysis and correction phases,
 not closure of all timeout mechanisms. The next hosted action remains

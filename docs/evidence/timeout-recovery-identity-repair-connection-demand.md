@@ -138,6 +138,12 @@ established; do not label it a harmless flake, weaken the assertion, or claim
 the overall CI gate passed. Frontend and Compose steps were skipped after the
 backend failure. Scenario production code and tests were not changed.
 
+Subsequent work on 2026-09-06 reproduced and corrected a concurrent SLA
+escalation race. See the separate
+[CI gate follow-up](timeout-recovery-sla-escalation-race.md) for the controlled
+failure, atomic transition correction, and newer verification results. The
+original CI failure above remains part of the evidence history.
+
 ### Bounded Hosted Readback
 
 The readback started more than nine minutes after push, using the existing
