@@ -44,7 +44,9 @@ public class CoreIdentityWriteIsolationService {
             executeRequiresNew(writeAction);
         } catch (DataIntegrityViolationException exception) {
             log.warn("{} conflicted; synchronizing core identity sequences and retrying once.", writeDescription);
-            synchronizeCoreIdentitySequencesSafely();
+            // The proxied sequence service owns REQUIRES_NEW. Wrapping it would
+            // suspend an unused connection while waiting to borrow another one.
+            identitySequenceMigrationService.synchronizeCoreIdentitySequences();
             executeRequiresNew(writeAction);
         }
     }
@@ -53,9 +55,4 @@ public class CoreIdentityWriteIsolationService {
         requiresNewTransactionTemplate.executeWithoutResult(status -> writeAction.run());
     }
 
-    private void synchronizeCoreIdentitySequencesSafely() {
-        requiresNewTransactionTemplate.executeWithoutResult(status ->
-            identitySequenceMigrationService.synchronizeCoreIdentitySequences()
-        );
-    }
 }

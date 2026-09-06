@@ -57,6 +57,9 @@ application connection retention or overlap
 5. If code changes, use one bounded change set, commit and push it, wait for the new Render revision to deploy and become ready, then verify the served revision before testing.
 6. Stop at the first new failure and preserve its exact time window.
 7. Keep `CHROME_HTTP_SLOW` separate from `HTTP_FAST_BUT_UI_STALE`.
+8. Warm-baseline and live-capture gates govern hosted work. Source inspection and bounded local reproductions may proceed using existing evidence without waiting for another hosted failure.
+9. When a cause is reproduced, apply Phases 9-10 to that cause before attacking the next unresolved family. A healthy capture alone neither clears a family nor requires another identical capture.
+10. Before another hosted capture, verify that available diagnostics can answer the missing ownership question. PostgreSQL samples and timestamps alone do not establish a Java owner or exact cumulative SQL duration.
 
 ## Phase 0 - Freeze the Truth Map
 
@@ -253,9 +256,18 @@ SYNAPSCORE TIMEOUT RECOVERY OPEN - EXACT HOLDER MAPPING OR FIX VERIFICATION REMA
 
 ## Current Starting Point
 
-The next authorized phase is **Phase 1 - Establish a Warm Baseline** only. The
-program must not jump to broad E2E, infrastructure upgrades, or frontend changes
-until the active-runtime boundary is classified.
+As of 2026-09-06, the local source/reproduction pass has identified the first
+concrete cause. See
+[Identity repair connection-demand evidence](evidence/timeout-recovery-identity-repair-connection-demand.md).
 
-No production code, tests, configuration, infrastructure, commit, or deployment
-is changed by this map.
+Ten independent repairs reproduced `active=10, idle=0` with ten acquisition
+waiters using the real Spring JPA transaction proxy. The redundant repair
+wrapper is corrected locally: six focused tests and the full 322-test backend
+suite pass, and the backend package builds. Hosted verification remains
+pending in that evidence record.
+
+This is partial progress through the holder analysis and correction phases,
+not closure of all timeout mechanisms. The next hosted action remains
+**Phase 1 - Establish a Warm Baseline**, after the exact deployed revision is
+confirmed. Broad hosted E2E is still gated by the failure classification and
+the bounded correction's verification.
