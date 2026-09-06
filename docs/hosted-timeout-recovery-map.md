@@ -281,8 +281,14 @@ bounded hosted baseline stopped at a successful but slow login (5836 ms,
 2026-09-06T11:47:22.721Z, request
 `70482131-7817-48b4-8f66-a63b3fdb89da`). No further hosted requests or E2E
 followed. The served revision and complete warm baseline remain unconfirmed.
-The next prepared local diagnostic is the early session-resolution timing and
-correlation gap; it is not yet a proven cause of that login latency.
+The early session-resolution timing/correlation gap was subsequently reproduced:
+five direct checks failed against unchanged production source. The bounded
+filter correction passes all 22 focused tracing/identity/SLA tests, all 338
+backend tests, and the package build. Local verification is recorded in
+[Early request tracing evidence](evidence/timeout-recovery-early-request-tracing.md).
+This is a measurement correction, not a proven cause of the slow login, whose
+path skips those early session lookups. The next prepared local holder family
+is the product/import outer-transaction path and its independent identity repair.
 
 This is partial progress through the holder analysis and correction phases,
 not closure of all timeout mechanisms. The next hosted action remains

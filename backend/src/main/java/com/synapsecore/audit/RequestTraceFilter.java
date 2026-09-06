@@ -36,13 +36,13 @@ public class RequestTraceFilter extends OncePerRequestFilter {
     protected void doFilterInternal(HttpServletRequest request,
                                     HttpServletResponse response,
                                     FilterChain filterChain) throws ServletException, IOException {
+        long startedAtNanos = System.nanoTime();
         String incomingRequestId = request.getHeader(RequestTraceContext.REQUEST_ID_HEADER);
         String requestId = incomingRequestId != null && !incomingRequestId.isBlank()
             ? incomingRequestId.trim()
             : UUID.randomUUID().toString();
-        String actorName = resolveActorName(request);
-        String tenantCode = resolveTenantCode(request);
-        long startedAtNanos = System.nanoTime();
+        String actorName = RequestTraceContext.ANONYMOUS_ACTOR;
+        String tenantCode = RequestTraceContext.MISSING_TENANT_CONTEXT;
         int responseStatus = HttpServletResponse.SC_OK;
 
         requestTraceContext.setCurrentRequestId(requestId);
@@ -54,6 +54,14 @@ public class RequestTraceFilter extends OncePerRequestFilter {
         MDC.put(TENANT_MDC_KEY, tenantCode);
 
         try {
+            // Session resolution can acquire a connection; trace and time it too.
+            actorName = resolveActorName(request);
+            requestTraceContext.setCurrentActor(actorName);
+            MDC.put(ACTOR_MDC_KEY, actorName);
+            tenantCode = resolveTenantCode(request);
+            requestTraceContext.setCurrentTenant(tenantCode);
+            MDC.put(TENANT_MDC_KEY, tenantCode);
+
             filterChain.doFilter(request, response);
             responseStatus = response.getStatus();
         } catch (IOException | ServletException | RuntimeException exception) {
@@ -69,16 +77,19 @@ public class RequestTraceFilter extends OncePerRequestFilter {
             responseStatus = response.getStatus() >= 400 ? response.getStatus() : HttpServletResponse.SC_INTERNAL_SERVER_ERROR;
             throw exception;
         } finally {
-            operationalMetricsService.recordHttpRequest(
-                tenantCode,
-                request.getMethod(),
-                responseStatus,
-                System.nanoTime() - startedAtNanos
-            );
-            MDC.remove(REQUEST_ID_MDC_KEY);
-            MDC.remove(ACTOR_MDC_KEY);
-            MDC.remove(TENANT_MDC_KEY);
-            requestTraceContext.clear();
+            try {
+                operationalMetricsService.recordHttpRequest(
+                    tenantCode,
+                    request.getMethod(),
+                    responseStatus,
+                    System.nanoTime() - startedAtNanos
+                );
+            } finally {
+                MDC.remove(REQUEST_ID_MDC_KEY);
+                MDC.remove(ACTOR_MDC_KEY);
+                MDC.remove(TENANT_MDC_KEY);
+                requestTraceContext.clear();
+            }
         }
     }
 
