@@ -275,6 +275,15 @@ readback received readiness and login responses, then timed out on runtime
 before confirming the served revision. Traffic stopped. CI and hosted
 acceptance require the corrected commit's verification as recorded in the evidence documents.
 
+Correction `196bfd7d12584e47508e0623af4f93378e8dc9ec` subsequently passed all
+326 backend tests locally and in CI, plus CI frontend/Compose checks. Its
+bounded hosted baseline stopped at a successful but slow login (5836 ms,
+2026-09-06T11:47:22.721Z, request
+`70482131-7817-48b4-8f66-a63b3fdb89da`). No further hosted requests or E2E
+followed. The served revision and complete warm baseline remain unconfirmed.
+The next prepared local diagnostic is the early session-resolution timing and
+correlation gap; it is not yet a proven cause of that login latency.
+
 This is partial progress through the holder analysis and correction phases,
 not closure of all timeout mechanisms. The next hosted action remains
 **Phase 1 - Establish a Warm Baseline**, after the exact deployed revision is

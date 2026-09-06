@@ -92,17 +92,56 @@ Backend package: `cmd /c mvnw.cmd -q -DskipTests package`, exit 0, after the
 full suite. Documentation links: 785 checked, none missing. `git diff --check`
 passes. Frontend code, configuration, infrastructure and the original CI test
 assertion were not changed.
-New-commit CI and hosted revision/warm verification: pending.
+## Pushed Commit and CI
+
+Production correction: `196bfd7d12584e47508e0623af4f93378e8dc9ec`, pushed to
+`origin/main` at approximately 2026-09-06T11:41:36Z.
+[CI run 34030976126](https://github.com/kobanihlulani77-maker/SynapsCore/actions/runs/34030976126)
+passed: **326 tests, zero failures/errors/skips**, frontend build, development
+Compose validation, and production Compose validation. The original 34-test
+authority class and all four new race/rollback tests passed in CI. The backend
+CI success was logged at 2026-09-06T11:45:39Z.
+
+## Hosted Baseline Boundary
+
+One bounded readback began at 2026-09-06T11:47:19.121Z, more than five minutes
+after push and after CI passed. It used the existing synthetic proof account;
+no fixtures were reset and no E2E was run.
+
+| Request | HTTP status | Duration |
+| --- | --- | --- |
+| Frontend shell | 200 | 684 ms |
+| GET /actuator/health | 200 | 1010 ms |
+| GET /actuator/health/readiness | 200 | 563 ms |
+| GET /actuator/health/liveness | 200 | 376 ms |
+| GET /api/auth/session | 200 | 610 ms |
+| GET /ws/info | 200 | 340 ms |
+| POST /api/auth/session/login | 200 | 5836 ms |
+
+Login began at **2026-09-06T11:47:22.721Z**, completed at
+**2026-09-06T11:47:28.557Z**, request ID
+`70482131-7817-48b4-8f66-a63b3fdb89da`.
+
+Traffic stopped because login exceeded the five-second baseline gate. Runtime
+and dashboard requests were not sent afterward. The served revision and full
+`WARM_BASELINE_UTC` remain **unconfirmed**. Fast public checks plus slow login
+do not prove Hikari starvation, PostgreSQL blocking, cold start, or a defect in
+this newly pushed revision. Chrome reported `Debugger unattached`, so this is
+an API timing observation, not a synchronized Chrome/Render/PostgreSQL capture.
+
+The CI regression is locally and in CI corrected. Hosted timeout recovery is
+not closed by that result.
 
 ## Next Work
 
 This closes neither historical Hikari ownership nor warm-runtime latency.
 It clears a separately reproduced CI-blocking race only after verification.
 
-1. Finish full local verification, commit/push this bounded correction, and inspect its CI result.
-2. Confirm the new Render revision before a warm baseline; stop at the first failed/slow boundary rather than running broad E2E.
-3. If ownership still cannot be measured, locally prove the early request-timing/correlation gap before changing instrumentation. Do not ask for another identical database capture.
-4. Once measurement is adequate, resume the unresolved product/import outer-transaction connection-demand family from the recovery map.
+1. Local verification, commit/push and production-commit CI are complete for this correction.
+2. Obtain the Render deployment/log evidence for request `70482131-7817-48b4-8f66-a63b3fdb89da`; establish which revision served it before attributing latency.
+3. The next prepared local diagnostic is the early request-timing/correlation gap in `RequestTraceFilter`. Prove missing timing/cleanup on session-resolution delay or failure before changing instrumentation. This is a measurement gap, not an established explanation for the slow login.
+4. Resume warm-baseline verification only after the observed boundary is accounted for; do not generate broad E2E or another identical database capture to force a failure.
+5. Once measurement and release gates are adequate, resume the unresolved product/import outer-transaction connection-demand family from the recovery map.
 
 Recommendation reconciliation remains ruled down for its captured window.
 The healthy control capture remains valid. Overall timeout recovery and
