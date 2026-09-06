@@ -123,7 +123,46 @@ suite. Documentation links: 781 checked, none missing. `git diff --check` passes
 Frontend code was not changed; no additional frontend or hosted E2E run was
 performed for this bounded local correction.
 
-Hosted deployment and verification: pending.
+Implementation commit: `cda37614259fc36b8495ecde315b33b63434dd97`, pushed to
+`origin/main` at 2026-09-06T11:04:45Z.
+
+### CI Gate
+
+[GitHub CI run 34029193241](https://github.com/kobanihlulani77-maker/SynapsCore/actions/runs/34029193241)
+completed with **322 tests, 1 failure, 0 errors, 0 skipped**. All six focused
+identity-repair tests passed in CI. The failing existing test is
+`PlatformTenantAccessBoundaryIntegrationTest.scenarioPhaseSevenSlaEscalationRequiresAssignedOwnerAndPreservesOperationalTruth`
+at line 2736: expected one matching SLA escalation event, observed three.
+This differs from the clean local full-suite result. Its cause is not yet
+established; do not label it a harmless flake, weaken the assertion, or claim
+the overall CI gate passed. Frontend and Compose steps were skipped after the
+backend failure. Scenario production code and tests were not changed.
+
+### Bounded Hosted Readback
+
+The readback started more than nine minutes after push, using the existing
+synthetic proof account, without fixture preparation or E2E traffic:
+
+| UTC start | Request | Result | Duration | Request ID |
+| --- | --- | --- | --- | --- |
+| 2026-09-06T11:14:13.187Z | GET /actuator/health/readiness | 200 | 739 ms | 0f3861fc-f7ac-4597-95e4-4510d2e61619 |
+| 2026-09-06T11:14:13.937Z | POST /api/auth/session/login | 200 | 3602 ms | ff574507-9e6f-4642-b380-755b1830820e |
+| 2026-09-06T11:14:17.539Z | GET /api/system/runtime | Client timeout; no response received | 20011 ms | Unavailable |
+
+Traffic stopped at that timeout. The runtime response did not return its build
+information, so the served revision remains **unconfirmed**. The complete warm
+baseline was not established. This capture proves a timed-out client request,
+not Hikari starvation, PostgreSQL blocking, the responsible Java owner, or a
+regression on the new revision. Chrome/Render automation was unavailable in this
+attempt, so no synchronized server-side attribution is claimed.
+
+Hosted deployment and verification: **blocked/unconfirmed**. Overall acceptance
+also remains blocked by the CI discrepancy. No broad hosted E2E was run.
+
+PostgreSQL open-transaction count is not Hikari checked-out-connection count.
+An application can retain a connection without executing business SQL while
+waiting for another connection. Do not infer Hikari headroom by subtracting
+PostgreSQL open transactions from the configured pool size.
 
 ## Remaining Work
 

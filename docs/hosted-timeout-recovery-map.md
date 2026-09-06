@@ -263,8 +263,13 @@ concrete cause. See
 Ten independent repairs reproduced `active=10, idle=0` with ten acquisition
 waiters using the real Spring JPA transaction proxy. The redundant repair
 wrapper is corrected locally: six focused tests and the full 322-test backend
-suite pass, and the backend package builds. Hosted verification remains
-pending in that evidence record.
+suite pass, and the backend package builds. The correction was pushed in
+`cda37614259fc36b8495ecde315b33b63434dd97`. CI passed the six focused tests but
+failed an existing Scenario SLA event-count assertion (322 tests, one failure);
+the discrepancy is unresolved, not dismissed as a flake. A bounded hosted
+readback received readiness and login responses, then timed out on runtime
+before confirming the served revision. Traffic stopped. CI and hosted
+acceptance remain blocked as recorded in the evidence document.
 
 This is partial progress through the holder analysis and correction phases,
 not closure of all timeout mechanisms. The next hosted action remains
