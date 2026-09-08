@@ -77,6 +77,13 @@ Documentation link check: **788 links, no missing local links**.
 This is the local verification checkpoint; CI and hosted acceptance are separate
 release gates, not results claimed by these local tests.
 
+CI for production commit `62eeb41914e0b936e525432962ab02714d6adbd5`
+subsequently passed all 12 tracing tests but failed the existing SLA event-count
+assertion (338 tests, 1 failure). The independent read-only caller defect and
+bounded correction are tracked in
+[SLA read-only caller evidence](timeout-recovery-sla-readonly-callers.md).
+That failure is not treated as resolved by the preceding local pass.
+
 ## Limits and Next Action
 
 - Login POSTs deliberately skip the early session lookups. This measurement correction is not an explanation for the observed slow login.

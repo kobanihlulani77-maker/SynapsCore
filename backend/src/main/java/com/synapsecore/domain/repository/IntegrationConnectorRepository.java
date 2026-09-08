@@ -5,6 +5,7 @@ import com.synapsecore.domain.entity.IntegrationConnectorType;
 import com.synapsecore.domain.entity.IntegrationSyncMode;
 import java.util.List;
 import java.util.Optional;
+import org.springframework.data.jpa.repository.EntityGraph;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
@@ -54,6 +55,7 @@ public interface IntegrationConnectorRepository extends JpaRepository<Integratio
 
     List<IntegrationConnector> findAllByOrderByTypeAscSourceSystemAsc();
 
+    @EntityGraph(attributePaths = "tenant", type = EntityGraph.EntityGraphType.LOAD)
     List<IntegrationConnector> findAllByTenant_CodeIgnoreCaseOrderByTypeAscSourceSystemAsc(String tenantCode);
 
     List<IntegrationConnector> findAllByTenant_CodeIgnoreCaseAndSourceSystemIgnoreCaseOrderByTypeAscSourceSystemAsc(String tenantCode,

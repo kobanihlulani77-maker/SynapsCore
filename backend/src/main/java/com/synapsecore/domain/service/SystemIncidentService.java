@@ -25,7 +25,6 @@ import java.util.Optional;
 import java.util.stream.Stream;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
 
 @Service
 @RequiredArgsConstructor
@@ -42,7 +41,7 @@ public class SystemIncidentService {
     private final TenantContextService tenantContextService;
     private final AccessDirectoryService accessDirectoryService;
 
-    @Transactional(readOnly = true)
+    // Scenario notification reads can escalate overdue plans in their own write transaction.
     public List<SystemIncidentResponse> getActiveIncidents() {
         return Stream.of(
                 auditLogService.getRecentAuditLogs().stream()

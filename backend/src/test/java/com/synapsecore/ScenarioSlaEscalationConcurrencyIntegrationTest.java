@@ -4,9 +4,11 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.synapsecore.access.AccessDirectoryService;
+import com.synapsecore.access.TenantWorkspaceAdministrationService;
 import com.synapsecore.access.SynapseAccessRole;
 import com.synapsecore.access.dto.AccessOperatorResponse;
 import com.synapsecore.audit.RequestTraceContext;
+import com.synapsecore.audit.AuditLogService;
 import com.synapsecore.config.SynapseStarterProperties;
 import com.synapsecore.domain.entity.BusinessEventType;
 import com.synapsecore.domain.entity.ScenarioApprovalPolicy;
@@ -19,15 +21,34 @@ import com.synapsecore.domain.entity.TenantOperationalPolicy;
 import com.synapsecore.domain.repository.BusinessEventRepository;
 import com.synapsecore.domain.repository.ScenarioRunRepository;
 import com.synapsecore.domain.repository.TenantRepository;
+import com.synapsecore.domain.repository.IntegrationInboundRecordRepository;
+import com.synapsecore.domain.repository.OperationalDispatchWorkItemRepository;
+import com.synapsecore.domain.repository.AccessOperatorRepository;
+import com.synapsecore.domain.repository.AccessUserRepository;
+import com.synapsecore.domain.repository.AuditLogRepository;
+import com.synapsecore.domain.repository.WarehouseRepository;
+import com.synapsecore.domain.repository.IntegrationConnectorRepository;
+import com.synapsecore.domain.repository.IntegrationReplayRecordRepository;
+import com.synapsecore.domain.repository.CustomerOrderRepository;
+import com.synapsecore.domain.repository.FulfillmentTaskRepository;
+import com.synapsecore.domain.repository.InventoryRepository;
 import com.synapsecore.domain.service.CoreIdentityWriteIsolationService;
 import com.synapsecore.domain.service.IdentitySequenceMigrationService;
 import com.synapsecore.domain.service.TenantOperationalPolicyService;
+import com.synapsecore.domain.service.SystemIncidentService;
+import com.synapsecore.domain.dto.AuditLogResponse;
+import com.synapsecore.domain.dto.SystemIncidentResponse;
+import com.synapsecore.integration.IntegrationConnectorService;
+import com.synapsecore.integration.IntegrationReplayService;
+import com.synapsecore.integration.dto.IntegrationConnectorResponse;
+import com.synapsecore.integration.dto.IntegrationReplayRecordResponse;
 import com.synapsecore.event.BusinessEventService;
 import com.synapsecore.scenario.ScenarioHistoryService;
 import com.synapsecore.scenario.ScenarioSlaEscalationService;
 import com.synapsecore.tenant.TenantContextService;
 import java.time.Instant;
 import java.util.List;
+import java.util.Optional;
 import java.util.UUID;
 import java.util.concurrent.CyclicBarrier;
 import java.util.concurrent.Executors;
@@ -35,10 +56,13 @@ import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.orm.jpa.DataJpaTest;
 import org.springframework.context.annotation.Import;
 import org.springframework.context.ApplicationEventPublisher;
+import org.springframework.context.ApplicationContext;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.transaction.PlatformTransactionManager;
@@ -61,10 +85,14 @@ class ScenarioSlaEscalationConcurrencyIntegrationTest {
     @Autowired private ApplicationEventPublisher publisher;
     @Autowired private PlatformTransactionManager transactions;
     @Autowired private JdbcTemplate jdbc;
+    @Autowired private IntegrationInboundRecordRepository inbound;
+    @Autowired private OperationalDispatchWorkItemRepository dispatch;
+    @Autowired private ApplicationContext application;
     private ScenarioSlaEscalationService sla;
     private TenantContextService context;
     private Tenant tenant;
     private CyclicBarrier overlap;
+    private AccessDirectoryService directory;
 
     @BeforeEach
     void prepareTenant() {
@@ -72,8 +100,12 @@ class ScenarioSlaEscalationConcurrencyIntegrationTest {
             .name("SLA concurrency proof").active(true).build());
         context = new TenantContextService(null, null, null, null, null) {
             @Override public String getCurrentTenantCodeOrDefault() { return tenant.getCode(); }
+            @Override public Tenant getCurrentTenantOrDefault() { return tenant; }
         };
-        AccessDirectoryService directory = new AccessDirectoryService(null, null, null, null, null) {
+        directory = new AccessDirectoryService(null, null, null, null, null) {
+            @Override public Optional<com.synapsecore.domain.entity.AccessOperator> getCurrentOperator() {
+                return Optional.empty();
+            }
             @Override public List<AccessOperatorResponse> getActiveOperators(String tenantCode) {
                 return List.of(operator("final.original", SynapseAccessRole.FINAL_APPROVER),
                     operator("final.alternate", SynapseAccessRole.FINAL_APPROVER),
@@ -99,6 +131,81 @@ class ScenarioSlaEscalationConcurrencyIntegrationTest {
         sla = proxied(businessEvents);
         history = new ScenarioHistoryService(runs, new ObjectMapper().findAndRegisterModules(), null, null,
             businessEvents, null, directory, context, policies, new SynapseStarterProperties(), sla);
+    }
+
+    @ParameterizedTest
+    @ValueSource(booleans = {false, true})
+    void incidentAggregationPersistsTheSlaMarkerAlongsideItsEvent(boolean viaWorkspace) {
+        ScenarioRun plan = overduePlan();
+        List<Long> operationalBefore = operationalCounts();
+
+        List<SystemIncidentResponse> incidents = readIncidents(viaWorkspace);
+
+        assertThat(escalationCount(plan)).isEqualTo(1);
+        assertThat(runs.findById(plan.getId()).orElseThrow().getSlaEscalatedAt())
+            .as("The incident reader must not persist the event without the SLA marker")
+            .isNotNull();
+        assertThat(incidents).isNotEmpty();
+        assertThat(operationalCounts()).isEqualTo(operationalBefore);
+    }
+
+    @ParameterizedTest
+    @ValueSource(booleans = {false, true})
+    void incidentReadFollowedByNotificationReadDoesNotEscalateAgain(boolean viaWorkspace) {
+        ScenarioRun plan = overduePlan();
+
+        readIncidents(viaWorkspace);
+        history.getScenarioNotifications();
+        history.getScenarioRun(plan.getId());
+
+        assertThat(escalationCount(plan)).isEqualTo(1);
+    }
+
+    private List<SystemIncidentResponse> readIncidents(boolean viaWorkspace) {
+        if (!viaWorkspace) {
+            return incidentReader().getActiveIncidents();
+        }
+        TenantWorkspaceAdministrationService workspace = new TenantWorkspaceAdministrationService(
+            context, directory, application.getBean(AccessOperatorRepository.class),
+            application.getBean(AccessUserRepository.class), application.getBean(AuditLogRepository.class),
+            application.getBean(WarehouseRepository.class), application.getBean(IntegrationConnectorRepository.class),
+            application.getBean(IntegrationReplayRecordRepository.class), runs,
+            application.getBean(CustomerOrderRepository.class), application.getBean(FulfillmentTaskRepository.class),
+            application.getBean(InventoryRepository.class), incidentReader(), null, emptyConnectors());
+        TransactionInterceptor interceptor = new TransactionInterceptor();
+        interceptor.setTransactionManager(transactions);
+        interceptor.setTransactionAttributeSource(new AnnotationTransactionAttributeSource());
+        ProxyFactory proxy = new ProxyFactory(workspace);
+        proxy.setProxyTargetClass(true);
+        proxy.addAdvice(interceptor);
+        return ((TenantWorkspaceAdministrationService) proxy.getProxy()).getWorkspace().supportIncidents();
+    }
+
+    private SystemIncidentService incidentReader() {
+        AuditLogService audit = new AuditLogService(null, null, null, null, null, null) {
+            @Override public List<AuditLogResponse> getRecentAuditLogs() { return List.of(); }
+        };
+        IntegrationConnectorService connectors = emptyConnectors();
+        IntegrationReplayService replay = new IntegrationReplayService(
+            null, null, null, null, null, null, null, null, null, null, null, null, null, null) {
+            @Override public List<IntegrationReplayRecordResponse> getReplayQueue() { return List.of(); }
+        };
+        SystemIncidentService target = new SystemIncidentService(audit, connectors, replay,
+            inbound, history, dispatch, context, directory);
+        TransactionInterceptor interceptor = new TransactionInterceptor();
+        interceptor.setTransactionManager(transactions);
+        interceptor.setTransactionAttributeSource(new AnnotationTransactionAttributeSource());
+        ProxyFactory proxy = new ProxyFactory(target);
+        proxy.setProxyTargetClass(true);
+        proxy.addAdvice(interceptor);
+        return (SystemIncidentService) proxy.getProxy();
+    }
+
+    private IntegrationConnectorService emptyConnectors() {
+        return new IntegrationConnectorService(
+            null, null, null, null, null, null, null, null, null, null, null, null) {
+            @Override public List<IntegrationConnectorResponse> getConnectors() { return List.of(); }
+        };
     }
 
     @Test

@@ -290,6 +290,17 @@ This is a measurement correction, not a proven cause of the slow login, whose
 path skips those early session lookups. The next prepared local holder family
 is the product/import outer-transaction path and its independent identity repair.
 
+CI for tracing commit `62eeb41914e0b936e525432962ab02714d6adbd5` then failed
+the original SLA count assertion (2 events instead of 1). The controlled
+three-reader test still passed, but direct tests of Runtime incident and
+workspace support composition reproduced a separate ambient read-only
+transaction defect. Verification of the caller-boundary correction is tracked in
+[SLA read-only caller evidence](evidence/timeout-recovery-sla-readonly-callers.md).
+It removes the two read-only wrappers and explicitly fetches connector tenants
+for detached workspace read composition. All 66 focused tests and 342 full
+backend tests pass, and packaging succeeds (2026-09-08). CI and served-revision
+verification remain separate gates before claiming hosted closure.
+
 This is partial progress through the holder analysis and correction phases,
 not closure of all timeout mechanisms. The next hosted action remains
 **Phase 1 - Establish a Warm Baseline**, after the exact deployed revision is

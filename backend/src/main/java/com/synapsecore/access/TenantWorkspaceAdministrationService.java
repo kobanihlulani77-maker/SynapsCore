@@ -77,7 +77,7 @@ public class TenantWorkspaceAdministrationService {
     private final AuditLogService auditLogService;
     private final IntegrationConnectorService integrationConnectorService;
 
-    @Transactional(readOnly = true)
+    // Support incidents may perform SLA transitions; do not wrap composition in a read-only transaction.
     public TenantWorkspaceResponse getWorkspace() {
         Tenant tenant = tenantContextService.getCurrentTenantOrDefault();
         String tenantCode = tenant.getCode();
