@@ -100,8 +100,13 @@ worktree changes and starting HEAD.
   Log: `backend/target/sla-readonly-callers-package.log`.
 - Docs link check: CLEAN, 792 local links, none missing.
 - `git diff --check`: exit 0. Unrelated local changes were preserved.
-- CI for this correction is pending at the pre-push checkpoint. No hosted
-  verification is claimed.
+- Correction committed and pushed as `0d9711bd253fbc8d85300b117754b3d7cf7d07d9`.
+- [CI run 34228050405](https://github.com/kobanihlulani77-maker/SynapsCore/actions/runs/34228050405),
+  job `102066944190`: SUCCESS. All **342 backend tests passed**, zero
+  failures/errors/skips; backend completed `2026-09-08T12:51:08Z` in 3m51s.
+  Frontend installation/build and development/production Compose validation
+  also passed. This verifies the correction commit, not a served Render revision.
+- No hosted verification is claimed.
 
 ## Limits and Next Gate
 

@@ -299,7 +299,12 @@ transaction defect. Verification of the caller-boundary correction is tracked in
 It removes the two read-only wrappers and explicitly fetches connector tenants
 for detached workspace read composition. All 66 focused tests and 342 full
 backend tests pass, and packaging succeeds (2026-09-08). CI and served-revision
-verification remain separate gates before claiming hosted closure.
+verification remain separate gates before claiming hosted closure. Correction
+`0d9711bd253fbc8d85300b117754b3d7cf7d07d9` subsequently passed CI run
+`34228050405`: all 342 backend tests, frontend build, and both Compose checks.
+The local/CI regression gate is complete. Product/import connection demand is
+the next prepared local holder investigation; hosted served-revision and warm
+baseline verification are still unconfirmed.
 
 This is partial progress through the holder analysis and correction phases,
 not closure of all timeout mechanisms. The next hosted action remains
