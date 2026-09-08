@@ -311,3 +311,16 @@ not closure of all timeout mechanisms. The next hosted action remains
 **Phase 1 - Establish a Warm Baseline**, after the exact deployed revision is
 confirmed. Broad hosted E2E is still gated by the failure classification and
 the bounded correction's verification.
+
+## Product/Import Holder Checkpoint - 2026-09-08
+
+The next HTTP holder reproduction identified both product entrypoints borrowing
+an outer catalog connection before independent sequence preflight. Ten aligned
+requests reproduced ten retained connections and ten waiters. Preflight now
+finishes before the top-level catalog transaction begins. All 49 focused tests
+and 348 full backend tests pass. Details, explicit outer-caller limitations,
+and hosted gates are in
+[Product preflight evidence](evidence/timeout-recovery-product-preflight-connection-demand.md).
+This removes a proven local double-borrow deadlock, not all hosted latency or
+all transient queueing. The product watchdog's scheduler selection is the next
+bounded diagnostics check; no further scheduler behavior change is included.

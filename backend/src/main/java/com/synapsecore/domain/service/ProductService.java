@@ -37,6 +37,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.transaction.support.TransactionSynchronization;
 import org.springframework.transaction.support.TransactionSynchronizationManager;
+import org.springframework.transaction.support.TransactionTemplate;
 import org.springframework.web.multipart.MultipartFile;
 import org.springframework.web.server.ResponseStatusException;
 
@@ -57,6 +58,7 @@ public class ProductService {
     private final OperationalMetricsService operationalMetricsService;
     private final RequestTraceContext requestTraceContext;
     private final ProductWriteContentionDiagnostics productWriteContentionDiagnostics;
+    private final TransactionTemplate transactionTemplate;
 
     @Transactional(readOnly = true)
     public List<ProductResponse> getProducts() {
@@ -68,16 +70,21 @@ public class ProductService {
             .toList();
     }
 
-    @Transactional
     public ProductResponse createProduct(ProductUpsertRequest request, String actorName) {
         long startedAtNanos = System.nanoTime();
         String traceTenantCode = requestTraceContext.getCurrentTenantOrDefault();
         logProductWriteStage("PRODUCT_CREATE_ENTER", startedAtNanos, traceTenantCode);
-        registerProductTransactionDiagnostics(startedAtNanos, traceTenantCode);
-
         logProductWriteStage("SEQUENCE_SYNC_START", startedAtNanos, traceTenantCode);
         identitySequenceMigrationService.synchronizeCoreIdentitySequences();
         logProductWriteStage("SEQUENCE_SYNC_COMPLETE", startedAtNanos, traceTenantCode);
+        // Finish independent sequence preflight before borrowing the catalog connection.
+        return transactionTemplate.execute(status -> createProductInTransaction(
+            request, actorName, startedAtNanos, traceTenantCode));
+    }
+
+    private ProductResponse createProductInTransaction(ProductUpsertRequest request, String actorName,
+                                                        long startedAtNanos, String traceTenantCode) {
+        registerProductTransactionDiagnostics(startedAtNanos, traceTenantCode);
         Tenant tenant = tenantContextService.getCurrentTenantOrDefault();
         logProductWriteStage("AUTHORITY_TENANT_RESOLUTION_COMPLETE", startedAtNanos, tenant.getCode());
         String catalogSku = normalizeCatalogSku(request.sku());
@@ -189,13 +196,16 @@ public class ProductService {
         }
     }
 
-    @Transactional
     public ProductImportResponse importProducts(MultipartFile file, String actorName) {
         if (file == null || file.isEmpty()) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "A non-empty product CSV file is required.");
         }
 
         identitySequenceMigrationService.synchronizeCoreIdentitySequences();
+        return transactionTemplate.execute(status -> importProductsInTransaction(file, actorName));
+    }
+
+    private ProductImportResponse importProductsInTransaction(MultipartFile file, String actorName) {
         Tenant tenant = tenantContextService.getCurrentTenantOrDefault();
         List<ProductImportRowResult> rowResults = new ArrayList<>();
         Set<String> seenSkus = new HashSet<>();
