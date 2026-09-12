@@ -5367,6 +5367,37 @@ class MvpFlowIntegrationTest {
     }
 
     @Test
+    void systemRuntimeReadDoesNotDrainDeferredOperationalWork() throws Exception {
+        Tenant runtimeTenant = tenantRepository.save(Tenant.builder()
+            .code("RUNTIME-READ-BOUNDARY")
+            .name("Runtime Read Boundary Tenant")
+            .description("Tenant used to prove Runtime reads do not execute deferred fan-out work.")
+            .active(true)
+            .build());
+        OperationalDispatchWorkItem pending = operationalDispatchWorkItemRepository.save(
+            OperationalDispatchWorkItem.builder()
+                .tenantCode(runtimeTenant.getCode())
+                .updateType(OperationalUpdateType.ORDER_FLOW)
+                .source("runtime-read-boundary")
+                .requestId("runtime-read-boundary-request")
+                .status(OperationalDispatchStatus.PENDING)
+                .attemptCount(0)
+                .occurredAt(Instant.now())
+                .build()
+        );
+        entityManager.flush();
+
+        mockMvc.perform(get("/api/system/runtime")
+                .header("X-Synapse-Tenant", runtimeTenant.getCode()))
+            .andExpect(status().isOk());
+
+        entityManager.flush();
+        entityManager.clear();
+        assertThat(operationalDispatchWorkItemRepository.findById(pending.getId()).orElseThrow().getStatus())
+            .isEqualTo(OperationalDispatchStatus.PENDING);
+    }
+
+    @Test
     void systemRuntimeEndpointIncludesOperationalTelemetrySignals() throws Exception {
         String csvBody = """
             externalOrderId,warehouseCode,productSku,quantity,unitPrice

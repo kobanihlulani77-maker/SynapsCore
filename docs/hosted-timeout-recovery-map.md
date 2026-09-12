@@ -367,3 +367,14 @@ See [Runtime inline dispatch context evidence](evidence/timeout-recovery-runtime
 This is a trace-ownership correction, not a Hikari starvation fix. The separate
 read-side question of whether Runtime should synchronously drain deferred global
 work remains open until its direct side-effect/latency proof is complete.
+
+## Runtime Read Dispatch Boundary Checkpoint - 2026-09-12
+
+With test scheduling disabled, a single Runtime GET changed a persisted dispatch
+item from `PENDING` to `COMPLETED`. Runtime was therefore executing deferred
+global fan-out, repository calls, and bounded sleeps before returning an
+observability response. The two Runtime entrypoints no longer invoke that
+drainer; after-commit and scheduled dispatch ownership are unchanged. See
+[Runtime read dispatch evidence](evidence/timeout-recovery-runtime-read-dispatch-boundary.md).
+This removes one proven HTTP-thread workload mechanism. It does not establish
+continuous JDBC hold time or identify all historical Hikari holders.

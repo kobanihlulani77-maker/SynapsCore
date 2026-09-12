@@ -128,8 +128,6 @@ public class SystemRuntimeService {
         }
         LivenessState livenessState = applicationAvailability.getLivenessState();
         ReadinessState readinessState = applicationAvailability.getReadinessState();
-        String tenantCode = tenantContextService.getCurrentTenantCodeOrDefault();
-        drainOperationalDispatchQueue(tenantCode);
 
         return new SystemRuntimeResponse(
             applicationName,
@@ -164,8 +162,6 @@ public class SystemRuntimeService {
     public TenantRuntimeResponse getTenantRuntimeStatus() {
         LivenessState livenessState = applicationAvailability.getLivenessState();
         ReadinessState readinessState = applicationAvailability.getReadinessState();
-        String tenantCode = tenantContextService.getCurrentTenantCodeOrDefault();
-        drainOperationalDispatchQueue(tenantCode);
         SystemBackboneSummary backbone = buildBackboneSummary();
 
         return new TenantRuntimeResponse(
@@ -352,26 +348,6 @@ public class SystemRuntimeService {
 
     private SystemMetricsSummary buildMetricsSummary() {
         return operationalMetricsService.snapshotForTenant(tenantContextService.getCurrentTenantCodeOrDefault());
-    }
-
-    private void drainOperationalDispatchQueue(String tenantCode) {
-        int drainRetries = 5;
-        for (int i = 0; i < drainRetries; i++) {
-            try {
-                operationalDispatchQueueService.processPendingWork();
-                long pending = operationalDispatchWorkItemRepository.countByTenantCodeIgnoreCaseAndStatusIn(
-                    tenantCode,
-                    List.of(OperationalDispatchStatus.PENDING, OperationalDispatchStatus.PROCESSING)
-                );
-                if (pending == 0) {
-                    return;
-                }
-                Thread.sleep(100);
-            } catch (InterruptedException e) {
-                Thread.currentThread().interrupt();
-                return;
-            }
-        }
     }
 
     private SystemDiagnosticsSummary buildDiagnosticsSummary() {
