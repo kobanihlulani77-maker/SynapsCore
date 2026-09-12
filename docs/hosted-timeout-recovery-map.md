@@ -404,3 +404,19 @@ succeeds. This removes unrelated cross-warehouse hydration from the connection
 hold window; it does not identify all historical holders or prove hosted pool
 headroom. The next bounded phase is concurrent Order/Fulfillment transaction-
 demand proof before any broad hosted E2E.
+
+## Order Connection Demand Checkpoint - 2026-09-12
+
+Ten distinct real Order requests were aligned after product resolution while
+their required Order transactions held all ten Hikari connections. Across three
+repetitions, all 30 requests returned 201, committed the required Inventory,
+Order, and Fulfillment state, and fully released the pool. Waiter samples stayed
+bounded at zero or one in both the focused and full-suite executions; no waiter
+prevented progress, and all were gone after release. See
+[Order connection demand evidence](evidence/timeout-recovery-order-connection-demand.md).
+
+The normal distinct Order path is therefore ruled down locally as a circular
+same-request double-borrow mechanism. This is not hosted PostgreSQL capacity
+proof and does not identify the historical ten holders. The next bounded holder
+phase is Replay/Order overlap, specifically the per-record Replay attempt and
+post-rollback failure-recording boundaries.
