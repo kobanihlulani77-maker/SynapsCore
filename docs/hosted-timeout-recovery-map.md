@@ -378,3 +378,13 @@ drainer; after-commit and scheduled dispatch ownership are unchanged. See
 [Runtime read dispatch evidence](evidence/timeout-recovery-runtime-read-dispatch-boundary.md).
 This removes one proven HTTP-thread workload mechanism. It does not establish
 continuous JDBC hold time or identify all historical Hikari holders.
+
+## Background Holder Budget Checkpoint - 2026-09-12
+
+Default one-instance executor wiring and direct focused tests bound meaningful
+background concurrency to one main scheduled job, one recommendation job, and
+one active dispatch drain. Fifteen focused tests pass. See
+[Background holder budget evidence](evidence/timeout-recovery-background-holder-budget.md).
+Background executors alone are ruled down as the source of ten simultaneous
+long-running holders on one default instance. Overlap with HTTP work, multiple
+instances, and per-operation nested connection demand remain separate questions.
