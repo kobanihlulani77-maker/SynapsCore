@@ -449,3 +449,20 @@ Scheduled-pull external latency is ruled down locally as a JDBC-retention holder
 The four prepared holder families now have bounded evidence. The next phase is
 consolidation and CI/deployed-revision/warm-baseline gating, not a speculative
 transaction, timeout, pool-size, or infrastructure change.
+
+## Scheduler Owner Telemetry Checkpoint - 2026-09-12
+
+The exact `60e4646` hosted revision produced a slow authenticated baseline while
+the shared main scheduler emitted repeated follow-on-locking warnings. Existing
+logs exposed only `SynapseScheduled-1`, so they could not distinguish automated
+Replay from scheduled pull ownership across all active tenants. Stable task
+identity, duration, outcome, and Hikari boundary counters are now emitted for
+automated Replay, scheduled pull, and non-empty operational dispatch runs. See
+[Scheduler owner telemetry evidence](evidence/timeout-recovery-scheduler-owner-telemetry.md).
+
+Ten focused tests and all 367 backend tests pass, and backend packaging succeeds.
+The telemetry reads the Hikari MXBean without borrowing a connection and changes
+no schedule, concurrency, transaction, timeout, pool, or infrastructure setting.
+The observability gap is closed locally; the historical timeout owner remains
+open until CI passes, the exact revision is live, and one measured warm baseline
+is correlated with the new records. Broad hosted E2E remains blocked until then.

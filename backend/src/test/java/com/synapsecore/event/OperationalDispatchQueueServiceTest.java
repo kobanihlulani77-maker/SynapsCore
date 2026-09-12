@@ -14,6 +14,7 @@ import com.synapsecore.domain.repository.OperationalDispatchWorkItemRepository;
 import com.synapsecore.domain.service.CoreIdentityWriteIsolationService;
 import com.synapsecore.domain.service.DashboardService;
 import com.synapsecore.observability.OperationalMetricsService;
+import com.synapsecore.observability.ScheduledTaskExecutionDiagnostics;
 import com.synapsecore.realtime.RealtimeService;
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import java.lang.reflect.Method;
@@ -44,7 +45,8 @@ class OperationalDispatchQueueServiceTest {
             new StaticObjectProvider<>(realtimeService),
             new RequestTraceContext(),
             noOpMetricsService(),
-            null
+            null,
+            new ScheduledTaskExecutionDiagnostics(null)
         );
 
         int processedCount = service.processPendingWork();
@@ -76,7 +78,8 @@ class OperationalDispatchQueueServiceTest {
             new StaticObjectProvider<>(new RecordingRealtimeService()),
             traceContext,
             noOpMetricsService(),
-            null
+            null,
+            new ScheduledTaskExecutionDiagnostics(null)
         );
 
         try {

@@ -1,5 +1,6 @@
 package com.synapsecore.integration;
 
+import com.synapsecore.observability.ScheduledTaskExecutionDiagnostics;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
@@ -12,6 +13,7 @@ import org.springframework.stereotype.Service;
 public class IntegrationReplayAutomationService {
 
     private final IntegrationReplayService integrationReplayService;
+    private final ScheduledTaskExecutionDiagnostics scheduledTaskExecutionDiagnostics;
 
     @Value("${synapsecore.integration.replay.automation.enabled:true}")
     private boolean automationEnabled;
@@ -25,7 +27,10 @@ public class IntegrationReplayAutomationService {
             return;
         }
 
-        int processed = integrationReplayService.processAutomatedReplayBatch(automationBatchSize);
+        int processed = scheduledTaskExecutionDiagnostics.observe(
+            "integration-replay-automation",
+            () -> integrationReplayService.processAutomatedReplayBatch(automationBatchSize)
+        );
         if (processed > 0) {
             log.info("Processed {} automated integration replay attempt(s).", processed);
         }

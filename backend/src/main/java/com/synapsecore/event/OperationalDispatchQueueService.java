@@ -7,6 +7,7 @@ import com.synapsecore.domain.repository.OperationalDispatchWorkItemRepository;
 import com.synapsecore.domain.service.DashboardService;
 import com.synapsecore.domain.service.CoreIdentityWriteIsolationService;
 import com.synapsecore.observability.OperationalMetricsService;
+import com.synapsecore.observability.ScheduledTaskExecutionDiagnostics;
 import com.synapsecore.realtime.RealtimeService;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
@@ -41,6 +42,7 @@ public class OperationalDispatchQueueService {
     private final RequestTraceContext requestTraceContext;
     private final OperationalMetricsService operationalMetricsService;
     private final CoreIdentityWriteIsolationService coreIdentityWriteIsolationService;
+    private final ScheduledTaskExecutionDiagnostics scheduledTaskExecutionDiagnostics;
 
     private final AtomicBoolean draining = new AtomicBoolean(false);
 
@@ -79,17 +81,26 @@ public class OperationalDispatchQueueService {
                 List.of(OperationalDispatchStatus.PENDING),
                 PageRequest.of(0, Math.max(batchSize, 1))
             );
-            List<DispatchBatch> dispatchBatches = collapseIntoDispatchBatches(pendingItems);
-            for (DispatchBatch dispatchBatch : dispatchBatches) {
-                processedCount += processDispatchBatch(dispatchBatch);
+            if (pendingItems.isEmpty()) {
+                return 0;
             }
-            if (!pendingItems.isEmpty()) {
-                log.debug("Operational dispatch queue collapsed {} pending item(s) into {} broadcast batch(es).",
-                    pendingItems.size(), dispatchBatches.size());
-            }
+            return scheduledTaskExecutionDiagnostics.observe(
+                "operational-dispatch",
+                () -> processPendingItems(pendingItems)
+            );
         } finally {
             draining.set(false);
         }
+    }
+
+    private int processPendingItems(List<OperationalDispatchWorkItem> pendingItems) {
+        int processedCount = 0;
+        List<DispatchBatch> dispatchBatches = collapseIntoDispatchBatches(pendingItems);
+        for (DispatchBatch dispatchBatch : dispatchBatches) {
+            processedCount += processDispatchBatch(dispatchBatch);
+        }
+        log.debug("Operational dispatch queue collapsed {} pending item(s) into {} broadcast batch(es).",
+            pendingItems.size(), dispatchBatches.size());
         return processedCount;
     }
 

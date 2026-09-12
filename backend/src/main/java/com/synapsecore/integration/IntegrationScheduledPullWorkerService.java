@@ -8,6 +8,7 @@ import com.synapsecore.domain.entity.IntegrationConnectorType;
 import com.synapsecore.domain.entity.IntegrationSyncMode;
 import com.synapsecore.domain.repository.IntegrationConnectorRepository;
 import com.synapsecore.integration.dto.ExternalOrderWebhookRequest;
+import com.synapsecore.observability.ScheduledTaskExecutionDiagnostics;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
@@ -40,6 +41,7 @@ public class IntegrationScheduledPullWorkerService {
     private final IntegrationImportRunService integrationImportRunService;
     private final ObjectMapper objectMapper;
     private final RequestTraceContext requestTraceContext;
+    private final ScheduledTaskExecutionDiagnostics scheduledTaskExecutionDiagnostics;
     private final HttpClient httpClient = HttpClient.newBuilder()
         .connectTimeout(Duration.ofSeconds(10))
         .followRedirects(HttpClient.Redirect.NEVER)
@@ -62,7 +64,10 @@ public class IntegrationScheduledPullWorkerService {
         if (!workerEnabled) {
             return;
         }
-        int processed = processDuePulls(Math.max(workerBatchSize, 1));
+        int processed = scheduledTaskExecutionDiagnostics.observe(
+            "integration-scheduled-pull",
+            () -> processDuePulls(Math.max(workerBatchSize, 1))
+        );
         if (processed > 0) {
             log.info("Processed {} scheduled integration pull connector(s).", processed);
         }
