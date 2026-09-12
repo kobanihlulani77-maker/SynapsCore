@@ -420,3 +420,18 @@ same-request double-borrow mechanism. This is not hosted PostgreSQL capacity
 proof and does not identify the historical ten holders. The next bounded holder
 phase is Replay/Order overlap, specifically the per-record Replay attempt and
 post-rollback failure-recording boundaries.
+
+## Replay/Order Connection Demand Checkpoint - 2026-09-12
+
+One failed automated Replay attempt and nine independent HTTP Orders were
+aligned while their transactions occupied all ten Hikari connections. Across
+three repetitions, all 27 HTTP Orders completed, the Replay attempt rolled back
+without operational side effects, and its durable failure transaction began
+only after the initial transaction completed. Waiter samples stayed bounded at
+zero or one, and the pool fully released. See
+[Replay/Order connection demand evidence](evidence/timeout-recovery-replay-order-connection-demand.md).
+
+Replay/Order overlap is ruled down locally as a nested same-thread connection-
+borrow mechanism. The next bounded holder family is scheduled pull, separating
+external response/body delay from JDBC-backed ingestion and measuring its
+overlap with HTTP demand.
