@@ -129,11 +129,40 @@ Local correction verification:
 - documentation link check: 808 links, none missing;
 - `git diff --check`: clean, with line-ending notices only.
 
-CI, exact deployed-revision confirmation, and one bounded post-deploy baseline
-remain required. The live proof must show the 96 task attempts collapse to the
-actual active-warehouse count and must compare reconciliation and authenticated
-request duration without broad E2E traffic.
+Commit `1811332e0ccd1b34b21b6b01ff00183ea620b7be` passed CI run 396 in
+4m33s and Render deployed that exact revision in 4m37s. A bounded authenticated
+baseline ran from `2026-09-12T16:35:04.8121709Z` through
+`2026-09-12T16:36:20.7409387Z`, with no broad E2E traffic:
+
+- readiness: 1,343 ms;
+- liveness: 399 ms;
+- unauthenticated session: 617 ms;
+- login: 3,457 ms;
+- authenticated session: 1,294 ms;
+- Dashboard summary: 2,480 ms;
+- Dashboard snapshot: 39,526 ms;
+- Runtime: 23,483 ms;
+- SockJS info: 1,224 ms;
+- audit read: 1,250 ms;
+- logout: 772 ms.
+
+Tenant audit correlated the immediately preceding reconciliation run
+`aaf5fc6f-5634-4b28-bc08-f1bf144624b7`. It completed in 83,203 ms with
+155 successful Inventory work units and exactly one successful Fulfillment
+warehouse work unit. This proves the prior 96 repeated task evaluations
+collapsed to the active-warehouse count while preserving successful completion.
+
+Render logs contained no Hikari acquisition timeout for the deployed revision.
+Immediately after the baseline, scheduled dispatch, replay, and pull telemetry
+showed zero waiters and eight to ten idle connections, with dispatch work
+completing in 2-94 ms. The observed request latency is therefore not a reproduced
+10/10 pool-starvation event. Historical Hikari starvation remains proven, but
+this fulfillment amplification seam is closed.
+
+The remaining latency signal is the 155-item Inventory reconciliation path. It
+must be diagnosed as the next bounded work family rather than inferred from a
+numbered browser test.
 
 `RECOMMENDATION_SCHEDULER_ROUTING = VERIFIED LIVE`
 
-`RECOMMENDATION_FULFILLMENT_WAREHOUSE_AMPLIFICATION = CORRECTED LOCALLY`
+`RECOMMENDATION_FULFILLMENT_WAREHOUSE_AMPLIFICATION = VERIFIED LIVE`

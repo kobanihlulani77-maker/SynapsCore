@@ -549,3 +549,24 @@ This is the next smallest proven latency correction. Historical Hikari
 starvation remains a separate open classification until exact live evidence
 closes it; no pool, timeout, scheduler-frequency, or infrastructure setting is
 changed.
+
+## Recommendation Warehouse Amplification Closure - 2026-09-12
+
+Commit `1811332e0ccd1b34b21b6b01ff00183ea620b7be` passed CI run 396 and
+was confirmed live on Render. The first bounded hosted run completed in 83,203
+ms with 155 successful Inventory evaluations and one successful Fulfillment
+warehouse evaluation. The previous deployed run had performed 96 Fulfillment
+task evaluations and took 221,399 ms. The intended warehouse-level reduction is
+therefore proven in production.
+
+The accompanying authenticated baseline still measured 39,526 ms for Dashboard
+snapshot and 23,483 ms for Runtime. There was no Hikari timeout, and adjacent
+scheduler telemetry retained eight to ten idle connections with zero waiters.
+This closes the Fulfillment amplification mechanism without claiming that all
+hosted latency is resolved.
+
+The next bounded target is Inventory reconciliation work. Its 155 distinct
+records now dominate the recommendation pass and overlap the remaining slow
+authenticated reads. Diagnose its query, transaction, and no-op persistence
+behavior before changing code; do not widen the pool, raise timeouts, or run
+broad E2E as a substitute for that mapping.
