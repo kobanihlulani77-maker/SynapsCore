@@ -6,14 +6,21 @@ import com.synapsecore.audit.RequestTraceContext;
 import com.synapsecore.decision.RecommendationReconciliationEvidenceService;
 import com.synapsecore.decision.RecommendationReconciliationService;
 import com.synapsecore.domain.entity.AuditLog;
+import com.synapsecore.domain.entity.CustomerOrder;
+import com.synapsecore.domain.entity.FulfillmentStatus;
+import com.synapsecore.domain.entity.FulfillmentTask;
+import com.synapsecore.domain.entity.OrderStatus;
 import com.synapsecore.domain.entity.Product;
 import com.synapsecore.domain.entity.Tenant;
 import com.synapsecore.domain.entity.Warehouse;
 import com.synapsecore.domain.repository.AuditLogRepository;
+import com.synapsecore.domain.repository.CustomerOrderRepository;
+import com.synapsecore.domain.repository.FulfillmentTaskRepository;
 import com.synapsecore.domain.repository.InventoryRepository;
 import com.synapsecore.domain.repository.ProductRepository;
 import com.synapsecore.domain.repository.TenantRepository;
 import com.synapsecore.domain.repository.WarehouseRepository;
+import java.math.BigDecimal;
 import java.util.List;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
@@ -45,6 +52,12 @@ class RecommendationReconciliationObservabilityIntegrationTest {
 
     @Autowired
     private ProductRepository productRepository;
+
+    @Autowired
+    private CustomerOrderRepository customerOrderRepository;
+
+    @Autowired
+    private FulfillmentTaskRepository fulfillmentTaskRepository;
 
     @Test
     void enabledScheduledInvocationCreatesExactlyOneStartAndCompletionPair() {
@@ -135,6 +148,30 @@ class RecommendationReconciliationObservabilityIntegrationTest {
             .isInstanceOf(RequestTraceContext.class);
     }
 
+    @Test
+    void scheduledReconciliationCountsOneFulfillmentWorkUnitPerWarehouse() {
+        String tenantCode = "RECON-OBS-H-" + UUID.randomUUID();
+        Tenant tenant = tenantRepository.save(Tenant.builder()
+            .code(tenantCode)
+            .name("Reconciliation warehouse work")
+            .build());
+        Warehouse warehouse = warehouseRepository.save(Warehouse.builder()
+            .tenant(tenant)
+            .code("WH-OBS")
+            .name("Observability warehouse")
+            .location("Test")
+            .build());
+        fulfillmentTask(tenant, warehouse, "ORDER-NEWEST");
+        fulfillmentTask(tenant, warehouse, "ORDER-OLDEST");
+
+        reconciliationService.reconcileOnSchedule();
+
+        AuditLog completed = findAction(evidenceFor(tenantCode), "RECOMMENDATION_RECONCILIATION_COMPLETED");
+        assertThat(completed.getDetails()).contains(
+            "fulfillment=attempted:1,succeeded:1,failed:0"
+        );
+    }
+
     private AuditLog findAction(List<AuditLog> evidence, String action) {
         return evidence.stream().filter(log -> action.equals(log.getAction())).findFirst().orElseThrow();
     }
@@ -167,6 +204,24 @@ class RecommendationReconciliationObservabilityIntegrationTest {
             .quantityReserved(0L)
             .quantityAvailable(20L)
             .reorderThreshold(10L)
+            .build());
+    }
+
+    private void fulfillmentTask(Tenant tenant, Warehouse warehouse, String externalOrderId) {
+        CustomerOrder order = customerOrderRepository.save(CustomerOrder.builder()
+            .tenant(tenant)
+            .warehouse(warehouse)
+            .externalOrderId(externalOrderId)
+            .status(OrderStatus.CREATED)
+            .totalAmount(BigDecimal.ZERO)
+            .build());
+        fulfillmentTaskRepository.save(FulfillmentTask.builder()
+            .tenant(tenant)
+            .warehouse(warehouse)
+            .customerOrder(order)
+            .status(FulfillmentStatus.QUEUED)
+            .totalUnits(1)
+            .fulfilledUnits(0)
             .build());
     }
 }

@@ -522,3 +522,30 @@ closed. The focused runtime routing proof, 25-test recommendation gate, full
 369-test backend suite, package, documentation, and diff checks are green. The
 remaining gates are CI, exact deployed-revision confirmation, then one warm
 baseline to verify thread ownership and latency before any broad hosted E2E.
+
+## Recommendation Warehouse Amplification Checkpoint - 2026-09-12
+
+The exact `dfc0df3` deployment proved the scheduler split live: recommendation
+work ran on `SynapseRecommendationScheduled-1` while main-scheduler dispatch
+continued. A bounded authenticated baseline nevertheless took 47,520 ms for
+Dashboard snapshot and 25,261 ms for Runtime. Hikari retained eight to nine idle
+connections with zero waiters, so this window is active workload latency rather
+than current pool starvation.
+
+The overlapping recommendation run lasted 221,399 ms and processed 155
+Inventory records plus 96 active Fulfillment tasks. Both the fulfillment
+Recommendation and its three Alert conditions are warehouse-level, but the
+scheduler rebuilt and rewrote them once per task. Scheduled reconciliation now
+performs one final-state-equivalent work unit per active warehouse while leaving
+event-driven Fulfillment evaluation unchanged. See
+[Recommendation scheduler routing evidence](evidence/timeout-recovery-recommendation-scheduler-routing.md).
+
+The direct and integration gate passed 11 tests, the expanded affected-domain
+gate passed 49 tests, and the full backend suite passed 371 tests with no
+failures, errors, or skips. Production packaging also succeeded. CI, exact
+deployed-revision confirmation, and a bounded live baseline remain required.
+
+This is the next smallest proven latency correction. Historical Hikari
+starvation remains a separate open classification until exact live evidence
+closes it; no pool, timeout, scheduler-frequency, or infrastructure setting is
+changed.

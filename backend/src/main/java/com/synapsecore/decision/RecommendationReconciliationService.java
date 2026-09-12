@@ -2,6 +2,7 @@ package com.synapsecore.decision;
 
 import com.synapsecore.audit.RequestTraceContext;
 import com.synapsecore.domain.entity.FulfillmentStatus;
+import com.synapsecore.domain.entity.FulfillmentTask;
 import com.synapsecore.domain.entity.Inventory;
 import com.synapsecore.domain.entity.Recommendation;
 import com.synapsecore.domain.entity.RecommendationStatus;
@@ -13,7 +14,7 @@ import com.synapsecore.intelligence.InventoryMonitoringService;
 import java.time.Instant;
 import java.util.Collection;
 import java.util.HashMap;
-import java.util.HashSet;
+import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
@@ -134,10 +135,11 @@ public class RecommendationReconciliationService {
             }
         }
 
-        Set<Long> activeWarehouseIds = new HashSet<>();
-        for (var task : input.activeTasks()) {
+        Map<Long, FulfillmentTask> representativeTasks =
+            selectOneTaskPerWarehouse(input.activeTasks());
+        Set<Long> activeWarehouseIds = representativeTasks.keySet();
+        for (var task : representativeTasks.values()) {
             String tenantCode = task.getTenant().getCode();
-            activeWarehouseIds.add(task.getWarehouse().getId());
             accumulator.fulfillmentAttempted(tenantCode);
             try {
                 fulfillmentService.reconcileRecommendation(task.getId(), "recommendation-reconciliation");
@@ -165,6 +167,18 @@ public class RecommendationReconciliationService {
         }
 
         return accumulator;
+    }
+
+    static Map<Long, FulfillmentTask> selectOneTaskPerWarehouse(
+        Collection<FulfillmentTask> activeTasks
+    ) {
+        Map<Long, FulfillmentTask> representatives = new LinkedHashMap<>();
+        for (var task : activeTasks) {
+            // Input is newest-first. Replacing the value preserves the oldest task that
+            // previously produced the final warehouse-level recommendation and alerts.
+            representatives.put(task.getWarehouse().getId(), task);
+        }
+        return representatives;
     }
 
     private void safelyRecordStarted(String runId, Instant startedAt, Set<String> tenantCodes) {

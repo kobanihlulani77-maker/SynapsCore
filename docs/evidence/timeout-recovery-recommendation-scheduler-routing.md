@@ -84,3 +84,56 @@ split in Render logs and tenant audit evidence.
 Historical Hikari starvation remains a separate proven phenomenon until the
 post-deploy warm proof establishes whether this routing correction removes the
 observed latency and preserves pool headroom.
+
+## Post-Deploy Runtime Result
+
+Commit `dfc0df3e0a7f5cb35c8a7f70f05bdf8c2b997fc6` passed CI run 395 and was
+confirmed as Render's last successfully deployed commit. Render logs showed
+recommendation work on `SynapseRecommendationScheduled-1` while dispatch
+continued independently on `SynapseScheduled-1`, proving the routing correction
+is effective in production.
+
+The bounded authenticated baseline from `2026-09-12T15:57:50.6880303Z` through
+`2026-09-12T15:59:17.6603581Z` still measured 47,520 ms for Dashboard snapshot
+and 25,261 ms for Runtime. During that window, Hikari generally reported one
+active connection, nine idle, and zero waiters, with a brief maximum of two
+active and eight idle. This is not a current pool-acquisition starvation event.
+
+Tenant audit evidence correlated the window with recommendation run
+`b1314b57-d36a-4ff1-8c01-9864f2a7db80`, which ran from
+`2026-09-12T15:56:23.492608293Z` through `2026-09-12T16:00:04.892467469Z` for
+221,399 ms. It evaluated 155 Inventory records and 96 active Fulfillment tasks.
+Nearby recommendation-only runs completed in approximately 39-42 seconds.
+
+Source inspection found that fulfillment Recommendations and all three
+fulfillment Alert types use warehouse-level condition identities. Despite that,
+scheduled reconciliation rebuilt the same warehouse assessment and rewrote the
+same warehouse-level Recommendation and Alerts once for every active task. The
+task list is newest-first, so the oldest task in each warehouse produced the
+final persisted state after all repeated calls.
+
+The bounded amplification correction selects one task per active warehouse,
+preserving that same final-state representative while removing duplicate
+warehouse-level transactions. Event-driven evaluation after a real Fulfillment
+change is untouched. Reconciliation evidence now counts actual warehouse work
+units rather than repeated active-task rewrites.
+
+Local correction verification:
+
+- direct final-state representative and Spring/JPA work-unit gate: 11 tests,
+  0 failures, 0 errors, 0 skipped;
+- expanded Recommendation, Alert, Fulfillment, scheduler, and connection gate:
+  49 tests, 0 failures, 0 errors, 0 skipped;
+- full backend suite: 371 tests, 0 failures, 0 errors, 0 skipped;
+- backend production package: success;
+- documentation link check: 808 links, none missing;
+- `git diff --check`: clean, with line-ending notices only.
+
+CI, exact deployed-revision confirmation, and one bounded post-deploy baseline
+remain required. The live proof must show the 96 task attempts collapse to the
+actual active-warehouse count and must compare reconciliation and authenticated
+request duration without broad E2E traffic.
+
+`RECOMMENDATION_SCHEDULER_ROUTING = VERIFIED LIVE`
+
+`RECOMMENDATION_FULFILLMENT_WAREHOUSE_AMPLIFICATION = CORRECTED LOCALLY`
