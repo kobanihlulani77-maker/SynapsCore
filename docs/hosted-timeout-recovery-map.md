@@ -457,7 +457,7 @@ the shared main scheduler emitted repeated follow-on-locking warnings. Existing
 logs exposed only `SynapseScheduled-1`, so they could not distinguish automated
 Replay from scheduled pull ownership across all active tenants. Stable task
 identity, duration, outcome, and Hikari boundary counters are now emitted for
-automated Replay, scheduled pull, and non-empty operational dispatch runs. See
+automated Replay, scheduled pull, and operational dispatch runs. See
 [Scheduler owner telemetry evidence](evidence/timeout-recovery-scheduler-owner-telemetry.md).
 
 Ten focused tests and all 367 backend tests pass, and backend packaging succeeds.
@@ -466,3 +466,28 @@ no schedule, concurrency, transaction, timeout, pool, or infrastructure setting.
 The observability gap is closed locally; the historical timeout owner remains
 open until CI passes, the exact revision is live, and one measured warm baseline
 is correlated with the new records. Broad hosted E2E remains blocked until then.
+
+## Operational Dispatch Boundary Coverage Checkpoint - 2026-09-12
+
+The exact `b79c0e7` deployment was live for an authenticated warm baseline from
+`2026-09-12T14:59:32.5700987Z` to `2026-09-12T15:00:09.2418124Z`. Dashboard
+snapshot took 18,016 ms and Runtime took 9,906 ms, both HTTP 200. The complete
+window fell inside a shared-main-scheduler telemetry gap from Replay completion
+at `14:58:18.048Z` until scheduled pull and Replay restarted at
+`15:00:21.246Z`/`15:00:21.248Z`. Surrounding Replay and pull boundaries reported
+zero active Hikari connections, ten idle, and zero waiters; repeated `HHH000444`
+warnings identified only the shared scheduler thread.
+
+The first telemetry seam wrapped operational dispatch only after its initial
+queue query and only when work was present. Consequently, the lack of a dispatch
+record inside the gap could not rule dispatch in or out. The observer now wraps
+the entire `drainOnSchedule()` invocation, including queue selection and empty
+results, without labeling direct or async drains as scheduled work. Seven
+focused tests and all 368 backend tests pass; backend packaging succeeds.
+
+`OPERATIONAL_DISPATCH_SCHEDULE_BOUNDARY_GAP = CLOSED LOCALLY`
+
+This remains diagnostic-only. The next bounded gate is CI, exact served-revision
+confirmation, and one warm-baseline correlation against the complete dispatch
+boundary. No broad hosted E2E, pool increase, timeout increase, scheduler change,
+or infrastructure change is justified.

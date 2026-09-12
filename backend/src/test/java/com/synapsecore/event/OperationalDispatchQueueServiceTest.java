@@ -20,14 +20,47 @@ import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import java.lang.reflect.Method;
 import java.lang.reflect.Proxy;
 import java.time.Instant;
+import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.List;
+import java.util.function.IntSupplier;
 import org.junit.jupiter.api.Test;
 import org.slf4j.MDC;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.data.domain.Pageable;
 
 class OperationalDispatchQueueServiceTest {
+
+    @Test
+    void scheduledDrainObservesQueueSelectionEvenWhenNoWorkIsPending() {
+        List<String> stages = new ArrayList<>();
+        OperationalDispatchWorkItemRepository repository = repositoryProxy(
+            OperationalDispatchWorkItemRepository.class,
+            (method, args) -> {
+                if (method.getName().equals("findByStatusInOrderByCreatedAtAsc")) {
+                    stages.add("queue-selection");
+                    return List.of();
+                }
+                return defaultValue(method.getReturnType());
+            }
+        );
+        RecordingScheduledTaskExecutionDiagnostics diagnostics =
+            new RecordingScheduledTaskExecutionDiagnostics(stages);
+        OperationalDispatchQueueService service = new OperationalDispatchQueueService(
+            repository,
+            new StaticObjectProvider<>(new RecordingDashboardService()),
+            new StaticObjectProvider<>(new RecordingRealtimeService()),
+            new RequestTraceContext(),
+            noOpMetricsService(),
+            null,
+            diagnostics
+        );
+
+        service.drainOnSchedule();
+
+        assertThat(diagnostics.taskName).isEqualTo("operational-dispatch");
+        assertThat(stages).containsExactly("telemetry-start", "queue-selection", "telemetry-complete");
+    }
 
     @Test
     void processPendingWorkCollapsesOperationalAndIntegrationFanoutByTenant() {
@@ -290,6 +323,27 @@ class OperationalDispatchQueueServiceTest {
         public void broadcastIntegrationUpdates(String tenantCode) {
             integrationBroadcasts++;
             lastIntegrationTenantCode = tenantCode;
+        }
+    }
+
+    private static final class RecordingScheduledTaskExecutionDiagnostics
+            extends ScheduledTaskExecutionDiagnostics {
+
+        private final List<String> stages;
+        private String taskName;
+
+        private RecordingScheduledTaskExecutionDiagnostics(List<String> stages) {
+            super(null);
+            this.stages = stages;
+        }
+
+        @Override
+        public int observe(String taskName, IntSupplier work) {
+            this.taskName = taskName;
+            stages.add("telemetry-start");
+            int processed = work.getAsInt();
+            stages.add("telemetry-complete");
+            return processed;
         }
     }
 }

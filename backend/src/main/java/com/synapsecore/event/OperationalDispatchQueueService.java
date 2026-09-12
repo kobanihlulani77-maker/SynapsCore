@@ -67,7 +67,10 @@ public class OperationalDispatchQueueService {
 
     @Scheduled(fixedDelayString = "${synapsecore.queue.dispatch-interval-ms:1500}")
     public void drainOnSchedule() {
-        processPendingWork();
+        scheduledTaskExecutionDiagnostics.observe(
+            "operational-dispatch",
+            this::processPendingWork
+        );
     }
 
     public int processPendingWork() {
@@ -84,10 +87,7 @@ public class OperationalDispatchQueueService {
             if (pendingItems.isEmpty()) {
                 return 0;
             }
-            return scheduledTaskExecutionDiagnostics.observe(
-                "operational-dispatch",
-                () -> processPendingItems(pendingItems)
-            );
+            return processPendingItems(pendingItems);
         } finally {
             draining.set(false);
         }

@@ -47,10 +47,12 @@ The following stable task names are wired:
 - `integration-scheduled-pull`
 - `operational-dispatch`
 
-Operational dispatch emits the boundary only when pending work exists. Replay
-and pull keep their existing enabled checks and schedules. The diagnostics read
-the existing Hikari MXBean and do not request a JDBC connection. Exceptions are
-logged and rethrown unchanged.
+Operational dispatch now emits the boundary for every scheduled invocation,
+including its initial queue selection and an empty-queue result. Direct and
+asynchronous calls to `processPendingWork()` are not mislabeled as scheduled
+work. Replay and pull keep their existing enabled checks and schedules. The
+diagnostics read the existing Hikari MXBean and do not request a JDBC
+connection. Exceptions are logged and rethrown unchanged.
 
 ## Direct Proof
 
@@ -61,23 +63,45 @@ at one connection. It also verifies that failure identity is emitted and the
 original exception is propagated.
 
 `ScheduledWorkerDiagnosticsWiringTest` invokes the real scheduled entrypoints
-and verifies the exact Replay and pull task labels. Existing operational dispatch
-tests exercise the updated constructor and unchanged queue behavior.
+and verifies the exact Replay and pull task labels.
+`OperationalDispatchQueueServiceTest` proves that the scheduled boundary starts
+before queue selection and completes after an empty result, while preserving the
+existing queue behavior.
 
-Focused verification: **10 tests passed, 0 failures/errors/skips**.
+Focused verification after the full dispatch-boundary correction: **7 tests
+passed, 0 failures/errors/skips**.
 
-Full backend verification: **367 tests passed, 0 failures/errors/skips**.
+Full backend verification: **368 tests passed, 0 failures/errors/skips**.
 
 Backend package: **BUILD SUCCESS**.
 
 ## Classification and Next Gate
 
-`SCHEDULER_OWNER_OBSERVABILITY_GAP = CLOSED LOCALLY`
+The exact `b79c0e7` deployment was then confirmed live. A second authenticated
+warm baseline ran from `2026-09-12T14:59:32.5700987Z` through
+`2026-09-12T15:00:09.2418124Z`. All requests returned HTTP 200, but dashboard
+snapshot took **18,016 ms** (`433271cf-c63c-4872-8728-b53affcb394c`) and Runtime
+took **9,906 ms** (`52c337da-6bae-495d-8457-a12d6128a083`).
 
-This is not a timeout fix and does not claim that a scheduler owns the historical
-ten Hikari holders. After CI succeeds and the exact commit is confirmed live,
-the next action is one measured warm baseline while correlating
-`Scheduled work task=` records with HTTP request IDs, `HHH000444`, durations,
-and Hikari counters. Broad hosted E2E remains blocked until that baseline is
-healthy. If it is slow, the overlapping task record identifies the next bounded
-owner investigation.
+Replay completed at `14:58:18.048Z`; the next scheduled pull and Replay records
+did not start until `15:00:21.246Z` and `15:00:21.248Z`. This approximately
+123-second shared-main-scheduler blackout fully contained the slow baseline.
+The surrounding Replay and pull boundaries showed `hikariActive=0`,
+`hikariIdle=10`, and `hikariWaiting=0`. Dense `HHH000444` follow-on-locking
+warnings appeared on `SynapseScheduled-1`, but no `operational-dispatch`
+boundary existed because the first implementation began observation only after
+queue selection and only for a non-empty result. That absence was an
+instrumentation blind spot, not proof that dispatch owned the interval.
+
+The dispatch correction therefore moves the observer to `drainOnSchedule()` and
+wraps the complete scheduled invocation. It changes no domain behavior or
+scheduler setting.
+
+`OPERATIONAL_DISPATCH_SCHEDULE_BOUNDARY_GAP = CLOSED LOCALLY`
+
+This is not a timeout fix and does not claim that dispatch or another scheduler
+owns the historical ten Hikari holders. After CI succeeds and the exact
+correction commit is confirmed live, the next action is one measured warm
+baseline while correlating the complete `operational-dispatch` boundary with
+HTTP request IDs, `HHH000444`, duration, and Hikari counters. Broad hosted E2E
+remains blocked until that bounded correlation is complete.
