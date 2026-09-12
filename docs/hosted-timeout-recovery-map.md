@@ -600,3 +600,26 @@ Dashboard snapshot, and Runtime duration against the 83,203 ms / 39,526 ms /
 23,483 ms baseline.
 
 `RECOMMENDATION_INVENTORY_POLICY_LOOKUP_AMPLIFICATION = CORRECTED LOCALLY`
+
+## Recommendation Inventory Policy Lookup Closure - 2026-09-12
+
+Commit `f70fb9fcb4ac62a49d66a4efe3c6bbe096ca4a99` passed CI run 398 in
+4m36s and Render deployed that exact revision in 4m55s. Two post-deploy
+reconciliation runs completed with all 155 Inventory units and one Fulfillment
+warehouse unit successful: 70,903 ms and 84,698 ms respectively.
+
+The corrected bounded authenticated baseline measured 31,085 ms for Dashboard
+snapshot and 17,584 ms for Runtime, compared with 39,526 ms and 23,483 ms before
+the policy correction. Every endpoint returned HTTP 200. Render showed no new
+Hikari acquisition timeout; adjacent task telemetry retained nine to ten idle
+connections with zero waiters.
+
+Policy lookup amplification is therefore closed as a live-verified query-work
+reduction. It is not the full latency explanation: reconciliation duration still
+varies, and both Dashboard snapshot and Runtime remain materially slow. The next
+bounded target is the remaining 155-item Inventory path, specifically per-record
+predictive demand lookup and Recommendation/Alert no-op transaction behavior.
+
+`RECOMMENDATION_INVENTORY_POLICY_LOOKUP_AMPLIFICATION = VERIFIED LIVE`
+
+`RECOMMENDATION_INVENTORY_LATENCY = STILL OPEN`

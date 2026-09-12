@@ -208,3 +208,51 @@ and one bounded hosted reconciliation measurement remain required. No Hikari,
 timeout, scheduler, database, or infrastructure setting changes.
 
 `RECOMMENDATION_INVENTORY_POLICY_LOOKUP_AMPLIFICATION = CORRECTED LOCALLY`
+
+## Inventory Policy Lookup Live Result
+
+Commit `f70fb9fcb4ac62a49d66a4efe3c6bbe096ca4a99` passed SynapseCore CI run
+398 in 4m36s. Render then auto-deployed that exact revision in 4m55s and exposed
+it as the last successfully deployed commit before hosted measurement began.
+
+The first two completed post-deploy reconciliation runs preserved all work:
+
+- run `47f58e29-aa94-4126-946a-d159d933b752`: 70,903 ms, Inventory
+  155/155, Fulfillment 1/1, failures 0;
+- run `9730ea9e-456c-4127-913c-c7d6c354435f`: 84,698 ms, Inventory
+  155/155, Fulfillment 1/1, failures 0.
+
+The corrected authenticated baseline ran from
+`2026-09-12T17:29:20.5510758Z` through `2026-09-12T17:30:18.5918331Z`:
+
+- readiness: 1,021 ms;
+- liveness: 788 ms;
+- unauthenticated session: 1,054 ms;
+- login: 1,667 ms;
+- authenticated session: 500 ms;
+- Dashboard summary: 1,677 ms;
+- Dashboard snapshot: 31,085 ms;
+- Runtime: 17,584 ms;
+- SockJS info: 540 ms;
+- audit read: 1,311 ms;
+- logout: 676 ms.
+
+The prior baseline was 83,203 ms for reconciliation, 39,526 ms for Dashboard
+snapshot, and 23,483 ms for Runtime. The first new reconciliation improved, but
+the second varied above the old scheduler duration; the read endpoints improved
+directionally but remain slow. Therefore the exact query-work reduction is
+verified live, while deterministic latency closure is not claimed.
+
+Render's one-hour Hikari search contained no connection-acquisition timeout for
+the new process. Adjacent scheduler telemetry reported zero waiters and nine to
+ten idle connections, with operational dispatch completing in 1-81 ms and
+automated Replay in 4 ms. This is not a reproduced 10/10 pool-starvation window.
+
+The next bounded Inventory target is the per-record predictive demand query and
+Recommendation/Alert no-op transaction work. Diagnose and reduce only proven
+repeated work; do not skip Inventory evaluation or alter policy, condition-lock,
+pool, timeout, scheduler, database, or infrastructure behavior.
+
+`RECOMMENDATION_INVENTORY_POLICY_LOOKUP_AMPLIFICATION = VERIFIED LIVE`
+
+`RECOMMENDATION_INVENTORY_LATENCY = IMPROVED BUT STILL OPEN`
