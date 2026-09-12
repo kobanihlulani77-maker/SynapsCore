@@ -500,10 +500,11 @@ public class FulfillmentService {
         TenantOperationalPolicy policy = tenantOperationalPolicyService.getPolicy(tenantCode);
         Long warehouseId = task.getWarehouse().getId();
         List<FulfillmentTask> warehouseTasks = fulfillmentTaskRepository
-            .findAllByTenant_CodeIgnoreCaseAndStatusInOrderByUpdatedAtDesc(tenantCode, ACTIVE_STATUSES)
-            .stream()
-            .filter(candidate -> candidate.getWarehouse().getId().equals(warehouseId))
-            .toList();
+            .findAllByTenant_CodeIgnoreCaseAndWarehouse_IdAndStatusInOrderByUpdatedAtDesc(
+                tenantCode,
+                warehouseId,
+                ACTIVE_STATUSES
+            );
 
         return buildWarehouseAssessment(
             task,

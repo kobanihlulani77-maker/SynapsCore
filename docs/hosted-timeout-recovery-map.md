@@ -388,3 +388,19 @@ one active dispatch drain. Fifteen focused tests pass. See
 Background executors alone are ruled down as the source of ten simultaneous
 long-running holders on one default instance. Overlap with HTTP work, multiple
 instances, and per-operation nested connection demand remain separate questions.
+
+## Order/Fulfillment Assessment Scope Checkpoint - 2026-09-12
+
+The required atomic Order path was not found to make external calls, sleep, or
+open an ordinary nested independent transaction. It did, however, load every
+active Fulfillment task and Order line for the tenant before filtering to the
+Order's warehouse in Java. A direct transaction-scoped proof reproduced 119
+entity loads with 24 unrelated Coast tasks. Fulfillment assessment now queries
+by tenant, warehouse, and active status at the repository boundary. See
+[Order/Fulfillment assessment scope evidence](evidence/timeout-recovery-order-fulfillment-assessment-scope.md).
+
+Twenty-three focused tests and all 354 backend tests pass, and backend packaging
+succeeds. This removes unrelated cross-warehouse hydration from the connection
+hold window; it does not identify all historical holders or prove hosted pool
+headroom. The next bounded phase is concurrent Order/Fulfillment transaction-
+demand proof before any broad hosted E2E.

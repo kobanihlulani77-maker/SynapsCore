@@ -35,6 +35,13 @@ public interface FulfillmentTaskRepository extends JpaRepository<FulfillmentTask
     List<FulfillmentTask> findAllByTenant_CodeIgnoreCaseAndStatusInOrderByUpdatedAtDesc(String tenantCode, Collection<FulfillmentStatus> statuses);
 
     @EntityGraph(attributePaths = {"tenant", "customerOrder", "customerOrder.items", "warehouse"})
+    List<FulfillmentTask> findAllByTenant_CodeIgnoreCaseAndWarehouse_IdAndStatusInOrderByUpdatedAtDesc(
+        String tenantCode,
+        Long warehouseId,
+        Collection<FulfillmentStatus> statuses
+    );
+
+    @EntityGraph(attributePaths = {"tenant", "customerOrder", "customerOrder.items", "warehouse"})
     List<FulfillmentTask> findAllByStatusInOrderByUpdatedAtDesc(Collection<FulfillmentStatus> statuses);
 
     @EntityGraph(attributePaths = {"tenant", "customerOrder", "warehouse"})
