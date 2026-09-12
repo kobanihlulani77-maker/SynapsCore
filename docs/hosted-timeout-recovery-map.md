@@ -435,3 +435,17 @@ Replay/Order overlap is ruled down locally as a nested same-thread connection-
 borrow mechanism. The next bounded holder family is scheduled pull, separating
 external response/body delay from JDBC-backed ingestion and measuring its
 overlap with HTTP demand.
+
+## Scheduled Pull External Delay Checkpoint - 2026-09-12
+
+A real scheduled-pull connector was held inside a deliberately slow external
+response-body read. Hikari reported zero active connections throughout that
+delay. While the pull remained blocked, ten independent HTTP Orders occupied all
+ten connections and completed in each of three repetitions; connector success
+was persisted after the body was released. See
+[Scheduled pull external-delay evidence](evidence/timeout-recovery-scheduled-pull-external-delay.md).
+
+Scheduled-pull external latency is ruled down locally as a JDBC-retention holder.
+The four prepared holder families now have bounded evidence. The next phase is
+consolidation and CI/deployed-revision/warm-baseline gating, not a speculative
+transaction, timeout, pool-size, or infrastructure change.
