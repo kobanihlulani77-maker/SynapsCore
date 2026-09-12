@@ -623,3 +623,36 @@ predictive demand lookup and Recommendation/Alert no-op transaction behavior.
 `RECOMMENDATION_INVENTORY_POLICY_LOOKUP_AMPLIFICATION = VERIFIED LIVE`
 
 `RECOMMENDATION_INVENTORY_LATENCY = STILL OPEN`
+
+## Recommendation Inventory Demand Query Checkpoint - 2026-09-12
+
+The next exact source map found one recent-order aggregate query in
+`StockPredictionService` for every Inventory record. The hosted proof tenant has
+155 Inventory records, so each recommendation pass issued 155 same-shape demand
+queries before Recommendation and Alert reconciliation.
+
+Scheduled reconciliation now uses one grouped read for the pass and maps each
+result by the exact product/warehouse pair. Inventory pairs with no recent order
+line receive the same zero value as the previous `coalesce(sum(...), 0)` query.
+The one-hour boundary is now fixed once for the pass rather than moving between
+records. Event-driven prediction retains its original single-record query.
+
+If the grouped read fails, the pass logs the failure and falls back to the
+original bounded per-Inventory query path. All Inventory records still execute
+the same intelligence, Recommendation, Alert, advisory-lock, and persistence
+logic. No condition identity, transaction boundary, pool setting, timeout,
+scheduler, database, or infrastructure setting changes.
+
+The focused local gate passed seven tests, the expanded Alert/Inventory/
+Recommendation gate passed 40 tests, and the full backend suite passed 375
+tests, all with no failures, errors, or skips. Verification includes direct
+product/warehouse mapping and zero-demand checks, supplied-demand rule
+equivalence, scheduled monitoring delegation, and a Spring/JPA integration run
+that executes the grouped query and preserves per-item failure accounting.
+Production packaging succeeded, the documentation check found all 808 local
+links valid, and `git diff --check` was clean apart from line-ending notices.
+CI and exact-deployment proof remain.
+
+`RECOMMENDATION_INVENTORY_DEMAND_QUERY_AMPLIFICATION = CORRECTED LOCALLY`
+
+`RECOMMENDATION_INVENTORY_LATENCY = STILL OPEN`

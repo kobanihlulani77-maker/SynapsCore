@@ -13,7 +13,9 @@ import com.synapsecore.domain.repository.RecommendationRepository;
 import com.synapsecore.domain.service.TenantOperationalPolicyService;
 import com.synapsecore.fulfillment.FulfillmentService;
 import com.synapsecore.intelligence.InventoryMonitoringService;
+import com.synapsecore.prediction.StockPredictionService;
 import java.time.Instant;
+import java.time.temporal.ChronoUnit;
 import java.util.Collection;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
@@ -60,6 +62,7 @@ public class RecommendationReconciliationService {
     private final RecommendationReconciliationEvidenceService evidenceService;
     private final RequestTraceContext requestTraceContext;
     private final TenantOperationalPolicyService tenantOperationalPolicyService;
+    private final StockPredictionService stockPredictionService;
 
     @Value("${synapsecore.recommendation.reconciliation.enabled:true}")
     private boolean enabled;
@@ -127,19 +130,27 @@ public class RecommendationReconciliationService {
     private ReconciliationAccumulator reconcile(ReconciliationInput input,
                                                  ReconciliationAccumulator accumulator) {
         Map<String, TenantOperationalPolicy> inventoryPolicies = new LinkedHashMap<>();
+        Map<Long, Long> recentUnitsByInventoryId = loadRecentInventoryDemand(input.inventories());
         for (var inventory : input.inventories()) {
             String tenantCode = inventory.getWarehouse().getTenant().getCode();
             accumulator.inventoryAttempted(tenantCode);
             try {
-                inventoryMonitoringService.evaluateAfterChange(
-                    inventory,
-                    "recommendation-reconciliation",
-                    resolveInventoryPolicy(
-                        inventoryPolicies,
-                        tenantCode,
-                        tenantOperationalPolicyService::getPolicy
-                    )
+                TenantOperationalPolicy policy = resolveInventoryPolicy(
+                    inventoryPolicies,
+                    tenantCode,
+                    tenantOperationalPolicyService::getPolicy
                 );
+                if (recentUnitsByInventoryId == null) {
+                    inventoryMonitoringService.evaluateAfterChange(
+                        inventory, "recommendation-reconciliation", policy);
+                } else {
+                    inventoryMonitoringService.evaluateAfterChange(
+                        inventory,
+                        "recommendation-reconciliation",
+                        policy,
+                        recentUnitsByInventoryId.getOrDefault(inventory.getId(), 0L)
+                    );
+                }
                 accumulator.inventorySucceeded(tenantCode);
             } catch (RuntimeException exception) {
                 accumulator.inventoryFailed(tenantCode);
@@ -180,6 +191,19 @@ public class RecommendationReconciliationService {
         }
 
         return accumulator;
+    }
+
+    private Map<Long, Long> loadRecentInventoryDemand(List<Inventory> inventories) {
+        try {
+            return stockPredictionService.loadRecentUnitsByInventoryId(
+                inventories,
+                Instant.now().minus(1, ChronoUnit.HOURS)
+            );
+        } catch (RuntimeException exception) {
+            log.warn("Recommendation reconciliation could not batch recent inventory demand; "
+                + "falling back to bounded per-inventory queries: {}", exception.getMessage());
+            return null;
+        }
     }
 
     static Map<Long, FulfillmentTask> selectOneTaskPerWarehouse(

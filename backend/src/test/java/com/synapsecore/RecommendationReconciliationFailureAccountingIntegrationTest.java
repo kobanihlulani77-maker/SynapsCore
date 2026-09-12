@@ -91,6 +91,14 @@ class RecommendationReconciliationFailureAccountingIntegrationTest {
                         throw new IllegalStateException("synthetic per-item failure");
                     }
                 }
+
+                @Override
+                public void evaluateAfterChange(Inventory inventory,
+                                                String source,
+                                                TenantOperationalPolicy policy,
+                                                long recentUnits) {
+                    evaluateAfterChange(inventory, source, policy);
+                }
             };
         }
     }

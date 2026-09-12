@@ -6,6 +6,10 @@ import com.synapsecore.domain.repository.OrderItemRepository;
 import com.synapsecore.domain.service.TenantOperationalPolicyService;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
+import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
+import java.util.List;
+import java.util.Map;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
@@ -32,6 +36,12 @@ public class StockPredictionService {
             inventory.getWarehouse().getId(),
             since
         );
+        return estimate(inventory, policy, recentUnits);
+    }
+
+    public StockPrediction estimate(Inventory inventory,
+                                    TenantOperationalPolicy policy,
+                                    long recentUnits) {
 
         double unitsPerHour = recentUnits;
         Double hoursToStockout = unitsPerHour > 0
@@ -53,5 +63,38 @@ public class StockPredictionService {
             urgentRisk,
             rapidConsumption
         );
+    }
+
+    public Map<Long, Long> loadRecentUnitsByInventoryId(List<Inventory> inventories, Instant since) {
+        if (inventories.isEmpty()) {
+            return Map.of();
+        }
+
+        var productIds = new LinkedHashSet<Long>();
+        var warehouseIds = new LinkedHashSet<Long>();
+        inventories.forEach(inventory -> {
+            productIds.add(inventory.getProduct().getId());
+            warehouseIds.add(inventory.getWarehouse().getId());
+        });
+
+        Map<DemandKey, Long> recentUnitsByKey = new LinkedHashMap<>();
+        orderItemRepository.sumRecentQuantityByProductAndWarehouse(productIds, warehouseIds, since)
+            .forEach(summary -> recentUnitsByKey.put(
+                new DemandKey(summary.getProductId(), summary.getWarehouseId()),
+                summary.getRecentUnits()
+            ));
+
+        Map<Long, Long> recentUnitsByInventoryId = new LinkedHashMap<>();
+        inventories.forEach(inventory -> recentUnitsByInventoryId.put(
+            inventory.getId(),
+            recentUnitsByKey.getOrDefault(
+                new DemandKey(inventory.getProduct().getId(), inventory.getWarehouse().getId()),
+                0L
+            )
+        ));
+        return recentUnitsByInventoryId;
+    }
+
+    private record DemandKey(Long productId, Long warehouseId) {
     }
 }

@@ -34,6 +34,15 @@ public class InventoryMonitoringService {
         persistAdvisoryState(inventory, source, prediction, insight);
     }
 
+    public void evaluateAfterChange(Inventory inventory,
+                                    String source,
+                                    TenantOperationalPolicy policy,
+                                    long recentUnits) {
+        StockPrediction prediction = stockPredictionService.estimate(inventory, policy, recentUnits);
+        InventoryInsight insight = inventoryIntelligenceService.evaluate(inventory, prediction, policy);
+        persistAdvisoryState(inventory, source, prediction, insight);
+    }
+
     private void persistAdvisoryState(Inventory inventory,
                                       String source,
                                       StockPrediction prediction,

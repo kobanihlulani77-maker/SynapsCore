@@ -70,7 +70,7 @@ class InventoryMonitoringServiceTest {
     }
 
     @Test
-    void scheduledEvaluationUsesTheSuppliedPolicyWithoutReloadingIt() {
+    void scheduledEvaluationUsesTheSuppliedPolicyAndDemandWithoutReloadingEither() {
         Tenant tenant = Tenant.builder().code("POLICY-TEST").name("Policy Test").build();
         Warehouse warehouse = Warehouse.builder().tenant(tenant).code("WH-NORTH").name("North").location("North").build();
         Product product = Product.builder().tenant(tenant).catalogSku("SKU-POLICY").name("Policy Item").category("Test").build();
@@ -83,6 +83,7 @@ class InventoryMonitoringServiceTest {
             null, "HEALTHY", "Healthy stock");
         AtomicBoolean suppliedPredictionPolicyUsed = new AtomicBoolean();
         AtomicBoolean suppliedIntelligencePolicyUsed = new AtomicBoolean();
+        AtomicReference<Long> suppliedRecentUnits = new AtomicReference<>();
 
         StockPredictionService predictionService = new StockPredictionService(null, null) {
             @Override
@@ -92,7 +93,15 @@ class InventoryMonitoringServiceTest {
 
             @Override
             public StockPrediction estimate(Inventory ignored, TenantOperationalPolicy suppliedPolicy) {
+                throw new AssertionError("Scheduled evaluation must use the supplied recent demand");
+            }
+
+            @Override
+            public StockPrediction estimate(Inventory ignored,
+                                              TenantOperationalPolicy suppliedPolicy,
+                                              long recentUnits) {
                 suppliedPredictionPolicyUsed.set(suppliedPolicy == policy);
+                suppliedRecentUnits.set(recentUnits);
                 return prediction;
             }
         };
@@ -130,9 +139,10 @@ class InventoryMonitoringServiceTest {
         InventoryMonitoringService service = new InventoryMonitoringService(
             predictionService, intelligenceService, recommendationService, alertService);
 
-        service.evaluateAfterChange(inventory, "recommendation-reconciliation", policy);
+        service.evaluateAfterChange(inventory, "recommendation-reconciliation", policy, 17L);
 
         assertThat(suppliedPredictionPolicyUsed).isTrue();
         assertThat(suppliedIntelligencePolicyUsed).isTrue();
+        assertThat(suppliedRecentUnits.get()).isEqualTo(17L);
     }
 }

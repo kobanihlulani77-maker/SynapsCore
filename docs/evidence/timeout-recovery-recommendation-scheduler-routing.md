@@ -256,3 +256,30 @@ pool, timeout, scheduler, database, or infrastructure behavior.
 `RECOMMENDATION_INVENTORY_POLICY_LOOKUP_AMPLIFICATION = VERIFIED LIVE`
 
 `RECOMMENDATION_INVENTORY_LATENCY = IMPROVED BUT STILL OPEN`
+
+## Inventory Demand Query Amplification Correction
+
+The remaining stable-row source path issued
+`sumRecentQuantityByProductAndWarehouse` once for every Inventory record. At
+the observed 155-record hosted volume, this produced 155 serial aggregate
+queries with the same one-hour demand shape.
+
+The scheduled pass now obtains those totals through one grouped product-and-
+warehouse query and supplies each exact total to the existing prediction rules.
+Missing grouped rows map to zero, matching the previous aggregate result. The
+event-driven Inventory entrypoint keeps its single-record query, while a failed
+scheduled batch read falls back to that original path rather than aborting the
+pass.
+
+The change does not skip Inventory evaluation or alter intelligence rules,
+Recommendation/Alert persistence, condition locks, transactions, Hikari,
+timeouts, scheduler settings, or infrastructure. The focused gate passed seven
+tests, the expanded Alert/Inventory/Recommendation gate passed 40 tests, and the
+full backend suite passed 375 tests, all with no failures, errors, or skips.
+This includes a Spring/JPA integration execution of the grouped query and
+preserved per-item failure accounting. Production packaging succeeded, the
+documentation check found all 808 local links valid, and `git diff --check` was
+clean apart from line-ending notices. CI and exact-deployment gates remain
+before live measurement.
+
+`RECOMMENDATION_INVENTORY_DEMAND_QUERY_AMPLIFICATION = CORRECTED LOCALLY`
