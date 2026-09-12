@@ -5,21 +5,19 @@ import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.scheduling.annotation.SchedulingConfigurer;
 import org.springframework.scheduling.annotation.EnableScheduling;
-import org.springframework.scheduling.config.ScheduledTaskRegistrar;
 import org.springframework.scheduling.concurrent.ThreadPoolTaskScheduler;
 
 @Configuration
 @ConditionalOnProperty(prefix = "spring.task.scheduling", name = "enabled", havingValue = "true", matchIfMissing = true)
 @EnableScheduling
 @Slf4j
-public class SchedulingConfig implements SchedulingConfigurer {
+public class SchedulingConfig {
 
     @Value("${synapsecore.scheduling.pool-size:1}")
     private int schedulerPoolSize = 1;
 
-    @Bean
+    @Bean(name = {"taskScheduler", "synapseScheduledTaskScheduler"}, destroyMethod = "shutdown")
     public ThreadPoolTaskScheduler synapseScheduledTaskScheduler() {
         ThreadPoolTaskScheduler scheduler = new ThreadPoolTaskScheduler();
         scheduler.setPoolSize(Math.max(schedulerPoolSize, 1));
@@ -43,8 +41,4 @@ public class SchedulingConfig implements SchedulingConfigurer {
         return scheduler;
     }
 
-    @Override
-    public void configureTasks(ScheduledTaskRegistrar taskRegistrar) {
-        taskRegistrar.setTaskScheduler(synapseScheduledTaskScheduler());
-    }
 }

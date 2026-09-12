@@ -491,3 +491,34 @@ This remains diagnostic-only. The next bounded gate is CI, exact served-revision
 confirmation, and one warm-baseline correlation against the complete dispatch
 boundary. No broad hosted E2E, pool increase, timeout increase, scheduler change,
 or infrastructure change is justified.
+
+## Recommendation Scheduler Routing Root Cause - 2026-09-12
+
+The exact `498d9a5` deployment produced another authenticated warm baseline from
+`2026-09-12T15:23:21.9879163Z` through `2026-09-12T15:24:50.1912751Z`.
+Dashboard snapshot took 48,454 ms and Runtime took 26,553 ms. Complete dispatch
+telemetry proved the main scheduler stopped between `15:21:09.265Z` and
+`15:25:09.888Z`, while dispatch itself completed normally at both boundaries.
+
+Tenant audit evidence identified the exact owner: recommendation reconciliation
+run `4fac31f3-4abb-4642-86ca-db7e732993ac` ran from
+`15:21:10.191674147Z` through `15:25:08.891581758Z` for 238,699 ms, evaluating
+155 Inventory records and 96 Fulfillment tasks. Its interval matches the main-
+scheduler blackout and dense `HHH000444` warnings on `SynapseScheduled-1`.
+
+The dedicated scheduler annotation was present but ineffective. The custom
+`SchedulingConfigurer` replaced Spring's qualifier-aware `TaskSchedulerRouter`
+with the main scheduler, forcing every annotation-driven task onto that one
+executor. The correction removes only that override and aliases the existing
+main scheduler as `taskScheduler`, allowing unqualified tasks to retain their
+current executor while the recommendation qualifier routes to
+`synapseRecommendationTaskScheduler`. See
+[Recommendation scheduler routing evidence](evidence/timeout-recovery-recommendation-scheduler-routing.md).
+
+`RECOMMENDATION_SCHEDULER_ROUTING_DEFECT = PROVEN, CORRECTED, AND VERIFIED LOCALLY`
+
+This does not yet claim the historical ten-connection Hikari starvation is
+closed. The focused runtime routing proof, 25-test recommendation gate, full
+369-test backend suite, package, documentation, and diff checks are green. The
+remaining gates are CI, exact deployed-revision confirmation, then one warm
+baseline to verify thread ownership and latency before any broad hosted E2E.
