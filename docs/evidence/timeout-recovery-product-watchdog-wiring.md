@@ -47,8 +47,14 @@ BUILD SUCCESS in 4m32s, completed `2026-09-08T13:27:37Z`. Log:
 `backend/target/product-watchdog-wiring-full-suite.log`. Backend packaging also
 passed; log: `backend/target/product-watchdog-wiring-package.log`.
 
-CI and hosted served-revision verification remain separate gates at this
-pre-push checkpoint.
+Committed and pushed as `9726cec28fe4a44d0f458f7f9554ce4842eaa158`.
+[CI run 34691377338](https://github.com/kobanihlulani77-maker/SynapsCore/actions/runs/34691377338)
+passed all 351 backend tests in 4m12s, the frontend build, and both Compose
+configuration checks on `2026-09-12`. The CI Product overlap cases reached
+10/10 for both paths, with peak waiters 0 (create) and 5 (import).
+
+Hosted served-revision verification remains a separate gate. No hosted health
+or contention result is claimed from local or CI verification.
 
 ## Limits
 
