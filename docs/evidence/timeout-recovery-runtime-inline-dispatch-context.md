@@ -40,8 +40,13 @@ BUILD SUCCESS in 11m11s, completed `2026-09-12T11:52:06Z`. Log:
 verification also passed; log:
 `backend/target/runtime-inline-dispatch-context-package.log`.
 
-CI and hosted served-revision verification remain separate gates at this
-pre-push checkpoint.
+Committed and pushed as `d036d6778c803d46579ec577ba7d40f0d32d3a41`.
+[CI run 34692246250](https://github.com/kobanihlulani77-maker/SynapsCore/actions/runs/34692246250)
+passed all 352 backend tests in 3m38s, the frontend build, and both Compose
+configuration checks on `2026-09-12`.
+
+Hosted served-revision verification remains a separate gate. No hosted request
+latency or Hikari result is claimed from local or CI verification.
 
 ## Limits and Next Boundary
 
