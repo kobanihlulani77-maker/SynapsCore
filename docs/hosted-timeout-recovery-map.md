@@ -651,8 +651,28 @@ equivalence, scheduled monitoring delegation, and a Spring/JPA integration run
 that executes the grouped query and preserves per-item failure accounting.
 Production packaging succeeded, the documentation check found all 808 local
 links valid, and `git diff --check` was clean apart from line-ending notices.
-CI and exact-deployment proof remain.
+Commit `638536a316d6f6b1f18cfab9a3855099637d410f` passed SynapseCore CI run
+400 in 5m28s. Render then exposed that exact revision as Live before hosted
+measurement began. The first completed post-deploy pass took 80,097 ms; the
+next three completed passes took 26,705 ms, 21,495 ms, and 19,577 ms. Every run
+preserved Inventory 155/155, Fulfillment 1/1, and zero failures.
 
-`RECOMMENDATION_INVENTORY_DEMAND_QUERY_AMPLIFICATION = CORRECTED LOCALLY`
+The first bounded authenticated sample overlapped the 80,097 ms reconciliation
+and measured 46,718 ms for Dashboard snapshot and 18,486 ms for Runtime. The
+next sample began after reconciliation completed and measured 10,945 ms and
+7,944 ms respectively. Render contained no grouped-demand fallback warning and
+no Hikari acquisition timeout for the deployed process. Adjacent dispatch,
+Replay, and pull telemetry showed `hikariActive=0`, `hikariIdle=10`, and
+`hikariWaiting=0`.
+
+The exact 155-query amplification is therefore removed and verified live. The
+three steady-state reconciliation durations after the initial post-deploy pass
+average 22,592 ms, versus 70,903 ms and 84,698 ms in the prior live checkpoint.
+This is material work reduction, not full latency closure: the initial pass was
+still slow and authenticated snapshot/runtime reads remain above the desired
+active-runtime threshold. The next bounded target is Recommendation and Alert
+no-op transactional work per stable Inventory record.
+
+`RECOMMENDATION_INVENTORY_DEMAND_QUERY_AMPLIFICATION = VERIFIED LIVE`
 
 `RECOMMENDATION_INVENTORY_LATENCY = STILL OPEN`

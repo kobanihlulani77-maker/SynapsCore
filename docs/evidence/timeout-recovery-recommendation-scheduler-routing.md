@@ -279,7 +279,33 @@ full backend suite passed 375 tests, all with no failures, errors, or skips.
 This includes a Spring/JPA integration execution of the grouped query and
 preserved per-item failure accounting. Production packaging succeeded, the
 documentation check found all 808 local links valid, and `git diff --check` was
-clean apart from line-ending notices. CI and exact-deployment gates remain
-before live measurement.
+clean apart from line-ending notices.
 
-`RECOMMENDATION_INVENTORY_DEMAND_QUERY_AMPLIFICATION = CORRECTED LOCALLY`
+Commit `638536a316d6f6b1f18cfab9a3855099637d410f` passed SynapseCore CI run
+400 in 5m28s. Render then exposed that exact revision as Live before hosted
+measurement began.
+
+The first completed post-deploy reconciliation took 80,097 ms. The next three
+completed reconciliations took 26,705 ms, 21,495 ms, and 19,577 ms. All four
+runs preserved Inventory 155/155, Fulfillment 1/1, and zero failures. The three
+steady-state runs after the initial pass average 22,592 ms, compared with the
+prior 70,903 ms and 84,698 ms live checkpoint.
+
+The first bounded authenticated sample overlapped the 80,097 ms reconciliation
+and measured 46,718 ms for Dashboard snapshot and 18,486 ms for Runtime. A
+second sample after reconciliation completed measured 10,945 ms and 7,944 ms
+respectively. Render contained no grouped-demand fallback warning and no Hikari
+acquisition timeout for the deployed process. Adjacent operational dispatch,
+Replay, and pull telemetry showed `hikariActive=0`, `hikariIdle=10`, and
+`hikariWaiting=0`.
+
+The grouped path is active and the exact per-Inventory demand-query
+amplification is verified removed in production. This does not close Inventory
+latency: the first post-deploy pass remained slow and authenticated reads remain
+above the desired active-runtime threshold. The next bounded source seam is the
+Recommendation and Alert no-op transactional work repeated for each stable
+Inventory record.
+
+`RECOMMENDATION_INVENTORY_DEMAND_QUERY_AMPLIFICATION = VERIFIED LIVE`
+
+`RECOMMENDATION_INVENTORY_LATENCY = STILL OPEN`
