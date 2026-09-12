@@ -676,3 +676,41 @@ no-op transactional work per stable Inventory record.
 `RECOMMENDATION_INVENTORY_DEMAND_QUERY_AMPLIFICATION = VERIFIED LIVE`
 
 `RECOMMENDATION_INVENTORY_LATENCY = STILL OPEN`
+
+## Recommendation Inventory Stable No-op Checkpoint - 2026-09-12
+
+The next source map found that every healthy Inventory row still entered both
+advisory persistence services during scheduled reconciliation. Each row took a
+pessimistic Recommendation lookup, an invalidated-transfer lookup, two Alert
+advisory locks, and two active Alert lookups even when the calculated state was
+healthy and no advisory record existed. At 155 Inventory rows, this repeated
+hundreds of provably unnecessary database operations.
+
+Scheduled reconciliation now loads one current advisory-state snapshot before
+the Inventory loop. A row skips Recommendation or Alert synchronization only
+when its calculated condition is healthy and the snapshot proves there is no
+corresponding persisted state to repair. Active low-stock or depletion
+conditions, current Inventory Recommendations, and current transfer
+Recommendations whose source is the row all retain the original authoritative
+locking and persistence paths. Event-driven Inventory evaluation also retains
+full synchronization.
+
+The snapshot uses the same condition-key generators as the authoritative
+Recommendation and Alert services. If either snapshot read fails, the entire
+pass falls back to full per-Inventory synchronization. No intelligence rule,
+condition identity, transaction boundary, Hikari setting, timeout, scheduler,
+database, or infrastructure setting changes.
+
+The focused gate passed 10 tests and the expanded Alert/Inventory/
+Recommendation gate passed 42 tests. The complete backend suite passed 379
+tests with no failures, errors, or skips, and production packaging succeeded.
+Direct tests cover a healthy no-state skip, persisted-state repair, active
+condition handling, transfer-source repair, and full-synchronization fallback.
+
+This checkpoint is locally verified but not yet production-verified. It closes
+the identified stable-row no-op amplification only after exact-revision CI,
+deployment, and bounded hosted reconciliation evidence are complete.
+
+`RECOMMENDATION_INVENTORY_STABLE_NOOP_AMPLIFICATION = CORRECTED LOCALLY`
+
+`RECOMMENDATION_INVENTORY_LATENCY = STILL OPEN`

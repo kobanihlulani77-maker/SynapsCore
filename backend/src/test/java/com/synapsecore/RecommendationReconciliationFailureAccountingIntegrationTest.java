@@ -16,6 +16,7 @@ import com.synapsecore.domain.repository.ProductRepository;
 import com.synapsecore.domain.repository.TenantRepository;
 import com.synapsecore.domain.repository.WarehouseRepository;
 import com.synapsecore.intelligence.InventoryMonitoringService;
+import com.synapsecore.intelligence.InventoryAdvisoryStateSnapshot;
 import java.util.List;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
@@ -97,6 +98,23 @@ class RecommendationReconciliationFailureAccountingIntegrationTest {
                                                 String source,
                                                 TenantOperationalPolicy policy,
                                                 long recentUnits) {
+                    evaluateAfterChange(inventory, source, policy);
+                }
+
+                @Override
+                public void evaluateAfterChange(Inventory inventory,
+                                                String source,
+                                                TenantOperationalPolicy policy,
+                                                InventoryAdvisoryStateSnapshot advisoryState) {
+                    evaluateAfterChange(inventory, source, policy);
+                }
+
+                @Override
+                public void evaluateAfterChange(Inventory inventory,
+                                                String source,
+                                                TenantOperationalPolicy policy,
+                                                long recentUnits,
+                                                InventoryAdvisoryStateSnapshot advisoryState) {
                     evaluateAfterChange(inventory, source, policy);
                 }
             };

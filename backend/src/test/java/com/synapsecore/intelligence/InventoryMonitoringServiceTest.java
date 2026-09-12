@@ -14,6 +14,7 @@ import com.synapsecore.prediction.StockPrediction;
 import com.synapsecore.prediction.StockPredictionService;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
+import java.util.Set;
 import org.junit.jupiter.api.Test;
 
 class InventoryMonitoringServiceTest {
@@ -144,5 +145,134 @@ class InventoryMonitoringServiceTest {
         assertThat(suppliedPredictionPolicyUsed).isTrue();
         assertThat(suppliedIntelligencePolicyUsed).isTrue();
         assertThat(suppliedRecentUnits.get()).isEqualTo(17L);
+    }
+
+    @Test
+    void scheduledReconciliationSkipsPersistenceForAHealthyInventoryWithoutCurrentState() {
+        Inventory inventory = inventory(101L, 201L, 301L);
+        TenantOperationalPolicy policy = TenantOperationalPolicy.builder().tenant(inventory.getTenant()).build();
+        StockPrediction prediction = new StockPrediction(0, 0, null, false, false, false);
+        InventoryInsight insight = new InventoryInsight(false, false, false, false,
+            null, "HEALTHY", "Healthy stock");
+        AtomicBoolean recommendationSynchronized = new AtomicBoolean();
+        AtomicBoolean alertSynchronized = new AtomicBoolean();
+
+        InventoryMonitoringService service = monitoringService(
+            prediction,
+            insight,
+            recommendationSynchronized,
+            alertSynchronized
+        );
+
+        service.evaluateAfterChange(
+            inventory,
+            "recommendation-reconciliation",
+            policy,
+            0L,
+            InventoryAdvisoryStateSnapshot.from(java.util.List.of(), java.util.List.of())
+        );
+
+        assertThat(recommendationSynchronized).isFalse();
+        assertThat(alertSynchronized).isFalse();
+    }
+
+    @Test
+    void scheduledReconciliationRepairsPersistedStateWhenTheConditionIsNowHealthy() {
+        Inventory inventory = inventory(102L, 202L, 302L);
+        TenantOperationalPolicy policy = TenantOperationalPolicy.builder().tenant(inventory.getTenant()).build();
+        StockPrediction prediction = new StockPrediction(0, 0, null, false, false, false);
+        InventoryInsight insight = new InventoryInsight(false, false, false, false,
+            null, "HEALTHY", "Healthy stock");
+        AtomicBoolean recommendationSynchronized = new AtomicBoolean();
+        AtomicBoolean alertSynchronized = new AtomicBoolean();
+        InventoryAdvisoryStateSnapshot advisoryState = new InventoryAdvisoryStateSnapshot(
+            Set.of(InventoryAdvisoryStateSnapshot.recommendationConditionKey(inventory)),
+            Set.of(),
+            Set.of(InventoryAdvisoryStateSnapshot.alertConditionKey(
+                com.synapsecore.domain.entity.AlertType.LOW_STOCK,
+                inventory
+            )),
+            false
+        );
+
+        InventoryMonitoringService service = monitoringService(
+            prediction,
+            insight,
+            recommendationSynchronized,
+            alertSynchronized
+        );
+
+        service.evaluateAfterChange(
+            inventory,
+            "recommendation-reconciliation",
+            policy,
+            0L,
+            advisoryState
+        );
+
+        assertThat(recommendationSynchronized).isTrue();
+        assertThat(alertSynchronized).isTrue();
+    }
+
+    private InventoryMonitoringService monitoringService(
+        StockPrediction prediction,
+        InventoryInsight insight,
+        AtomicBoolean recommendationSynchronized,
+        AtomicBoolean alertSynchronized
+    ) {
+        StockPredictionService predictionService = new StockPredictionService(null, null) {
+            @Override
+            public StockPrediction estimate(Inventory ignored,
+                                              TenantOperationalPolicy ignoredPolicy,
+                                              long ignoredRecentUnits) {
+                return prediction;
+            }
+        };
+        InventoryIntelligenceService intelligenceService = new InventoryIntelligenceService(null) {
+            @Override
+            public InventoryInsight evaluate(Inventory ignored,
+                                             StockPrediction ignoredPrediction,
+                                             TenantOperationalPolicy ignoredPolicy) {
+                return insight;
+            }
+        };
+        RecommendationService recommendationService = new RecommendationService(null, null, null, null) {
+            @Override
+            public com.synapsecore.domain.entity.Recommendation createForInventory(
+                Inventory ignored, InventoryInsight ignoredInsight, StockPrediction ignoredPrediction, String ignoredSource) {
+                recommendationSynchronized.set(true);
+                return null;
+            }
+        };
+        AlertService alertService = new AlertService(null, null, null, null) {
+            @Override
+            public void syncInventoryAlerts(Inventory ignoredInventory,
+                                             InventoryInsight ignoredInsight,
+                                             StockPrediction ignoredPrediction,
+                                             com.synapsecore.domain.entity.Recommendation ignoredRecommendation,
+                                             String ignoredSource) {
+                alertSynchronized.set(true);
+            }
+        };
+        return new InventoryMonitoringService(
+            predictionService, intelligenceService, recommendationService, alertService);
+    }
+
+    private Inventory inventory(Long inventoryId, Long productId, Long warehouseId) {
+        Tenant tenant = Tenant.builder().id(401L).code("NOOP-TEST").name("No-op Test").build();
+        Warehouse warehouse = Warehouse.builder().id(warehouseId).tenant(tenant)
+            .code("WH-NORTH").name("North").location("North").build();
+        Product product = Product.builder().id(productId).tenant(tenant)
+            .catalogSku("SKU-NOOP").name("No-op Item").category("Test").build();
+        return Inventory.builder()
+            .id(inventoryId)
+            .tenant(tenant)
+            .warehouse(warehouse)
+            .product(product)
+            .quantityOnHand(20L)
+            .quantityReserved(0L)
+            .quantityAvailable(20L)
+            .reorderThreshold(10L)
+            .build();
     }
 }

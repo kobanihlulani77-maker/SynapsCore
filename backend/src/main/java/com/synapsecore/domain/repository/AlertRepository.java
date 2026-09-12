@@ -7,6 +7,8 @@ import java.util.List;
 import java.util.Optional;
 import org.springframework.data.jpa.repository.EntityGraph;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
 
 public interface AlertRepository extends JpaRepository<Alert, Long> {
 
@@ -37,4 +39,12 @@ public interface AlertRepository extends JpaRepository<Alert, Long> {
                                                                                      AlertType type,
                                                                                      AlertStatus status,
                                                                                      String conditionKey);
+
+    @Query("""
+        select a.conditionKey
+        from Alert a
+        where a.status = :status
+          and a.conditionKey is not null
+        """)
+    List<String> findConditionKeysByStatus(@Param("status") AlertStatus status);
 }

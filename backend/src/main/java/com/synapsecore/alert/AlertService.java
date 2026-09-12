@@ -12,6 +12,7 @@ import com.synapsecore.domain.repository.AlertRepository;
 import com.synapsecore.domain.service.TenantOperationalPolicyService;
 import com.synapsecore.event.BusinessEventService;
 import com.synapsecore.fulfillment.FulfillmentAssessment;
+import com.synapsecore.intelligence.InventoryAdvisoryStateSnapshot;
 import com.synapsecore.intelligence.InventoryInsight;
 import com.synapsecore.prediction.StockPrediction;
 import com.synapsecore.scenario.dto.ScenarioAlertProjection;
@@ -430,8 +431,7 @@ public class AlertService {
     }
 
     private String buildInventoryConditionKey(AlertType type, Inventory inventory) {
-        return type.name() + "|PRODUCT:" + inventory.getProduct().getId()
-            + "|WAREHOUSE:" + inventory.getWarehouse().getId();
+        return InventoryAdvisoryStateSnapshot.alertConditionKey(type, inventory);
     }
 
     private String buildFulfillmentConditionKey(AlertType type, FulfillmentTask task) {

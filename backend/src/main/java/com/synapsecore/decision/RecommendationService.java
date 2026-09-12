@@ -13,6 +13,7 @@ import com.synapsecore.domain.repository.RecommendationRepository;
 import com.synapsecore.domain.service.TenantOperationalPolicyService;
 import com.synapsecore.event.BusinessEventService;
 import com.synapsecore.fulfillment.FulfillmentAssessment;
+import com.synapsecore.intelligence.InventoryAdvisoryStateSnapshot;
 import com.synapsecore.intelligence.InventoryInsight;
 import com.synapsecore.prediction.StockPrediction;
 import com.synapsecore.scenario.dto.ScenarioRecommendationProjection;
@@ -306,7 +307,7 @@ public class RecommendationService {
     }
 
     private String inventoryConditionKey(Inventory inventory) {
-        return "INVENTORY|" + inventory.getProduct().getId() + "|" + inventory.getWarehouse().getId();
+        return InventoryAdvisoryStateSnapshot.recommendationConditionKey(inventory);
     }
 
     private String fulfillmentSourceRef(FulfillmentTask task) {

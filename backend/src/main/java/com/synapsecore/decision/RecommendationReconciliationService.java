@@ -1,18 +1,21 @@
 package com.synapsecore.decision;
 
 import com.synapsecore.audit.RequestTraceContext;
+import com.synapsecore.domain.entity.AlertStatus;
 import com.synapsecore.domain.entity.FulfillmentStatus;
 import com.synapsecore.domain.entity.FulfillmentTask;
 import com.synapsecore.domain.entity.Inventory;
 import com.synapsecore.domain.entity.Recommendation;
 import com.synapsecore.domain.entity.RecommendationStatus;
 import com.synapsecore.domain.entity.TenantOperationalPolicy;
+import com.synapsecore.domain.repository.AlertRepository;
 import com.synapsecore.domain.repository.FulfillmentTaskRepository;
 import com.synapsecore.domain.repository.InventoryRepository;
 import com.synapsecore.domain.repository.RecommendationRepository;
 import com.synapsecore.domain.service.TenantOperationalPolicyService;
 import com.synapsecore.fulfillment.FulfillmentService;
 import com.synapsecore.intelligence.InventoryMonitoringService;
+import com.synapsecore.intelligence.InventoryAdvisoryStateSnapshot;
 import com.synapsecore.prediction.StockPredictionService;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
@@ -56,6 +59,7 @@ public class RecommendationReconciliationService {
     private final InventoryRepository inventoryRepository;
     private final FulfillmentTaskRepository fulfillmentTaskRepository;
     private final RecommendationRepository recommendationRepository;
+    private final AlertRepository alertRepository;
     private final InventoryMonitoringService inventoryMonitoringService;
     private final FulfillmentService fulfillmentService;
     private final RecommendationService recommendationService;
@@ -131,6 +135,7 @@ public class RecommendationReconciliationService {
                                                  ReconciliationAccumulator accumulator) {
         Map<String, TenantOperationalPolicy> inventoryPolicies = new LinkedHashMap<>();
         Map<Long, Long> recentUnitsByInventoryId = loadRecentInventoryDemand(input.inventories());
+        InventoryAdvisoryStateSnapshot advisoryState = loadInventoryAdvisoryState();
         for (var inventory : input.inventories()) {
             String tenantCode = inventory.getWarehouse().getTenant().getCode();
             accumulator.inventoryAttempted(tenantCode);
@@ -142,13 +147,14 @@ public class RecommendationReconciliationService {
                 );
                 if (recentUnitsByInventoryId == null) {
                     inventoryMonitoringService.evaluateAfterChange(
-                        inventory, "recommendation-reconciliation", policy);
+                        inventory, "recommendation-reconciliation", policy, advisoryState);
                 } else {
                     inventoryMonitoringService.evaluateAfterChange(
                         inventory,
                         "recommendation-reconciliation",
                         policy,
-                        recentUnitsByInventoryId.getOrDefault(inventory.getId(), 0L)
+                        recentUnitsByInventoryId.getOrDefault(inventory.getId(), 0L),
+                        advisoryState
                     );
                 }
                 accumulator.inventorySucceeded(tenantCode);
@@ -203,6 +209,20 @@ public class RecommendationReconciliationService {
             log.warn("Recommendation reconciliation could not batch recent inventory demand; "
                 + "falling back to bounded per-inventory queries: {}", exception.getMessage());
             return null;
+        }
+    }
+
+    private InventoryAdvisoryStateSnapshot loadInventoryAdvisoryState() {
+        try {
+            return InventoryAdvisoryStateSnapshot.from(
+                recommendationRepository.findAllBySourceTypeAndStatus(
+                    "INVENTORY", RecommendationStatus.CURRENT),
+                alertRepository.findConditionKeysByStatus(AlertStatus.ACTIVE)
+            );
+        } catch (RuntimeException exception) {
+            log.warn("Recommendation reconciliation could not load current inventory advisory state; "
+                + "falling back to full per-inventory synchronization: {}", exception.getMessage());
+            return InventoryAdvisoryStateSnapshot.fullSynchronization();
         }
     }
 
