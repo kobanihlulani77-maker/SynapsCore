@@ -22,6 +22,7 @@ import java.time.Instant;
 import java.util.Iterator;
 import java.util.List;
 import org.junit.jupiter.api.Test;
+import org.slf4j.MDC;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.data.domain.Pageable;
 
@@ -54,6 +55,45 @@ class OperationalDispatchQueueServiceTest {
         assertThat(realtimeService.integrationBroadcasts).isZero();
         assertThat(realtimeService.lastOperationalTenantCode).isEqualTo("PILOT-TENANT");
         assertThat(realtimeService.lastIntegrationTenantCode).isNull();
+    }
+
+    @Test
+    void processPendingWorkRestoresCallerTraceContextAfterInlineDrain() {
+        RequestTraceContext traceContext = new RequestTraceContext();
+        traceContext.setCurrentRequestId("runtime-request");
+        traceContext.setCurrentActor("runtime-admin");
+        traceContext.setCurrentTenant("RUNTIME-TENANT");
+        MDC.put("requestId", "runtime-request");
+        MDC.put("actor", "runtime-admin");
+        MDC.put("tenant", "RUNTIME-TENANT");
+
+        RecordingDashboardService dashboardService = new RecordingDashboardService(traceContext);
+        OperationalDispatchQueueService service = new OperationalDispatchQueueService(
+            inMemoryRepository(List.of(
+                workItem(1L, "DISPATCH-TENANT", OperationalUpdateType.ORDER_FLOW, "order-api", "dispatch-request")
+            )),
+            new StaticObjectProvider<>(dashboardService),
+            new StaticObjectProvider<>(new RecordingRealtimeService()),
+            traceContext,
+            noOpMetricsService(),
+            null
+        );
+
+        try {
+            assertThat(service.processPendingWork()).isEqualTo(1);
+            assertThat(dashboardService.observedRequestId).isEqualTo("dispatch-request");
+            assertThat(dashboardService.observedActor).isEqualTo("system-queue");
+            assertThat(dashboardService.observedTenant).isEqualTo("DISPATCH-TENANT");
+            assertThat(traceContext.getRequiredRequestId()).isEqualTo("runtime-request");
+            assertThat(traceContext.getCurrentActorOrAnonymous()).isEqualTo("runtime-admin");
+            assertThat(traceContext.getCurrentTenantOrDefault()).isEqualTo("RUNTIME-TENANT");
+            assertThat(MDC.get("requestId")).isEqualTo("runtime-request");
+            assertThat(MDC.get("actor")).isEqualTo("runtime-admin");
+            assertThat(MDC.get("tenant")).isEqualTo("RUNTIME-TENANT");
+        } finally {
+            traceContext.clear();
+            MDC.clear();
+        }
     }
 
     private OperationalDispatchWorkItemRepository inMemoryRepository(List<OperationalDispatchWorkItem> workItems) {
@@ -200,14 +240,28 @@ class OperationalDispatchQueueServiceTest {
     private static final class RecordingDashboardService extends DashboardService {
 
         private int refreshCalls;
+        private final RequestTraceContext traceContext;
+        private String observedRequestId;
+        private String observedActor;
+        private String observedTenant;
 
         private RecordingDashboardService() {
+            this(null);
+        }
+
+        private RecordingDashboardService(RequestTraceContext traceContext) {
             super(null, null, null, null, null, null, null, null, null, null);
+            this.traceContext = traceContext;
         }
 
         @Override
         public DashboardSummaryResponse refreshSummary() {
             refreshCalls++;
+            if (traceContext != null) {
+                observedRequestId = traceContext.getRequiredRequestId();
+                observedActor = traceContext.getCurrentActorOrAnonymous();
+                observedTenant = traceContext.getCurrentTenantOrDefault();
+            }
             return null;
         }
     }

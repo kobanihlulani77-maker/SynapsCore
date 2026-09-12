@@ -356,3 +356,14 @@ No duration, exact historical PID, Hikari headroom, or hosted causal attribution
 is claimed for these four source-mapped families. The next local bounded phase
 is Runtime inline-dispatch ownership; hosted progression still requires the
 exact served revision and a complete warm baseline, not elapsed deploy time.
+
+## Runtime Inline Dispatch Context Checkpoint - 2026-09-12
+
+The first Runtime ownership proof reproduced caller-correlation loss after an
+inline queue batch: queued fan-out used the correct queued identity, but the
+Runtime request's original RequestTraceContext and MDC were cleared afterward.
+The batch now restores the caller snapshot from its existing `finally` boundary.
+See [Runtime inline dispatch context evidence](evidence/timeout-recovery-runtime-inline-dispatch-context.md).
+This is a trace-ownership correction, not a Hikari starvation fix. The separate
+read-side question of whether Runtime should synchronously drain deferred global
+work remains open until its direct side-effect/latency proof is complete.

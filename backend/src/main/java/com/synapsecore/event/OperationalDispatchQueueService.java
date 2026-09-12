@@ -114,6 +114,7 @@ public class OperationalDispatchQueueService {
             return 0;
         }
 
+        TraceSnapshot callerTrace = captureTrace();
         OperationalDispatchWorkItem representativeItem = claimedItems.get(0);
         requestTraceContext.setCurrentRequestId(representativeItem.getRequestId());
         requestTraceContext.setCurrentActor(SYSTEM_ACTOR);
@@ -140,10 +141,34 @@ public class OperationalDispatchQueueService {
                 representativeItem.getRequestId(), exception.getMessage());
             return 0;
         } finally {
-            MDC.remove(REQUEST_ID_MDC_KEY);
-            MDC.remove(ACTOR_MDC_KEY);
-            MDC.remove(TENANT_MDC_KEY);
-            requestTraceContext.clear();
+            restoreTrace(callerTrace);
+        }
+    }
+
+    private TraceSnapshot captureTrace() {
+        return new TraceSnapshot(
+            requestTraceContext.getCurrentRequestId().orElse(null),
+            requestTraceContext.getCurrentActor().orElse(null),
+            requestTraceContext.getCurrentTenant().orElse(null),
+            MDC.getCopyOfContextMap()
+        );
+    }
+
+    private void restoreTrace(TraceSnapshot trace) {
+        requestTraceContext.clear();
+        if (trace.requestId() != null) {
+            requestTraceContext.setCurrentRequestId(trace.requestId());
+        }
+        if (trace.actor() != null) {
+            requestTraceContext.setCurrentActor(trace.actor());
+        }
+        if (trace.tenant() != null) {
+            requestTraceContext.setCurrentTenant(trace.tenant());
+        }
+
+        MDC.clear();
+        if (trace.mdc() != null) {
+            MDC.setContextMap(trace.mdc());
         }
     }
 
@@ -225,5 +250,11 @@ public class OperationalDispatchQueueService {
     private record DispatchBatch(String tenantCode,
                                  DispatchSurface surface,
                                  List<OperationalDispatchWorkItem> workItems) {
+    }
+
+    private record TraceSnapshot(String requestId,
+                                 String actor,
+                                 String tenant,
+                                 Map<String, String> mdc) {
     }
 }
