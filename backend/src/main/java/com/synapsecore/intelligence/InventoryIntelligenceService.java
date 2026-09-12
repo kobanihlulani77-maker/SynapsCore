@@ -2,6 +2,7 @@ package com.synapsecore.intelligence;
 
 import com.synapsecore.domain.entity.AlertSeverity;
 import com.synapsecore.domain.entity.Inventory;
+import com.synapsecore.domain.entity.TenantOperationalPolicy;
 import com.synapsecore.domain.service.TenantOperationalPolicyService;
 import com.synapsecore.prediction.StockPrediction;
 import java.util.Locale;
@@ -20,6 +21,12 @@ public class InventoryIntelligenceService {
                 ? inventory.getTenant().getCode()
                 : inventory.getWarehouse().getTenant().getCode()
         );
+        return evaluate(inventory, prediction, policy);
+    }
+
+    public InventoryInsight evaluate(Inventory inventory,
+                                     StockPrediction prediction,
+                                     TenantOperationalPolicy policy) {
         boolean lowStock = inventory.getQuantityAvailable() <= inventory.getReorderThreshold();
         boolean depletionRisk = !lowStock && prediction.depletionRisk();
         boolean criticalQuantity = inventory.getQuantityAvailable() == 0

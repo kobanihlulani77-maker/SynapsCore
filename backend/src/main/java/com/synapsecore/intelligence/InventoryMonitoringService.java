@@ -3,6 +3,7 @@ package com.synapsecore.intelligence;
 import com.synapsecore.alert.AlertService;
 import com.synapsecore.decision.RecommendationService;
 import com.synapsecore.domain.entity.Inventory;
+import com.synapsecore.domain.entity.TenantOperationalPolicy;
 import com.synapsecore.prediction.StockPrediction;
 import com.synapsecore.prediction.StockPredictionService;
 import lombok.RequiredArgsConstructor;
@@ -22,6 +23,21 @@ public class InventoryMonitoringService {
     public void evaluateAfterChange(Inventory inventory, String source) {
         StockPrediction prediction = stockPredictionService.estimate(inventory);
         InventoryInsight insight = inventoryIntelligenceService.evaluate(inventory, prediction);
+        persistAdvisoryState(inventory, source, prediction, insight);
+    }
+
+    public void evaluateAfterChange(Inventory inventory,
+                                    String source,
+                                    TenantOperationalPolicy policy) {
+        StockPrediction prediction = stockPredictionService.estimate(inventory, policy);
+        InventoryInsight insight = inventoryIntelligenceService.evaluate(inventory, prediction, policy);
+        persistAdvisoryState(inventory, source, prediction, insight);
+    }
+
+    private void persistAdvisoryState(Inventory inventory,
+                                      String source,
+                                      StockPrediction prediction,
+                                      InventoryInsight insight) {
         com.synapsecore.domain.entity.Recommendation recommendation = null;
         try {
             recommendation = recommendationService.createForInventory(inventory, insight, prediction, source);

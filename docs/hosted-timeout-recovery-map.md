@@ -570,3 +570,33 @@ records now dominate the recommendation pass and overlap the remaining slow
 authenticated reads. Diagnose its query, transaction, and no-op persistence
 behavior before changing code; do not widen the pool, raise timeouts, or run
 broad E2E as a substitute for that mapping.
+
+## Recommendation Inventory Policy Lookup Checkpoint - 2026-09-12
+
+The 155-item Inventory path loaded the same tenant operational policy once in
+prediction and again in intelligence for every record. Those transactional
+service calls created at least 310 policy repository calls during the first
+bounded post-amplification pass, repeatedly resolving the same tenant policies.
+
+Scheduled reconciliation now resolves one policy on first use per distinct
+Inventory tenant and supplies it to both calculations. Resolution remains inside
+the per-item failure boundary, and the cache exists for one run only. Every
+Inventory record still runs through prediction, intelligence, Recommendation
+persistence, and Alert synchronization; event-driven evaluation continues to
+resolve current policy through its existing entrypoint. This is query-work
+reduction, not skipped reconciliation or cached cross-run state.
+
+The focused gate passed 15 tests, the expanded affected-domain rerun passed 69
+tests, and the full backend suite passed 373 tests with no failures, errors, or
+skips. One unchanged scheduled-pull test missed its local HTTP-server latch in
+the first expanded attempt, then passed all repetitions alone and in the clean
+expanded rerun. That isolated harness-timing result is not attributed to this
+policy change.
+
+CI, exact deployment confirmation, and one bounded hosted measurement remain
+before live closure. The live run must preserve 155 successful Inventory work
+units and one Fulfillment warehouse work unit while comparing reconciliation,
+Dashboard snapshot, and Runtime duration against the 83,203 ms / 39,526 ms /
+23,483 ms baseline.
+
+`RECOMMENDATION_INVENTORY_POLICY_LOOKUP_AMPLIFICATION = CORRECTED LOCALLY`

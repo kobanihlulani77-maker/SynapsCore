@@ -166,3 +166,45 @@ numbered browser test.
 `RECOMMENDATION_SCHEDULER_ROUTING = VERIFIED LIVE`
 
 `RECOMMENDATION_FULFILLMENT_WAREHOUSE_AMPLIFICATION = VERIFIED LIVE`
+
+## Inventory Policy Lookup Amplification Correction
+
+The first post-warehouse-bounding reconciliation still took 83,203 ms while
+successfully evaluating 155 distinct Inventory records. Source tracing found a
+second bounded amplification seam in each Inventory evaluation:
+
+- `StockPredictionService.estimate(Inventory)` loaded the tenant operational
+  policy;
+- `InventoryIntelligenceService.evaluate(Inventory, StockPrediction)` loaded
+  the same tenant operational policy again;
+- both lookups called the transactional policy service and therefore performed
+  at least 310 policy repository calls across the 155-item pass, repeatedly
+  resolving the same policy for records belonging to the same tenant.
+
+Scheduled reconciliation now loads one policy when it first encounters each
+distinct Inventory tenant and supplies it to prediction and intelligence through
+explicit overloads. The cache lives only for that run and policy resolution
+remains inside the existing per-item failure boundary, so one tenant lookup
+cannot abort the whole pass. The existing methods remain unchanged for
+event-driven Inventory evaluation, all 155 Inventory records are still
+evaluated, and Recommendation/Alert persistence and condition-lock semantics
+are unchanged.
+
+Direct tests prove that three Inventory records across two tenants perform two
+policy loads and that the scheduled monitoring overload does not call either
+legacy policy-loading method. Local verification:
+
+- focused reconciliation and inventory-intelligence gate: 15 tests, 0
+  failures, 0 errors, 0 skipped;
+- expanded Recommendation, Alert, Fulfillment, scheduler, and connection gate:
+  69 tests, 0 failures, 0 errors, 0 skipped;
+- the unchanged scheduled-pull external-delay test had one missed 10-second
+  local-server latch during the first combined run, then passed all three
+  repetitions alone and all three repetitions in the clean expanded rerun;
+- full backend suite: 373 tests, 0 failures, 0 errors, 0 skipped.
+
+Production packaging, documentation, CI, exact deployed-revision confirmation,
+and one bounded hosted reconciliation measurement remain required. No Hikari,
+timeout, scheduler, database, or infrastructure setting changes.
+
+`RECOMMENDATION_INVENTORY_POLICY_LOOKUP_AMPLIFICATION = CORRECTED LOCALLY`

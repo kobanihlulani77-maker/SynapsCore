@@ -1,6 +1,7 @@
 package com.synapsecore.prediction;
 
 import com.synapsecore.domain.entity.Inventory;
+import com.synapsecore.domain.entity.TenantOperationalPolicy;
 import com.synapsecore.domain.repository.OrderItemRepository;
 import com.synapsecore.domain.service.TenantOperationalPolicyService;
 import java.time.Instant;
@@ -16,12 +17,16 @@ public class StockPredictionService {
     private final TenantOperationalPolicyService tenantOperationalPolicyService;
 
     public StockPrediction estimate(Inventory inventory) {
-        Instant since = Instant.now().minus(1, ChronoUnit.HOURS);
         var policy = tenantOperationalPolicyService.getPolicy(
             inventory.getTenant() != null
                 ? inventory.getTenant().getCode()
                 : inventory.getWarehouse().getTenant().getCode()
         );
+        return estimate(inventory, policy);
+    }
+
+    public StockPrediction estimate(Inventory inventory, TenantOperationalPolicy policy) {
+        Instant since = Instant.now().minus(1, ChronoUnit.HOURS);
         long recentUnits = orderItemRepository.sumRecentQuantityByProductAndWarehouse(
             inventory.getProduct().getId(),
             inventory.getWarehouse().getId(),

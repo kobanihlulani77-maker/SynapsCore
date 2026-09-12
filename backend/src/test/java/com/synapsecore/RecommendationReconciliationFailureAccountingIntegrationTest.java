@@ -8,6 +8,7 @@ import com.synapsecore.domain.entity.AuditLog;
 import com.synapsecore.domain.entity.Inventory;
 import com.synapsecore.domain.entity.Product;
 import com.synapsecore.domain.entity.Tenant;
+import com.synapsecore.domain.entity.TenantOperationalPolicy;
 import com.synapsecore.domain.entity.Warehouse;
 import com.synapsecore.domain.repository.AuditLogRepository;
 import com.synapsecore.domain.repository.InventoryRepository;
@@ -79,6 +80,13 @@ class RecommendationReconciliationFailureAccountingIntegrationTest {
             return new InventoryMonitoringService(null, null, null, null) {
                 @Override
                 public void evaluateAfterChange(Inventory inventory, String source) {
+                    evaluateAfterChange(inventory, source, null);
+                }
+
+                @Override
+                public void evaluateAfterChange(Inventory inventory,
+                                                String source,
+                                                TenantOperationalPolicy policy) {
                     if (inventory.getProduct().resolveCatalogSku().endsWith("FAIL")) {
                         throw new IllegalStateException("synthetic per-item failure");
                     }

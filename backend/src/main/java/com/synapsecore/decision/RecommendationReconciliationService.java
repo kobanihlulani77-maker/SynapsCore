@@ -6,9 +6,11 @@ import com.synapsecore.domain.entity.FulfillmentTask;
 import com.synapsecore.domain.entity.Inventory;
 import com.synapsecore.domain.entity.Recommendation;
 import com.synapsecore.domain.entity.RecommendationStatus;
+import com.synapsecore.domain.entity.TenantOperationalPolicy;
 import com.synapsecore.domain.repository.FulfillmentTaskRepository;
 import com.synapsecore.domain.repository.InventoryRepository;
 import com.synapsecore.domain.repository.RecommendationRepository;
+import com.synapsecore.domain.service.TenantOperationalPolicyService;
 import com.synapsecore.fulfillment.FulfillmentService;
 import com.synapsecore.intelligence.InventoryMonitoringService;
 import java.time.Instant;
@@ -20,6 +22,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
+import java.util.function.Function;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
@@ -56,6 +59,7 @@ public class RecommendationReconciliationService {
     private final RecommendationService recommendationService;
     private final RecommendationReconciliationEvidenceService evidenceService;
     private final RequestTraceContext requestTraceContext;
+    private final TenantOperationalPolicyService tenantOperationalPolicyService;
 
     @Value("${synapsecore.recommendation.reconciliation.enabled:true}")
     private boolean enabled;
@@ -121,12 +125,21 @@ public class RecommendationReconciliationService {
     }
 
     private ReconciliationAccumulator reconcile(ReconciliationInput input,
-                                                ReconciliationAccumulator accumulator) {
+                                                 ReconciliationAccumulator accumulator) {
+        Map<String, TenantOperationalPolicy> inventoryPolicies = new LinkedHashMap<>();
         for (var inventory : input.inventories()) {
             String tenantCode = inventory.getWarehouse().getTenant().getCode();
             accumulator.inventoryAttempted(tenantCode);
             try {
-                inventoryMonitoringService.evaluateAfterChange(inventory, "recommendation-reconciliation");
+                inventoryMonitoringService.evaluateAfterChange(
+                    inventory,
+                    "recommendation-reconciliation",
+                    resolveInventoryPolicy(
+                        inventoryPolicies,
+                        tenantCode,
+                        tenantOperationalPolicyService::getPolicy
+                    )
+                );
                 accumulator.inventorySucceeded(tenantCode);
             } catch (RuntimeException exception) {
                 accumulator.inventoryFailed(tenantCode);
@@ -181,6 +194,14 @@ public class RecommendationReconciliationService {
         return representatives;
     }
 
+    static TenantOperationalPolicy resolveInventoryPolicy(
+        Map<String, TenantOperationalPolicy> policies,
+        String tenantCode,
+        Function<String, TenantOperationalPolicy> policyLoader
+    ) {
+        return policies.computeIfAbsent(tenantCode, policyLoader);
+    }
+
     private void safelyRecordStarted(String runId, Instant startedAt, Set<String> tenantCodes) {
         try {
             evidenceService.recordStarted(runId, startedAt, tenantCodes);
@@ -205,7 +226,7 @@ public class RecommendationReconciliationService {
 
     private record ReconciliationInput(
         List<Inventory> inventories,
-        List<com.synapsecore.domain.entity.FulfillmentTask> activeTasks,
+        List<FulfillmentTask> activeTasks,
         List<Recommendation> fulfillmentRecommendations
     ) {
 
