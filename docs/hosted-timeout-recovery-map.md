@@ -324,3 +324,35 @@ and hosted gates are in
 This removes a proven local double-borrow deadlock, not all hosted latency or
 all transient queueing. The product watchdog's scheduler selection is the next
 bounded diagnostics check; no further scheduler behavior change is included.
+
+Product correction `6cb6ddbf755f664b3fb1ae21d9fc46f0207404b1` passed CI run
+`34230885610`: 348 backend tests, frontend build, and both Compose checks.
+Ten-request tests reached all ten catalog boundaries; transient acquisition
+waiters still occurred, but the circular double-borrow deadlock did not.
+
+## Product Watchdog Checkpoint - 2026-09-08
+
+The actual two-scheduler Spring configuration reproduced the product watchdog
+silently returning NO_OP. Its optional provider is now qualified to the existing
+main scheduler, without changing scheduler count, frequency, or pool capacity.
+Verification and limitations are recorded in
+[Product watchdog wiring evidence](evidence/timeout-recovery-product-watchdog-wiring.md).
+This restores a diagnostic, not proof that the historical ten holders are known.
+
+## Next Holder Work - Prepared, Not Cleared
+
+The following source map is a work queue, not measured connection-hold evidence.
+Keep the completed healthy recommendation capture locked unless contradictory
+runtime evidence appears.
+
+| Order | Entry and ownership boundary | Next bounded proof |
+| --- | --- | --- |
+| 1 | `SystemRuntimeService.getRuntimeStatus/getTenantRuntimeStatus` calls `drainOperationalDispatchQueue`, which may invoke global `OperationalDispatchQueueService.processPendingWork` five times. The queue has no outer transaction and an instance-local draining guard. | Separate inline dispatch latency from database retention; determine whether HTTP trace/tenant context survives a dispatched batch. Measure repository/downstream transaction boundaries rather than treating the whole drain as one connection hold. |
+| 2 | `IntegrationReplayAutomationService` calls per-record `IntegrationReplayService` TransactionTemplate attempts. Order creation joins the attempt; failed-attempt recording occurs after rollback. | Measure one attempt and overlapping HTTP work. Preserve proven replay atomicity; do not turn the whole batch into one transaction or infer its duration from scheduler duration. |
+| 3 | `OrderService.createOrderForTenant` is transactional and includes line reservation, signal reevaluation, Fulfillment initialization, event/audit persistence, and dispatch publication. | Distinguish aggregate SQL time from work between calls within that required atomic write. Do not split inventory/order atomicity without a demonstrated seam. |
+| 4 | `IntegrationScheduledPullWorkerService` has no outer transaction on its scheduled entrypoint; it performs external fetch/body reads before ingestion calls. | Check external response/body delay separately from JDBC retention and main-scheduler delay. Absence of an annotation alone is not measured proof of zero borrowed connections. |
+
+No duration, exact historical PID, Hikari headroom, or hosted causal attribution
+is claimed for these four source-mapped families. The next local bounded phase
+is Runtime inline-dispatch ownership; hosted progression still requires the
+exact served revision and a complete warm baseline, not elapsed deploy time.

@@ -93,8 +93,12 @@ Full backend: **348 tests passed, 0 failures/errors/skips**, BUILD SUCCESS;
 5m20s, completed `2026-09-08T13:14:34Z`.
 Log: `backend/target/product-preflight-full-suite.log`.
 Backend packaging passed (exit 0); log: `backend/target/product-preflight-package.log`.
-CI is pending at this pre-push checkpoint. No hosted verification or served
-revision is claimed.
+Committed and pushed: `6cb6ddbf755f664b3fb1ae21d9fc46f0207404b1`.
+[CI run 34230885610](https://github.com/kobanihlulani77-maker/SynapsCore/actions/runs/34230885610)
+passed all 348 backend tests, frontend build, and both Compose checks. Backend
+completed `2026-09-08T13:19:55Z` in 3m56s. CI overlap cases reached 10/10 for
+both paths, with peak waiters 0 (create) and 5 (import), and complete release.
+No hosted verification or served revision is claimed.
 
 ## Remaining Boundaries
 

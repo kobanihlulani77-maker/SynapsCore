@@ -4,10 +4,10 @@ import java.time.Instant;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ScheduledFuture;
-import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.BeansException;
 import org.springframework.beans.factory.ObjectProvider;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.dao.DataAccessException;
 import org.springframework.jdbc.core.ConnectionCallback;
 import org.springframework.jdbc.core.JdbcTemplate;
@@ -19,7 +19,6 @@ import org.springframework.stereotype.Service;
  * SQL parameters or making the diagnostic path externally callable.
  */
 @Service
-@RequiredArgsConstructor
 @Slf4j
 public class ProductWriteContentionDiagnostics {
 
@@ -28,6 +27,12 @@ public class ProductWriteContentionDiagnostics {
 
     private final JdbcTemplate jdbcTemplate;
     private final ObjectProvider<TaskScheduler> taskSchedulerProvider;
+
+    public ProductWriteContentionDiagnostics(JdbcTemplate jdbcTemplate,
+            @Qualifier("synapseScheduledTaskScheduler") ObjectProvider<TaskScheduler> taskSchedulerProvider) {
+        this.jdbcTemplate = jdbcTemplate;
+        this.taskSchedulerProvider = taskSchedulerProvider;
+    }
 
     public ProductWriteWatch begin(String requestId, String tenantCode, long startedAtNanos) {
         if (!isPostgres()) {
