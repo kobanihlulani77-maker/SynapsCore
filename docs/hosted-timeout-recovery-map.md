@@ -818,3 +818,33 @@ by this result.
 `DASHBOARD_SNAPSHOT_INVENTORY_QUERY_AMPLIFICATION = VERIFIED LIVE`
 
 `AUTHENTICATED_DASHBOARD_RUNTIME_LATENCY = STILL OPEN`
+
+## Authenticated Composition Snapshot Reuse Checkpoint - 2026-09-19
+
+The next bounded source map found duplicate reads inside the authenticated
+Dashboard snapshot and Runtime composition paths. Dashboard snapshot loaded
+recent audit logs, connector telemetry, Replay queue records, and Scenario
+notifications for its response, then `SystemIncidentService` loaded those same
+sources again while composing incidents. Runtime loaded rich connector
+telemetry for connector diagnostics, then incident composition loaded the same
+connector telemetry again. Runtime also repeated pending and failed dispatch
+counts after already loading them for its backbone summary.
+
+Dashboard snapshot now supplies its exact source snapshots to incident
+composition. Runtime loads connector telemetry and its backbone once, then
+reuses those values for incident, diagnostic, and telemetry composition.
+Incident visibility resolves the current operator once per composition instead
+of once per candidate incident. Standalone incident reads retain their original
+source-loading path, and incident filtering, ordering, limits, tenant and
+warehouse scope, and response contracts are unchanged.
+
+No transaction boundary, Hikari setting, timeout, scheduler, database schema,
+frontend behavior, or infrastructure setting changed. Direct snapshot-reuse
+tests and the batching regression gate passed six tests. The expanded Realtime,
+MVP-flow, and production-hardening gate passed 124 tests with zero failures,
+errors, or skips. The complete backend suite passed 385 tests with zero
+failures, errors, or skips, and production packaging succeeded.
+
+`AUTHENTICATED_COMPOSITION_DUPLICATE_READS = CORRECTED LOCALLY`
+
+`AUTHENTICATED_DASHBOARD_RUNTIME_LATENCY = STILL OPEN`

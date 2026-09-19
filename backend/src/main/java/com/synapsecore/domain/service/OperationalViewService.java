@@ -227,6 +227,17 @@ public class OperationalViewService {
     }
 
     private DashboardSnapshotResponse buildSnapshot() {
+        List<AuditLogResponse> auditLogs = getRecentAuditLogs();
+        List<IntegrationConnectorResponse> integrationConnectors = getIntegrationConnectors();
+        List<IntegrationReplayRecordResponse> integrationReplayQueue = getIntegrationReplayQueue();
+        List<ScenarioNotificationResponse> scenarioNotifications = getScenarioNotifications();
+        List<SystemIncidentResponse> systemIncidents = systemIncidentService.getActiveIncidents(
+            auditLogs,
+            integrationReplayQueue,
+            integrationConnectors,
+            scenarioNotifications
+        );
+
         return new DashboardSnapshotResponse(
             dashboardService.getSummary(),
             getAlertFeed(),
@@ -235,12 +246,12 @@ public class OperationalViewService {
             getFulfillmentOverview(),
             getRecentOrders(),
             getRecentEvents(),
-            getRecentAuditLogs(),
-            getSystemIncidents(),
-            getIntegrationConnectors(),
+            auditLogs,
+            systemIncidents,
+            integrationConnectors,
             getRecentIntegrationImportRuns(),
-            getIntegrationReplayQueue(),
-            getScenarioNotifications(),
+            integrationReplayQueue,
+            scenarioNotifications,
             getSlaEscalations(),
             getRecentScenarios(),
             Instant.now()

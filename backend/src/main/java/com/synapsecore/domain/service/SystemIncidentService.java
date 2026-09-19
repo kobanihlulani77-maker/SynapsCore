@@ -43,36 +43,64 @@ public class SystemIncidentService {
 
     // Scenario notification reads can escalate overdue plans in their own write transaction.
     public List<SystemIncidentResponse> getActiveIncidents() {
+        return getActiveIncidents(null, null, null, null);
+    }
+
+    public List<SystemIncidentResponse> getActiveIncidentsWithConnectors(
+            List<IntegrationConnectorResponse> connectorSnapshot) {
+        return getActiveIncidents(null, null, connectorSnapshot, null);
+    }
+
+    public List<SystemIncidentResponse> getActiveIncidents(
+            List<AuditLogResponse> auditSnapshot,
+            List<IntegrationReplayRecordResponse> replaySnapshot,
+            List<IntegrationConnectorResponse> connectorSnapshot,
+            List<ScenarioNotificationResponse> scenarioNotificationSnapshot) {
+        Optional<com.synapsecore.domain.entity.AccessOperator> currentOperator =
+            accessDirectoryService.getCurrentOperator();
+        List<AuditLogResponse> auditLogs = auditSnapshot == null
+            ? auditLogService.getRecentAuditLogs()
+            : auditSnapshot;
+        List<IntegrationReplayRecordResponse> replayQueue = replaySnapshot == null
+            ? integrationReplayService.getReplayQueue()
+            : replaySnapshot;
+        List<IntegrationConnectorResponse> connectors = connectorSnapshot == null
+            ? integrationConnectorService.getConnectors()
+            : connectorSnapshot;
+        List<ScenarioNotificationResponse> scenarioNotifications = scenarioNotificationSnapshot == null
+            ? scenarioHistoryService.getScenarioNotifications()
+            : scenarioNotificationSnapshot;
+
         return Stream.of(
-                auditLogService.getRecentAuditLogs().stream()
+                auditLogs.stream()
                     .filter(log -> "FAILURE".equals(log.status().name()))
                     .filter(this::isOperationalAuditFailure)
-                    .filter(log -> isVisibleToCurrentOperator(null))
+                    .filter(log -> isVisibleToOperator(currentOperator, null))
                     .map(this::toAuditIncident),
                 integrationInboundRecordRepository.findTop8ByTenantCodeIgnoreCaseAndStatusInOrderByUpdatedAtDesc(
                         tenantContextService.getCurrentTenantCodeOrDefault(),
                         List.of(IntegrationInboundStatus.REJECTED, IntegrationInboundStatus.REPLAY_QUEUED)
                     )
                     .stream()
-                    .filter(record -> isVisibleToCurrentOperator(record.getWarehouseCode()))
+                    .filter(record -> isVisibleToOperator(currentOperator, record.getWarehouseCode()))
                     .map(this::toInboundIncident),
-                integrationReplayService.getReplayQueue().stream()
-                    .filter(record -> isVisibleToCurrentOperator(record.warehouseCode()))
+                replayQueue.stream()
+                    .filter(record -> isVisibleToOperator(currentOperator, record.warehouseCode()))
                     .map(this::toReplayIncident),
-                integrationConnectorService.getConnectors().stream()
+                connectors.stream()
                     .filter(connector -> connector.healthStatus() != IntegrationConnectorHealthStatus.LIVE)
-                    .filter(connector -> isVisibleToCurrentOperator(connector.defaultWarehouseCode()))
+                    .filter(connector -> isVisibleToOperator(currentOperator, connector.defaultWarehouseCode()))
                     .map(this::toConnectorIncident),
                 operationalDispatchWorkItemRepository.findTop8ByTenantCodeIgnoreCaseAndStatusOrderByUpdatedAtDesc(
                         tenantContextService.getCurrentTenantCodeOrDefault(),
                         OperationalDispatchStatus.FAILED
                     )
                     .stream()
-                    .filter(workItem -> isVisibleToCurrentOperator(null))
+                    .filter(workItem -> isVisibleToOperator(currentOperator, null))
                     .map(this::toDispatchIncident),
-                scenarioHistoryService.getScenarioNotifications().stream()
+                scenarioNotifications.stream()
                     .filter(ScenarioNotificationResponse::actionRequired)
-                    .filter(notification -> isVisibleToCurrentOperator(notification.warehouseCode()))
+                    .filter(notification -> isVisibleToOperator(currentOperator, notification.warehouseCode()))
                     .map(this::toScenarioIncident)
             )
             .flatMap(stream -> stream)
@@ -208,8 +236,8 @@ public class SystemIncidentService {
         return !details.matches("^403\\b.*");
     }
 
-    private boolean isVisibleToCurrentOperator(String warehouseCode) {
-        Optional<com.synapsecore.domain.entity.AccessOperator> currentOperator = accessDirectoryService.getCurrentOperator();
+    private boolean isVisibleToOperator(Optional<com.synapsecore.domain.entity.AccessOperator> currentOperator,
+                                        String warehouseCode) {
         if (currentOperator.isEmpty()) {
             return true;
         }

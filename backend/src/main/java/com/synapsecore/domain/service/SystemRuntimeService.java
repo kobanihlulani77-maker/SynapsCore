@@ -30,6 +30,7 @@ import com.synapsecore.domain.repository.IntegrationReplayRecordRepository;
 import com.synapsecore.domain.repository.OperationalDispatchWorkItemRepository;
 import com.synapsecore.event.OperationalDispatchQueueService;
 import com.synapsecore.integration.IntegrationConnectorService;
+import com.synapsecore.integration.dto.IntegrationConnectorResponse;
 import com.synapsecore.observability.OperationalMetricsService;
 import com.synapsecore.observability.OperationalAlertHookService;
 import com.synapsecore.realtime.RealtimeBrokerMode;
@@ -128,6 +129,8 @@ public class SystemRuntimeService {
         }
         LivenessState livenessState = applicationAvailability.getLivenessState();
         ReadinessState readinessState = applicationAvailability.getReadinessState();
+        SystemBackboneSummary backbone = buildBackboneSummary();
+        List<IntegrationConnectorResponse> connectors = integrationConnectorService.getConnectors();
 
         return new SystemRuntimeResponse(
             applicationName,
@@ -150,11 +153,11 @@ public class SystemRuntimeService {
             corsProperties.getAllowedOrigins(),
             publicAppUrl,
             publicApiUrl,
-            buildTelemetrySummary(),
-            buildBackboneSummary(),
+            buildTelemetrySummary(backbone.pendingDispatchCount(), backbone.failedDispatchCount()),
+            backbone,
             buildMetricsSummary(),
-            buildDiagnosticsSummary(),
-            buildConnectorDiagnostics(),
+            buildDiagnosticsSummary(connectors),
+            buildConnectorDiagnostics(connectors),
             Instant.now()
         );
     }
@@ -163,6 +166,7 @@ public class SystemRuntimeService {
         LivenessState livenessState = applicationAvailability.getLivenessState();
         ReadinessState readinessState = applicationAvailability.getReadinessState();
         SystemBackboneSummary backbone = buildBackboneSummary();
+        List<IntegrationConnectorResponse> connectors = integrationConnectorService.getConnectors();
 
         return new TenantRuntimeResponse(
             applicationName,
@@ -171,7 +175,7 @@ public class SystemRuntimeService {
             livenessState.name(),
             readinessState.name(),
             secureSessionCookies,
-            buildTelemetrySummary(),
+            buildTelemetrySummary(backbone.pendingDispatchCount(), backbone.failedDispatchCount()),
             new TenantBackboneSummary(
                 backbone.realtimeBrokerMode(),
                 backbone.realtimeBrokerDetail(),
@@ -181,8 +185,8 @@ public class SystemRuntimeService {
                 backbone.latestProcessedAt()
             ),
             buildMetricsSummary(),
-            buildDiagnosticsSummary(),
-            buildConnectorDiagnostics(),
+            buildDiagnosticsSummary(connectors),
+            buildConnectorDiagnostics(connectors),
             Instant.now()
         );
     }
@@ -247,7 +251,8 @@ public class SystemRuntimeService {
         return value.trim();
     }
 
-    private SystemTelemetrySummary buildTelemetrySummary() {
+    private SystemTelemetrySummary buildTelemetrySummary(long pendingDispatchCount,
+                                                          long failedDispatchCount) {
         String tenantCode = tenantContextService.getCurrentTenantCodeOrDefault();
         Instant windowStart = Instant.now().minus(Duration.ofHours(diagnosticsWindowHours));
         long recentImportIssues = integrationImportRunRepository
@@ -291,14 +296,8 @@ public class SystemRuntimeService {
                 tenantCode,
                 List.of(FulfillmentStatus.DELAYED, FulfillmentStatus.EXCEPTION)
             ),
-            operationalDispatchWorkItemRepository.countByTenantCodeIgnoreCaseAndStatusIn(
-                tenantCode,
-                List.of(OperationalDispatchStatus.PENDING, OperationalDispatchStatus.PROCESSING)
-            ),
-            operationalDispatchWorkItemRepository.countByTenantCodeIgnoreCaseAndStatusIn(
-                tenantCode,
-                List.of(OperationalDispatchStatus.FAILED)
-            )
+            pendingDispatchCount,
+            failedDispatchCount
         );
     }
 
@@ -350,7 +349,7 @@ public class SystemRuntimeService {
         return operationalMetricsService.snapshotForTenant(tenantContextService.getCurrentTenantCodeOrDefault());
     }
 
-    private SystemDiagnosticsSummary buildDiagnosticsSummary() {
+    private SystemDiagnosticsSummary buildDiagnosticsSummary(List<IntegrationConnectorResponse> connectors) {
         Instant windowStart = Instant.now().minus(Duration.ofHours(diagnosticsWindowHours));
         String tenantCode = tenantContextService.getCurrentTenantCodeOrDefault();
 
@@ -402,7 +401,7 @@ public class SystemRuntimeService {
                 tenantCode,
                 AuditStatus.FAILURE,
                 windowStart),
-            systemIncidentService.getActiveIncidents().size(),
+            systemIncidentService.getActiveIncidentsWithConnectors(connectors).size(),
             businessEventRepository.findTopByTenantCodeIgnoreCaseOrderByCreatedAtDesc(tenantCode)
                 .map(event -> event.getCreatedAt())
                 .orElse(null),
@@ -412,8 +411,9 @@ public class SystemRuntimeService {
         );
     }
 
-    private List<SystemConnectorDiagnosticSummary> buildConnectorDiagnostics() {
-        return integrationConnectorService.getConnectors().stream()
+    private List<SystemConnectorDiagnosticSummary> buildConnectorDiagnostics(
+            List<IntegrationConnectorResponse> connectors) {
+        return connectors.stream()
             .filter(connector -> connector.healthStatus() != com.synapsecore.integration.dto.IntegrationConnectorHealthStatus.LIVE
                 || connector.recentInboundFailureCount() > 0
                 || connector.pendingReplayCount() > 0
