@@ -422,3 +422,34 @@ snapshot baseline of 9,634-24,890 ms.
 `DASHBOARD_SNAPSHOT_INVENTORY_QUERY_AMPLIFICATION = CORRECTED LOCALLY`
 
 `AUTHENTICATED_DASHBOARD_RUNTIME_LATENCY = STILL OPEN`
+
+## Dashboard Inventory Projection Batching Live Result
+
+Commit `63deb26339b84a346278b91267fafb8bcf5f3a73` passed SynapseCore CI
+run 404 in 5m11s. Render's first auto-deploy was canceled after 11m24s at the
+internal health-check gate. A manual deployment of the same commit then became
+Live, and the six-flag connection gate was fully green.
+
+One bounded authenticated session produced the following exact timings:
+
+- login: 4,063 ms;
+- Dashboard summary: 2,462 ms, 1,981 ms, and 8,264 ms;
+- Dashboard snapshot: 31,097 ms, 25,642 ms, and 21,088 ms;
+- Runtime: 31,481 ms, 20,694 ms, and 15,130 ms;
+- logout: 464 ms.
+
+Every snapshot returned HTTP 200 and all 155 Inventory rows. Render had no
+`Dashboard snapshot could not batch recent inventory demand` warning and no
+Hikari connection-acquisition timeout in the inspected process window. The
+grouped read is therefore active without correctness fallback, and the former
+per-Inventory demand-query amplification is verified removed in production.
+
+The endpoint remains unacceptably slow. This proof does not support another
+Dashboard Inventory batching change or any pool, timeout, database, frontend,
+or infrastructure adjustment. It moves the bounded investigation to the
+serial Runtime composition path, where repeated repository reads remain
+visible in source.
+
+`DASHBOARD_SNAPSHOT_INVENTORY_QUERY_AMPLIFICATION = VERIFIED LIVE`
+
+`AUTHENTICATED_DASHBOARD_RUNTIME_LATENCY = STILL OPEN`

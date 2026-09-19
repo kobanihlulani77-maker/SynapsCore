@@ -786,3 +786,35 @@ hosted snapshot/runtime measurements are required before production closure.
 `DASHBOARD_SNAPSHOT_INVENTORY_QUERY_AMPLIFICATION = CORRECTED LOCALLY`
 
 `AUTHENTICATED_DASHBOARD_RUNTIME_LATENCY = STILL OPEN`
+
+## Dashboard Inventory Projection Batching Live Result - 2026-09-19
+
+Commit `63deb26339b84a346278b91267fafb8bcf5f3a73` passed SynapseCore CI
+run 404 in 5m11s. The initial Render auto-deploy remained at its internal
+health check and was canceled after 11m24s. A manual deploy of the same exact
+commit then completed, Render identified it as the last successfully deployed
+commit, and all six live-connection flags were green before authenticated
+measurement began.
+
+The bounded proof logged in once in 4,063 ms and ran three sequential samples.
+Dashboard summary completed in 2,462 ms, 1,981 ms, and 8,264 ms. Dashboard
+snapshot completed in 31,097 ms, 25,642 ms, and 21,088 ms, returning HTTP 200
+and all 155 visible Inventory rows every time. Runtime completed in 31,481 ms,
+20,694 ms, and 15,130 ms. Logout completed in 464 ms.
+
+Render contained neither the grouped-demand fallback warning nor a Hikari
+connection-acquisition timeout in the inspected process window. The deployed
+grouped path therefore retained complete Inventory truth without falling back
+to the former per-row demand-query path. The exact query amplification is
+verified removed in production.
+
+This is not an endpoint-latency closure. The measured snapshot range of
+21,088-31,097 ms did not improve on the prior 9,634-24,890 ms range, and Runtime
+remained similarly slow. The next bounded seam is the serial authenticated
+Runtime composition path and its duplicated repository work. No Hikari,
+timeout, frontend, database, scheduler, or infrastructure change is justified
+by this result.
+
+`DASHBOARD_SNAPSHOT_INVENTORY_QUERY_AMPLIFICATION = VERIFIED LIVE`
+
+`AUTHENTICATED_DASHBOARD_RUNTIME_LATENCY = STILL OPEN`
