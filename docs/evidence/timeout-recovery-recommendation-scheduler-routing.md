@@ -482,3 +482,34 @@ with zero failures, errors, or skips, and production packaging succeeded.
 `AUTHENTICATED_COMPOSITION_DUPLICATE_READS = CORRECTED LOCALLY`
 
 `AUTHENTICATED_DASHBOARD_RUNTIME_LATENCY = STILL OPEN`
+
+## Authenticated Composition Snapshot Reuse Live Result
+
+Commit `0d1e56e5308351a6464af3d8edcd0895b0602deb` passed SynapseCore CI
+run 406 in 5m07s and became Live through an exact Render auto-deploy lasting
+5m23s. The six-flag live gate was fully green before the bounded authenticated
+proof began at `2026-09-19T12:24:27.4281088Z`.
+
+The proof logged in once in 6,634 ms, then measured three sequential samples.
+Dashboard summary completed in 5,413 ms, 1,975 ms, and 487 ms. Dashboard
+snapshot completed in 27,385 ms, 11,795 ms, and 8,016 ms. Runtime completed in
+10,633 ms, 9,443 ms, and 7,722 ms. Logout completed in 625 ms. Every request
+returned HTTP 200, and all three snapshots retained all 155 visible Inventory
+rows.
+
+Compared with the prior exact-deployment proof, snapshot average improved from
+25,942 ms to 15,732 ms, while Runtime average improved from 22,435 ms to 9,266
+ms. Render showed no Hikari connection-acquisition timeout in the inspected
+window. Adjacent post-proof scheduler telemetry retained ten idle connections
+and zero waiters during dispatch, Replay automation, and scheduled-pull work.
+
+This verifies the request-local snapshot reuse in production and materially
+reduces the shared authenticated composition latency. The endpoint family is
+not yet fully closed because the first snapshot remained 27,385 ms. That
+remaining serial composition cost stays the next bounded source target; this
+result does not justify Hikari, timeout, database, frontend, scheduler, or
+infrastructure changes, nor a broad E2E run.
+
+`AUTHENTICATED_COMPOSITION_DUPLICATE_READS = VERIFIED LIVE`
+
+`AUTHENTICATED_DASHBOARD_RUNTIME_LATENCY = MATERIALLY REDUCED BUT STILL OPEN`

@@ -848,3 +848,37 @@ failures, errors, or skips, and production packaging succeeded.
 `AUTHENTICATED_COMPOSITION_DUPLICATE_READS = CORRECTED LOCALLY`
 
 `AUTHENTICATED_DASHBOARD_RUNTIME_LATENCY = STILL OPEN`
+
+## Authenticated Composition Snapshot Reuse Live Result - 2026-09-19
+
+Commit `0d1e56e5308351a6464af3d8edcd0895b0602deb` passed SynapseCore CI
+run 406 in 5m07s. Render auto-deployed that exact commit in 5m23s and marked it
+Live. All six live-connection flags were green before authenticated measurement
+began at `2026-09-19T12:24:27.4281088Z`.
+
+One bounded authenticated session produced the following exact timings:
+
+- login: 6,634 ms;
+- Dashboard summary: 5,413 ms, 1,975 ms, and 487 ms;
+- Dashboard snapshot: 27,385 ms, 11,795 ms, and 8,016 ms;
+- Runtime: 10,633 ms, 9,443 ms, and 7,722 ms;
+- logout: 625 ms.
+
+Every request returned HTTP 200, and every Dashboard snapshot contained all 155
+visible Inventory rows. The snapshot average fell from 25,942 ms on the prior
+exact-revision proof to 15,732 ms, a 39% reduction. Runtime average fell from
+22,435 ms to 9,266 ms, a 59% reduction. Render contained no Hikari connection-
+acquisition timeout in the inspected process window. Adjacent post-proof
+scheduler telemetry reported ten total connections, zero active, ten idle, and
+zero waiters while dispatch, Replay automation, and scheduled-pull work ran.
+
+The duplicate-read seam is therefore verified removed in production and the
+authenticated composition latency is materially reduced. It is not fully
+closed: the first snapshot still required 27,385 ms, so the next bounded source
+map should continue inside the remaining serial snapshot composition rather
+than changing Hikari, timeouts, database resources, frontend behavior, or
+infrastructure. No broad E2E is justified by this read-only proof.
+
+`AUTHENTICATED_COMPOSITION_DUPLICATE_READS = VERIFIED LIVE`
+
+`AUTHENTICATED_DASHBOARD_RUNTIME_LATENCY = MATERIALLY REDUCED BUT STILL OPEN`
