@@ -387,3 +387,38 @@ composition remain the next bounded latency target.
 `RECOMMENDATION_INVENTORY_LATENCY = MATERIALLY REDUCED`
 
 `AUTHENTICATED_DASHBOARD_RUNTIME_LATENCY = STILL OPEN`
+
+## Dashboard Inventory Projection Batching
+
+After the stable Inventory advisory no-op closure, the bounded source map moved
+to authenticated read composition. `OperationalViewService.getInventoryOverview()`
+loaded the visible Inventory set once but calculated every row through APIs that
+each resolved tenant policy and queried recent demand independently. The
+snapshot path consequently repeated one recent-demand aggregate query and at
+least two policy lookups for every Inventory row.
+
+The Dashboard path now uses the existing grouped-demand reader once and caches
+one operational policy per tenant for the request. Prediction and intelligence
+receive that same policy and the exact grouped units. A failed grouped read
+retains correctness by logging
+`Dashboard snapshot could not batch recent inventory demand` and using the
+original per-row demand query path; policy lookup remains request-scoped. No
+Inventory rule, response contract, scope boundary, persistence behavior,
+transaction boundary, scheduler, Hikari setting, timeout, schema, frontend, or
+infrastructure setting changes.
+
+Two direct tests prove the grouped path and fail-safe fallback. The expanded
+Stock Prediction, Operational View, and Realtime unit gate passed seven tests,
+and the Spring/JPA Dashboard snapshot integration test passed. The full backend
+suite passed 381 tests with no failures, errors, or skips. Production packaging
+also succeeded.
+
+The seam remains locally verified pending exact-revision CI and hosted proof.
+The production proof must establish the exact deployed revision, all six live
+flags, absence of the grouped-read fallback warning and Hikari acquisition
+timeouts, and repeated bounded snapshot/runtime timings against the current
+snapshot baseline of 9,634-24,890 ms.
+
+`DASHBOARD_SNAPSHOT_INVENTORY_QUERY_AMPLIFICATION = CORRECTED LOCALLY`
+
+`AUTHENTICATED_DASHBOARD_RUNTIME_LATENCY = STILL OPEN`

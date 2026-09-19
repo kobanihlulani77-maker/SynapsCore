@@ -371,7 +371,7 @@ class RealtimeServiceTest {
             List<ScenarioRunResponse> slaEscalations,
             List<ScenarioRunResponse> recentScenarios
         ) {
-            super(null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null);
+            super(null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null);
             this.alerts = alerts;
             this.recommendations = recommendations;
             this.inventory = inventory;

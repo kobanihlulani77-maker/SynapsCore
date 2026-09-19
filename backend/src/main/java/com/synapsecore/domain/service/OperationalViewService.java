@@ -29,6 +29,7 @@ import com.synapsecore.domain.entity.CustomerOrder;
 import com.synapsecore.domain.entity.Inventory;
 import com.synapsecore.domain.entity.OrderItem;
 import com.synapsecore.domain.entity.Recommendation;
+import com.synapsecore.domain.entity.TenantOperationalPolicy;
 import com.synapsecore.domain.repository.CustomerOrderRepository;
 import com.synapsecore.domain.repository.InventoryRepository;
 import com.synapsecore.domain.repository.RecommendationRepository;
@@ -40,17 +41,22 @@ import com.synapsecore.prediction.StockPrediction;
 import com.synapsecore.prediction.StockPredictionService;
 import com.synapsecore.tenant.TenantContextService;
 import java.time.Instant;
+import java.time.temporal.ChronoUnit;
 import java.util.Comparator;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
 
 @Service
 @RequiredArgsConstructor
+@Slf4j
 public class OperationalViewService {
 
     private final AlertScopeService alertScopeService;
@@ -61,6 +67,7 @@ public class OperationalViewService {
     private final CustomerOrderRepository customerOrderRepository;
     private final StockPredictionService stockPredictionService;
     private final InventoryIntelligenceService inventoryIntelligenceService;
+    private final TenantOperationalPolicyService tenantOperationalPolicyService;
     private final DashboardService dashboardService;
     private final BusinessEventQueryService businessEventQueryService;
     private final AuditLogService auditLogService;
@@ -101,11 +108,44 @@ public class OperationalViewService {
     }
 
     public List<InventoryStatusResponse> getInventoryOverview() {
-        return inventoryRepository.findAllWithProductAndWarehouseByTenantCode(
-                tenantContextService.getCurrentTenantCodeOrDefault())
+        List<Inventory> inventories = inventoryRepository.findAllWithProductAndWarehouseByTenantCode(
+            tenantContextService.getCurrentTenantCodeOrDefault());
+        if (inventories.isEmpty()) {
+            return List.of();
+        }
+
+        Map<Long, Long> recentUnitsByInventoryId = loadRecentInventoryDemand(inventories);
+        Map<String, TenantOperationalPolicy> policiesByTenant = new LinkedHashMap<>();
+        return inventories
             .stream()
-            .map(this::toInventoryStatusResponse)
+            .map(inventory -> toInventoryStatusResponse(
+                inventory,
+                policiesByTenant.computeIfAbsent(
+                    inventoryTenantCode(inventory),
+                    tenantOperationalPolicyService::getPolicy
+                ),
+                recentUnitsByInventoryId
+            ))
             .toList();
+    }
+
+    private Map<Long, Long> loadRecentInventoryDemand(List<Inventory> inventories) {
+        try {
+            return stockPredictionService.loadRecentUnitsByInventoryId(
+                inventories,
+                Instant.now().minus(1, ChronoUnit.HOURS)
+            );
+        } catch (RuntimeException exception) {
+            log.warn("Dashboard snapshot could not batch recent inventory demand; "
+                + "falling back to per-inventory queries: {}", exception.getMessage());
+            return null;
+        }
+    }
+
+    private String inventoryTenantCode(Inventory inventory) {
+        return inventory.getTenant() != null
+            ? inventory.getTenant().getCode()
+            : inventory.getWarehouse().getTenant().getCode();
     }
 
     public List<OrderResponse> getRecentOrders() {
@@ -331,9 +371,17 @@ public class OperationalViewService {
         };
     }
 
-    private InventoryStatusResponse toInventoryStatusResponse(Inventory inventory) {
-        StockPrediction prediction = stockPredictionService.estimate(inventory);
-        InventoryInsight insight = inventoryIntelligenceService.evaluate(inventory, prediction);
+    private InventoryStatusResponse toInventoryStatusResponse(Inventory inventory,
+                                                              TenantOperationalPolicy policy,
+                                                              Map<Long, Long> recentUnitsByInventoryId) {
+        StockPrediction prediction = recentUnitsByInventoryId == null
+            ? stockPredictionService.estimate(inventory, policy)
+            : stockPredictionService.estimate(
+                inventory,
+                policy,
+                recentUnitsByInventoryId.getOrDefault(inventory.getId(), 0L)
+            );
+        InventoryInsight insight = inventoryIntelligenceService.evaluate(inventory, prediction, policy);
         return new InventoryStatusResponse(
             inventory.getId(),
             inventory.getProduct().resolveCatalogSku(),

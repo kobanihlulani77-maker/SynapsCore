@@ -752,3 +752,37 @@ scheduler rewrite or a broad E2E run.
 `RECOMMENDATION_INVENTORY_LATENCY = MATERIALLY REDUCED`
 
 `AUTHENTICATED_DASHBOARD_RUNTIME_LATENCY = STILL OPEN`
+
+## Dashboard Inventory Projection Batching Checkpoint - 2026-09-19
+
+The next bounded source map found a separate read-side amplification in
+`OperationalViewService.getInventoryOverview()`, which contributes Inventory
+composition to `/api/dashboard/snapshot`. For every Inventory row, the path
+resolved the same tenant policy twice and issued an individual recent-demand
+aggregate query. At the current hosted fixture size of 155 Inventory rows, one
+snapshot could therefore repeat 155 demand queries and at least 310 policy
+lookups before the remaining Dashboard sections were composed.
+
+Dashboard Inventory composition now uses the existing grouped recent-demand
+query once for the complete visible Inventory set and resolves each tenant's
+operational policy once per request. The exact supplied policy is reused for
+both prediction and intelligence evaluation. If the grouped demand read fails,
+the request logs a bounded warning and falls back to the original per-Inventory
+demand path while still reusing the policy; it does not return partial
+Inventory truth or change event-driven evaluation.
+
+The change does not alter intelligence rules, warehouse or tenant scope,
+response fields, transactions, Hikari, timeouts, scheduler settings, database
+schema, frontend behavior, or infrastructure. Direct batching/fallback tests
+passed two tests, the expanded service/realtime unit gate passed seven tests,
+and the Dashboard snapshot integration test passed. The complete backend suite
+passed 381 tests with zero failures, errors, or skips, and production packaging
+succeeded.
+
+This checkpoint is locally verified only. Exact-revision CI, deployment, the
+six-flag live gate, fallback-warning inspection, Hikari inspection, and bounded
+hosted snapshot/runtime measurements are required before production closure.
+
+`DASHBOARD_SNAPSHOT_INVENTORY_QUERY_AMPLIFICATION = CORRECTED LOCALLY`
+
+`AUTHENTICATED_DASHBOARD_RUNTIME_LATENCY = STILL OPEN`
