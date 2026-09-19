@@ -714,3 +714,41 @@ deployment, and bounded hosted reconciliation evidence are complete.
 `RECOMMENDATION_INVENTORY_STABLE_NOOP_AMPLIFICATION = CORRECTED LOCALLY`
 
 `RECOMMENDATION_INVENTORY_LATENCY = STILL OPEN`
+
+## Recommendation Inventory Stable No-op Closure - 2026-09-19
+
+Commit `d7a622989c745fb3b7387dcaabab7127f652c1b8` passed SynapseCore CI
+run 402 in 4m46s. Render then deployed that exact revision and marked it Live
+after a 4m45s deployment. The six-flag live gate was green before hosted
+measurement began.
+
+Three consecutive completed reconciliation runs on that exact deployment
+preserved all work and improved steadily:
+
+- run `c6bccc04-ca91-4464-9242-865d85e00eae`: 10,398 ms, Inventory
+  155/155, Fulfillment 1/1, failures 0;
+- run `56cba2b6-596d-49b7-823c-1b5379286f43`: 4,777 ms, Inventory
+  155/155, Fulfillment 1/1, failures 0;
+- run `b11f0160-9291-44ad-8652-e9fc97bb069e`: 2,600 ms, Inventory
+  155/155, Fulfillment 1/1, failures 0.
+
+The three-run average was 5,925 ms, compared with the 22,592 ms average for
+the three steady-state runs after the grouped-demand correction. Render had no
+current inventory-advisory snapshot fallback warning and no Hikari connection-
+acquisition timeout in the inspected process window. Adjacent scheduler
+telemetry retained seven to ten idle connections with zero waiters while
+dispatch, pull, Replay, authenticated HTTP, and recommendation work overlapped.
+
+The stable-row no-op amplification is therefore verified removed in production.
+This does not close active-runtime read latency. Four bounded authenticated
+samples measured Dashboard snapshot between 9,634 ms and 24,890 ms and Runtime
+between 4,756 ms and 12,710 ms. Every request returned HTTP 200 and the sampled
+window did not reproduce Hikari starvation. The next bounded target is the
+Dashboard snapshot and Runtime composition path, not another recommendation
+scheduler rewrite or a broad E2E run.
+
+`RECOMMENDATION_INVENTORY_STABLE_NOOP_AMPLIFICATION = VERIFIED LIVE`
+
+`RECOMMENDATION_INVENTORY_LATENCY = MATERIALLY REDUCED`
+
+`AUTHENTICATED_DASHBOARD_RUNTIME_LATENCY = STILL OPEN`

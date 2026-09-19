@@ -346,3 +346,44 @@ still required before this seam can be classified as verified live.
 `RECOMMENDATION_INVENTORY_STABLE_NOOP_AMPLIFICATION = CORRECTED LOCALLY`
 
 `RECOMMENDATION_INVENTORY_LATENCY = STILL OPEN`
+
+## Stable Inventory Advisory No-op Live Result
+
+Commit `d7a622989c745fb3b7387dcaabab7127f652c1b8` passed SynapseCore CI
+run 402 in 4m46s. Render deployed that exact revision in 4m45s and showed it as
+Live before the bounded hosted proof began. The six required live-connection
+flags were all true.
+
+The first three completed reconciliation events observed on the exact deployed
+revision were:
+
+- `c6bccc04-ca91-4464-9242-865d85e00eae`: 10,398 ms;
+- `56cba2b6-596d-49b7-823c-1b5379286f43`: 4,777 ms;
+- `b11f0160-9291-44ad-8652-e9fc97bb069e`: 2,600 ms.
+
+Every run reported Inventory 155 attempted, 155 succeeded, zero failed;
+Fulfillment one attempted, one succeeded, zero failed; and no retirements or
+run failure. The average duration was 5,925 ms, versus 22,592 ms for the prior
+three steady-state grouped-demand runs.
+
+Render contained no `Recommendation reconciliation could not load current
+inventory advisory state` warning and no Hikari connection-acquisition timeout
+for the inspected process window. Adjacent scheduled-work telemetry showed zero
+Hikari waiters and seven to ten idle connections, including while authenticated
+HTTP traffic overlapped recommendation and dispatch work. Repeated Hibernate
+follow-on-locking warnings and platform notification activity remained visible
+on the recommendation thread, but they did not coincide with pool starvation or
+failed work in this proof and are not classified as a new defect from this
+evidence alone.
+
+Bounded authenticated reads still varied materially. Dashboard snapshot was
+24,890 ms, 18,118 ms, 9,634 ms, and 10,527 ms across four samples; Runtime was
+12,710 ms, 7,922 ms, 4,756 ms, and 6,100 ms. All returned HTTP 200. The stable
+advisory no-op seam is live-verified, while Dashboard snapshot and Runtime
+composition remain the next bounded latency target.
+
+`RECOMMENDATION_INVENTORY_STABLE_NOOP_AMPLIFICATION = VERIFIED LIVE`
+
+`RECOMMENDATION_INVENTORY_LATENCY = MATERIALLY REDUCED`
+
+`AUTHENTICATED_DASHBOARD_RUNTIME_LATENCY = STILL OPEN`
