@@ -97,10 +97,20 @@ public class OperationalViewService {
     }
 
     public List<RecommendationResponse> getRecommendations() {
-        return recommendationScopeService.visible(recommendationRepository.findAllByTenant_CodeIgnoreCaseAndStatusOrderByUpdatedAtDesc(
+        return toRecommendationResponses(loadVisibleCurrentRecommendations());
+    }
+
+    List<Recommendation> loadVisibleCurrentRecommendations() {
+        return recommendationScopeService.visible(
+            recommendationRepository.findAllByTenant_CodeIgnoreCaseAndStatusOrderByUpdatedAtDesc(
                 tenantContextService.getCurrentTenantCodeOrDefault(),
-                com.synapsecore.domain.entity.RecommendationStatus.CURRENT))
-            .stream()
+                com.synapsecore.domain.entity.RecommendationStatus.CURRENT
+            )
+        );
+    }
+
+    List<RecommendationResponse> toRecommendationResponses(List<Recommendation> recommendations) {
+        return recommendations.stream()
             .sorted(this::compareOperationalRecommendationPriority)
             .limit(12)
             .map(this::toRecommendationResponse)
@@ -238,11 +248,12 @@ public class OperationalViewService {
             scenarioNotifications
         );
         FulfillmentOverviewResponse fulfillmentOverview = getFulfillmentOverview();
+        List<Recommendation> currentRecommendations = loadVisibleCurrentRecommendations();
 
         return new DashboardSnapshotResponse(
-            dashboardService.getSummary(fulfillmentOverview),
+            dashboardService.getSummary(fulfillmentOverview, (long) currentRecommendations.size()),
             getAlertFeed(),
-            getRecommendations(),
+            toRecommendationResponses(currentRecommendations),
             getInventoryOverview(),
             fulfillmentOverview,
             getRecentOrders(),

@@ -49,13 +49,18 @@ public class DashboardService {
     private long summaryCacheTtlSeconds;
 
     public DashboardSummaryResponse getSummary() {
-        return getSummary(null);
+        return getSummary(null, null);
     }
 
     DashboardSummaryResponse getSummary(FulfillmentOverviewResponse fulfillmentSnapshot) {
+        return getSummary(fulfillmentSnapshot, null);
+    }
+
+    DashboardSummaryResponse getSummary(FulfillmentOverviewResponse fulfillmentSnapshot,
+                                        Long currentRecommendationCount) {
         String tenantCode = tenantContextService.getCurrentTenantCodeOrDefault();
         if (!cacheEnabled || alertScopeService.isCurrentOperatorWarehouseScoped()) {
-            return refreshSummary(fulfillmentSnapshot);
+            return refreshSummary(fulfillmentSnapshot, currentRecommendationCount);
         }
         try {
             String cached = redisTemplate.opsForValue().get(cacheKey + ":" + tenantCode);
@@ -64,14 +69,15 @@ public class DashboardService {
             }
         } catch (Exception ignored) {
         }
-        return refreshSummary(fulfillmentSnapshot);
+        return refreshSummary(fulfillmentSnapshot, currentRecommendationCount);
     }
 
     public DashboardSummaryResponse refreshSummary() {
-        return refreshSummary(null);
+        return refreshSummary(null, null);
     }
 
-    private DashboardSummaryResponse refreshSummary(FulfillmentOverviewResponse fulfillmentSnapshot) {
+    private DashboardSummaryResponse refreshSummary(FulfillmentOverviewResponse fulfillmentSnapshot,
+                                                    Long currentRecommendationCount) {
         String tenantCode = tenantContextService.getCurrentTenantCodeOrDefault();
         boolean warehouseScoped = alertScopeService.isCurrentOperatorWarehouseScoped();
         var warehouseScopes = accessDirectoryService.getCurrentOperator()
@@ -90,8 +96,12 @@ public class DashboardService {
             warehouseScoped
                 ? inventoryRepository.countLowStockItemsByTenantCodeAndWarehouseCodes(tenantCode, warehouseScopes)
                 : inventoryRepository.countLowStockItemsByTenantCode(tenantCode),
-            recommendationScopeService.visible(recommendationRepository.findAllByTenant_CodeIgnoreCaseAndStatusOrderByUpdatedAtDesc(
-                tenantCode, RecommendationStatus.CURRENT)).size(),
+            currentRecommendationCount != null
+                ? currentRecommendationCount
+                : recommendationScopeService.visible(
+                    recommendationRepository.findAllByTenant_CodeIgnoreCaseAndStatusOrderByUpdatedAtDesc(
+                        tenantCode, RecommendationStatus.CURRENT)
+                ).size(),
             fulfillmentOverview.backlogCount(),
             fulfillmentOverview.delayedShipmentCount(),
             fulfillmentOverview.atRiskCount(),

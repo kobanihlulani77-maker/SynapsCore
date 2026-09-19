@@ -10,6 +10,7 @@ import com.synapsecore.domain.dto.InventoryStatusResponse;
 import com.synapsecore.domain.dto.OrderResponse;
 import com.synapsecore.domain.dto.RecommendationResponse;
 import com.synapsecore.domain.dto.SystemIncidentResponse;
+import com.synapsecore.domain.entity.Recommendation;
 import com.synapsecore.integration.dto.IntegrationConnectorResponse;
 import com.synapsecore.integration.dto.IntegrationImportRunResponse;
 import com.synapsecore.integration.dto.IntegrationReplayRecordResponse;
@@ -33,7 +34,10 @@ class OperationalViewServiceSnapshotReuseTest {
         List<SystemIncidentResponse> incidents = new ArrayList<>();
         AtomicInteger incidentCompositions = new AtomicInteger();
         AtomicInteger fulfillmentCompositions = new AtomicInteger();
+        AtomicInteger recommendationCompositions = new AtomicInteger();
         AtomicInteger summaryCompositions = new AtomicInteger();
+        List<Recommendation> currentRecommendations = List.of(new Recommendation(), new Recommendation());
+        List<RecommendationResponse> recommendationResponses = new ArrayList<>();
         FulfillmentOverviewResponse fulfillment = new FulfillmentOverviewResponse(
             0, 0, 0, 0, List.of(), java.time.Instant.now()
         );
@@ -60,9 +64,11 @@ class OperationalViewServiceSnapshotReuseTest {
         ) {
             @Override
             public com.synapsecore.domain.dto.DashboardSummaryResponse getSummary(
-                    FulfillmentOverviewResponse suppliedFulfillment) {
+                    FulfillmentOverviewResponse suppliedFulfillment,
+                    Long suppliedRecommendationCount) {
                 summaryCompositions.incrementAndGet();
                 assertThat(suppliedFulfillment).isSameAs(fulfillment);
+                assertThat(suppliedRecommendationCount).isEqualTo(2L);
                 return null;
             }
         };
@@ -84,7 +90,14 @@ class OperationalViewServiceSnapshotReuseTest {
             incidentService, null, null, null, null, null, tenantContextService, accessDirectoryService
         ) {
             @Override public com.synapsecore.domain.dto.AlertFeedResponse getAlertFeed() { return null; }
-            @Override public List<RecommendationResponse> getRecommendations() { return List.of(); }
+            @Override List<Recommendation> loadVisibleCurrentRecommendations() {
+                recommendationCompositions.incrementAndGet();
+                return currentRecommendations;
+            }
+            @Override List<RecommendationResponse> toRecommendationResponses(List<Recommendation> suppliedRecommendations) {
+                assertThat(suppliedRecommendations).isSameAs(currentRecommendations);
+                return recommendationResponses;
+            }
             @Override public List<InventoryStatusResponse> getInventoryOverview() { return List.of(); }
             @Override public FulfillmentOverviewResponse getFulfillmentOverview() {
                 fulfillmentCompositions.incrementAndGet();
@@ -109,8 +122,10 @@ class OperationalViewServiceSnapshotReuseTest {
         assertThat(snapshot.scenarioNotifications()).isSameAs(notifications);
         assertThat(snapshot.systemIncidents()).isSameAs(incidents);
         assertThat(snapshot.fulfillment()).isSameAs(fulfillment);
+        assertThat(snapshot.recommendations()).isSameAs(recommendationResponses);
         assertThat(incidentCompositions).hasValue(1);
         assertThat(fulfillmentCompositions).hasValue(1);
+        assertThat(recommendationCompositions).hasValue(1);
         assertThat(summaryCompositions).hasValue(1);
     }
 }

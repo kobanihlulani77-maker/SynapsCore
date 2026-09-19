@@ -54,6 +54,37 @@ class DashboardServiceSnapshotReuseTest {
         assertThat(summary.fulfillmentRiskCount()).isEqualTo(1);
     }
 
+    @Test
+    void summaryUsesSuppliedRecommendationCountWithoutReloadingRecommendations() {
+        FulfillmentOverviewResponse fulfillment = new FulfillmentOverviewResponse(
+            0, 0, 0, 0, List.of(), Instant.now()
+        );
+        RecommendationRepository recommendations = (RecommendationRepository) Proxy.newProxyInstance(
+            RecommendationRepository.class.getClassLoader(),
+            new Class<?>[]{RecommendationRepository.class},
+            (proxy, method, args) -> {
+                throw new AssertionError("Unexpected recommendation repository call: " + method.getName());
+            }
+        );
+        DashboardService service = new DashboardService(
+            zeroRepository(CustomerOrderRepository.class),
+            zeroRepository(InventoryRepository.class),
+            recommendations,
+            zeroRepository(WarehouseRepository.class),
+            null,
+            null,
+            new ObjectMapper(),
+            tenantContextService(),
+            alertScopeService(),
+            accessDirectoryService()
+        );
+        ReflectionTestUtils.setField(service, "cacheEnabled", false);
+
+        var summary = service.getSummary(fulfillment, 11L);
+
+        assertThat(summary.recommendationsCount()).isEqualTo(11);
+    }
+
     private TenantContextService tenantContextService() {
         return new TenantContextService(null, null, null, null, null) {
             @Override
