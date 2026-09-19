@@ -4,6 +4,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.synapsecore.access.AccessDirectoryService;
 import com.synapsecore.alert.AlertScopeService;
 import com.synapsecore.domain.dto.DashboardSummaryResponse;
+import com.synapsecore.domain.dto.FulfillmentOverviewResponse;
 import com.synapsecore.domain.repository.CustomerOrderRepository;
 import com.synapsecore.domain.repository.InventoryRepository;
 import com.synapsecore.domain.repository.RecommendationRepository;
@@ -48,9 +49,13 @@ public class DashboardService {
     private long summaryCacheTtlSeconds;
 
     public DashboardSummaryResponse getSummary() {
+        return getSummary(null);
+    }
+
+    DashboardSummaryResponse getSummary(FulfillmentOverviewResponse fulfillmentSnapshot) {
         String tenantCode = tenantContextService.getCurrentTenantCodeOrDefault();
         if (!cacheEnabled || alertScopeService.isCurrentOperatorWarehouseScoped()) {
-            return refreshSummary();
+            return refreshSummary(fulfillmentSnapshot);
         }
         try {
             String cached = redisTemplate.opsForValue().get(cacheKey + ":" + tenantCode);
@@ -59,10 +64,14 @@ public class DashboardService {
             }
         } catch (Exception ignored) {
         }
-        return refreshSummary();
+        return refreshSummary(fulfillmentSnapshot);
     }
 
     public DashboardSummaryResponse refreshSummary() {
+        return refreshSummary(null);
+    }
+
+    private DashboardSummaryResponse refreshSummary(FulfillmentOverviewResponse fulfillmentSnapshot) {
         String tenantCode = tenantContextService.getCurrentTenantCodeOrDefault();
         boolean warehouseScoped = alertScopeService.isCurrentOperatorWarehouseScoped();
         var warehouseScopes = accessDirectoryService.getCurrentOperator()
@@ -70,7 +79,9 @@ public class DashboardService {
             .orElse(java.util.List.of());
         Instant now = Instant.now();
         Instant recentWindow = now.minus(24, ChronoUnit.HOURS);
-        var fulfillmentOverview = fulfillmentService.getOverview();
+        var fulfillmentOverview = fulfillmentSnapshot != null
+            ? fulfillmentSnapshot
+            : fulfillmentService.getOverview();
         DashboardSummaryResponse summary = new DashboardSummaryResponse(
             warehouseScoped
                 ? customerOrderRepository.countByTenantCodeAndWarehouseCodes(tenantCode, warehouseScopes)

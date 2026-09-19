@@ -237,13 +237,14 @@ public class OperationalViewService {
             integrationConnectors,
             scenarioNotifications
         );
+        FulfillmentOverviewResponse fulfillmentOverview = getFulfillmentOverview();
 
         return new DashboardSnapshotResponse(
-            dashboardService.getSummary(),
+            dashboardService.getSummary(fulfillmentOverview),
             getAlertFeed(),
             getRecommendations(),
             getInventoryOverview(),
-            getFulfillmentOverview(),
+            fulfillmentOverview,
             getRecentOrders(),
             getRecentEvents(),
             auditLogs,
