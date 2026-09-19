@@ -513,3 +513,63 @@ infrastructure changes, nor a broad E2E run.
 `AUTHENTICATED_COMPOSITION_DUPLICATE_READS = VERIFIED LIVE`
 
 `AUTHENTICATED_DASHBOARD_RUNTIME_LATENCY = MATERIALLY REDUCED BUT STILL OPEN`
+
+## Dashboard Fulfillment Snapshot Reuse
+
+The next bounded source map found one remaining cache-miss duplication inside
+Dashboard snapshot composition. `OperationalViewService` composed the complete
+Fulfillment overview for the response, while a cache-miss
+`DashboardService.getSummary()` independently composed the same overview again
+for its backlog, delay, and risk counts.
+
+Dashboard snapshot now composes one request-local Fulfillment overview, supplies
+that exact object to Dashboard summary refresh when the summary cache misses,
+and returns the same object in the response. Standalone summary reads preserve
+their original no-argument path and continue composing Fulfillment when no
+snapshot is supplied. Summary caching, response fields, tenant and warehouse
+authority, transaction boundaries, Hikari settings, timeouts, schedulers,
+schema, frontend behavior, and infrastructure are unchanged.
+
+Four focused snapshot-reuse and batching tests passed. The expanded Realtime,
+MVP-flow, and production-hardening gate passed 118 tests with zero failures,
+errors, or skips. The complete backend suite passed 386 tests across 66 reports
+with zero failures, errors, or skips, and production packaging succeeded.
+
+Commit `3bb4a08cb1c0cbb7e3348bab62fbe8cdcd14c461` passed SynapseCore CI
+run 408 and Render auto-deployed that exact commit in 4m43s. All six live-
+connection flags were green before authenticated measurement began at
+`2026-09-19T12:56:39.4388720Z`.
+
+One bounded authenticated session produced the following exact timings:
+
+- login: 4,519 ms;
+- Dashboard summary: 3,866 ms, 1,207 ms, and 964 ms;
+- Dashboard snapshot: 23,322 ms, 13,311 ms, and 13,121 ms;
+- Runtime: 12,765 ms, 10,490 ms, and 13,679 ms;
+- logout: 727 ms.
+
+Every request returned HTTP 200, and every Dashboard snapshot contained all 155
+visible Inventory rows. Because the sequence intentionally measured Summary
+before Snapshot, it warmed the 30-second summary cache and is not sufficient by
+itself to prove the cache-miss branch timing. After the cache TTL had elapsed,
+one isolated authenticated Snapshot with no preceding Summary call in its
+session returned HTTP 200 with all 155 Inventory rows in 13,272 ms.
+
+Render contained no Hikari connection-acquisition timeout and no Dashboard
+Inventory batching fallback warning in the inspected one-hour window. Adjacent
+post-proof dispatch, Replay-automation, and scheduled-pull telemetry reported
+ten total connections, zero active, ten idle, and zero waiters.
+
+The duplicate Fulfillment composition is removed in the exact live revision and
+the bounded live contract remains correct. Endpoint latency is not closed: the
+three-Snapshot average was 16,585 ms versus 15,732 ms in the preceding proof,
+and Runtime averaged 12,311 ms versus 9,266 ms. The first Snapshot improved from
+27,385 ms to 23,322 ms, while the isolated cache-miss-oriented Snapshot completed
+in 13,272 ms, but the aggregate variation does not justify claiming a general
+performance closure. The next source map must continue through remaining serial
+Snapshot composition rather than changing Hikari, timeouts, database resources,
+frontend behavior, or infrastructure.
+
+`DASHBOARD_SNAPSHOT_DUPLICATE_FULFILLMENT_COMPOSITION = CORRECTED, CI-GREEN, AND LIVE-CONTRACT VERIFIED`
+
+`AUTHENTICATED_DASHBOARD_RUNTIME_LATENCY = STILL OPEN`
