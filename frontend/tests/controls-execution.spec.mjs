@@ -233,15 +233,15 @@ test('BATCH 2 shell navigation search and shared controls execute', async ({ pag
   ]
 
   for (const [route, heading] of routes) {
-    await page.goto(route)
+    await navigateWithinApp(page, route)
     await expect(page.getByRole('heading', { name: heading })).toBeVisible()
   }
 
-  await page.goto('/approvals')
+  await navigateWithinApp(page, '/approvals')
   await expect(page).toHaveURL(/\/dashboard$/)
   await expect(page.getByRole('heading', { name: 'Live operational command center' })).toBeVisible()
 
-  await page.goto('/dashboard')
+  await navigateWithinApp(page, '/dashboard')
   await page.getByPlaceholder('Search pages, orders, alerts, or incidents').fill('runtime')
   await expect(page.locator('.workspace-search-result').filter({ hasText: /Runtime/i }).first()).toBeVisible()
   await page.keyboard.press('Tab')
@@ -257,7 +257,7 @@ test('BATCH 2 shell navigation search and shared controls execute', async ({ pag
   await page.getByRole('button', { name: /Profile/i }).first().click()
   await expect(page).toHaveURL(/\/profile$/)
 
-  await page.goto('/catalog')
+  await navigateWithinApp(page, '/catalog')
   const sortable = page.getByRole('button', { name: /Sort by SKU/i }).first()
   if (await sortable.isVisible().catch(() => false)) {
     await sortable.click()
@@ -269,31 +269,31 @@ test('BATCH 2 shell navigation search and shared controls execute', async ({ pag
 
 test('BATCH 3 dashboard runtime audit and operational read controls execute', async ({ page }) => {
   await login(page, users.admin)
-  await page.goto('/dashboard')
+  await navigateWithinApp(page, '/dashboard')
   await expect(page.getByRole('heading', { name: 'Live operational command center' })).toBeVisible()
   for (const button of ['Open Runtime', 'Open Audit', 'Open Alerts', 'Open Recommendations']) {
     const locator = page.getByRole('button', { name: button }).first()
     if (await locator.isVisible().catch(() => false)) {
       await locator.click()
       await expect(page).toHaveURL(new RegExp(`/${button.split(' ')[1].toLowerCase().replace('recommendations', 'recommendations')}`))
-      await page.goto('/dashboard')
+      await navigateWithinApp(page, '/dashboard')
     }
   }
   await clickFirstVisible(page, '.action-card, .lane-card, .signal-list-item.selectable-card')
 
-  await page.goto('/runtime')
+  await navigateWithinApp(page, '/runtime')
   await page.locator('.content-grid').getByRole('button', { name: 'Open audit' }).first().click()
   await expect(page).toHaveURL(/\/audit-events$/)
-  await page.goto('/runtime')
+  await navigateWithinApp(page, '/runtime')
   await expect(page.locator('.content-grid').getByRole('button', { name: 'Open releases' })).toHaveCount(0)
-  await page.goto('/runtime')
+  await navigateWithinApp(page, '/runtime')
   await clickFirstButtonIfPresent(page, '.signal-list-item.selectable-card')
 
-  await page.goto('/audit-events')
+  await navigateWithinApp(page, '/audit-events')
   await clickFirstButtonIfPresent(page, '.signal-list-item.selectable-card')
   await page.locator('.content-grid').getByRole('button', { name: 'Open Runtime' }).first().click()
   await expect(page).toHaveURL(/\/runtime$/)
-  await page.goto('/audit-events')
+  await navigateWithinApp(page, '/audit-events')
   await page.locator('.content-grid').getByRole('button', { name: 'Open Replay' }).first().click()
   await expect(page).toHaveURL(/\/replay-queue$/)
 
@@ -312,7 +312,7 @@ test('BATCH 4 catalog and workspace-admin mutation controls execute with readbac
   const suffix = randomUUID().slice(0, 8).toUpperCase()
   const sku = `G4-${suffix}`
   try {
-    await page.goto('/catalog')
+    await navigateWithinApp(page, '/catalog')
     await page.getByPlaceholder('SKU-ACME-100').fill(sku)
     await page.getByPlaceholder('Product name').fill(`Gate Four ${suffix}`)
     await page.getByPlaceholder('Operational category').fill('Gate Four')
@@ -333,7 +333,7 @@ test('BATCH 4 catalog and workspace-admin mutation controls execute with readbac
     }, { timeout: 15_000 }).toBeTruthy()
     await clickClearCatalogFormOrRecordDefect(page)
 
-    await page.goto('/company-settings')
+    await navigateWithinApp(page, '/company-settings')
     await expect(page.getByRole('heading', { name: 'Tenant and workspace settings' })).toBeVisible()
     const workspaceBefore = await readJson(await api.get('/api/access/admin/workspace'))
     const nameField = page.getByLabel('Company workspace name')
@@ -396,7 +396,7 @@ test('BATCH 4 catalog and workspace-admin mutation controls execute with readbac
 
 test('BATCH 5 scenarios replay approvals and role restrictions execute', async ({ page }) => {
   await login(page, users.admin)
-  await page.goto('/scenarios')
+  await navigateWithinApp(page, '/scenarios')
   await expect(page.getByRole('heading', { name: 'Decision lab and scenario planning' })).toBeVisible()
   await page.getByPlaceholder('North restock option').fill(`Gate 4 Scenario ${randomUUID().slice(0, 6)}`)
   const requestedBy = page.getByLabel('Requested By')
@@ -418,11 +418,11 @@ test('BATCH 5 scenarios replay approvals and role restrictions execute', async (
     if (await button.isVisible().catch(() => false)) await button.click()
   }
 
-  await page.goto('/scenario-history')
+  await navigateWithinApp(page, '/scenario-history')
   await clickFirstButtonIfPresent(page, '.signal-list-item.selectable-card')
-  await page.goto('/approvals')
+  await navigateWithinApp(page, '/approvals')
   await clickFirstButtonIfPresent(page, '.signal-list-item.selectable-card')
-  await page.goto('/replay-queue')
+  await navigateWithinApp(page, '/replay-queue')
   await clickFirstButtonIfPresent(page, '.signal-list-item.selectable-card')
   const replayButton = page.getByRole('button', { name: /Replay Into Live Flow|Replaying/i }).first()
   if (await replayButton.isVisible().catch(() => false)) {
@@ -433,8 +433,9 @@ test('BATCH 5 scenarios replay approvals and role restrictions execute', async (
 
   await signOut(page)
   await login(page, users.planner)
-  await page.goto('/users')
-  await expect(page.getByRole('heading', { name: /Access your operational workspace|Enter the operational platform/i }).first()).toBeVisible()
+  await navigateWithinApp(page, '/users')
+  await expect(page).toHaveURL(/\/dashboard$/)
+  await expect(page.getByRole('heading', { name: 'Live operational command center' })).toBeVisible()
 
   recorder.mark(replayApprovalScenarioIds.filter((id) => !['CTRL-117', 'CTRL-137'].includes(id)), 'VERIFIED WORKING', 'Scenario inputs, filters, line controls, preview, compare, save, history selection, approval selection, and replay selection controls executed in browser.')
   recorder.mark(['CTRL-137'], 'DISABLED BY DESIGN - VERIFIED', 'Requested By is session-bound for signed-in operators and verified disabled so a user cannot impersonate another requester from the UI.')
@@ -449,11 +450,11 @@ test('BATCH 6 admin users profile tenants and platform controls execute', async 
   await verifySelectionRoute(page, '/users', 'Users and access control')
   await page.getByRole('button', { name: 'Open company settings' }).click()
   await expect(page).toHaveURL(/\/company-settings$/)
-  await page.goto('/users')
+  await navigateWithinApp(page, '/users')
   await page.getByRole('button', { name: 'Open my profile' }).click()
   await expect(page).toHaveURL(/\/profile$/)
 
-  await page.goto('/profile')
+  await navigateWithinApp(page, '/profile')
   await page.getByLabel('Current Password').fill('wrong-current-password')
   await page.getByLabel('New Password').fill('GateFourNewPassword123!')
   await page.getByLabel('Confirm Password').fill('GateFourNewPassword123!')
@@ -463,7 +464,7 @@ test('BATCH 6 admin users profile tenants and platform controls execute', async 
     const button = page.getByRole('button', { name }).first()
     if (await button.isVisible().catch(() => false)) {
       await button.click()
-      await page.goto('/profile')
+      await navigateWithinApp(page, '/profile')
     }
   }
 
@@ -492,7 +493,7 @@ test('BATCH 7 responsive and keyboard reachability close remaining controls', as
   ]) {
     await page.setViewportSize(viewport)
     for (const route of ['/dashboard', '/catalog', '/scenarios', '/company-settings', '/profile']) {
-      await page.goto(route)
+      await navigateWithinApp(page, route)
       await expect(page.locator('main, .workspace-shell').first()).toBeVisible()
       const firstButton = page.getByRole('button').first()
       if (await firstButton.isVisible().catch(() => false)) {
@@ -617,9 +618,16 @@ async function clickNthButtonIfPresent(page, selector, index) {
 }
 
 async function verifySelectionRoute(page, route, heading) {
-  await page.goto(route)
+  await navigateWithinApp(page, route)
   await expect(page.getByRole('heading', { name: heading })).toBeVisible()
   await clickFirstButtonIfPresent(page, '.signal-list-item.selectable-card')
+}
+
+async function navigateWithinApp(page, route) {
+  await page.evaluate((nextRoute) => {
+    window.history.pushState({}, '', nextRoute)
+    window.dispatchEvent(new PopStateEvent('popstate'))
+  }, route)
 }
 
 async function clickClearCatalogFormOrRecordDefect(page) {
