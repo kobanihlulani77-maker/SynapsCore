@@ -26,7 +26,6 @@ public interface RecommendationRepository extends JpaRepository<Recommendation, 
 
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @QueryHints(@QueryHint(name = "jakarta.persistence.lock.timeout", value = "1000"))
-    @EntityGraph(attributePaths = {"tenant", "warehouse", "product", "sourceWarehouse", "destinationWarehouse"})
     @Query("""
         select r
         from Recommendation r
