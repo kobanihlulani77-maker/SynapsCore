@@ -49,18 +49,24 @@ public class DashboardService {
     private long summaryCacheTtlSeconds;
 
     public DashboardSummaryResponse getSummary() {
-        return getSummary(null, null);
+        return getSummary(null, null, null);
     }
 
     DashboardSummaryResponse getSummary(FulfillmentOverviewResponse fulfillmentSnapshot) {
-        return getSummary(fulfillmentSnapshot, null);
+        return getSummary(fulfillmentSnapshot, null, null);
     }
 
     DashboardSummaryResponse getSummary(FulfillmentOverviewResponse fulfillmentSnapshot,
                                         Long currentRecommendationCount) {
+        return getSummary(fulfillmentSnapshot, currentRecommendationCount, null);
+    }
+
+    DashboardSummaryResponse getSummary(FulfillmentOverviewResponse fulfillmentSnapshot,
+                                        Long currentRecommendationCount,
+                                        Long activeAlertCount) {
         String tenantCode = tenantContextService.getCurrentTenantCodeOrDefault();
         if (!cacheEnabled || alertScopeService.isCurrentOperatorWarehouseScoped()) {
-            return refreshSummary(fulfillmentSnapshot, currentRecommendationCount);
+            return refreshSummary(fulfillmentSnapshot, currentRecommendationCount, activeAlertCount);
         }
         try {
             String cached = redisTemplate.opsForValue().get(cacheKey + ":" + tenantCode);
@@ -69,15 +75,16 @@ public class DashboardService {
             }
         } catch (Exception ignored) {
         }
-        return refreshSummary(fulfillmentSnapshot, currentRecommendationCount);
+        return refreshSummary(fulfillmentSnapshot, currentRecommendationCount, activeAlertCount);
     }
 
     public DashboardSummaryResponse refreshSummary() {
-        return refreshSummary(null, null);
+        return refreshSummary(null, null, null);
     }
 
     private DashboardSummaryResponse refreshSummary(FulfillmentOverviewResponse fulfillmentSnapshot,
-                                                    Long currentRecommendationCount) {
+                                                    Long currentRecommendationCount,
+                                                    Long activeAlertCount) {
         String tenantCode = tenantContextService.getCurrentTenantCodeOrDefault();
         boolean warehouseScoped = alertScopeService.isCurrentOperatorWarehouseScoped();
         var warehouseScopes = accessDirectoryService.getCurrentOperator()
@@ -92,7 +99,9 @@ public class DashboardService {
             warehouseScoped
                 ? customerOrderRepository.countByTenantCodeAndWarehouseCodes(tenantCode, warehouseScopes)
                 : customerOrderRepository.countByTenant_CodeIgnoreCase(tenantCode),
-            alertScopeService.countVisibleActiveAlerts(tenantCode),
+            activeAlertCount != null
+                ? activeAlertCount
+                : alertScopeService.countVisibleActiveAlerts(tenantCode),
             warehouseScoped
                 ? inventoryRepository.countLowStockItemsByTenantCodeAndWarehouseCodes(tenantCode, warehouseScopes)
                 : inventoryRepository.countLowStockItemsByTenantCode(tenantCode),

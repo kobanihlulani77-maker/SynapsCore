@@ -82,14 +82,25 @@ public class OperationalViewService {
     private final InFlightRequestCoordinator<DashboardSnapshotResponse> snapshotRequests = new InFlightRequestCoordinator<>();
 
     public AlertFeedResponse getAlertFeed() {
-        String tenantCode = tenantContextService.getCurrentTenantCodeOrDefault();
+        return toAlertFeed(loadVisibleActiveAlerts(), loadVisibleRecentAlerts());
+    }
+
+    List<Alert> loadVisibleActiveAlerts() {
+        return alertScopeService.visibleActiveAlerts(tenantContextService.getCurrentTenantCodeOrDefault());
+    }
+
+    List<Alert> loadVisibleRecentAlerts() {
+        return alertScopeService.visibleRecentAlerts(tenantContextService.getCurrentTenantCodeOrDefault());
+    }
+
+    AlertFeedResponse toAlertFeed(List<Alert> activeAlerts, List<Alert> recentAlerts) {
         return new AlertFeedResponse(
-            alertScopeService.visibleActiveAlerts(tenantCode).stream()
+            activeAlerts.stream()
                 .sorted(this::compareOperationalAlertPriority)
                 .limit(12)
                 .map(this::toAlertResponse)
                 .toList(),
-            alertScopeService.visibleRecentAlerts(tenantCode).stream()
+            recentAlerts.stream()
                 .limit(12)
                 .map(this::toAlertResponse)
                 .toList()
@@ -249,10 +260,16 @@ public class OperationalViewService {
         );
         FulfillmentOverviewResponse fulfillmentOverview = getFulfillmentOverview();
         List<Recommendation> currentRecommendations = loadVisibleCurrentRecommendations();
+        List<Alert> activeAlerts = loadVisibleActiveAlerts();
+        AlertFeedResponse alertFeed = toAlertFeed(activeAlerts, loadVisibleRecentAlerts());
 
         return new DashboardSnapshotResponse(
-            dashboardService.getSummary(fulfillmentOverview, (long) currentRecommendations.size()),
-            getAlertFeed(),
+            dashboardService.getSummary(
+                fulfillmentOverview,
+                (long) currentRecommendations.size(),
+                (long) activeAlerts.size()
+            ),
+            alertFeed,
             toRecommendationResponses(currentRecommendations),
             getInventoryOverview(),
             fulfillmentOverview,

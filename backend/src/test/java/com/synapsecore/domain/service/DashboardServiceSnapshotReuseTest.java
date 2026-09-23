@@ -85,6 +85,41 @@ class DashboardServiceSnapshotReuseTest {
         assertThat(summary.recommendationsCount()).isEqualTo(11);
     }
 
+    @Test
+    void summaryUsesSuppliedAlertCountWithoutReloadingAlerts() {
+        FulfillmentOverviewResponse fulfillment = new FulfillmentOverviewResponse(
+            0, 0, 0, 0, List.of(), Instant.now()
+        );
+        AlertScopeService alerts = new AlertScopeService(null, null) {
+            @Override
+            public boolean isCurrentOperatorWarehouseScoped() {
+                return false;
+            }
+
+            @Override
+            public long countVisibleActiveAlerts(String tenantCode) {
+                throw new AssertionError("Active alerts must not be reloaded when a snapshot count is supplied");
+            }
+        };
+        DashboardService service = new DashboardService(
+            zeroRepository(CustomerOrderRepository.class),
+            zeroRepository(InventoryRepository.class),
+            zeroRepository(RecommendationRepository.class),
+            zeroRepository(WarehouseRepository.class),
+            null,
+            null,
+            new ObjectMapper(),
+            tenantContextService(),
+            alerts,
+            accessDirectoryService()
+        );
+        ReflectionTestUtils.setField(service, "cacheEnabled", false);
+
+        var summary = service.getSummary(fulfillment, 0L, 13L);
+
+        assertThat(summary.activeAlerts()).isEqualTo(13);
+    }
+
     private TenantContextService tenantContextService() {
         return new TenantContextService(null, null, null, null, null) {
             @Override

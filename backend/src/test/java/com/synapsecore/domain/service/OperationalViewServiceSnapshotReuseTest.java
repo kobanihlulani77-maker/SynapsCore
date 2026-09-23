@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import com.synapsecore.access.AccessDirectoryService;
 import com.synapsecore.domain.dto.AuditLogResponse;
+import com.synapsecore.domain.dto.AlertFeedResponse;
 import com.synapsecore.domain.dto.BusinessEventResponse;
 import com.synapsecore.domain.dto.FulfillmentOverviewResponse;
 import com.synapsecore.domain.dto.InventoryStatusResponse;
@@ -11,6 +12,7 @@ import com.synapsecore.domain.dto.OrderResponse;
 import com.synapsecore.domain.dto.RecommendationResponse;
 import com.synapsecore.domain.dto.SystemIncidentResponse;
 import com.synapsecore.domain.entity.Recommendation;
+import com.synapsecore.domain.entity.Alert;
 import com.synapsecore.integration.dto.IntegrationConnectorResponse;
 import com.synapsecore.integration.dto.IntegrationImportRunResponse;
 import com.synapsecore.integration.dto.IntegrationReplayRecordResponse;
@@ -35,9 +37,14 @@ class OperationalViewServiceSnapshotReuseTest {
         AtomicInteger incidentCompositions = new AtomicInteger();
         AtomicInteger fulfillmentCompositions = new AtomicInteger();
         AtomicInteger recommendationCompositions = new AtomicInteger();
+        AtomicInteger activeAlertCompositions = new AtomicInteger();
+        AtomicInteger recentAlertCompositions = new AtomicInteger();
         AtomicInteger summaryCompositions = new AtomicInteger();
         List<Recommendation> currentRecommendations = List.of(new Recommendation(), new Recommendation());
         List<RecommendationResponse> recommendationResponses = new ArrayList<>();
+        List<Alert> activeAlerts = List.of(new Alert(), new Alert(), new Alert());
+        List<Alert> recentAlerts = List.of(new Alert());
+        AlertFeedResponse alertFeed = new AlertFeedResponse(List.of(), List.of());
         FulfillmentOverviewResponse fulfillment = new FulfillmentOverviewResponse(
             0, 0, 0, 0, List.of(), java.time.Instant.now()
         );
@@ -65,10 +72,12 @@ class OperationalViewServiceSnapshotReuseTest {
             @Override
             public com.synapsecore.domain.dto.DashboardSummaryResponse getSummary(
                     FulfillmentOverviewResponse suppliedFulfillment,
-                    Long suppliedRecommendationCount) {
+                    Long suppliedRecommendationCount,
+                    Long suppliedAlertCount) {
                 summaryCompositions.incrementAndGet();
                 assertThat(suppliedFulfillment).isSameAs(fulfillment);
                 assertThat(suppliedRecommendationCount).isEqualTo(2L);
+                assertThat(suppliedAlertCount).isEqualTo(3L);
                 return null;
             }
         };
@@ -89,7 +98,21 @@ class OperationalViewServiceSnapshotReuseTest {
             null, null, null, null, null, null, null, dashboardService, null, null,
             incidentService, null, null, null, null, null, tenantContextService, accessDirectoryService
         ) {
-            @Override public com.synapsecore.domain.dto.AlertFeedResponse getAlertFeed() { return null; }
+            @Override List<Alert> loadVisibleActiveAlerts() {
+                activeAlertCompositions.incrementAndGet();
+                return activeAlerts;
+            }
+            @Override List<Alert> loadVisibleRecentAlerts() {
+                recentAlertCompositions.incrementAndGet();
+                return recentAlerts;
+            }
+            @Override AlertFeedResponse toAlertFeed(
+                    List<Alert> suppliedActiveAlerts,
+                    List<Alert> suppliedRecentAlerts) {
+                assertThat(suppliedActiveAlerts).isSameAs(activeAlerts);
+                assertThat(suppliedRecentAlerts).isSameAs(recentAlerts);
+                return alertFeed;
+            }
             @Override List<Recommendation> loadVisibleCurrentRecommendations() {
                 recommendationCompositions.incrementAndGet();
                 return currentRecommendations;
@@ -123,9 +146,12 @@ class OperationalViewServiceSnapshotReuseTest {
         assertThat(snapshot.systemIncidents()).isSameAs(incidents);
         assertThat(snapshot.fulfillment()).isSameAs(fulfillment);
         assertThat(snapshot.recommendations()).isSameAs(recommendationResponses);
+        assertThat(snapshot.alerts()).isSameAs(alertFeed);
         assertThat(incidentCompositions).hasValue(1);
         assertThat(fulfillmentCompositions).hasValue(1);
         assertThat(recommendationCompositions).hasValue(1);
+        assertThat(activeAlertCompositions).hasValue(1);
+        assertThat(recentAlertCompositions).hasValue(1);
         assertThat(summaryCompositions).hasValue(1);
     }
 }
