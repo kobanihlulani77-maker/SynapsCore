@@ -573,3 +573,35 @@ frontend behavior, or infrastructure.
 `DASHBOARD_SNAPSHOT_DUPLICATE_FULFILLMENT_COMPOSITION = CORRECTED, CI-GREEN, AND LIVE-CONTRACT VERIFIED`
 
 `AUTHENTICATED_DASHBOARD_RUNTIME_LATENCY = STILL OPEN`
+
+## Direct Recommendation Lock Live Closure
+
+Repository inspection traced the repeated PostgreSQL/Hibernate follow-on-lock
+warning to `RecommendationService.createForInventory()` and
+`RecommendationRepository.findByTenantCodeAndConditionKeyForUpdate()`. The
+transactional service intentionally requires a pessimistic row lock, but the
+locked repository method also requested an association `EntityGraph`. Hibernate
+could not apply the PostgreSQL lock directly to that joined result and emitted
+`HHH000444` before issuing a separate locking select.
+
+Commit `23cb441fe05836b9b2a7ef07517374bcb9f3ff79` removed only that
+`EntityGraph`. It retained `PESSIMISTIC_WRITE`, the 1,000 ms lock timeout, the
+same condition identity, and all transaction and authority boundaries. A direct
+reflection test protects that lock strategy. Seventeen focused tests, 123
+expanded tests, and the complete 388-test backend suite passed with zero
+failures, errors, or skips; packaging also succeeded. GitHub Actions run
+`35883689356` was successful.
+
+Render deployed the exact commit in 5m02s. The retired `[r4cht]` process emitted
+its final `HHH000444` warning at `2026-09-23T15:48:42.148Z`; replacement process
+`[2248c]` completed application startup at `2026-09-23T15:48:45.376Z`. The six-
+flag live gate was fully green. New-process recommendation cycles were visible
+at approximately `15:50:16Z` and `15:51:17Z-15:51:35Z`, including realtime
+publication stages completing in 2-192 ms. No `HHH000444` warning and no Hikari
+connection-acquisition timeout appeared on `[2248c]` after the cutover.
+
+This closes the warning and direct-lock seam only. It does not reopen the prior
+healthy recommendation connection-retention capture and does not close the
+separate historical Hikari starvation or authenticated endpoint-latency work.
+
+`RECOMMENDATION_FOLLOW_ON_LOCKING = VERIFIED REMOVED ON THE LIVE REPLACEMENT INSTANCE`

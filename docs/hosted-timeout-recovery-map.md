@@ -942,3 +942,44 @@ frontend behavior, or infrastructure.
 `DASHBOARD_SNAPSHOT_DUPLICATE_FULFILLMENT_COMPOSITION = CORRECTED, CI-GREEN, AND LIVE-CONTRACT VERIFIED`
 
 `AUTHENTICATED_DASHBOARD_RUNTIME_LATENCY = STILL OPEN`
+
+## Recommendation Lock Query Directness - 2026-09-23
+
+The remaining `HHH000444` warning was traced to the scheduled recommendation
+path. `RecommendationService.createForInventory()` owns the transaction and
+calls `RecommendationRepository.findByTenantCodeAndConditionKeyForUpdate()`.
+That repository method combined `PESSIMISTIC_WRITE` and a 1,000 ms lock timeout
+with an association `EntityGraph`. Hibernate therefore selected the candidate
+through association joins and issued a separate follow-on locking select on
+PostgreSQL. This produced one warning and an extra database round trip for each
+condition processed by recommendation reconciliation.
+
+Commit `23cb441fe05836b9b2a7ef07517374bcb9f3ff79` removed only the
+`EntityGraph` from the locking query. The pessimistic lock, lock timeout, query
+identity, transaction boundary, tenant authority, scheduler topology, Hikari
+settings, schema, frontend, and infrastructure are unchanged. A direct lock-
+strategy regression test was added. The focused gate passed 17 tests, the
+expanded gate passed 123 tests, the complete backend suite passed 388 tests
+across 67 reports with zero failures, errors, or skips, and production packaging
+succeeded.
+
+GitHub Actions run `35883689356` completed successfully. Render deployed that
+exact commit in 5m02s. The retired instance `[r4cht]` emitted its final
+`HHH000444` warning at `2026-09-23T15:48:42.148Z`. The new instance `[2248c]`
+reported application startup at `2026-09-23T15:48:45.376Z`, establishing an
+unambiguous cutover boundary. All six live-connection flags were green.
+
+The new instance then executed recommendation scheduler work at approximately
+`15:50:16Z` and again from `15:51:17Z` through `15:51:35Z`. Its realtime
+publication stages completed in 2-192 ms. Render contained no `HHH000444` entry
+for `[2248c]` and no `Connection is not available` entry after cutover. Every
+matching follow-on-lock warning belonged to retired instance `[r4cht]`.
+
+The warning and extra follow-on-lock round trip are therefore removed in the
+exact live revision. This does not claim that historical Hikari starvation or
+the remaining authenticated Dashboard/Runtime latency is closed; those remain
+separate bounded work.
+
+`RECOMMENDATION_FOLLOW_ON_LOCKING = CORRECTED, CI-GREEN, AND VERIFIED LIVE`
+
+`AUTHENTICATED_DASHBOARD_RUNTIME_LATENCY = STILL OPEN`
