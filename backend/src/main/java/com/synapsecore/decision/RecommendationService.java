@@ -90,7 +90,8 @@ public class RecommendationService {
         recommendation.setStatus(RecommendationStatus.CURRENT);
         Recommendation saved = recommendationRepository.save(recommendation);
         if (existing == null) {
-            businessEventService.record(
+            businessEventService.recordForTenant(
+                tenantCode,
                 BusinessEventType.RECOMMENDATION_GENERATED,
                 source,
                 "Generated " + projection.priority() + " recommendation for " + inventory.getProduct().resolveCatalogSku()
@@ -232,7 +233,8 @@ public class RecommendationService {
         recommendation.setStatus(RecommendationStatus.CURRENT);
         Recommendation saved = recommendationRepository.save(recommendation);
         if (existing == null) {
-            businessEventService.record(
+            businessEventService.recordForTenant(
+                tenantCode,
                 BusinessEventType.RECOMMENDATION_GENERATED,
                 source,
                 "Generated " + priority + " logistics recommendation for " + task.getWarehouse().getCode()

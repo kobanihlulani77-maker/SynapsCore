@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import com.synapsecore.decision.RecommendationService;
 import com.synapsecore.domain.entity.AlertSeverity;
+import com.synapsecore.domain.entity.BusinessEventType;
 import com.synapsecore.domain.entity.Inventory;
 import com.synapsecore.domain.entity.Product;
 import com.synapsecore.domain.entity.Recommendation;
@@ -12,6 +13,7 @@ import com.synapsecore.domain.entity.RecommendationStatus;
 import com.synapsecore.domain.entity.Tenant;
 import com.synapsecore.domain.entity.Warehouse;
 import com.synapsecore.domain.repository.InventoryRepository;
+import com.synapsecore.domain.repository.BusinessEventRepository;
 import com.synapsecore.domain.repository.ProductRepository;
 import com.synapsecore.domain.repository.RecommendationRepository;
 import com.synapsecore.domain.repository.TenantRepository;
@@ -47,6 +49,9 @@ class RecommendationLifecyclePhase1IntegrationTest {
     private RecommendationRepository recommendationRepository;
 
     @Autowired
+    private BusinessEventRepository businessEventRepository;
+
+    @Autowired
     private RecommendationService recommendationService;
 
     @Test
@@ -71,6 +76,10 @@ class RecommendationLifecyclePhase1IntegrationTest {
         assertThat(first.getStatus()).isEqualTo(RecommendationStatus.CURRENT);
         assertThat(first.getWarehouse().getCode()).isEqualTo("WH-NORTH");
         assertThat(first.getProduct().resolveCatalogSku()).isEqualTo("SKU-REC-1");
+        assertThat(businessEventRepository.findTopByTenantCodeIgnoreCaseOrderByCreatedAtDesc(tenant.getCode()))
+            .get()
+            .extracting(event -> event.getEventType())
+            .isEqualTo(BusinessEventType.RECOMMENDATION_GENERATED);
 
         Recommendation refreshed = recommendationService.createForInventory(inventory, lowStock, prediction, "phase1-test");
         assertThat(refreshed.getId()).isEqualTo(first.getId());

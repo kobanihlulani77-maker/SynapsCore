@@ -10,12 +10,14 @@ import com.synapsecore.domain.entity.Alert;
 import com.synapsecore.domain.entity.AlertSeverity;
 import com.synapsecore.domain.entity.AlertStatus;
 import com.synapsecore.domain.entity.AlertType;
+import com.synapsecore.domain.entity.BusinessEventType;
 import com.synapsecore.domain.entity.Inventory;
 import com.synapsecore.domain.entity.Product;
 import com.synapsecore.domain.entity.Tenant;
 import com.synapsecore.domain.entity.Warehouse;
 import com.synapsecore.domain.repository.AccessOperatorRepository;
 import com.synapsecore.domain.repository.AlertRepository;
+import com.synapsecore.domain.repository.BusinessEventRepository;
 import com.synapsecore.domain.repository.InventoryRepository;
 import com.synapsecore.domain.repository.ProductRepository;
 import com.synapsecore.domain.repository.TenantRepository;
@@ -63,6 +65,9 @@ class AlertLifecyclePhase1IntegrationTest {
 
     @Autowired
     private AlertRepository alertRepository;
+
+    @Autowired
+    private BusinessEventRepository businessEventRepository;
 
     @Autowired
     private AlertService alertService;
@@ -114,6 +119,32 @@ class AlertLifecyclePhase1IntegrationTest {
             .andExpect(status().isOk())
             .andReturn().getResponse().getContentAsString();
         assertThat(tenantWideResponse).contains("WH-NORTH", "WH-COAST", "SKU-NORTH-1", "SKU-COAST-1");
+    }
+
+    @Test
+    void alertEventsUseTheAuthoritativeEntityTenantWithoutRequestContext() {
+        Tenant tenant = createTenant("ALERT-EVENT-TENANT");
+        Warehouse warehouse = createWarehouse(tenant, "WH-EVENT");
+        Product product = createProduct(tenant, "SKU-EVENT-1");
+        Inventory inventory = inventoryRepository.save(Inventory.builder()
+            .tenant(tenant)
+            .warehouse(warehouse)
+            .product(product)
+            .quantityOnHand(2L)
+            .quantityReserved(0L)
+            .quantityAvailable(2L)
+            .reorderThreshold(10L)
+            .build());
+        InventoryInsight insight = new InventoryInsight(
+            true, false, false, false, AlertSeverity.HIGH, "HIGH", "Test pressure.");
+        StockPrediction prediction = new StockPrediction(0, 0, null, false, false, false);
+
+        alertService.syncInventoryAlerts(inventory, insight, prediction, null, "scheduled-alert-test");
+
+        assertThat(businessEventRepository.findTopByTenantCodeIgnoreCaseOrderByCreatedAtDesc(tenant.getCode()))
+            .get()
+            .extracting(event -> event.getEventType())
+            .isEqualTo(BusinessEventType.LOW_STOCK_DETECTED);
     }
 
     @Test

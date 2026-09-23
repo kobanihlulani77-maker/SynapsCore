@@ -130,7 +130,8 @@ public class AlertService {
         Alert saved = alertRepository.save(alert);
 
         if (existing == null) {
-            businessEventService.record(
+            businessEventService.recordForTenant(
+                tenantCode,
                 BusinessEventType.LOW_STOCK_DETECTED,
                 source,
                 inventory.getProduct().resolveCatalogSku() + " fell below threshold in " + inventory.getWarehouse().getCode()
@@ -287,7 +288,8 @@ public class AlertService {
         if (existing == null
             || !java.util.Objects.equals(previousImpactSummary, saved.getImpactSummary())
             || previousSeverity != saved.getSeverity()) {
-            businessEventService.record(
+            businessEventService.recordForTenant(
+                task.getTenant().getCode(),
                 BusinessEventType.FULFILLMENT_BACKLOG_DETECTED,
                 source,
                 task.getWarehouse().getCode() + " backlog rose to " + assessment.backlogCount() + " active warehouse tasks."
@@ -341,7 +343,8 @@ public class AlertService {
         alert.setStatus(AlertStatus.ACTIVE);
         Alert saved = alertRepository.save(alert);
         if (existing == null) {
-            businessEventService.record(
+            businessEventService.recordForTenant(
+                task.getTenant().getCode(),
                 BusinessEventType.DELIVERY_DELAY_REPORTED,
                 source,
                 "Delivery delay pressure was raised for " + task.getWarehouse().getCode() + "."
@@ -395,7 +398,8 @@ public class AlertService {
         alert.setStatus(AlertStatus.ACTIVE);
         Alert saved = alertRepository.save(alert);
         if (existing == null) {
-            businessEventService.record(
+            businessEventService.recordForTenant(
+                task.getTenant().getCode(),
                 BusinessEventType.FULFILLMENT_ANOMALY_DETECTED,
                 source,
                 "Logistics anomaly pressure was raised for " + task.getWarehouse().getCode() + "."
