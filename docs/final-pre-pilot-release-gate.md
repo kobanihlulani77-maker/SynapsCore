@@ -2,6 +2,12 @@
 
 Last checked: **2026-08-13**
 
+Historical acceptance record: the verdict below applies to its recorded build,
+scope, and date, not the current candidate. Current authorization and remaining
+gates are tracked in the
+[Master Engineering Readiness Map](SYNAPSCORE-MASTER-ENGINEERING-READINESS-MAP.md).
+This record is preserved as evidence, not renewed pilot approval.
+
 This is the final engineering gate before handing SynapseCore to Company 1 for a controlled pilot.
 
 The purpose of this record is not to create new scope. It answers one question:

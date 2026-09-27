@@ -1,5 +1,9 @@
 # SynapseCore Hosted Timeout Recovery Map
 
+This is the runtime investigation sub-map of the
+[Master Engineering Readiness Map](SYNAPSCORE-MASTER-ENGINEERING-READINESS-MAP.md).
+Its phase numbers are local to timeout recovery, not the master program gates.
+
 ## Purpose
 
 This map is the single forward path for the intermittent hosted timeout problem.

@@ -6,6 +6,12 @@ The repo contains product, architecture, recovery, proof, pilot, roadmap, review
 
 ## Recommended Reading Path
 
+Start current engineering and pilot-readiness decisions with the
+[Master Engineering Readiness Map](SYNAPSCORE-MASTER-ENGINEERING-READINESS-MAP.md).
+It connects the current baseline, phase gates, evidence, operator experience,
+adversarial verification, and company handover. The reading path below provides
+supporting context; older verdicts retain their original dates and scope.
+
 If someone is new to the project, the recommended reading order is:
 
 1. [README.md](../README.md)

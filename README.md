@@ -1,5 +1,10 @@
 # SynapseCore
 
+For current engineering status, proof boundaries, open risks, and the gated path
+to a controlled company pilot, start with the
+[Master Engineering Readiness Map](docs/SYNAPSCORE-MASTER-ENGINEERING-READINESS-MAP.md).
+Historical hosted passes below do not constitute current pilot approval.
+
 SynapseCore is a real-time Operations Control System delivered as a multi-tenant SaaS platform.
 
 It gives operations teams one governed place to see live state, recover failed inbound work, route approvals, track incidents, and keep tenant-scoped operational truth visible across orders, inventory, integrations, replay, alerts, recommendations, and runtime trust surfaces.

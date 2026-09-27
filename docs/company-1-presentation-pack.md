@@ -1,5 +1,9 @@
 # Company 1 Presentation Pack
 
+Before presenting readiness, verify the current candidate against the
+[Master Engineering Readiness Map](SYNAPSCORE-MASTER-ENGINEERING-READINESS-MAP.md).
+Historical readiness statements in this pack are not current launch authorization.
+
 This is the official internal guide for presenting SynapseCore to the first prospective controlled pilot company.
 
 It is written for the SynapseCore platform owner or presenter. It is not a sales deck, a product roadmap, a feature wishlist, or a promise of broad enterprise readiness.
