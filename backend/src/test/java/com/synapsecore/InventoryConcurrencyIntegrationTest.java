@@ -13,17 +13,23 @@ import com.synapsecore.domain.repository.InventoryRepository;
 import com.synapsecore.domain.repository.ProductRepository;
 import com.synapsecore.domain.repository.WarehouseRepository;
 import java.util.List;
+import java.util.Optional;
 import java.util.concurrent.Callable;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicReference;
 import java.util.stream.IntStream;
+import org.aspectj.lang.ProceedingJoinPoint;
+import org.aspectj.lang.annotation.Around;
+import org.aspectj.lang.annotation.Aspect;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.context.annotation.Import;
 import org.springframework.test.annotation.DirtiesContext;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.web.servlet.MockMvc;
@@ -34,6 +40,7 @@ import org.springframework.transaction.support.TransactionTemplate;
 @AutoConfigureMockMvc
 @ActiveProfiles("test")
 @DirtiesContext(classMode = DirtiesContext.ClassMode.AFTER_CLASS)
+@Import(InventoryConcurrencyIntegrationTest.FirstRowRaceBarrier.class)
 class InventoryConcurrencyIntegrationTest {
 
     @Autowired
@@ -56,6 +63,9 @@ class InventoryConcurrencyIntegrationTest {
 
     @Autowired
     private TransactionTemplate transactionTemplate;
+
+    @Autowired
+    private FirstRowRaceBarrier firstRowRaceBarrier;
 
     @Test
     void concurrentReservationsDoNotOversellSingleAvailableUnit() throws Exception {
@@ -261,26 +271,66 @@ class InventoryConcurrencyIntegrationTest {
     void concurrentFirstRowUpdatesDoNotCreateDuplicateInventoryRows() throws Exception {
         String productSku = "SKU-CONC-FIRST-" + System.nanoTime();
         createProduct(productSku);
-
-        List<Integer> statuses = runConcurrently(List.of(
-            () -> inventoryRequest("/api/inventory/update", """
-                {"productSku":"%s","warehouseCode":"WH-NORTH","quantityAvailable":20,"reorderThreshold":4}
-                """.formatted(productSku)),
-            () -> inventoryRequest("/api/inventory/update", """
-                {"productSku":"%s","warehouseCode":"WH-NORTH","quantityAvailable":30,"reorderThreshold":5}
-                """.formatted(productSku))
-        ));
-
-        assertThat(statuses).containsExactlyInAnyOrder(200, 409);
         Product product = productRepository
             .findByTenant_CodeIgnoreCaseAndCatalogSkuIgnoreCase("STARTER-OPS", productSku)
             .orElseThrow();
+        firstRowRaceBarrier.arm(product.getId());
+
+        List<Integer> statuses;
+        try {
+            statuses = runConcurrently(List.of(
+                () -> inventoryRequest("/api/inventory/update", """
+                    {"productSku":"%s","warehouseCode":"WH-NORTH","quantityAvailable":20,"reorderThreshold":4}
+                    """.formatted(productSku)),
+                () -> inventoryRequest("/api/inventory/update", """
+                    {"productSku":"%s","warehouseCode":"WH-NORTH","quantityAvailable":30,"reorderThreshold":5}
+                    """.formatted(productSku))
+            ));
+            assertThat(firstRowRaceBarrier.bothArrived()).isTrue();
+        } finally {
+            firstRowRaceBarrier.clear();
+        }
+
+        assertThat(statuses).containsExactlyInAnyOrder(200, 409);
         var warehouse = warehouseRepository.findByCode("WH-NORTH").orElseThrow();
         assertThat(inventoryRepository.findByProductIdAndWarehouseId(product.getId(), warehouse.getId())).isPresent();
         assertThat(inventoryRepository.findAll().stream()
             .filter(inventory -> inventory.getProduct().getId().equals(product.getId()))
             .filter(inventory -> inventory.getWarehouse().getId().equals(warehouse.getId())))
             .hasSize(1);
+    }
+
+    @Aspect
+    static class FirstRowRaceBarrier {
+        private final AtomicReference<Race> active = new AtomicReference<>();
+
+        void arm(Long productId) {
+            active.set(new Race(productId, new CountDownLatch(2)));
+        }
+
+        void clear() {
+            active.set(null);
+        }
+
+        boolean bothArrived() {
+            Race race = active.get();
+            return race != null && race.arrivals().getCount() == 0;
+        }
+
+        @Around("execution(* com.synapsecore.domain.repository.InventoryRepository.findByProductIdAndWarehouseIdForUpdate(..)) && args(productId,warehouseId)")
+        Object awaitBothMissingRowReads(ProceedingJoinPoint joinPoint, Long productId, Long warehouseId) throws Throwable {
+            Object result = joinPoint.proceed();
+            Race race = active.get();
+            if (race != null && race.productId().equals(productId) && result instanceof Optional<?> optional && optional.isEmpty()) {
+                race.arrivals().countDown();
+                if (!race.arrivals().await(10, TimeUnit.SECONDS)) {
+                    throw new AssertionError("Both first-row requests must read the missing inventory before either inserts.");
+                }
+            }
+            return result;
+        }
+
+        private record Race(Long productId, CountDownLatch arrivals) { }
     }
 
     @Test

@@ -736,6 +736,66 @@ function ensurePageDiagnostics(page) {
   return diagnostics
 }
 
+function recordReplayNetwork(page, sourceSystem) {
+  const entries = []
+  const starts = new WeakMap()
+  const relevant = (url) => /\/api\/(integrations\/orders\/(connectors|replay\/queue)|dashboard\/snapshot)/i.test(url)
+  const add = (entry) => {
+    entries.push(entry)
+    if (entries.length > 40) entries.shift()
+  }
+  const onRequest = (request) => {
+    if (request.method() === 'GET' && relevant(request.url())) {
+      starts.set(request, Date.now())
+      add({ phase: 'start', atUtc: new Date().toISOString(), url: request.url() })
+    }
+  }
+  const onResponse = async (response) => {
+    const request = response.request()
+    const startedAt = starts.get(request)
+    if (!startedAt) return
+    const entry = {
+      phase: 'response', atUtc: new Date().toISOString(), url: response.url(),
+      status: response.status(), ttfbMs: Date.now() - startedAt,
+      requestId: response.headers()['x-request-id'] || null,
+    }
+    add(entry)
+    if (/\/connectors(?:\?|$)|\/dashboard\/snapshot(?:\?|$)/i.test(response.url())) {
+      try {
+        const payload = await response.json()
+        const connectors = Array.isArray(payload) ? payload : payload?.integrationConnectors
+        const connector = connectors?.find?.((item) => item.sourceSystem === sourceSystem && item.type === 'CSV_ORDER_IMPORT')
+        entry.connector = connector
+          ? { id: connector.id, enabled: connector.enabled, version: connector.version, updatedAt: connector.updatedAt }
+          : null
+      } catch (error) {
+        entry.bodyError = error?.message || String(error)
+      }
+    }
+  }
+  const onFinished = (request) => {
+    const startedAt = starts.get(request)
+    if (startedAt) add({ phase: 'finished', atUtc: new Date().toISOString(), url: request.url(), totalMs: Date.now() - startedAt })
+  }
+  const onFailed = (request) => {
+    const startedAt = starts.get(request)
+    if (startedAt) add({ phase: 'failed', atUtc: new Date().toISOString(), url: request.url(), totalMs: Date.now() - startedAt, error: request.failure()?.errorText || 'unknown' })
+  }
+  page.on('request', onRequest)
+  page.on('response', onResponse)
+  page.on('requestfinished', onFinished)
+  page.on('requestfailed', onFailed)
+  return {
+    entries,
+    stop: () => {
+      page.off('request', onRequest)
+      page.off('response', onResponse)
+      page.off('requestfinished', onFinished)
+      page.off('requestfailed', onFailed)
+    },
+  }
+}
+
 async function readReplayOutcome(api, externalOrderId) {
   const replayQueueUrl = replayQueueLookupUrl(externalOrderId)
   let replayQueueError = null
@@ -953,9 +1013,7 @@ async function readReplayPageDiagnostics(page, replayFixture) {
     note: `Replay connector diagnostics for ${replayFixture.sourceSystem}.`,
   })
   const backendReplayOutcome = await readReplayOutcome(replayFixture.api, replayFixture.externalOrderId)
-  const exactReplayAction = await readExactReplayActionState(page, replayFixture)
-
-  const pageDiagnostics = await page.evaluate(async ({ externalOrderId, sourceSystem }) => {
+  const pageDiagnostics = await page.evaluate(async ({ externalOrderId, sourceSystem, backendUrl }) => {
     const textOrEmpty = (selector) => {
       const element = globalThis.document?.querySelector?.(selector)
       return element?.textContent?.trim?.() || ''
@@ -977,8 +1035,7 @@ async function readReplayPageDiagnostics(page, replayFixture) {
     const exactReplayMutedLines = [...(exactReplayDetail?.querySelectorAll?.('.muted-text') || [])]
       .map((element) => element.textContent?.trim?.())
       .filter(Boolean)
-    const runtimeConfig = globalThis.__SYNAPSE_RUNTIME_CONFIG__ || {}
-    const apiBaseUrl = runtimeConfig.apiUrl || ''
+    const apiBaseUrl = backendUrl
 
     let authSession = null
     let snapshotConnector = null
@@ -988,6 +1045,7 @@ async function readReplayPageDiagnostics(page, replayFixture) {
       try {
         const sessionResponse = await fetch(`${apiBaseUrl}/api/auth/session`, {
           credentials: 'include',
+          signal: AbortSignal.timeout(5_000),
         })
         authSession = {
           status: sessionResponse.status,
@@ -1002,6 +1060,7 @@ async function readReplayPageDiagnostics(page, replayFixture) {
       try {
         const snapshotResponse = await fetch(`${apiBaseUrl}/api/dashboard/snapshot`, {
           credentials: 'include',
+          signal: AbortSignal.timeout(8_000),
         })
         const snapshotPayload = await snapshotResponse.json().catch(() => null)
         snapshotConnector = snapshotPayload?.integrationConnectors?.find?.((connector) => (
@@ -1036,6 +1095,7 @@ async function readReplayPageDiagnostics(page, replayFixture) {
   }, {
     externalOrderId: replayFixture.externalOrderId,
     sourceSystem: replayFixture.sourceSystem,
+    backendUrl,
   })
 
   return {
@@ -1044,7 +1104,7 @@ async function readReplayPageDiagnostics(page, replayFixture) {
       connector.sourceSystem === replayFixture.sourceSystem && connector.type === 'CSV_ORDER_IMPORT'
     )) || null,
     page: pageDiagnostics,
-    exactReplayAction,
+    exactReplayAction: await readExactReplayActionState(page, replayFixture),
   }
 }
 
@@ -1174,7 +1234,7 @@ async function focusReplayRecord(page, replayFixture) {
   })
 }
 
-async function waitForReplayButtonReady(page, replayFixture) {
+async function waitForReplayButtonReady(page, replayFixture, networkTrace) {
   const replayQueueRecord = page.locator('.signal-list-item.selectable-card').filter({
     hasText: replayFixture.externalOrderId,
   }).first()
@@ -1205,7 +1265,8 @@ async function waitForReplayButtonReady(page, replayFixture) {
   if (diagnostics?.exactReplayAction?.domEnabled) {
     return diagnostics.exactReplayAction
   }
-  throw new Error(`Expected Replay Into Live Flow to become enabled after connector ${replayFixture.sourceSystem} was re-enabled and the replay queue refreshed. Diagnostics: ${JSON.stringify(diagnostics)}`)
+  const browserErrors = page.__synapsePageDiagnostics
+  throw new Error(`Expected Replay Into Live Flow to become enabled after connector ${replayFixture.sourceSystem} was re-enabled and the replay queue refreshed. Diagnostics: ${JSON.stringify({ ...diagnostics, networkTrace: networkTrace?.entries || [], consoleErrors: browserErrors?.consoleErrors || [], failedRequests: browserErrors?.failedRequests || [] })}`)
 }
 
 async function clickExactReplayButton(page, replayFixture) {
@@ -2596,6 +2657,8 @@ test('@realtime dashboard summary updates live without a browser refresh', async
 test('replay recovery, scenario approval, execution, and browser role gating work through the UI', async ({ page }, testInfo) => {
   testInfo.setTimeout(360_000)
   const replayFixture = await createReplayFixture()
+  ensurePageDiagnostics(page)
+  const replayNetwork = recordReplayNetwork(page, replayFixture.sourceSystem)
 
   try {
     const backendReplayCoverage = await waitForReplayQueueCoverage(
@@ -2685,7 +2748,7 @@ test('replay recovery, scenario approval, execution, and browser role gating wor
 
       if (currentReplayOutcome?.state !== 'replayed') {
         const replayPageDiagnostics = ensurePageDiagnostics(page)
-        await waitForReplayButtonReady(page, replayFixture)
+        await waitForReplayButtonReady(page, replayFixture, replayNetwork)
 
         const replayRequestPromise = page.waitForRequest((request) => (
           request.method() === 'POST'
@@ -2757,6 +2820,7 @@ test('replay recovery, scenario approval, execution, and browser role gating wor
 
   await expect(page.getByText(/Replay queue is clear|Replayed .* into the live order flow\./).first()).toBeVisible()
   } finally {
+    replayNetwork.stop()
     await replayFixture.api.dispose()
   }
 

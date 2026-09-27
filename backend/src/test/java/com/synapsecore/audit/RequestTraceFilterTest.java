@@ -3,6 +3,9 @@ package com.synapsecore.audit;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
+import ch.qos.logback.classic.Logger;
+import ch.qos.logback.classic.spi.ILoggingEvent;
+import ch.qos.logback.core.read.ListAppender;
 import com.synapsecore.access.AccessControlService;
 import com.synapsecore.auth.AuthSessionService;
 import com.synapsecore.config.SynapseAccessProperties;
@@ -10,6 +13,7 @@ import com.synapsecore.config.SynapseRealtimeProperties;
 import com.synapsecore.domain.entity.AccessOperator;
 import com.synapsecore.domain.entity.Tenant;
 import com.synapsecore.observability.OperationalMetricsService;
+import com.zaxxer.hikari.HikariDataSource;
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import jakarta.servlet.DispatcherType;
 import jakarta.servlet.http.HttpSession;
@@ -17,14 +21,17 @@ import java.io.IOException;
 import java.util.Optional;
 import java.util.UUID;
 import java.util.function.Supplier;
+import javax.sql.DataSource;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
+import org.slf4j.LoggerFactory;
 import org.slf4j.MDC;
 import org.springframework.mock.web.MockHttpServletRequest;
 import org.springframework.mock.web.MockHttpServletResponse;
 import org.springframework.mock.web.MockHttpSession;
+import org.springframework.web.servlet.HandlerMapping;
 
 class RequestTraceFilterTest {
 
@@ -32,7 +39,8 @@ class RequestTraceFilterTest {
     private final SynapseAccessProperties access = new SynapseAccessProperties();
     private final StubAuthService auth = new StubAuthService();
     private final RecordingMetrics metrics = new RecordingMetrics();
-    private final RequestTraceFilter filter = new RequestTraceFilter(trace, access, auth, metrics);
+    private final DataSource dataSource = new HikariDataSource();
+    private final RequestTraceFilter filter = new RequestTraceFilter(trace, access, auth, metrics, dataSource);
     private final MockHttpServletRequest request = new MockHttpServletRequest("GET", "/api/dashboard/snapshot");
     private final MockHttpServletResponse response = new MockHttpServletResponse();
 
@@ -99,6 +107,30 @@ class RequestTraceFilterTest {
         assertThat(auth.calls).isEqualTo(2);
         assertThat(metrics.durationNanos).isGreaterThanOrEqualTo(lookupWindow[1] - lookupWindow[0]);
         assertCleared();
+    }
+
+    @Test
+    void slowRequestLogsBoundedRouteAndPhaseDurationsWithoutRequestPayload() {
+        request.setAttribute(HandlerMapping.BEST_MATCHING_PATTERN_ATTRIBUTE, "/api/dashboard/snapshot");
+        request.setQueryString("token=must-not-enter-logs");
+        Logger logger = (Logger) LoggerFactory.getLogger(RequestTraceFilter.class);
+        ListAppender<ILoggingEvent> appender = new ListAppender<>();
+        appender.start();
+        logger.addAppender(appender);
+        try {
+            filter.logSlowRequest(request, 200, 4_999_000_000L, 1_000_000_000L);
+            assertThat(appender.list).isEmpty();
+
+            filter.logSlowRequest(request, 200, 5_000_000_000L, 1_000_000_000L);
+            assertThat(appender.list).hasSize(1);
+            String message = appender.list.get(0).getFormattedMessage();
+            assertThat(message).contains("route=/api/dashboard/snapshot", "durationMs=5000",
+                "identityMs=1000", "handlerMs=4000", "hikariTotal=-1");
+            assertThat(message).doesNotContain("must-not-enter-logs");
+        } finally {
+            logger.detachAppender(appender);
+            appender.stop();
+        }
     }
 
     @ParameterizedTest

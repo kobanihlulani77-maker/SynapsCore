@@ -44,3 +44,69 @@ synthetic tenant, record the connector update response, the page's exact
 connector GET, snapshot response, and Replay button state with UTC times. A
 passing focused proof closes this UI seam for that revision; a slow/failed GET
 continues the backend latency investigation instead of changing UI timeouts.
+
+## Focused hosted observation, 2026-09-27
+
+The hosted frontend served the same production bundle bytes as the locally
+built source containing the polling correction. This proves the served frontend
+code, not a Git SHA: its embedded build commit is the static value
+`render-deploy`. CI succeeded for `0485b63`; that alone does not prove the
+backend revision. One warm focused Replay flow failed after the connector
+update. Its separate authenticated backend read returned connector `134`,
+`version=1`, `enabled=true`, updated at `13:51:53.475Z`.
+
+The browser request trace gives the missing boundary:
+
+| UTC | Browser observation |
+| --- | --- |
+| `13:51:46.639` | Dashboard snapshot GET began before connector enable. |
+| `13:51:47.152` | Broad connector GET began; browser aborted it after 5.076 s. |
+| `13:51:59.940` | First snapshot returned HTTP 200 after 13.301 s TTFB, with connector `version=0`, disabled. Request ID `b1431331-bc11-4ea2-9ba7-bdb3fcd0fcd4`. |
+| `13:52:00.040` | New snapshot and broad connector GET began. |
+| `13:52:04.997` | Broad connector GET was again aborted after 4.957 s. |
+| `13:52:25.852` | Second snapshot returned HTTP 200 after 25.812 s TTFB, with connector `version=1`, enabled. Request ID `3ab14246-2602-4b25-a9f4-5100b3621473`. |
+
+The Replay panel was initially blocked but became eligible while the diagnostic
+read ran. The diagnostic had sampled its `exactReplayAction` before its own
+snapshot fetch, then compared that stale sample to the later enabled page.
+The proof helper now samples the final action after diagnostic reads and records
+bounded browser request timing and connector version. Its old runtime-config
+lookup also skipped browser-side auth/snapshot diagnostics for this build;
+the helper now uses the configured hosted backend URL with bounded reads.
+
+**Classification:** `CHROME_HTTP_SLOW` is proven for these snapshot requests.
+The broad connector GETs reached their configured 5-second browser cutoff and
+were aborted. The browser ultimately received the enabled state and rendered an
+enabled action, so permanent frontend staleness is **not** established by this
+run. The trace contained no exact filtered connector GET; why that page-side
+read was absent remains open. No Hikari or PostgreSQL holder evidence was
+captured for these request IDs, so do not infer a database lock, pool
+starvation, or a backend transaction owner from this observation. The local
+Chromium check was extended to enter Replay from an inactive route before
+exercising the poll. It still passed, so route activation alone does not
+explain the absent hosted exact GET.
+
+**Next boundary:** correlate the two request IDs and browser UTC window with
+backend entry/exit, snapshot composition, Hikari acquisition, and database
+activity. Establish whether the delay is routing, pool acquisition, SQL,
+non-SQL Java work, or contention. Do not increase the 5-second connector
+cutoff or the hosted proof timeout as a substitute for explaining that latency.
+H8 hosted convergence remains open; M1/M2 gates are unchanged.
+
+The existing Render application logs had no matching line for either snapshot
+request ID. A search for `HikariPool-1` showed startup/shutdown entries but no
+pool-timeout entry for this run. Scheduler samples around `13:51:22Z` showed
+two active of ten connections and zero waiters, but they do not cover every
+millisecond of the later slow response. The absence of a per-request timing
+line is an observability gap, not proof that the backend handler was fast.
+
+To close that measurement gap, the request trace filter now emits a bounded
+warning for API requests taking at least five seconds. It records the existing
+request ID via MDC, matched route pattern rather than query/body, status,
+whole-filter duration, session/identity-resolution duration, handler duration,
+and an in-process Hikari snapshot. It does not borrow a connection, change the
+HTTP outcome, or log credentials. This diagnostic is locally tested; **hosted
+request-timing output remains unverified until its backend deployment is
+confirmed and a slow request occurs**. It will distinguish early auth/session
+delay from downstream handler time, but SQL versus Java time still requires
+more targeted evidence after that split.

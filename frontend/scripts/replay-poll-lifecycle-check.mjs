@@ -39,11 +39,12 @@ try {
     }
     let snapshotConnector = { sourceSystem, type: connectorType, enabled: false, version: 0 }
     let callCount = 0
+    let isReplayPage = false
     const render = () => {
       root.render(React.createElement(ReplayPage, {
         context: {
           isAuthenticated: true,
-          isReplayPage: true,
+          isReplayPage,
           snapshot: {
             integrationReplayQueue: [record],
             integrationConnectors: [snapshotConnector],
@@ -73,6 +74,10 @@ try {
     const interval = setInterval(render, 50)
     window.__replayProof = {
       calls: () => callCount,
+      activate: () => {
+        isReplayPage = true
+        render()
+      },
       stop: () => clearInterval(interval),
       setSnapshotConnector: (connector) => {
         snapshotConnector = connector
@@ -81,6 +86,8 @@ try {
     }
   })
 
+  await page.waitForTimeout(100)
+  await page.evaluate(() => window.__replayProof.activate())
   const replayButton = page.getByRole('button', { name: 'Replay Into Live Flow' })
   await replayButton.waitFor({ state: 'visible' })
   await page.waitForFunction(() => {

@@ -4,6 +4,8 @@ import com.synapsecore.access.AccessControlService;
 import com.synapsecore.auth.AuthSessionService;
 import com.synapsecore.config.SynapseAccessProperties;
 import com.synapsecore.observability.OperationalMetricsService;
+import com.zaxxer.hikari.HikariDataSource;
+import com.zaxxer.hikari.HikariPoolMXBean;
 import jakarta.servlet.DispatcherType;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
@@ -11,32 +13,39 @@ import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import java.io.IOException;
 import java.util.UUID;
+import javax.sql.DataSource;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.slf4j.MDC;
 import org.springframework.core.Ordered;
 import org.springframework.core.annotation.Order;
 import org.springframework.stereotype.Component;
 import org.springframework.web.filter.OncePerRequestFilter;
+import org.springframework.web.servlet.HandlerMapping;
 
 @Component
 @RequiredArgsConstructor
+@Slf4j
 @Order(Ordered.HIGHEST_PRECEDENCE)
 public class RequestTraceFilter extends OncePerRequestFilter {
 
     private static final String REQUEST_ID_MDC_KEY = "requestId";
     private static final String ACTOR_MDC_KEY = "actor";
     private static final String TENANT_MDC_KEY = "tenant";
+    private static final long SLOW_REQUEST_THRESHOLD_NANOS = 5_000_000_000L;
 
     private final RequestTraceContext requestTraceContext;
     private final SynapseAccessProperties accessProperties;
     private final AuthSessionService authSessionService;
     private final OperationalMetricsService operationalMetricsService;
+    private final DataSource dataSource;
 
     @Override
     protected void doFilterInternal(HttpServletRequest request,
                                     HttpServletResponse response,
                                     FilterChain filterChain) throws ServletException, IOException {
         long startedAtNanos = System.nanoTime();
+        long identityResolvedAtNanos = -1;
         String incomingRequestId = request.getHeader(RequestTraceContext.REQUEST_ID_HEADER);
         String requestId = incomingRequestId != null && !incomingRequestId.isBlank()
             ? incomingRequestId.trim()
@@ -61,6 +70,7 @@ public class RequestTraceFilter extends OncePerRequestFilter {
             tenantCode = resolveTenantCode(request);
             requestTraceContext.setCurrentTenant(tenantCode);
             MDC.put(TENANT_MDC_KEY, tenantCode);
+            identityResolvedAtNanos = System.nanoTime();
 
             filterChain.doFilter(request, response);
             responseStatus = response.getStatus();
@@ -78,12 +88,15 @@ public class RequestTraceFilter extends OncePerRequestFilter {
             throw exception;
         } finally {
             try {
+                long elapsedNanos = System.nanoTime() - startedAtNanos;
                 operationalMetricsService.recordHttpRequest(
                     tenantCode,
                     request.getMethod(),
                     responseStatus,
-                    System.nanoTime() - startedAtNanos
+                    elapsedNanos
                 );
+                logSlowRequest(request, responseStatus, elapsedNanos,
+                    identityResolvedAtNanos < 0 ? elapsedNanos : identityResolvedAtNanos - startedAtNanos);
             } finally {
                 MDC.remove(REQUEST_ID_MDC_KEY);
                 MDC.remove(ACTOR_MDC_KEY);
@@ -91,6 +104,38 @@ public class RequestTraceFilter extends OncePerRequestFilter {
                 requestTraceContext.clear();
             }
         }
+    }
+
+    void logSlowRequest(HttpServletRequest request, int status, long elapsedNanos, long identityNanos) {
+        if (elapsedNanos < SLOW_REQUEST_THRESHOLD_NANOS || !request.getRequestURI().startsWith("/api/")) {
+            return;
+        }
+        Object matchedRoute = request.getAttribute(HandlerMapping.BEST_MATCHING_PATTERN_ATTRIBUTE);
+        String route = matchedRoute instanceof String pattern ? pattern : "<unmapped>";
+        if ("<unmapped>".equals(route) && isAuthLoginRequest(request)) {
+            route = request.getRequestURI();
+        }
+        int total = -1;
+        int active = -1;
+        int idle = -1;
+        int waiting = -1;
+        try {
+            if (dataSource instanceof HikariDataSource hikari && hikari.isRunning()) {
+                HikariPoolMXBean pool = hikari.getHikariPoolMXBean();
+                if (pool != null) {
+                    total = pool.getTotalConnections();
+                    active = pool.getActiveConnections();
+                    idle = pool.getIdleConnections();
+                    waiting = pool.getThreadsAwaitingConnection();
+                }
+            }
+        } catch (RuntimeException ignored) {
+            // Diagnostics must never change the HTTP outcome during pool shutdown.
+        }
+        log.warn("Slow HTTP request method={} route={} status={} durationMs={} identityMs={} handlerMs={} hikariTotal={} hikariActive={} hikariIdle={} hikariWaiting={}",
+            request.getMethod(), route, status, elapsedNanos / 1_000_000,
+            identityNanos / 1_000_000, (elapsedNanos - identityNanos) / 1_000_000,
+            total, active, idle, waiting);
     }
 
     private String resolveActorName(HttpServletRequest request) {
