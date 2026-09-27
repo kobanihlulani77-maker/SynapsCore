@@ -13,10 +13,10 @@ establish which network call, if any, delivered the newer state to that page.
 Source inspection found a deterministic page-side polling failure. `useApi()`
 creates `fetchJson` on each workspace render. The Replay connector effect depended
 on that function and the snapshot connector array. A disabled exact-connector
-read scheduled a two-second retry, then updated local state. That update rendered
-the page again, replaced `fetchJson`, cleaned up the effect, and cleared the
-retry timer. Unrelated snapshot/realtime renders could also invalidate an
-in-flight read; its completion was then ignored. Consequently a still-disabled
+read scheduled a two-second retry. A parent workspace render recreates
+`fetchJson`, cleans up the effect, and clears that timer. Snapshot/realtime
+refreshes can also change the connector array dependency and invalidate an
+in-flight read; its completion is then ignored. Consequently a still-disabled
 snapshot could keep the action blocked even after the backend enabled the
 connector. This is a proven source-code lifecycle defect, not a proven exclusive
 explanation of the historical failure or its concurrent pool pressure.
@@ -31,9 +31,11 @@ when both exact read and snapshot have the connector, a newer snapshot version
 takes precedence over an older exact response. Backend eligibility remains
 authoritative when the operator submits replay.
 
-On this change, `npm.cmd run verify` and `npm.cmd run test:convergence` passed.
-The convergence script tests request gating and source contracts but does not
-render this effect. Browser behavior on a deployed version remains **OPEN**;
+On this change, `npm.cmd run verify`, `npm.cmd run test:convergence`, and
+`npm.cmd run test:replay-convergence` passed. The last check renders the actual
+Replay component in Chromium, changes the parent request helper every 50 ms,
+delays exact connector responses, and verifies both eventual enablement and
+newer disabled snapshot precedence. Browser behavior on a deployed version remains **OPEN**;
 do not promote this local correction to hosted verification. The September 23
 Hikari saturation and warm HTTP latency remain separate H1/H2/H7 work.
 
