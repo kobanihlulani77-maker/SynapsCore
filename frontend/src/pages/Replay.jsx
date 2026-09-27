@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import EmptyState from '../components/EmptyState'
 import Panel from '../components/Panel'
 import { MetricCard } from '../components/Card'
@@ -36,6 +36,11 @@ export default function ReplayPage({ context }) {
     ? snapshot.integrationConnectors.find((connector) => connector.sourceSystem === selectedRecord.sourceSystem && connector.type === selectedRecord.connectorType)
     : null
   const [selectedConnectorOverride, setSelectedConnectorOverride] = useState(null)
+  const fetchJsonRef = useRef(fetchJson)
+  fetchJsonRef.current = fetchJson
+  const selectedConnectorKey = selectedRecord
+    ? [signedInSession?.tenantCode, signedInSession?.username, signedInSession?.authenticatedAt, selectedRecord.sourceSystem, selectedRecord.connectorType].join(':')
+    : ''
 
   useEffect(() => {
     let active = true
@@ -49,7 +54,7 @@ export default function ReplayPage({ context }) {
     }
 
     async function loadSelectedConnector() {
-      if (!selectedRecord?.sourceSystem || !selectedRecord?.connectorType || !fetchJson) {
+      if (!selectedRecord?.sourceSystem || !selectedRecord?.connectorType || !fetchJsonRef.current) {
         if (active) {
           setSelectedConnectorOverride(null)
         }
@@ -57,7 +62,7 @@ export default function ReplayPage({ context }) {
       }
 
       try {
-        const connectorPayload = await fetchJson(
+        const connectorPayload = await fetchJsonRef.current(
           `/api/integrations/orders/connectors?sourceSystem=${encodeURIComponent(selectedRecord.sourceSystem)}&type=${encodeURIComponent(selectedRecord.connectorType)}`,
           {
             cache: 'no-store',
@@ -72,7 +77,7 @@ export default function ReplayPage({ context }) {
           return
         }
 
-        setSelectedConnectorOverride(exactConnector)
+        setSelectedConnectorOverride({ key: selectedConnectorKey, connector: exactConnector })
 
         if (selectedRecord.status === 'PENDING' && exactConnector && !exactConnector.enabled) {
           clearRefreshTimer()
@@ -85,7 +90,7 @@ export default function ReplayPage({ context }) {
         if (!active) {
           return
         }
-        setSelectedConnectorOverride(null)
+        setSelectedConnectorOverride({ key: selectedConnectorKey, connector: null })
         if (selectedRecord.status === 'PENDING') {
           clearRefreshTimer()
           refreshTimeoutId = globalThis.setTimeout(() => {
@@ -103,21 +108,17 @@ export default function ReplayPage({ context }) {
       clearRefreshTimer()
     }
   }, [
-    fetchJson,
+    selectedConnectorKey,
     selectedRecord?.id,
-    selectedRecord?.sourceSystem,
-    selectedRecord?.connectorType,
     selectedRecord?.status,
-    snapshot.integrationConnectors,
   ])
 
-  // Prefer a confirmed enabled connector when a queue refresh races the detail refresh.
-  // A stale disabled response must not keep a re-enabled replay lane blocked.
-  const selectedConnector = selectedConnectorOverride?.enabled
-    ? selectedConnectorOverride
-    : snapshotSelectedConnector?.enabled
-      ? snapshotSelectedConnector
-      : selectedConnectorOverride || snapshotSelectedConnector
+  const exactConnector = selectedConnectorOverride?.key === selectedConnectorKey
+    ? selectedConnectorOverride.connector
+    : null
+  const selectedConnector = snapshotSelectedConnector && exactConnector
+    ? (snapshotSelectedConnector.version > exactConnector.version ? snapshotSelectedConnector : exactConnector)
+    : exactConnector || snapshotSelectedConnector
   const replayBlockedByEligibility = Boolean(
     selectedRecord?.nextEligibleAt
       && Number.isFinite(Date.parse(selectedRecord.nextEligibleAt))
