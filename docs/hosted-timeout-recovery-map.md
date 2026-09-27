@@ -61,6 +61,49 @@ application connection retention or overlap
 9. When a cause is reproduced, apply Phases 9-10 to that cause before attacking the next unresolved family. A healthy capture alone neither clears a family nor requires another identical capture.
 10. Before another hosted capture, verify that available diagnostics can answer the missing ownership question. PostgreSQL samples and timestamps alone do not establish a Java owner or exact cumulative SQL duration.
 
+## Evidence-Efficient Hosted Workflow
+
+The hosted investigation must preserve enough evidence to map a failure without
+turning healthy controls into an endless traffic generator.
+
+### Before a hosted run
+
+1. Name the active phase and one question it can answer.
+2. Record the live backend revision, Render plan facts available from the
+   dashboard, and `WARM_BASELINE_UTC`.
+3. Verify that the capture can distinguish the candidate failure families. For
+   browser work this means Chrome timing/request ID; for pool work this means
+   Hikari diagnostics and PostgreSQL activity; for database waits this means
+   blocker and transaction state.
+
+### During a hosted run
+
+1. Prefer the smallest focused proof that can exercise the active boundary.
+2. Use Chrome only for the request whose browser duration, response, or rendered
+   state is material to the classification.
+3. On the first failure, stop the workload and retain only the bounded evidence
+   window: 60 seconds before the boundary, the failure interval, and 60 seconds
+   after the system recovers.
+4. Capture compact fields first: UTC start/end, request ID, method/endpoint,
+   status, browser duration, Hikari total/active/idle/waiting, PostgreSQL PIDs,
+   transaction/query age, wait/blocker state, scheduler thread, and outcome.
+5. Do not continue testing merely to reproduce the same already-captured
+   unhealthy state. A new run is justified only by a new phase question, a
+   changed revision, or repeatability verification.
+
+### After a hosted run
+
+1. Classify the result as `COLD_START_ENVIRONMENT`,
+   `ACTIVE_RUNTIME_HIKARI`, `ACTIVE_RUNTIME_BACKEND_LATENCY`,
+   `POSTGRESQL_WAIT`, `HTTP_FAST_BUT_UI_STALE`, or `DOMAIN_DEFECT`.
+2. Keep a healthy run as the comparison control; it does not clear an unresolved
+   holder family by itself.
+3. Do not change Hikari capacity, Render/PostgreSQL plans, Playwright timeouts,
+   scheduler count, transaction boundaries, or frontend behavior until the
+   active phase identifies a causal seam.
+4. Use compact summaries for already-proven facts and retrieve large logs only
+   when they can map the next missing owner or contradiction.
+
 ## Phase 0 - Freeze the Truth Map
 
 **Question:** Are we investigating one shared timeout chain rather than separate page defects?

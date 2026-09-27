@@ -69,3 +69,36 @@ Do not add:
 - `infrastructure/` should support one-command local startup.
 - `docs/` should explain system flow, architecture, and APIs clearly.
 - `scripts/` should help a new developer understand and run the MVP quickly.
+
+## Investigation Efficiency And Evidence Discipline
+
+For reliability, performance, hosted-runtime, and timeout work, use one
+evidence-led path instead of repeatedly generating broad traffic.
+
+1. State the single active question and the exact failure classification before
+   running a test or opening a dashboard.
+2. Establish and record a warm baseline before a hosted proof. Do not label a
+   cold-start delay as an active-runtime regression.
+3. Use focused tests while diagnosing. Run the broad hosted E2E only after a
+   focused change is ready for verification, or when the active phase explicitly
+   requires repeatability proof.
+4. Stop at the first failure. Preserve a bounded window: at least 60 seconds
+   before it, the failure interval, and 60 seconds after recovery. Do not keep
+   creating traffic after evidence has been captured.
+5. Use Chrome only when browser timing, response content, request ID, or UI
+   convergence is the missing link. Capture the relevant request rather than
+   repeatedly collecting whole-page console and network state.
+6. Treat a healthy capture as a control, not a reason to keep sampling. Compare
+   it with the next unhealthy boundary; do not rerun identical healthy windows
+   without a new question.
+7. Keep raw logs local and report compact evidence: UTC window, endpoint or
+   scheduler, request ID, Hikari state, PostgreSQL state, observed duration,
+   and outcome. Pull larger logs only when they can answer the active question.
+8. Separate `CHROME_HTTP_SLOW` from `HTTP_FAST_BUT_UI_STALE`. Do not change
+   frontend convergence behavior while the authoritative HTTP response is slow.
+9. Use high-effort reasoning for root-cause mapping, production changes, and
+   final review. Use lightweight retrieval and compact summaries for routine
+   status checks, log filtering, and already-proven evidence.
+10. After a production change, commit and push the bounded change, wait for the
+    exact revision to deploy and become ready, then verify that served revision
+    before treating any hosted result as evidence.
