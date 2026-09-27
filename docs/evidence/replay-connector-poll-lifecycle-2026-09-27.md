@@ -124,8 +124,9 @@ warning for API requests taking at least five seconds. It records the existing
 request ID via MDC, matched route pattern rather than query/body, status,
 whole-filter duration, session/identity-resolution duration, handler duration,
 and an in-process Hikari snapshot. It does not borrow a connection, change the
-HTTP outcome, or log credentials. This diagnostic is locally tested; **hosted
-request-timing output remains unverified until its backend deployment is
-confirmed and a slow request occurs**. It will distinguish early auth/session
+HTTP outcome, or log credentials. It will distinguish early auth/session
 delay from downstream handler time, but SQL versus Java time still requires
-more targeted evidence after that split.
+more targeted evidence after that split. Backend `4f91d89` later deployed and
+emitted this warning during a warm focused proof. See the separate
+[pool-pressure evidence](warm-runtime-pool-pressure-2026-09-27.md); that
+capture does not establish the exact SQL or transaction owner.
