@@ -14,6 +14,11 @@ try {
   const origin = `http://127.0.0.1:${address.port}`
   browser = await chromium.launch({ headless: true })
   const page = await browser.newPage()
+  const pageErrors = []
+  page.on('pageerror', (error) => pageErrors.push(error.message))
+  page.on('console', (message) => {
+    if (message.type() === 'error') pageErrors.push(message.text())
+  })
   await page.route(origin + '/', (route) => route.fulfill({
     contentType: 'text/html',
     body: '<!doctype html><html><body><div id="root"></div></body></html>',
@@ -87,6 +92,7 @@ try {
   })
 
   await page.waitForTimeout(100)
+  assert.equal(await page.evaluate(() => window.__replayProof.calls()), 0)
   await page.evaluate(() => window.__replayProof.activate())
   const replayButton = page.getByRole('button', { name: 'Replay Into Live Flow' })
   await replayButton.waitFor({ state: 'visible' })
@@ -112,6 +118,7 @@ try {
     return button?.disabled === true
   })
   assert.equal(await replayButton.isDisabled(), true)
+  assert.deepEqual(pageErrors, [])
   console.log('Replay connector poll lifecycle browser check passed.')
 } finally {
   await browser?.close()

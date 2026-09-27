@@ -83,8 +83,27 @@ read was absent remains open. No Hikari or PostgreSQL holder evidence was
 captured for these request IDs, so do not infer a database lock, pool
 starvation, or a backend transaction owner from this observation. The local
 Chromium check was extended to enter Replay from an inactive route before
-exercising the poll. It still passed, so route activation alone does not
-explain the absent hosted exact GET.
+exercising the poll. Its button assertion passed, but the check had not yet
+asserted a clean browser console. A later strict console assertion exposed a
+React warning on that transition, as recorded below.
+
+## Inactive-to-active hook-order correction
+
+`ReplayPage` returned before calling `useState`, `useRef`, and `useEffect`
+when the page was inactive. The same mounted component called those hooks
+when Replay became active. A local Chromium check that first renders the
+inactive route, then activates it, reproduced React's "Expected static flag
+was missing" warning. This violates stable hook ordering even though its
+original button assertion passed. The component now calls its hooks on every
+render and gates the connector effect and UI output by authentication and
+route activity. The strengthened check verifies no connector fetch before
+activation, the subsequent polling and button transition, and zero page or
+console errors. It passes locally, as does `npm run verify`.
+
+This is a confirmed frontend defect and a narrow correction, not proof that
+the missing filtered GET in the hosted trace had this exact cause. A deployed
+browser proof must still establish that GET and bounded convergence. The
+13/26-second snapshot responses remain a separate backend-latency finding.
 
 **Next boundary:** correlate the two request IDs and browser UTC window with
 backend entry/exit, snapshot composition, Hikari acquisition, and database

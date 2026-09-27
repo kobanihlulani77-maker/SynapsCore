@@ -24,16 +24,12 @@ export default function ReplayPage({ context }) {
     fetchJson,
   } = context
 
-  if (!isAuthenticated || !isReplayPage) {
-    return null
-  }
-
-  const queuedRecords = snapshot.integrationReplayQueue
+  const queuedRecords = snapshot?.integrationReplayQueue || []
   const selectedRecord = queuedRecords.find((record) => record.id === selectedReplayRecordId)
     || queuedRecords.find((record) => record.status === 'PENDING')
     || queuedRecords[0]
   const snapshotSelectedConnector = selectedRecord
-    ? snapshot.integrationConnectors.find((connector) => connector.sourceSystem === selectedRecord.sourceSystem && connector.type === selectedRecord.connectorType)
+    ? snapshot?.integrationConnectors?.find((connector) => connector.sourceSystem === selectedRecord.sourceSystem && connector.type === selectedRecord.connectorType)
     : null
   const [selectedConnectorOverride, setSelectedConnectorOverride] = useState(null)
   const fetchJsonRef = useRef(fetchJson)
@@ -54,7 +50,7 @@ export default function ReplayPage({ context }) {
     }
 
     async function loadSelectedConnector() {
-      if (!selectedRecord?.sourceSystem || !selectedRecord?.connectorType || !fetchJsonRef.current) {
+      if (!isAuthenticated || !isReplayPage || !selectedRecord?.sourceSystem || !selectedRecord?.connectorType || !fetchJsonRef.current) {
         if (active) {
           setSelectedConnectorOverride(null)
         }
@@ -108,10 +104,16 @@ export default function ReplayPage({ context }) {
       clearRefreshTimer()
     }
   }, [
+    isAuthenticated,
+    isReplayPage,
     selectedConnectorKey,
     selectedRecord?.id,
     selectedRecord?.status,
   ])
+
+  if (!isAuthenticated || !isReplayPage) {
+    return null
+  }
 
   const exactConnector = selectedConnectorOverride?.key === selectedConnectorKey
     ? selectedConnectorOverride.connector
