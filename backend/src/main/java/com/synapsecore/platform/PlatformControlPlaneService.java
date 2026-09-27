@@ -45,7 +45,6 @@ public class PlatformControlPlaneService {
     private final AuditLogRepository auditLogRepository;
     private final SystemRuntimeService systemRuntimeService;
 
-    @Transactional(readOnly = true)
     public PlatformOverviewResponse getOverview() {
         return new PlatformOverviewResponse(
             getRuntime(),

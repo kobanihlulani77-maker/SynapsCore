@@ -33,6 +33,7 @@ import com.synapsecore.domain.repository.WarehouseRepository;
 import com.synapsecore.domain.repository.ScenarioRunRepository;
 import com.synapsecore.domain.repository.TenantRepository;
 import com.synapsecore.domain.entity.ScenarioRunType;
+import com.synapsecore.platform.PlatformControlPlaneService;
 import com.synapsecore.config.SynapsePlatformOwnerProperties;
 import java.nio.charset.StandardCharsets;
 import java.time.Instant;
@@ -49,6 +50,7 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.test.annotation.DirtiesContext;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
+import org.springframework.transaction.interceptor.TransactionAttributeSource;
 
 @SpringBootTest(properties = {
     "spring.profiles.active=prod",
@@ -99,6 +101,9 @@ class PlatformTenantAccessBoundaryIntegrationTest {
 
     @Autowired
     private TenantRepository tenantRepository;
+
+    @Autowired
+    private TransactionAttributeSource transactionAttributeSource;
 
     @Autowired
     private ScenarioRunRepository scenarioRunRepository;
@@ -775,6 +780,17 @@ class PlatformTenantAccessBoundaryIntegrationTest {
         MockHttpSession convertedSession = (MockHttpSession) tenantLoginOnPlatformSession.getRequest().getSession(false);
         mockMvc.perform(get("/api/platform/overview").session(convertedSession))
             .andExpect(status().isForbidden());
+    }
+
+    @Test
+    void platformOverviewDoesNotHoldOneTransactionAcrossAllSections() throws Exception {
+        assertThat(transactionAttributeSource.getTransactionAttribute(
+            PlatformControlPlaneService.class.getMethod("getOverview"), PlatformControlPlaneService.class
+        )).isNull();
+        mockMvc.perform(get("/api/platform/overview").session(platformLogin()))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.runtime.readinessState").exists())
+            .andExpect(jsonPath("$.tenants[?(@.code == 'ACCESS-BOUNDARY-REHEARSAL')]").exists());
     }
 
     @Test
