@@ -308,7 +308,7 @@ it does not authorize changes to every downstream page.
 
 | ID | Purpose and present evidence/risk | Required work and exit evidence |
 | --- | --- | --- |
-| H1 - Request/holder ownership | Historical starvation proven; a warm hosted 2026-09-27 sample captured `10/10` Hikari active with one waiter and slow requests, but not the ten holders ([evidence](evidence/warm-runtime-pool-pressure-2026-09-27.md)). On deployed `487b012`, one warm snapshot request took 18,799 ms wall and 559 ms current-thread CPU; composition took 14,803/415 ms, with Hikari 1 active/9 idle at completion ([evidence](evidence/snapshot-cpu-wall-observability-2026-09-30.md)). That rules down CPU execution on this HTTP thread, not DB/network/off-thread wait or historical Hikari ownership. | For a representative slow request/job map UTC, request/thread, controller/service, transaction owner, acquisition wait, JDBC PID, SQL/lock state, non-SQL work, commit/rollback and response. Exit when the failing overlap has a defensible explanation or the missing instrumentation is precisely specified. Low thread CPU alone does not prove a PostgreSQL wait or CPU throttling. |
+| H1 - Request/holder ownership | Historical starvation proven; a warm hosted 2026-09-27 sample captured `10/10` Hikari active with one waiter and slow requests, but not the ten holders ([evidence](evidence/warm-runtime-pool-pressure-2026-09-27.md)). On deployed `487b012`, one warm snapshot request took 18,799 ms wall and 559 ms current-thread CPU; composition took 14,803/415 ms, with Hikari 1 active/9 idle at completion ([evidence](evidence/snapshot-cpu-wall-observability-2026-09-30.md)). That rules down CPU execution on this HTTP thread, not DB/network/off-thread wait or historical Hikari ownership. A bounded slow-snapshot stack sampler has been implemented locally but has no hosted result yet ([diagnostic boundary](evidence/snapshot-wait-sampling-2026-09-30.md)). | For a representative slow request/job map UTC, request/thread, controller/service, transaction owner, acquisition wait, JDBC PID, SQL/lock state, non-SQL work, commit/rollback and response. Exit when the failing overlap has a defensible explanation or the missing instrumentation is precisely specified. Low thread CPU or sampled JDBC frames alone do not prove a PostgreSQL wait or CPU throttling. |
 | H2 - Query/composition efficiency | Batching and request-local reuse implemented; platform overview's per-tenant count fan-out was replaced by seven grouped counts ([evidence](evidence/platform-tenant-count-query-bounds-2026-09-30.md)). Connector telemetry batching passed 396/396 local backend tests and exact-SHA CI, then showed 58-connector direct-read client latency of 2,022 ms versus an earlier 9,233 ms sample and connector snapshot section time of 499 ms versus 8,532 ms ([evidence](evidence/connector-telemetry-batching-2026-09-30.md)). The same hosted snapshot still took 17,363 ms at the client across many sections; H2 is not closed. | Correlate residual warm snapshot/login time with H1/H7 acquisition/hold and resource measurements before another correction. Inspect PostgreSQL plans only if measured SQL state points there. Also count queries/transactions and payload size for login, summary, snapshot, Runtime, Replay, catalog, platform overview and scoped reads at realistic sizes. Exit with measured budgets and no unexplained query amplification; preserve tenant/role/scope cache keys. |
 | H3 - Atomic writes and locks | Product/identity and Order/Replay double-borrow seams have focused proofs; the inventory first-row race test now synchronizes the actual missing-row boundary without changing production behavior ([evidence](evidence/inventory-first-row-race-proof-2026-09-27.md)) | Recheck top-level and ambient transaction callers; lock ordering, sequence repair under concurrent inserts, rollback on constraint failure, PostgreSQL aborted-transaction handling and inventory conservation. Exit with real PostgreSQL races producing documented success/conflict outcomes, exactly one durable result, released pool, and no partial side effects. |
 | H4 - Background overlap | One main scheduler, separate recommendation worker, guarded dispatch drain; local budget documented | Map main scheduler jobs, recommendation pass, async drain, HTTP and deploy overlap. Inspect dispatch PENDING/PROCESSING/FAILED recovery after crash, starvation/fairness across tenants, backlog age, failure accounting, stuck claims, thread-local cleanup. Exit with bounded headroom and recoverable queue state; process-local guards must not be described as multi-node coordination. |
@@ -345,7 +345,7 @@ establish exact SQL totals. Report sampled estimates and bounds honestly.
 
 **H2 connector batching is verified on its exact hosted revision. The later
 `487b012` hosted CPU/wall trace found 18,799 ms wall versus 559 ms CPU on one
-slow HTTP request; attribute that wait before another code or capacity change.
+slow HTTP request; attribute that wait before another behavioral or capacity change.
 H1/H7, broader H2 and M1 remain open.**
 
 The [September 30 warm hosted trace](evidence/hosted-connector-telemetry-amplification-2026-09-30.md)
@@ -361,9 +361,11 @@ not close H1 or establish that the historical ten Hikari holders were connectors
 1. Use the [September 27 UTC/request/instance trace](evidence/warm-runtime-pool-pressure-2026-09-27.md)
    as the warm-pressure reference. The ten holder identities were not captured;
    do not infer them from dispatch telemetry or completion-time pool snapshots.
-2. Inspect available request, scheduler, transaction and PostgreSQL telemetry for
-   a way to link acquisition and release to an owner. If it cannot do so, define
-   one bounded, privacy-safe diagnostic addition rather than rerunning broad E2E.
+2. Verify the [bounded snapshot wait sampler](evidence/snapshot-wait-sampling-2026-09-30.md)
+   on its exact deployed revision with one warm request-ID-matched trace. Use
+   its sampled Hikari/JDBC/Redis/Java category only to select the next precise
+   acquisition/hold, PostgreSQL or service-owner measurement; it cannot supply
+   exact SQL duration or a PostgreSQL PID.
 3. At the first warm `active=10, idle=0, waiting>0` recurrence, capture the
    request/scheduler threads, JDBC ownership, PostgreSQL session state and
    CPU/GC/resource window together. Stop traffic at the trigger. Classify

@@ -21,6 +21,7 @@ import com.synapsecore.integration.dto.IntegrationConnectorResponse;
 import com.synapsecore.integration.dto.IntegrationImportRunResponse;
 import com.synapsecore.integration.dto.IntegrationReplayRecordResponse;
 import com.synapsecore.observability.ThreadCpuTiming;
+import com.synapsecore.observability.SlowThreadWaitSampler;
 import com.synapsecore.scenario.ScenarioHistoryService;
 import com.synapsecore.scenario.dto.ScenarioNotificationResponse;
 import com.synapsecore.scenario.dto.ScenarioRunResponse;
@@ -263,6 +264,7 @@ public class OperationalViewService {
     private DashboardSnapshotResponse buildSnapshot() {
         long startedAt = System.nanoTime();
         long cpuStartedAt = ThreadCpuTiming.currentNanos();
+        SlowThreadWaitSampler waitSampler = SlowThreadWaitSampler.start();
         Map<String, Long> sectionsMs = new LinkedHashMap<>();
         Map<String, Long> sectionsCpuMs = new LinkedHashMap<>();
         try {
@@ -299,10 +301,12 @@ public class OperationalViewService {
                 Instant.now()
             );
         } finally {
+            waitSampler.close();
             long elapsed = System.nanoTime() - startedAt;
             if (elapsed >= SLOW_SNAPSHOT_NANOS) {
-                log.warn("Slow dashboard snapshot composition totalMs={} cpuMs={} sectionsMs={} sectionsCpuMs={}",
-                    elapsed / 1_000_000, ThreadCpuTiming.elapsedMillis(cpuStartedAt), sectionsMs, sectionsCpuMs);
+                log.warn("Slow dashboard snapshot composition totalMs={} cpuMs={} sectionsMs={} sectionsCpuMs={} waitSamples={}",
+                    elapsed / 1_000_000, ThreadCpuTiming.elapsedMillis(cpuStartedAt), sectionsMs, sectionsCpuMs,
+                    waitSampler.summary());
             }
         }
     }
