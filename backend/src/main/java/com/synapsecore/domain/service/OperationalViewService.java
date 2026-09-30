@@ -47,6 +47,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.function.Supplier;
 import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -58,6 +59,8 @@ import org.springframework.stereotype.Service;
 @RequiredArgsConstructor
 @Slf4j
 public class OperationalViewService {
+
+    private static final long SLOW_SNAPSHOT_NANOS = 5_000_000_000L;
 
     private final AlertScopeService alertScopeService;
     private final RecommendationRepository recommendationRepository;
@@ -244,47 +247,70 @@ public class OperationalViewService {
     }
 
     public DashboardSnapshotResponse getSnapshot() {
-        return snapshotRequests.execute(snapshotRequestKey(), this::buildSnapshot);
+        long startedAt = System.nanoTime();
+        try {
+            return snapshotRequests.execute(snapshotRequestKey(), this::buildSnapshot);
+        } finally {
+            long elapsed = System.nanoTime() - startedAt;
+            if (elapsed >= SLOW_SNAPSHOT_NANOS) {
+                log.warn("Slow dashboard snapshot request totalMs={} (includes coalesced wait when applicable)",
+                    elapsed / 1_000_000);
+            }
+        }
     }
 
     private DashboardSnapshotResponse buildSnapshot() {
-        List<AuditLogResponse> auditLogs = getRecentAuditLogs();
-        List<IntegrationConnectorResponse> integrationConnectors = getIntegrationConnectors();
-        List<IntegrationReplayRecordResponse> integrationReplayQueue = getIntegrationReplayQueue();
-        List<ScenarioNotificationResponse> scenarioNotifications = getScenarioNotifications();
-        List<SystemIncidentResponse> systemIncidents = systemIncidentService.getActiveIncidents(
-            auditLogs,
-            integrationReplayQueue,
-            integrationConnectors,
-            scenarioNotifications
-        );
-        FulfillmentOverviewResponse fulfillmentOverview = getFulfillmentOverview();
-        List<Recommendation> currentRecommendations = loadVisibleCurrentRecommendations();
-        List<Alert> activeAlerts = loadVisibleActiveAlerts();
-        AlertFeedResponse alertFeed = toAlertFeed(activeAlerts, loadVisibleRecentAlerts());
+        long startedAt = System.nanoTime();
+        Map<String, Long> sectionsMs = new LinkedHashMap<>();
+        try {
+            List<AuditLogResponse> auditLogs = timedSnapshotSection(sectionsMs, "audit", this::getRecentAuditLogs);
+            List<IntegrationConnectorResponse> integrationConnectors = timedSnapshotSection(sectionsMs, "connectors", this::getIntegrationConnectors);
+            List<IntegrationReplayRecordResponse> integrationReplayQueue = timedSnapshotSection(sectionsMs, "replay", this::getIntegrationReplayQueue);
+            List<ScenarioNotificationResponse> scenarioNotifications = timedSnapshotSection(sectionsMs, "scenarioNotifications", this::getScenarioNotifications);
+            List<SystemIncidentResponse> systemIncidents = timedSnapshotSection(sectionsMs, "incidents",
+                () -> systemIncidentService.getActiveIncidents(auditLogs, integrationReplayQueue,
+                    integrationConnectors, scenarioNotifications));
+            FulfillmentOverviewResponse fulfillmentOverview = timedSnapshotSection(sectionsMs, "fulfillment", this::getFulfillmentOverview);
+            List<Recommendation> currentRecommendations = timedSnapshotSection(sectionsMs, "recommendations", this::loadVisibleCurrentRecommendations);
+            List<Alert> activeAlerts = timedSnapshotSection(sectionsMs, "activeAlerts", this::loadVisibleActiveAlerts);
+            AlertFeedResponse alertFeed = timedSnapshotSection(sectionsMs, "alertFeed",
+                () -> toAlertFeed(activeAlerts, loadVisibleRecentAlerts()));
 
-        return new DashboardSnapshotResponse(
-            dashboardService.getSummary(
+            return new DashboardSnapshotResponse(
+                timedSnapshotSection(sectionsMs, "summary", () -> dashboardService.getSummary(
+                    fulfillmentOverview, (long) currentRecommendations.size(), (long) activeAlerts.size())),
+                alertFeed,
+                timedSnapshotSection(sectionsMs, "recommendationResponses", () -> toRecommendationResponses(currentRecommendations)),
+                timedSnapshotSection(sectionsMs, "inventory", this::getInventoryOverview),
                 fulfillmentOverview,
-                (long) currentRecommendations.size(),
-                (long) activeAlerts.size()
-            ),
-            alertFeed,
-            toRecommendationResponses(currentRecommendations),
-            getInventoryOverview(),
-            fulfillmentOverview,
-            getRecentOrders(),
-            getRecentEvents(),
-            auditLogs,
-            systemIncidents,
-            integrationConnectors,
-            getRecentIntegrationImportRuns(),
-            integrationReplayQueue,
-            scenarioNotifications,
-            getSlaEscalations(),
-            getRecentScenarios(),
-            Instant.now()
-        );
+                timedSnapshotSection(sectionsMs, "orders", this::getRecentOrders),
+                timedSnapshotSection(sectionsMs, "events", this::getRecentEvents),
+                auditLogs,
+                systemIncidents,
+                integrationConnectors,
+                timedSnapshotSection(sectionsMs, "imports", this::getRecentIntegrationImportRuns),
+                integrationReplayQueue,
+                scenarioNotifications,
+                timedSnapshotSection(sectionsMs, "sla", this::getSlaEscalations),
+                timedSnapshotSection(sectionsMs, "scenarios", this::getRecentScenarios),
+                Instant.now()
+            );
+        } finally {
+            long elapsed = System.nanoTime() - startedAt;
+            if (elapsed >= SLOW_SNAPSHOT_NANOS) {
+                log.warn("Slow dashboard snapshot composition totalMs={} sectionsMs={}",
+                    elapsed / 1_000_000, sectionsMs);
+            }
+        }
+    }
+
+    private <T> T timedSnapshotSection(Map<String, Long> sectionsMs, String section, Supplier<T> read) {
+        long startedAt = System.nanoTime();
+        try {
+            return read.get();
+        } finally {
+            sectionsMs.put(section, (System.nanoTime() - startedAt) / 1_000_000);
+        }
     }
 
     private String snapshotRequestKey() {
