@@ -68,7 +68,15 @@ public interface IntegrationConnectorRepository extends JpaRepository<Integratio
 
     long countByTenant_CodeIgnoreCase(String tenantCode);
 
+    @Query("select new com.synapsecore.domain.repository.TenantCount(lower(c.tenant.code), count(c)) "
+        + "from IntegrationConnector c group by lower(c.tenant.code)")
+    List<TenantCount> countByTenantGrouped();
+
     long countByTenant_CodeIgnoreCaseAndEnabledFalse(String tenantCode);
+
+    @Query("select new com.synapsecore.domain.repository.TenantCount(lower(c.tenant.code), count(c)) "
+        + "from IntegrationConnector c where c.enabled = false group by lower(c.tenant.code)")
+    List<TenantCount> countDisabledByTenant();
 
     boolean existsByTenant_CodeIgnoreCaseAndEnabledTrueAndDefaultWarehouseCodeIgnoreCase(String tenantCode,
                                                                                            String defaultWarehouseCode);

@@ -14,6 +14,9 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.synapsecore.access.BootstrapAccessService;
 import com.synapsecore.access.PlatformAdministrationAccessService;
 import com.synapsecore.domain.entity.BusinessEventType;
+import com.synapsecore.domain.entity.AlertStatus;
+import com.synapsecore.domain.entity.IntegrationInboundStatus;
+import com.synapsecore.domain.entity.IntegrationReplayStatus;
 import com.synapsecore.domain.entity.ScenarioApprovalPolicy;
 import com.synapsecore.domain.entity.ScenarioApprovalStage;
 import com.synapsecore.domain.entity.ScenarioApprovalStatus;
@@ -27,6 +30,9 @@ import com.synapsecore.domain.repository.BusinessEventRepository;
 import com.synapsecore.domain.repository.CustomerOrderRepository;
 import com.synapsecore.domain.repository.FulfillmentTaskRepository;
 import com.synapsecore.domain.repository.InventoryRepository;
+import com.synapsecore.domain.repository.IntegrationConnectorRepository;
+import com.synapsecore.domain.repository.IntegrationInboundRecordRepository;
+import com.synapsecore.domain.repository.IntegrationReplayRecordRepository;
 import com.synapsecore.domain.repository.OperationalDispatchWorkItemRepository;
 import com.synapsecore.domain.repository.RecommendationRepository;
 import com.synapsecore.domain.repository.WarehouseRepository;
@@ -125,6 +131,15 @@ class PlatformTenantAccessBoundaryIntegrationTest {
 
     @Autowired
     private AlertRepository alertRepository;
+
+    @Autowired
+    private IntegrationConnectorRepository integrationConnectorRepository;
+
+    @Autowired
+    private IntegrationInboundRecordRepository integrationInboundRecordRepository;
+
+    @Autowired
+    private IntegrationReplayRecordRepository integrationReplayRecordRepository;
 
     @Autowired
     private RecommendationRepository recommendationRepository;
@@ -791,6 +806,40 @@ class PlatformTenantAccessBoundaryIntegrationTest {
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.runtime.readinessState").exists())
             .andExpect(jsonPath("$.tenants[?(@.code == 'ACCESS-BOUNDARY-REHEARSAL')]").exists());
+    }
+
+    @Test
+    void platformTenantAggregatesMatchTenantScopedCounts() throws Exception {
+        var result = mockMvc.perform(get("/api/platform/tenants").session(platformLogin()))
+            .andExpect(status().isOk())
+            .andReturn();
+        var summaries = objectMapper.readTree(result.getResponse().getContentAsString());
+        for (String tenantCode : List.of(REHEARSAL_TENANT, ISOLATION_TENANT)) {
+            var tenant = tenantRepository.findByCodeIgnoreCase(tenantCode).orElseThrow();
+            var summary = java.util.stream.StreamSupport.stream(summaries.spliterator(), false)
+                .filter(row -> tenantCode.equals(row.path("code").asText()))
+                .findFirst().orElseThrow();
+            long disabled = integrationConnectorRepository.countByTenant_CodeIgnoreCaseAndEnabledFalse(tenantCode);
+            long failed = integrationInboundRecordRepository.countByTenantCodeIgnoreCaseAndStatusIn(
+                tenantCode, List.of(IntegrationInboundStatus.REJECTED, IntegrationInboundStatus.REPLAY_QUEUED));
+            long replay = integrationReplayRecordRepository.countByTenantCodeIgnoreCaseAndStatusIn(tenantCode,
+                List.of(IntegrationReplayStatus.PENDING, IntegrationReplayStatus.REPLAY_FAILED,
+                    IntegrationReplayStatus.DEAD_LETTERED));
+            long alerts = alertRepository.countByTenant_CodeIgnoreCaseAndStatus(tenantCode, AlertStatus.ACTIVE);
+
+            assertThat(summary.path("activeUserCount").asLong())
+                .isEqualTo(accessUserRepository.countByTenant_CodeIgnoreCaseAndActiveTrue(tenantCode));
+            assertThat(summary.path("activeOperatorCount").asLong())
+                .isEqualTo(accessOperatorRepository.countByTenant_CodeIgnoreCaseAndActiveTrue(tenantCode));
+            assertThat(summary.path("connectorCount").asLong())
+                .isEqualTo(integrationConnectorRepository.countByTenant_CodeIgnoreCase(tenantCode));
+            assertThat(summary.path("disabledConnectorCount").asLong()).isEqualTo(disabled);
+            assertThat(summary.path("failedInboundCount").asLong()).isEqualTo(failed);
+            assertThat(summary.path("replayAttentionCount").asLong()).isEqualTo(replay);
+            assertThat(summary.path("activeAlertCount").asLong()).isEqualTo(alerts);
+            assertThat(summary.path("supportState").asText()).isEqualTo(!tenant.isActive() ? "INACTIVE"
+                : disabled + failed + replay + alerts > 0 ? "ATTENTION" : "HEALTHY");
+        }
     }
 
     @Test

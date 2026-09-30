@@ -88,6 +88,11 @@ public interface IntegrationReplayRecordRepository extends JpaRepository<Integra
 
     long countByTenantCodeIgnoreCaseAndStatusIn(String tenantCode, Collection<IntegrationReplayStatus> statuses);
 
+    @Query("select new com.synapsecore.domain.repository.TenantCount(lower(r.tenantCode), count(r)) "
+        + "from IntegrationReplayRecord r where r.tenantCode is not null and r.status in ?1 "
+        + "group by lower(r.tenantCode)")
+    List<TenantCount> countByTenantAndStatusInGrouped(Collection<IntegrationReplayStatus> statuses);
+
     long countByTenantCodeIgnoreCaseAndSourceSystemIgnoreCaseAndConnectorTypeAndStatusIn(
         String tenantCode,
         String sourceSystem,

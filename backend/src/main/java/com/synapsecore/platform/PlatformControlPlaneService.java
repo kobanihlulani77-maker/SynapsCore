@@ -16,6 +16,7 @@ import com.synapsecore.domain.repository.IntegrationConnectorRepository;
 import com.synapsecore.domain.repository.IntegrationInboundRecordRepository;
 import com.synapsecore.domain.repository.IntegrationReplayRecordRepository;
 import com.synapsecore.domain.repository.TenantRepository;
+import com.synapsecore.domain.repository.TenantCount;
 import com.synapsecore.domain.service.SystemRuntimeService;
 import com.synapsecore.platform.dto.PlatformActivityResponse;
 import com.synapsecore.platform.dto.PlatformOverviewResponse;
@@ -26,6 +27,8 @@ import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
+import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -56,44 +59,48 @@ public class PlatformControlPlaneService {
 
     @Transactional(readOnly = true)
     public List<PlatformTenantSummary> getTenants() {
+        Map<String, Long> activeUsers = tenantCounts(accessUserRepository.countActiveByTenant());
+        Map<String, Long> activeOperators = tenantCounts(accessOperatorRepository.countActiveByTenant());
+        Map<String, Long> connectors = tenantCounts(integrationConnectorRepository.countByTenantGrouped());
+        Map<String, Long> disabled = tenantCounts(integrationConnectorRepository.countDisabledByTenant());
+        Map<String, Long> failedInbounds = tenantCounts(integrationInboundRecordRepository.countByTenantAndStatusInGrouped(
+            List.of(IntegrationInboundStatus.REJECTED, IntegrationInboundStatus.REPLAY_QUEUED)));
+        Map<String, Long> replayAttentionCounts = tenantCounts(integrationReplayRecordRepository.countByTenantAndStatusInGrouped(
+            List.of(IntegrationReplayStatus.PENDING, IntegrationReplayStatus.REPLAY_FAILED,
+                IntegrationReplayStatus.DEAD_LETTERED)));
+        Map<String, Long> activeAlerts = tenantCounts(alertRepository.countByTenantAndStatusGrouped(AlertStatus.ACTIVE));
         return tenantRepository.findAllByOrderByNameAsc().stream()
             .map(tenant -> {
                 String tenantCode = tenant.getCode();
-                long disabledConnectors = integrationConnectorRepository
-                    .countByTenant_CodeIgnoreCaseAndEnabledFalse(tenantCode);
-                long failedInbound = integrationInboundRecordRepository
-                    .countByTenantCodeIgnoreCaseAndStatusIn(
-                        tenantCode,
-                        List.of(IntegrationInboundStatus.REJECTED, IntegrationInboundStatus.REPLAY_QUEUED));
-                long replayAttention = integrationReplayRecordRepository
-                    .countByTenantCodeIgnoreCaseAndStatusIn(
-                        tenantCode,
-                        List.of(
-                            IntegrationReplayStatus.PENDING,
-                            IntegrationReplayStatus.REPLAY_FAILED,
-                            IntegrationReplayStatus.DEAD_LETTERED));
-                long activeAlerts = alertRepository
-                    .countByTenant_CodeIgnoreCaseAndStatus(tenantCode, AlertStatus.ACTIVE);
+                String key = tenantCode.toLowerCase(Locale.ROOT);
+                long disabledConnectors = disabled.getOrDefault(key, 0L);
+                long failedInbound = failedInbounds.getOrDefault(key, 0L);
+                long replayAttention = replayAttentionCounts.getOrDefault(key, 0L);
+                long alertCount = activeAlerts.getOrDefault(key, 0L);
                 String supportState = !tenant.isActive()
                     ? "INACTIVE"
-                    : disabledConnectors + failedInbound + replayAttention + activeAlerts > 0 ? "ATTENTION" : "HEALTHY";
+                    : disabledConnectors + failedInbound + replayAttention + alertCount > 0 ? "ATTENTION" : "HEALTHY";
                 return new PlatformTenantSummary(
                     tenant.getId(),
                     tenantCode,
                     tenant.getName(),
                     tenant.isActive(),
-                    accessUserRepository.countByTenant_CodeIgnoreCaseAndActiveTrue(tenantCode),
-                    accessOperatorRepository.countByTenant_CodeIgnoreCaseAndActiveTrue(tenantCode),
-                    integrationConnectorRepository.countByTenant_CodeIgnoreCase(tenantCode),
+                    activeUsers.getOrDefault(key, 0L),
+                    activeOperators.getOrDefault(key, 0L),
+                    connectors.getOrDefault(key, 0L),
                     disabledConnectors,
                     failedInbound,
                     replayAttention,
-                    activeAlerts,
+                    alertCount,
                     supportState,
                     tenant.getUpdatedAt()
                 );
             })
             .toList();
+    }
+
+    private Map<String, Long> tenantCounts(List<TenantCount> counts) {
+        return counts.stream().collect(Collectors.toMap(TenantCount::tenantCode, TenantCount::count));
     }
 
     @Transactional(readOnly = true)

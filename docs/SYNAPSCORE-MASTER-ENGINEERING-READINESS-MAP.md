@@ -245,7 +245,7 @@ it does not authorize changes to every downstream page.
 | ID | Purpose and present evidence/risk | Required work and exit evidence |
 | --- | --- | --- |
 | H1 - Request/holder ownership | Historical starvation proven; a warm hosted 2026-09-27 sample captured `10/10` Hikari active with one waiter and slow requests, but not the ten holders ([evidence](evidence/warm-runtime-pool-pressure-2026-09-27.md)) | For a representative slow request/job map UTC, request/thread, controller/service, transaction owner, acquisition wait, JDBC PID, SQL/lock state, non-SQL work, commit/rollback and response. Exit when the failing overlap has a defensible explanation or the missing instrumentation is precisely specified. ClientRead alone is not Java CPU proof. |
-| H2 - Query/composition efficiency | Batching and request-local reuse implemented; multi-domain snapshot remains serial and expensive. Platform overview's outer read-only transaction has been removed and its endpoint/transaction attribute verified locally; per-tenant counts and hosted latency remain open ([evidence](evidence/platform-overview-transaction-boundary-2026-09-27.md)) | Count queries/transactions and payload size for login, summary, snapshot, Runtime, Replay, catalog, platform overview and scoped reads at realistic dataset sizes. Inspect N+1, duplicate reads, lazy loads, coalescing keys, cache expiry/miss bursts, pagination and selection. Exit with measured budgets and no unexplained query amplification; preserve tenant/role/scope cache keys. |
+| H2 - Query/composition efficiency | Batching and request-local reuse implemented; multi-domain snapshot remains serial and expensive. Platform overview's outer read-only transaction was removed ([evidence](evidence/platform-overview-transaction-boundary-2026-09-27.md)); its per-tenant count fan-out is now replaced by seven grouped counts with local two-tenant equivalence proof ([evidence](evidence/platform-tenant-count-query-bounds-2026-09-30.md)). Hosted latency and PostgreSQL plans remain open. | Count queries/transactions and payload size for login, summary, snapshot, Runtime, Replay, catalog, platform overview and scoped reads at realistic dataset sizes. Inspect N+1, duplicate reads, lazy loads, coalescing keys, cache expiry/miss bursts, pagination and selection. Exit with measured budgets and no unexplained query amplification; preserve tenant/role/scope cache keys. |
 | H3 - Atomic writes and locks | Product/identity and Order/Replay double-borrow seams have focused proofs; the inventory first-row race test now synchronizes the actual missing-row boundary without changing production behavior ([evidence](evidence/inventory-first-row-race-proof-2026-09-27.md)) | Recheck top-level and ambient transaction callers; lock ordering, sequence repair under concurrent inserts, rollback on constraint failure, PostgreSQL aborted-transaction handling and inventory conservation. Exit with real PostgreSQL races producing documented success/conflict outcomes, exactly one durable result, released pool, and no partial side effects. |
 | H4 - Background overlap | One main scheduler, separate recommendation worker, guarded dispatch drain; local budget documented | Map main scheduler jobs, recommendation pass, async drain, HTTP and deploy overlap. Inspect dispatch PENDING/PROCESSING/FAILED recovery after crash, starvation/fairness across tenants, backlog age, failure accounting, stuck claims, thread-local cleanup. Exit with bounded headroom and recoverable queue state; process-local guards must not be described as multi-node coordination. |
 | H5 - Operational ledger and intelligence | Layer 2 plus lifecycle suites demonstrate key contracts locally | Overlap order intake, inventory corrections, partial dispatch, cancel/return and repeated request IDs. Verify available/reserved/on-hand arithmetic, no oversell or double release, terminal immutability, alert condition identity/resolution and recommendation currentness. Include transfer source/destination warehouse visibility and prediction with absent/sparse/stale demand. Exit with reconciled input/state/event/UI ledger. |
@@ -279,24 +279,24 @@ establish exact SQL totals. Report sampled estimates and bounds honestly.
 
 ### The exact next engineering objective
 
-**H1/H2/H7: reconstruct the September 23 warm Replay/connection-pressure window
-against the actual deployed resource envelope, then select one causal seam.**
+**H1/H2/H7: identify connection ownership in the already documented warm
+September 27 pool-pressure boundary, then measure the deployed resource envelope
+and select one causal seam.**
 
-1. Locate and archive the existing sanitized proof failure, Chrome timing and
-   Render pool/resource window. Confirm which backend instance/revision served it.
-   If artifacts have expired, mark the historical mapping unavailable.
-2. Compare the connector update/readback and Replay render timing to HTTP
-   concurrency, pool occupancy, scheduler boundaries and PostgreSQL waits. Do not
-   infer all ten holders or continuous retention from aggregate samples.
-3. Identify which missing measurement can distinguish slow DB, Java-held
-   connection, acquisition wait, CPU/GC scheduling, routing delay, and stale UI.
-   Inspect existing telemetry first. Specify the smallest diagnostic addition
-   if the boundary cannot currently be observed; do not request endless samples.
-4. Only if needed, run one warm focused capture with explicit trigger/stop rules
-   from the timeout map. No broad E2E or infrastructure mutation in this document
-   task. If code causality is established, reproduce and fix it; if bounded
-   application work is capacity-limited, prepare a one-variable capacity
-   comparison for owner decision. Neither conclusion is assumed in advance.
+1. Use the [September 27 UTC/request/instance trace](evidence/warm-runtime-pool-pressure-2026-09-27.md)
+   as the warm-pressure reference. The ten holder identities were not captured;
+   do not infer them from dispatch telemetry or completion-time pool snapshots.
+2. Inspect available request, scheduler, transaction and PostgreSQL telemetry for
+   a way to link acquisition and release to an owner. If it cannot do so, define
+   one bounded, privacy-safe diagnostic addition rather than rerunning broad E2E.
+3. At the first warm `active=10, idle=0, waiting>0` recurrence, capture the
+   request/scheduler threads, JDBC ownership, PostgreSQL session state and
+   CPU/GC/resource window together. Stop traffic at the trigger. Classify
+   acquisition wait, SQL/lock wait, Java-held connection, routing delay and
+   HTTP-fast/UI-stale as separate boundaries.
+4. Reproduce and correct only an established application cause. If measured
+   normal work is capacity-limited, prepare a one-variable capacity comparison
+   for owner decision. Neither conclusion follows from the current point sample.
 
 **Exit artifact:** one incident record with observed versus inferred timeline,
 causal classification, transaction-owner evidence or explicit remaining gap,

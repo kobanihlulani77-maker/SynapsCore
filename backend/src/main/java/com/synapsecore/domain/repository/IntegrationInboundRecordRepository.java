@@ -8,10 +8,16 @@ import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Query;
 
 public interface IntegrationInboundRecordRepository extends JpaRepository<IntegrationInboundRecord, Long> {
 
     long countByTenantCodeIgnoreCaseAndStatusIn(String tenantCode, Collection<IntegrationInboundStatus> statuses);
+
+    @Query("select new com.synapsecore.domain.repository.TenantCount(lower(r.tenantCode), count(r)) "
+        + "from IntegrationInboundRecord r where r.tenantCode is not null and r.status in ?1 "
+        + "group by lower(r.tenantCode)")
+    List<TenantCount> countByTenantAndStatusInGrouped(Collection<IntegrationInboundStatus> statuses);
 
     long countByTenantCodeIgnoreCaseAndStatusInAndCreatedAtAfter(String tenantCode,
                                                                  Collection<IntegrationInboundStatus> statuses,
