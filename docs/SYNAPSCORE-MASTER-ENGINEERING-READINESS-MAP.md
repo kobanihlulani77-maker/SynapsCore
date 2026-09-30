@@ -80,6 +80,52 @@ An existing raw artifact may be inspected without rerunning work. A copied
 statement without an inspectable artifact is labeled session-reported. A passing
 run after a failing run must preserve the failure and explain what changed.
 
+### Infrastructure and evidence policy
+
+This rule applies to M0-M8 and subsequent production-readiness work, including
+backend, PostgreSQL, Redis, schedulers, Replay, realtime, security, browser
+convergence, recovery, load and UI verification. Render Free is a useful
+engineering environment, not a SynapseCore product constraint. Use the cheapest
+environment that still gives valid evidence for the question being tested.
+Slower-but-measurable work does not justify an upgrade for convenience.
+
+For each failure or weak proof, record the observed boundary before choosing a
+remedy:
+
+| Classification | Required response |
+| --- | --- |
+| Application defect or inefficiency | Trace and correct the responsible code or transaction path; do not hide waste with a larger plan. |
+| Configuration defect | Correct the specific setting and verify the same workload. |
+| Test/proof defect | Correct the fixture or observation method without reducing its assertions or acceptance standard. |
+| Infrastructure limitation | Identify the measured resource or unavailable capability and show why it, rather than the application, prevents a valid result. |
+
+For a proven infrastructure blocker, preserve the constrained result and name
+the missing CPU, memory, database, cold-start, observability, concurrency, or
+recovery capability. State the minimum plan/capability change, current and
+expected monthly cost, the precise proof it will unlock, workload and stop
+thresholds, and residual uncertainty. Obtain owner approval **before** any
+paid-plan change. Hold the revision, dataset, workload, instrumentation, and
+acceptance criteria constant where practical; measure again and compare
+before/after. If the increase removes one ceiling but exposes inefficient SQL,
+long-held connections, runaway background work, or memory growth, fix those
+application causes rather than treating capacity as permanent compensation.
+Do not shrink representative work, disable useful functionality, add retries,
+or raise timeouts merely to manufacture a green result.
+
+Environment claims are stage-specific:
+
+| Stage | Infrastructure gate |
+| --- | --- |
+| Engineering and focused diagnosis | Continue on Free while the evidence remains trustworthy. A paid experiment requires a proven blocking limit and owner approval; it is not an automatic migration. |
+| Pre-pilot final verification | Exercise the frozen candidate in an environment representative of the declared operator, tenant, warehouse, data, background-job and realtime envelope. Free-tier passes or failures alone cannot settle company capacity. |
+| Controlled company pilot | Use an always-on paid environment, sized with measured CPU/RAM, JVM heap/GC/threads, PostgreSQL and Redis demand, Hikari headroom, request/freshness latency, background overlap, concurrent sessions, recovery and monthly cost. After sizing, deploy the frozen candidate and rerun required hosted verification on that environment before launch. |
+| Production reliance or expansion after pilot | Reassess capacity, scaling, monitoring, backup/recovery commitments and cost from actual pilot measurements; do not silently inherit the pilot plan. |
+
+A failure on Free does not prove SynapseCore cannot handle the intended company
+workload. A success on Free does not prove that it can. Both require the
+appropriate measured envelope and evidence. This policy does not authorize a
+plan change or declare a pilot ready.
+
 ## 3. The system being hardened
 
 SynapseCore is a tenant-scoped operational intelligence and control layer above
@@ -255,7 +301,7 @@ it does not authorize changes to every downstream page.
 | H4 - Background overlap | One main scheduler, separate recommendation worker, guarded dispatch drain; local budget documented | Map main scheduler jobs, recommendation pass, async drain, HTTP and deploy overlap. Inspect dispatch PENDING/PROCESSING/FAILED recovery after crash, starvation/fairness across tenants, backlog age, failure accounting, stuck claims, thread-local cleanup. Exit with bounded headroom and recoverable queue state; process-local guards must not be described as multi-node coordination. |
 | H5 - Operational ledger and intelligence | Layer 2 plus lifecycle suites demonstrate key contracts locally | Overlap order intake, inventory corrections, partial dispatch, cancel/return and repeated request IDs. Verify available/reserved/on-hand arithmetic, no oversell or double release, terminal immutability, alert condition identity/resolution and recommendation currentness. Include transfer source/destination warehouse visibility and prediction with absent/sparse/stale demand. Exit with reconciled input/state/event/UI ledger. |
 | H6 - Ingestion and Replay | CSV/webhook/pull exist; per-attempt Replay transactions implemented | Check repeated external IDs and different bodies, cross-connector collisions, manual/auto replay race, token disable/rotation in flight, payload limits, malformed CSV/JSON, partial import outcomes, remote fetch timeout/body limit and SSRF/redirect paths. Exit with one order/reservation/task per accepted identity and preserved failure history; no manual row insertion to make proof pass. |
-| H7 - Capacity and resource behavior | Historical OOM and small-plan pressure reported; September 30 Render dashboard reconfirmed Free backend and Basic-256mb PostgreSQL, with backend CPU/memory charts unavailable. An always-on backend is planned for pilot, but no plan change is authorized yet. | Record actual instance count, CPU/RAM/heap/GC/threads, DB CPU/memory/I/O, Redis, Hikari and browser request fan-out at a declared load/data envelope. Distinguish JVM build MAVEN_OPTS from runtime JVM flags. Inspect unbounded list/event/history/cache/session growth. Exit with a measured sustainable envelope, exhaustion behavior, recovery and cost; a plan change requires evidence and owner approval. |
+| H7 - Capacity and resource behavior | Historical OOM and small-plan pressure reported; September 30 Render dashboard reconfirmed Free backend and Basic-256mb PostgreSQL, with backend CPU/memory charts unavailable. An always-on backend is planned for pilot, but no plan change is authorized yet. | Record actual instance count, CPU/RAM/heap/GC/threads, DB CPU/memory/I/O, Redis, Hikari and browser request fan-out at a declared load/data envelope. Distinguish JVM build MAVEN_OPTS from runtime JVM flags. Inspect unbounded list/event/history/cache/session growth. Exit with a measured sustainable envelope, exhaustion behavior, recovery and cost. Apply the cross-phase infrastructure classification above; prove a Free-tier limit before proposing the smallest paid comparison, and obtain owner approval before changing plans. |
 | H8 - Realtime and convergence | REST repair, tenant topics, periodic refresh implemented; Replay poll and route hook-order defects corrected and browser-tested locally. A 2026-09-27 served-code hosted trace found two connector GET aborts at 5 s and snapshot TTFB of 13/26 s; the later enabled state did render, but the exact filtered GET was absent ([evidence](evidence/replay-connector-poll-lifecycle-2026-09-27.md)) | Trace commit -> dispatch -> Pub/Sub -> browser signal -> REST -> render. Challenge missed/duplicate/out-of-order events, reconnects, session/scope changes, multiple tabs and stale responses. First explain the warm HTTP latency with backend/pool/database evidence, then verify the exact connector GET and bounded button convergence. Do not call a diagnostic sampling race permanent UI staleness. |
 | H9 - Tenant, warehouse and authority | Six-role model, scoped services, platform separation, V12/V13 safeguards implemented | Exercise object IDs, tenant headers, role/scope revocation, disabled warehouses, last-admin/reviewer coverage, session expiry, CSRF/Origin/CORS and websocket destinations. Check caches, coalesced futures, scheduler context and support metadata. Exit with zero unauthorized read/write/event leakage across two tenants and at least two warehouse scopes. |
 | H10 - Governance determinism | Scenario non-execution, assignment, SLA and V14 lineage established in code/tests | Preserve requester identity; independent review; escalated final approval; overdue review/final-stage SLA ownership; rejection/revision races; same-warehouse linear successors; deterministic timestamp ties. Exit with exactly one legal transition/evidence result under conflict and unchanged operational counts for preview/save/approve. |
@@ -333,7 +379,8 @@ authority/data divergence, and measured M1 budgets hold. **Stop condition:**
 first unexpected failure or degraded dependency; preserve original attempt.
 **Exit criteria:** equivalent recorded conditions pass and final ledgers reconcile.
 **Required evidence:** baseline UTC/durations, run IDs, counts, console/network,
-pool/resource window, before/after state, and known exclusions. **Next:** M3.
+pool/resource window, before/after state, known exclusions, and the environment's
+representativeness relative to the declared workload. **Next:** M3.
 
 Run the existing six-flag connection gate first; `PROOF_ALLOWED=True` permits
 the proof path but does not itself establish authenticated warmth. Include
@@ -525,7 +572,8 @@ operator evidence. **Stop condition:** missing critical proof, unsupported sourc
 contract, unstable runtime, unknown served revision or unavailable recovery.
 **Exit criteria:** owner signs technical readiness for the precise scope and
 candidate, with expiry/change rules. **Required evidence:** signed readiness
-record, revision/config manifest, findings ledger, measured envelope and runbooks.
+record, revision/config manifest, findings ledger, measured envelope, environment
+comparison and runbooks. Free-tier proof alone cannot establish company capacity.
 **Next:** M7. This does not yet authorize customer traffic.
 
 ## 12. M7 - Customer integration, packaging and launch
@@ -539,6 +587,9 @@ identities/units/timezones, duplicate semantics, warehouses, user/role assignmen
 governance coverage, initial data reconciliation, policies, training and support.
 **Pass gate:** customer data rehearsal succeeds within M6 envelope, credentials
 are delivered/recoverable, no open blocker, and rollback/recovery/exit are agreed.
+Before launch, owner-approved always-on paid sizing must cover the measured
+company workload with justified headroom and cost; the frozen candidate must
+pass the required hosted checks again on that environment.
 **Stop condition:** unsupported source format/action, ambiguous ledger ownership,
 missing reviewer coverage, no backup/support owner or expanding load without proof.
 **Exit criteria:** owner and company approve the launch checklist and observation
@@ -579,7 +630,8 @@ data or loss of recovery capability; pause affected reliance and invoke incident
 plan. **Exit criteria:** company/owner decide continue, remediate, stop or expand.
 **Required evidence:** baseline versus measured detection/recovery/decision time,
 recommendation usefulness, manual investigation burden and incident ledger.
-**Next:** separate production-customer/expansion gate, never automatic conversion.
+**Next:** separate production-customer/expansion gate using actual pilot resource,
+reliability, backup/recovery and cost evidence, never automatic conversion.
 
 Do not invent business-value percentages. Use
 [day-one guide](company-day-one-pilot-guide.md),

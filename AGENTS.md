@@ -10,6 +10,23 @@ current implementation. Preserve proven governance, recovery, and operational
 behavior; do not interpret the simplified inventory flow as permission to bypass
 reservation or fulfillment semantics. Historical readiness is not current approval.
 
+## Infrastructure And Evidence Rule
+
+Apply the [cross-phase infrastructure decision rule](docs/SYNAPSCORE-MASTER-ENGINEERING-READINESS-MAP.md#infrastructure-and-evidence-policy)
+to all SynapseCore engineering, not only runtime hardening. Render Free is an
+engineering resource, not a product requirement or a pilot-readiness standard.
+Keep using it while it yields trustworthy evidence. Classify a failure as an
+application, configuration, proof, or infrastructure problem before changing
+anything. Do not weaken behavior, representative workloads, assertions, or
+timeouts merely to fit Free, and do not buy capacity to hide application waste.
+If a measured infrastructure limit blocks required proof, preserve the failed
+evidence, identify the exact limit and smallest paid experiment with expected
+cost, obtain owner approval before changing a plan, and compare the same
+measurement before and after. Pre-pilot verification needs a representative
+environment; a controlled company pilot requires an always-on paid environment
+sized from measured workload and reverified on the frozen candidate. Production
+capacity is a separate decision based on pilot evidence.
+
 ## Product Identity
 SynapseCore is a real-time operational intelligence platform.
 
