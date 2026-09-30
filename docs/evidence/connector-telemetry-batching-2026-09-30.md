@@ -71,5 +71,7 @@ measured hosted improvement in this window. Overall snapshot latency remains
 unacceptable for an M1 exit claim. Next, correlate representative warm snapshot
 and login requests with per-request connection acquisition/hold and resource
 evidence before attributing the distributed residual time to PostgreSQL, Java,
-or the Free instance's 0.15 CPU/512 MB limit. Inspect PostgreSQL plans only if
+or a Free-tier resource ceiling. Render's Metrics UI displayed a 0.15 CPU/512 MB
+limit, but that display alone does not establish the effective CPU allocation or
+the cause of this request's latency. Inspect PostgreSQL plans only if
 measured SQL state points there. H1/H7 and the rest of M1 remain open.
