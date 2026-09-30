@@ -61,7 +61,7 @@ class SystemIncidentServiceSnapshotReuseTest {
             }
         };
         IntegrationConnectorService connectorService = new IntegrationConnectorService(
-            null, null, null, null, null, null, null, null, null, null, null, null
+            null, null, null, null, null, null, null, null, null, null, null, null, null
         ) {
             @Override
             public List<com.synapsecore.integration.dto.IntegrationConnectorResponse> getConnectors() {

@@ -1,6 +1,7 @@
 package com.synapsecore.domain.repository;
 
 import com.synapsecore.domain.entity.AccessOperator;
+import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 import org.springframework.data.jpa.repository.JpaRepository;
@@ -13,6 +14,9 @@ public interface AccessOperatorRepository extends JpaRepository<AccessOperator, 
     Optional<AccessOperator> findByTenant_CodeIgnoreCaseAndActorNameIgnoreCaseAndActiveTrue(String tenantCode, String actorName);
 
     Optional<AccessOperator> findByTenant_CodeIgnoreCaseAndActorNameIgnoreCase(String tenantCode, String actorName);
+
+    @Query("select o from AccessOperator o where lower(o.tenant.code) = lower(?1) and lower(o.actorName) in ?2")
+    List<AccessOperator> findSupportOwnersByTenantAndActorNames(String tenantCode, Collection<String> actorNames);
 
     Optional<AccessOperator> findByTenant_CodeIgnoreCaseAndId(String tenantCode, Long id);
 

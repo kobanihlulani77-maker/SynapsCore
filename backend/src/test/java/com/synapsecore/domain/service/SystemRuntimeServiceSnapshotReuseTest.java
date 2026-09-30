@@ -75,7 +75,7 @@ class SystemRuntimeServiceSnapshotReuseTest {
             }
         };
         IntegrationConnectorService connectorService = new IntegrationConnectorService(
-            null, null, null, null, null, null, null, null, null, null, null, null
+            null, null, null, null, null, null, null, null, null, null, null, null, null
         ) {
             @Override
             public List<IntegrationConnectorResponse> getConnectors() {

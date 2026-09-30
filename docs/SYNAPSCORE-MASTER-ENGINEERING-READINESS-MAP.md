@@ -296,7 +296,7 @@ it does not authorize changes to every downstream page.
 | ID | Purpose and present evidence/risk | Required work and exit evidence |
 | --- | --- | --- |
 | H1 - Request/holder ownership | Historical starvation proven; a warm hosted 2026-09-27 sample captured `10/10` Hikari active with one waiter and slow requests, but not the ten holders ([evidence](evidence/warm-runtime-pool-pressure-2026-09-27.md)) | For a representative slow request/job map UTC, request/thread, controller/service, transaction owner, acquisition wait, JDBC PID, SQL/lock state, non-SQL work, commit/rollback and response. Exit when the failing overlap has a defensible explanation or the missing instrumentation is precisely specified. ClientRead alone is not Java CPU proof. |
-| H2 - Query/composition efficiency | Batching and request-local reuse implemented; platform overview's per-tenant count fan-out was replaced by seven grouped counts ([evidence](evidence/platform-tenant-count-query-bounds-2026-09-30.md)). The hosted snapshot trace now identifies connector telemetry as 8.5 seconds of a 14.1-second composition, and a direct 58-connector list takes 8.8 seconds in the handler; nine telemetry queries per connector make this an open amplification defect ([evidence](evidence/hosted-connector-telemetry-amplification-2026-09-30.md)). | Batch connector telemetry without unbounded record loading or pool-amplifying parallelism; prove response equivalence and bounded query count, then remeasure the exact hosted revision. Also count queries/transactions and payload size for login, summary, snapshot, Runtime, Replay, catalog, platform overview and scoped reads at realistic sizes. Exit with measured budgets and no unexplained query amplification; preserve tenant/role/scope cache keys. |
+| H2 - Query/composition efficiency | Batching and request-local reuse implemented; platform overview's per-tenant count fan-out was replaced by seven grouped counts ([evidence](evidence/platform-tenant-count-query-bounds-2026-09-30.md)). The hosted trace measured an 8.8-second 58-connector list and 8.5 seconds in snapshot connector composition ([trace](evidence/hosted-connector-telemetry-amplification-2026-09-30.md)). Connector telemetry batching is implemented and locally verified with a three-query 58-connector bound and 396/396 backend tests ([evidence](evidence/connector-telemetry-batching-2026-09-30.md)); CI and hosted PostgreSQL timing are not yet verified. | Verify the exact deployed revision and compare warm connector-list/snapshot latency, PostgreSQL plans if slow, and Hikari hold time. Also count queries/transactions and payload size for login, summary, snapshot, Runtime, Replay, catalog, platform overview and scoped reads at realistic sizes. Exit with measured budgets and no unexplained query amplification; preserve tenant/role/scope cache keys. |
 | H3 - Atomic writes and locks | Product/identity and Order/Replay double-borrow seams have focused proofs; the inventory first-row race test now synchronizes the actual missing-row boundary without changing production behavior ([evidence](evidence/inventory-first-row-race-proof-2026-09-27.md)) | Recheck top-level and ambient transaction callers; lock ordering, sequence repair under concurrent inserts, rollback on constraint failure, PostgreSQL aborted-transaction handling and inventory conservation. Exit with real PostgreSQL races producing documented success/conflict outcomes, exactly one durable result, released pool, and no partial side effects. |
 | H4 - Background overlap | One main scheduler, separate recommendation worker, guarded dispatch drain; local budget documented | Map main scheduler jobs, recommendation pass, async drain, HTTP and deploy overlap. Inspect dispatch PENDING/PROCESSING/FAILED recovery after crash, starvation/fairness across tenants, backlog age, failure accounting, stuck claims, thread-local cleanup. Exit with bounded headroom and recoverable queue state; process-local guards must not be described as multi-node coordination. |
 | H5 - Operational ledger and intelligence | Layer 2 plus lifecycle suites demonstrate key contracts locally | Overlap order intake, inventory corrections, partial dispatch, cancel/return and repeated request IDs. Verify available/reserved/on-hand arithmetic, no oversell or double release, terminal immutability, alert condition identity/resolution and recommendation currentness. Include transfer source/destination warehouse visibility and prediction with absent/sparse/stale demand. Exit with reconciled input/state/event/UI ledger. |
@@ -330,17 +330,17 @@ establish exact SQL totals. Report sampled estimates and bounds honestly.
 
 ### The exact next engineering objective
 
-**H2 first: remove the now-captured connector telemetry query amplification,
-then return to H1/H7 connection ownership and the measured resource envelope.**
+**H2 first: prove the locally verified connector telemetry correction on the
+exact hosted revision, then return to H1/H7 connection ownership and the
+measured resource envelope.**
 
 The [September 30 warm hosted trace](evidence/hosted-connector-telemetry-amplification-2026-09-30.md)
-provides a specific H2 correction target: 58 connector summaries, nine
-telemetry queries per connector, and 8.5 seconds spent in the snapshot's
-connector section. Preserve exact tenant/warehouse scope and response semantics
-while bounding query count; verify the correction locally, in CI, and on the
-exact hosted revision before attributing a latency improvement to it. This
-does not close H1 or establish that the historical ten Hikari holders were
-connectors.
+provides the before-state: 58 connector summaries, nine telemetry queries per
+connector, and 8.5 seconds spent in the snapshot's connector section. The
+[local correction](evidence/connector-telemetry-batching-2026-09-30.md) bounds
+the list path; verify CI and the exact hosted PostgreSQL revision before
+attributing any latency improvement to it. This does not close H1 or establish
+that the historical ten Hikari holders were connectors.
 
 **H1/H7 follow-through:**
 

@@ -203,7 +203,7 @@ class ScenarioSlaEscalationConcurrencyIntegrationTest {
 
     private IntegrationConnectorService emptyConnectors() {
         return new IntegrationConnectorService(
-            null, null, null, null, null, null, null, null, null, null, null, null) {
+            null, null, null, null, null, null, null, null, null, null, null, null, null) {
             @Override public List<IntegrationConnectorResponse> getConnectors() { return List.of(); }
         };
     }

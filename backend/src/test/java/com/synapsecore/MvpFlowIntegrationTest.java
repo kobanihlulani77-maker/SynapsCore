@@ -119,6 +119,9 @@ class MvpFlowIntegrationTest {
     private IntegrationConnectorRepository integrationConnectorRepository;
 
     @Autowired
+    private com.synapsecore.integration.IntegrationConnectorService integrationConnectorService;
+
+    @Autowired
     private com.synapsecore.integration.IntegrationScheduledPullWorkerService integrationScheduledPullWorkerService;
 
     @Autowired
@@ -3105,6 +3108,25 @@ class MvpFlowIntegrationTest {
         assertThat(integrationInboundRecordRepository.findAll())
             .anyMatch(record -> "CSV-TOKEN-1001".equals(record.getExternalOrderId())
                 && record.getStatus() == com.synapsecore.domain.entity.IntegrationInboundStatus.ACCEPTED);
+    }
+
+    @Test
+    void connectorListMatchesEstablishedSingleConnectorTelemetry() {
+        var connectors = integrationConnectorRepository.findAll();
+        var listed = integrationConnectorService.getConnectors();
+
+        for (var connector : connectors) {
+            if (connector.getTenant() == null || !STARTER_TENANT.equalsIgnoreCase(connector.getTenant().getCode())) {
+                continue;
+            }
+            var expected = integrationConnectorService.describeConnector(connector);
+            assertThat(listed).filteredOn(response -> response.sourceSystem().equalsIgnoreCase(connector.getSourceSystem())
+                    && response.type() == connector.getType())
+                .singleElement()
+                .usingRecursiveComparison()
+                .ignoringFields("oldestPendingReplayAgeSeconds")
+                .isEqualTo(expected);
+        }
     }
 
     @Test

@@ -38,8 +38,10 @@ import java.net.URISyntaxException;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.util.HexFormat;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 import lombok.RequiredArgsConstructor;
 import org.hibernate.LazyInitializationException;
 import org.springframework.http.HttpStatus;
@@ -65,6 +67,7 @@ public class IntegrationConnectorService {
     private final TenantContextService tenantContextService;
     private final SynapseStarterProperties starterProperties;
     private final WarehouseRepository warehouseRepository;
+    private final ConnectorTelemetryBatchReader connectorTelemetryBatchReader;
 
     @org.springframework.beans.factory.annotation.Value("${synapsecore.integration.health-window-hours:24}")
     private long integrationHealthWindowHours;
@@ -85,13 +88,39 @@ public class IntegrationConnectorService {
             ? null
             : normalizeSourceSystem(sourceSystem);
         boolean exactReadback = normalizedSourceSystem != null && type != null;
-        return resolveConnectorSelection(tenantCode, normalizedSourceSystem, type)
+        List<IntegrationConnector> connectors = resolveConnectorSelection(tenantCode, normalizedSourceSystem, type)
             .stream()
             .filter(connector -> currentOperator.isEmpty()
                 || isConnectorVisibleTo(currentOperator.get(), connector))
-            .map(connector -> exactReadback
-                ? describeConnectorForExactReadback(connector)
-                : describeConnector(connector))
+            .toList();
+        if (exactReadback) {
+            return connectors.stream().map(this::describeConnectorForExactReadback).toList();
+        }
+        if (connectors.isEmpty()) {
+            return List.of();
+        }
+
+        Instant windowStart = Instant.now().minus(Duration.ofHours(Math.max(integrationHealthWindowHours, 1)));
+        var telemetry = connectorTelemetryBatchReader.read(tenantCode, connectors, windowStart);
+        Map<String, AccessOperator> supportOwners = new HashMap<>();
+        List<String> ownerNames = connectors.stream()
+            .map(IntegrationConnector::getSupportOwnerActorName)
+            .map(this::normalizeOptional)
+            .filter(name -> name != null)
+            .map(name -> name.toLowerCase(Locale.ROOT))
+            .distinct()
+            .toList();
+        if (!ownerNames.isEmpty()) {
+            accessOperatorRepository.findSupportOwnersByTenantAndActorNames(tenantCode, ownerNames)
+                .forEach(owner -> supportOwners.put(owner.getActorName().toLowerCase(Locale.ROOT), owner));
+        }
+        return connectors.stream()
+            .map(connector -> toConnectorResponse(
+                connector,
+                supportOwners.get(normalizeOptional(connector.getSupportOwnerActorName()) == null
+                    ? null : connector.getSupportOwnerActorName().trim().toLowerCase(Locale.ROOT)),
+                buildBatchTelemetry(connector, telemetry.get(
+                    ConnectorTelemetryBatchReader.Key.of(connector.getSourceSystem(), connector.getType())))))
             .toList();
     }
 
@@ -760,7 +789,7 @@ public class IntegrationConnectorService {
 
         return new ConnectorTelemetry(
             healthStatus,
-            buildHealthSummary(connector, healthStatus, recentInboundFailureCount, pendingReplayCount, deadLetterCount, lastActivity),
+            buildHealthSummary(connector, healthStatus, recentInboundFailureCount, pendingReplayCount, deadLetterCount, lastActivity != null),
             lastActivity == null ? null : lastActivity.getCreatedAt(),
             lastSuccessfulActivity == null ? null : lastSuccessfulActivity.getCreatedAt(),
             lastImportRun == null ? null : lastImportRun.getStatus(),
@@ -773,6 +802,45 @@ public class IntegrationConnectorService {
             latestFailureSignal.failureAt(),
             oldestPendingReplayAt,
             oldestPendingReplayAgeSeconds
+        );
+    }
+
+    private ConnectorTelemetry buildBatchTelemetry(IntegrationConnector connector,
+                                                   ConnectorTelemetryBatchReader.Snapshot snapshot) {
+        if (connector.getTenant() == null || connector.getTenant().getCode() == null) {
+            return buildTelemetry(connector);
+        }
+        if (snapshot == null) {
+            snapshot = new ConnectorTelemetryBatchReader.Snapshot();
+        }
+        IntegrationConnectorHealthStatus healthStatus = resolveHealthStatus(
+            connector,
+            snapshot.recentInboundFailureCount,
+            snapshot.pendingReplayCount,
+            snapshot.deadLetterCount,
+            snapshot.lastImportStatus
+        );
+        FailureSignal latestFailure = snapshot.replayFailureAt != null
+            && (snapshot.inboundFailureAt == null || snapshot.replayFailureAt.isAfter(snapshot.inboundFailureAt))
+                ? new FailureSignal(snapshot.replayFailureCode, snapshot.replayFailureMessage, snapshot.replayFailureAt)
+                : new FailureSignal(snapshot.inboundFailureCode, snapshot.inboundFailureMessage, snapshot.inboundFailureAt);
+        return new ConnectorTelemetry(
+            healthStatus,
+            buildHealthSummary(connector, healthStatus, snapshot.recentInboundFailureCount,
+                snapshot.pendingReplayCount, snapshot.deadLetterCount, snapshot.lastActivityAt != null),
+            snapshot.lastActivityAt,
+            snapshot.lastSuccessfulActivityAt,
+            snapshot.lastImportStatus,
+            snapshot.lastImportAt,
+            snapshot.recentInboundFailureCount,
+            snapshot.pendingReplayCount,
+            snapshot.deadLetterCount,
+            latestFailure.failureCode(),
+            latestFailure.failureMessage(),
+            latestFailure.failureAt(),
+            snapshot.oldestPendingReplayAt,
+            snapshot.oldestPendingReplayAt == null ? null
+                : Math.max(Duration.between(snapshot.oldestPendingReplayAt, Instant.now()).getSeconds(), 0L)
         );
     }
 
@@ -836,14 +904,14 @@ public class IntegrationConnectorService {
                                       long recentInboundFailureCount,
                                       long pendingReplayCount,
                                       long deadLetterCount,
-                                      com.synapsecore.domain.entity.IntegrationInboundRecord lastActivity) {
+                                      boolean hasLastActivity) {
         return switch (healthStatus) {
             case OFFLINE -> "Connector is disabled and cannot ingest live activity.";
             case DEGRADED -> "Connector is enabled but needs attention: "
                 + recentInboundFailureCount + " recent inbound issue(s), "
                 + pendingReplayCount + " replay item(s), "
                 + deadLetterCount + " dead-lettered item(s).";
-            case LIVE -> lastActivity == null
+            case LIVE -> !hasLastActivity
                 ? "Connector is enabled and ready for live traffic."
                 : "Connector is enabled and processing activity without recent integration failures.";
         };

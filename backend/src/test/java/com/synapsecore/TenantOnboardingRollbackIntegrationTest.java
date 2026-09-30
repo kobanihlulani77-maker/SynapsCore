@@ -143,7 +143,8 @@ class TenantOnboardingRollbackIntegrationTest {
                 operationalStateChangePublisher,
                 tenantContextService,
                 starterProperties,
-                warehouseRepository
+                warehouseRepository,
+                null
             ) {
                 @Override
                 public void seedStarterConnectors(Tenant tenant) {
