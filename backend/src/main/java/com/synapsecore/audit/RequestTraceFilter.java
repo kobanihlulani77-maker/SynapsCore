@@ -4,6 +4,7 @@ import com.synapsecore.access.AccessControlService;
 import com.synapsecore.auth.AuthSessionService;
 import com.synapsecore.config.SynapseAccessProperties;
 import com.synapsecore.observability.OperationalMetricsService;
+import com.synapsecore.observability.ThreadCpuTiming;
 import com.zaxxer.hikari.HikariDataSource;
 import com.zaxxer.hikari.HikariPoolMXBean;
 import jakarta.servlet.DispatcherType;
@@ -45,7 +46,9 @@ public class RequestTraceFilter extends OncePerRequestFilter {
                                     HttpServletResponse response,
                                     FilterChain filterChain) throws ServletException, IOException {
         long startedAtNanos = System.nanoTime();
+        long cpuStartedAtNanos = ThreadCpuTiming.currentNanos();
         long identityResolvedAtNanos = -1;
+        long identityCpuMillis = -1;
         String incomingRequestId = request.getHeader(RequestTraceContext.REQUEST_ID_HEADER);
         String requestId = incomingRequestId != null && !incomingRequestId.isBlank()
             ? incomingRequestId.trim()
@@ -71,6 +74,7 @@ public class RequestTraceFilter extends OncePerRequestFilter {
             requestTraceContext.setCurrentTenant(tenantCode);
             MDC.put(TENANT_MDC_KEY, tenantCode);
             identityResolvedAtNanos = System.nanoTime();
+            identityCpuMillis = ThreadCpuTiming.elapsedMillis(cpuStartedAtNanos);
 
             filterChain.doFilter(request, response);
             responseStatus = response.getStatus();
@@ -96,7 +100,8 @@ public class RequestTraceFilter extends OncePerRequestFilter {
                     elapsedNanos
                 );
                 logSlowRequest(request, responseStatus, elapsedNanos,
-                    identityResolvedAtNanos < 0 ? elapsedNanos : identityResolvedAtNanos - startedAtNanos);
+                    identityResolvedAtNanos < 0 ? elapsedNanos : identityResolvedAtNanos - startedAtNanos,
+                    ThreadCpuTiming.elapsedMillis(cpuStartedAtNanos), identityCpuMillis);
             } finally {
                 MDC.remove(REQUEST_ID_MDC_KEY);
                 MDC.remove(ACTOR_MDC_KEY);
@@ -106,7 +111,8 @@ public class RequestTraceFilter extends OncePerRequestFilter {
         }
     }
 
-    void logSlowRequest(HttpServletRequest request, int status, long elapsedNanos, long identityNanos) {
+    void logSlowRequest(HttpServletRequest request, int status, long elapsedNanos, long identityNanos,
+                        long cpuMillis, long identityCpuMillis) {
         if (elapsedNanos < SLOW_REQUEST_THRESHOLD_NANOS || !request.getRequestURI().startsWith("/api/")) {
             return;
         }
@@ -132,9 +138,12 @@ public class RequestTraceFilter extends OncePerRequestFilter {
         } catch (RuntimeException ignored) {
             // Diagnostics must never change the HTTP outcome during pool shutdown.
         }
-        log.warn("Slow HTTP request method={} route={} status={} durationMs={} identityMs={} handlerMs={} hikariTotal={} hikariActive={} hikariIdle={} hikariWaiting={}",
+        long handlerCpuMillis = cpuMillis < 0 || identityCpuMillis < 0
+            ? -1 : Math.max(0, cpuMillis - identityCpuMillis);
+        log.warn("Slow HTTP request method={} route={} status={} durationMs={} identityMs={} handlerMs={} cpuMs={} identityCpuMs={} handlerCpuMs={} hikariTotal={} hikariActive={} hikariIdle={} hikariWaiting={}",
             request.getMethod(), route, status, elapsedNanos / 1_000_000,
             identityNanos / 1_000_000, (elapsedNanos - identityNanos) / 1_000_000,
+            cpuMillis, identityCpuMillis, handlerCpuMillis,
             total, active, idle, waiting);
     }
 

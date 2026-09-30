@@ -20,6 +20,7 @@ import com.synapsecore.integration.IntegrationReplayService;
 import com.synapsecore.integration.dto.IntegrationConnectorResponse;
 import com.synapsecore.integration.dto.IntegrationImportRunResponse;
 import com.synapsecore.integration.dto.IntegrationReplayRecordResponse;
+import com.synapsecore.observability.ThreadCpuTiming;
 import com.synapsecore.scenario.ScenarioHistoryService;
 import com.synapsecore.scenario.dto.ScenarioNotificationResponse;
 import com.synapsecore.scenario.dto.ScenarioRunResponse;
@@ -261,55 +262,60 @@ public class OperationalViewService {
 
     private DashboardSnapshotResponse buildSnapshot() {
         long startedAt = System.nanoTime();
+        long cpuStartedAt = ThreadCpuTiming.currentNanos();
         Map<String, Long> sectionsMs = new LinkedHashMap<>();
+        Map<String, Long> sectionsCpuMs = new LinkedHashMap<>();
         try {
-            List<AuditLogResponse> auditLogs = timedSnapshotSection(sectionsMs, "audit", this::getRecentAuditLogs);
-            List<IntegrationConnectorResponse> integrationConnectors = timedSnapshotSection(sectionsMs, "connectors", this::getIntegrationConnectors);
-            List<IntegrationReplayRecordResponse> integrationReplayQueue = timedSnapshotSection(sectionsMs, "replay", this::getIntegrationReplayQueue);
-            List<ScenarioNotificationResponse> scenarioNotifications = timedSnapshotSection(sectionsMs, "scenarioNotifications", this::getScenarioNotifications);
-            List<SystemIncidentResponse> systemIncidents = timedSnapshotSection(sectionsMs, "incidents",
+            List<AuditLogResponse> auditLogs = timedSnapshotSection(sectionsMs, sectionsCpuMs, "audit", this::getRecentAuditLogs);
+            List<IntegrationConnectorResponse> integrationConnectors = timedSnapshotSection(sectionsMs, sectionsCpuMs, "connectors", this::getIntegrationConnectors);
+            List<IntegrationReplayRecordResponse> integrationReplayQueue = timedSnapshotSection(sectionsMs, sectionsCpuMs, "replay", this::getIntegrationReplayQueue);
+            List<ScenarioNotificationResponse> scenarioNotifications = timedSnapshotSection(sectionsMs, sectionsCpuMs, "scenarioNotifications", this::getScenarioNotifications);
+            List<SystemIncidentResponse> systemIncidents = timedSnapshotSection(sectionsMs, sectionsCpuMs, "incidents",
                 () -> systemIncidentService.getActiveIncidents(auditLogs, integrationReplayQueue,
                     integrationConnectors, scenarioNotifications));
-            FulfillmentOverviewResponse fulfillmentOverview = timedSnapshotSection(sectionsMs, "fulfillment", this::getFulfillmentOverview);
-            List<Recommendation> currentRecommendations = timedSnapshotSection(sectionsMs, "recommendations", this::loadVisibleCurrentRecommendations);
-            List<Alert> activeAlerts = timedSnapshotSection(sectionsMs, "activeAlerts", this::loadVisibleActiveAlerts);
-            AlertFeedResponse alertFeed = timedSnapshotSection(sectionsMs, "alertFeed",
+            FulfillmentOverviewResponse fulfillmentOverview = timedSnapshotSection(sectionsMs, sectionsCpuMs, "fulfillment", this::getFulfillmentOverview);
+            List<Recommendation> currentRecommendations = timedSnapshotSection(sectionsMs, sectionsCpuMs, "recommendations", this::loadVisibleCurrentRecommendations);
+            List<Alert> activeAlerts = timedSnapshotSection(sectionsMs, sectionsCpuMs, "activeAlerts", this::loadVisibleActiveAlerts);
+            AlertFeedResponse alertFeed = timedSnapshotSection(sectionsMs, sectionsCpuMs, "alertFeed",
                 () -> toAlertFeed(activeAlerts, loadVisibleRecentAlerts()));
 
             return new DashboardSnapshotResponse(
-                timedSnapshotSection(sectionsMs, "summary", () -> dashboardService.getSummary(
+                timedSnapshotSection(sectionsMs, sectionsCpuMs, "summary", () -> dashboardService.getSummary(
                     fulfillmentOverview, (long) currentRecommendations.size(), (long) activeAlerts.size())),
                 alertFeed,
-                timedSnapshotSection(sectionsMs, "recommendationResponses", () -> toRecommendationResponses(currentRecommendations)),
-                timedSnapshotSection(sectionsMs, "inventory", this::getInventoryOverview),
+                timedSnapshotSection(sectionsMs, sectionsCpuMs, "recommendationResponses", () -> toRecommendationResponses(currentRecommendations)),
+                timedSnapshotSection(sectionsMs, sectionsCpuMs, "inventory", this::getInventoryOverview),
                 fulfillmentOverview,
-                timedSnapshotSection(sectionsMs, "orders", this::getRecentOrders),
-                timedSnapshotSection(sectionsMs, "events", this::getRecentEvents),
+                timedSnapshotSection(sectionsMs, sectionsCpuMs, "orders", this::getRecentOrders),
+                timedSnapshotSection(sectionsMs, sectionsCpuMs, "events", this::getRecentEvents),
                 auditLogs,
                 systemIncidents,
                 integrationConnectors,
-                timedSnapshotSection(sectionsMs, "imports", this::getRecentIntegrationImportRuns),
+                timedSnapshotSection(sectionsMs, sectionsCpuMs, "imports", this::getRecentIntegrationImportRuns),
                 integrationReplayQueue,
                 scenarioNotifications,
-                timedSnapshotSection(sectionsMs, "sla", this::getSlaEscalations),
-                timedSnapshotSection(sectionsMs, "scenarios", this::getRecentScenarios),
+                timedSnapshotSection(sectionsMs, sectionsCpuMs, "sla", this::getSlaEscalations),
+                timedSnapshotSection(sectionsMs, sectionsCpuMs, "scenarios", this::getRecentScenarios),
                 Instant.now()
             );
         } finally {
             long elapsed = System.nanoTime() - startedAt;
             if (elapsed >= SLOW_SNAPSHOT_NANOS) {
-                log.warn("Slow dashboard snapshot composition totalMs={} sectionsMs={}",
-                    elapsed / 1_000_000, sectionsMs);
+                log.warn("Slow dashboard snapshot composition totalMs={} cpuMs={} sectionsMs={} sectionsCpuMs={}",
+                    elapsed / 1_000_000, ThreadCpuTiming.elapsedMillis(cpuStartedAt), sectionsMs, sectionsCpuMs);
             }
         }
     }
 
-    private <T> T timedSnapshotSection(Map<String, Long> sectionsMs, String section, Supplier<T> read) {
+    private <T> T timedSnapshotSection(Map<String, Long> sectionsMs, Map<String, Long> sectionsCpuMs,
+                                       String section, Supplier<T> read) {
         long startedAt = System.nanoTime();
+        long cpuStartedAt = ThreadCpuTiming.currentNanos();
         try {
             return read.get();
         } finally {
             sectionsMs.put(section, (System.nanoTime() - startedAt) / 1_000_000);
+            sectionsCpuMs.put(section, ThreadCpuTiming.elapsedMillis(cpuStartedAt));
         }
     }
 
