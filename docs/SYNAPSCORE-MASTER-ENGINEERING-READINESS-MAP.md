@@ -17,8 +17,8 @@ the detailed runtime investigation playbook within this program.
 | Immediate objective | Explain the latest warm hosted failure using request timing, pool overlap, transaction ownership, and resource evidence; identify one justified next correction or bounded capacity experiment |
 | Next gate | M2: repeatable hosted verification; entry BLOCKED until M1's in-scope hardening gates pass |
 | Pilot authorization | NOT GRANTED by this map; current candidate is not accepted for customer operations |
-| Last reported live backend | `4162179f46d9c9a5946f9638e2514e9ea8929f62`, observed in the September 23 session; NOT freshly verified on September 27 |
-| Current CI | GitHub Actions API returned success for assessed baseline `a5f1982`, preceding `b8f4217`, and `4162179` on September 27 |
+| Last reported live backend | `d966da6643f00097a2deb0c1c0e21a655bddc52b`, observed Live in Render deploy `dep-daufq3mq1p3s738ibeu0` on September 30; this is not a pilot approval |
+| Current CI | GitHub Actions run `36713480849` succeeded for exact SHA `d966da6` on September 30; CI does not include hosted browser/load proof |
 | Local test artifacts | Existing September 23 Surefire XML totals: 390 tests, 0 failures, 0 errors, 0 skips. Inspected, not rerun for this documentation task. |
 | Worktree boundary | Unrelated frontend Dockerfile edit, `.gitattributes`, two untracked Scenario evidence files, and raw CSV captures are not part of this assessment's committed implementation. |
 
@@ -296,7 +296,7 @@ it does not authorize changes to every downstream page.
 | ID | Purpose and present evidence/risk | Required work and exit evidence |
 | --- | --- | --- |
 | H1 - Request/holder ownership | Historical starvation proven; a warm hosted 2026-09-27 sample captured `10/10` Hikari active with one waiter and slow requests, but not the ten holders ([evidence](evidence/warm-runtime-pool-pressure-2026-09-27.md)) | For a representative slow request/job map UTC, request/thread, controller/service, transaction owner, acquisition wait, JDBC PID, SQL/lock state, non-SQL work, commit/rollback and response. Exit when the failing overlap has a defensible explanation or the missing instrumentation is precisely specified. ClientRead alone is not Java CPU proof. |
-| H2 - Query/composition efficiency | Batching and request-local reuse implemented; platform overview's per-tenant count fan-out was replaced by seven grouped counts ([evidence](evidence/platform-tenant-count-query-bounds-2026-09-30.md)). The hosted trace measured an 8.8-second 58-connector list and 8.5 seconds in snapshot connector composition ([trace](evidence/hosted-connector-telemetry-amplification-2026-09-30.md)). Connector telemetry batching is implemented and locally verified with a three-query 58-connector bound and 396/396 backend tests ([evidence](evidence/connector-telemetry-batching-2026-09-30.md)); CI and hosted PostgreSQL timing are not yet verified. | Verify the exact deployed revision and compare warm connector-list/snapshot latency, PostgreSQL plans if slow, and Hikari hold time. Also count queries/transactions and payload size for login, summary, snapshot, Runtime, Replay, catalog, platform overview and scoped reads at realistic sizes. Exit with measured budgets and no unexplained query amplification; preserve tenant/role/scope cache keys. |
+| H2 - Query/composition efficiency | Batching and request-local reuse implemented; platform overview's per-tenant count fan-out was replaced by seven grouped counts ([evidence](evidence/platform-tenant-count-query-bounds-2026-09-30.md)). Connector telemetry batching passed 396/396 local backend tests and exact-SHA CI, then showed 58-connector direct-read client latency of 2,022 ms versus an earlier 9,233 ms sample and connector snapshot section time of 499 ms versus 8,532 ms ([evidence](evidence/connector-telemetry-batching-2026-09-30.md)). The same hosted snapshot still took 17,363 ms at the client across many sections; H2 is not closed. | Correlate residual warm snapshot/login time with H1/H7 acquisition/hold and resource measurements before another correction. Inspect PostgreSQL plans only if measured SQL state points there. Also count queries/transactions and payload size for login, summary, snapshot, Runtime, Replay, catalog, platform overview and scoped reads at realistic sizes. Exit with measured budgets and no unexplained query amplification; preserve tenant/role/scope cache keys. |
 | H3 - Atomic writes and locks | Product/identity and Order/Replay double-borrow seams have focused proofs; the inventory first-row race test now synchronizes the actual missing-row boundary without changing production behavior ([evidence](evidence/inventory-first-row-race-proof-2026-09-27.md)) | Recheck top-level and ambient transaction callers; lock ordering, sequence repair under concurrent inserts, rollback on constraint failure, PostgreSQL aborted-transaction handling and inventory conservation. Exit with real PostgreSQL races producing documented success/conflict outcomes, exactly one durable result, released pool, and no partial side effects. |
 | H4 - Background overlap | One main scheduler, separate recommendation worker, guarded dispatch drain; local budget documented | Map main scheduler jobs, recommendation pass, async drain, HTTP and deploy overlap. Inspect dispatch PENDING/PROCESSING/FAILED recovery after crash, starvation/fairness across tenants, backlog age, failure accounting, stuck claims, thread-local cleanup. Exit with bounded headroom and recoverable queue state; process-local guards must not be described as multi-node coordination. |
 | H5 - Operational ledger and intelligence | Layer 2 plus lifecycle suites demonstrate key contracts locally | Overlap order intake, inventory corrections, partial dispatch, cancel/return and repeated request IDs. Verify available/reserved/on-hand arithmetic, no oversell or double release, terminal immutability, alert condition identity/resolution and recommendation currentness. Include transfer source/destination warehouse visibility and prediction with absent/sparse/stale demand. Exit with reconciled input/state/event/UI ledger. |
@@ -330,17 +330,17 @@ establish exact SQL totals. Report sampled estimates and bounds honestly.
 
 ### The exact next engineering objective
 
-**H2 first: prove the locally verified connector telemetry correction on the
-exact hosted revision, then return to H1/H7 connection ownership and the
-measured resource envelope.**
+**H2 connector batching is now verified on the exact hosted revision; return to
+H1/H7 connection ownership and the measured resource envelope before calling
+the broader H2 or M1 gates closed.**
 
 The [September 30 warm hosted trace](evidence/hosted-connector-telemetry-amplification-2026-09-30.md)
 provides the before-state: 58 connector summaries, nine telemetry queries per
 connector, and 8.5 seconds spent in the snapshot's connector section. The
-[local correction](evidence/connector-telemetry-batching-2026-09-30.md) bounds
-the list path; verify CI and the exact hosted PostgreSQL revision before
-attributing any latency improvement to it. This does not close H1 or establish
-that the historical ten Hikari holders were connectors.
+[verified correction](evidence/connector-telemetry-batching-2026-09-30.md)
+bounds the list path and reduced that section to 499 ms in one exact-revision
+hosted sample. The snapshot still took 17.4 seconds at the client. This does
+not close H1 or establish that the historical ten Hikari holders were connectors.
 
 **H1/H7 follow-through:**
 

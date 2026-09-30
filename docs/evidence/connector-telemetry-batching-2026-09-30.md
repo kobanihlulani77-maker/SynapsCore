@@ -41,10 +41,35 @@ is still unpaginated and may need a separately justified high-volume boundary.
 
 ## Remaining gate
 
-After exact-SHA CI and deployment, use one warm authenticated read against the
-existing proof tenant to compare the same connector-list and snapshot endpoints
-with the prior 58-connector result. Record deployed revision, connector count,
-request IDs, client/handler/composition durations, and Hikari/DB state. If the
-window queries remain slow, inspect PostgreSQL plans and table/index pressure
-before adding an index or changing infrastructure. No hosted latency or Hikari
-improvement is claimed from the local tests. H1/H7 and the rest of M1 remain open.
+Exact-SHA CI [run 36713480849](https://github.com/kobanihlulani77-maker/SynapsCore/actions/runs/36713480849)
+completed successfully for `d966da6643f00097a2deb0c1c0e21a655bddc52b`.
+Render showed that SHA Live as deploy `dep-daufq3mq1p3s738ibeu0` after a 4m35s
+rollout, before the following read-only hosted check. The existing proof tenant
+was used; no catalog, connector, inventory, or other business record was changed.
+
+At 12:19 UTC, authenticated login returned 200 in 5,845 ms. Direct
+`GET /api/integrations/orders/connectors` returned 200 with 58 connectors in
+2,022 ms at the client (request `926961d3-7a97-4734-8c8d-b0903bc012f7`),
+versus the earlier single 9,233 ms client sample with 58 connectors. This is a
+bounded comparison, not a distribution or capacity guarantee. No slow-handler
+line for that direct request was present in the searched Render logs.
+
+`GET /api/dashboard/snapshot` returned 200 with 58 connector responses in
+17,363 ms at the client (request `e17d293e-0079-4368-882b-fd6094bb3f31`).
+The same request's Render trace recorded connector composition at **499 ms**,
+down from the earlier **8,532 ms** sample. However, total snapshot composition
+was **13,806 ms** and the HTTP handler was **16,875 ms**. The new section trace
+showed audit=1,900 ms, summary=1,891 ms, fulfillment=1,299 ms,
+incidents=994 ms, scenarioNotifications=907 ms, alertFeed=899 ms, sla=802 ms,
+inventory=702 ms, replay=700 ms, and other sections below 700 ms each.
+No single remaining section dominates like connector telemetry did. The
+completion-time Hikari snapshot was total=10, active=0, idle=10, waiting=0;
+it does not establish borrow/release timing or rule out earlier overlap.
+
+The connector amplification is corrected and locally/CI verified, with a
+measured hosted improvement in this window. Overall snapshot latency remains
+unacceptable for an M1 exit claim. Next, correlate representative warm snapshot
+and login requests with per-request connection acquisition/hold and resource
+evidence before attributing the distributed residual time to PostgreSQL, Java,
+or the Free instance's 0.15 CPU/512 MB limit. Inspect PostgreSQL plans only if
+measured SQL state points there. H1/H7 and the rest of M1 remain open.
