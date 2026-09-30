@@ -19,6 +19,9 @@ Keep using it while it yields trustworthy evidence. Classify a failure as an
 application, configuration, proof, or infrastructure problem before changing
 anything. Do not weaken behavior, representative workloads, assertions, or
 timeouts merely to fit Free, and do not buy capacity to hide application waste.
+Reassess the required work and evidence at each phase gate; closing M1 or
+entering M2/M3 is not by itself a reason to upgrade or a reason to remain on
+Free if that environment has become an evidenced blocker.
 If a measured infrastructure limit blocks required proof, preserve the failed
 evidence, identify the exact limit and smallest paid experiment with expected
 cost, obtain owner approval before changing a plan, and compare the same
