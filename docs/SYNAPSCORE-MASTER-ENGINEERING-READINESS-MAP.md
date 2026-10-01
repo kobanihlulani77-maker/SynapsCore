@@ -42,6 +42,9 @@ passes do not close the present runtime gate.
 5. Provider restore expectations, credential recovery, supported integration
    mappings, support ownership, and real-company operating limits need explicit
    customer-specific records before handover.
+6. Final post-remediation connected-engine acceptance has not been run; the
+   candidate needs one correlated cross-pipeline proof before M6 sign-off and
+   an applicable rerun on the actual M7 customer environment.
 
 These are readiness blockers and evidence requirements. They are not an invented
 count of Critical vulnerabilities. Earlier domain reports' zero Critical/High
@@ -264,7 +267,7 @@ Broader documentation reconciliation belongs to M3/M6, with history preserved.
 | M3 - Operator experience engineering | Planned; page inventory below is preparation only | M4 adversarial review of the finished candidate |
 | M4 - Full adversarial verification | BLOCKED by M2/M3 | M5 remediation with ranked, reproducible findings |
 | M5 - Remediation and independent re-verification | Planned | M6 technical pilot-readiness decision |
-| M6 - Technical pilot-readiness gate | BLOCKED | M7 customer integration and pilot packaging |
+| M6 - Final connected-engine acceptance and technical pilot-readiness gate | BLOCKED; mandatory post-remediation whole-system proof not yet run | M7 customer integration and pilot packaging only after integrated acceptance and owner sign-off |
 | M7 - Company packaging and launch gate | Planned; existing runbooks reused | M8 controlled real-company pilot, only after owner/customer sign-off |
 | M8 - Controlled pilot and measured value | Not started | Separate decision on production reliance or expansion |
 
@@ -575,22 +578,119 @@ replacement for severity. In-scope High/Critical defects cannot be waived as
 cosmetic. Out-of-scope acceptance requires evidence that the defect cannot affect
 in-scope operations. Future features are not readiness debts by default.
 
-## 11. M6 - Technical pilot-readiness gate
+## 11. M6 - Final connected-engine acceptance and technical pilot-readiness gate
 
-**Purpose:** Freeze a technically supportable pilot candidate. **Current
-evidence:** historical August approval only; current M1 remains open. **Open
-risks:** premature readiness claims and unmeasured envelope. **Required work:**
-review M1-M5 evidence, freeze build/schema/config, verify supported scope and
-limitations, test recovery, identify engineering/support owners. **Pass gate:**
-zero unresolved pilot blockers, zero Critical and zero in-scope High defects;
-repeatable correctness, safe authority, accepted latency/freshness, recovery and
-operator evidence. **Stop condition:** missing critical proof, unsupported source
-contract, unstable runtime, unknown served revision or unavailable recovery.
-**Exit criteria:** owner signs technical readiness for the precise scope and
-candidate, with expiry/change rules. **Required evidence:** signed readiness
-record, revision/config manifest, findings ledger, measured envelope, environment
-comparison and runbooks. Free-tier proof alone cannot establish company capacity.
-**Next:** M7. This does not yet authorize customer traffic.
+**Purpose:** After M1 hardening, M2 repeatable hosted proof, M3 final UI/operator
+engineering, M4 adversarial examination and M5 remediation, prove that
+SynapseCore operates as **one connected operational intelligence and control
+engine**, not a set of separately passing modules. This is a mandatory final
+integrated acceptance before the candidate may be called technically
+pilot-ready. The historical August approval, green CI, isolated E2E passes,
+and polished screens cannot replace this gate.
+
+**Current status:** NOT RUN / BLOCKED by preceding gates. Neither an
+individual domain pass nor the M2 pre-UI hosted proof establishes final
+connected-engine acceptance.
+
+### Full connected-engine verification scope
+
+Freeze and record the exact post-remediation frontend/backend build and served
+revisions, database schema/migrations, config, infrastructure, tenant/warehouse
+fixtures, connector contracts, roles, data volume, scheduler load, concurrent
+operators and clients, and predeclared correctness, p50/p95/max latency,
+freshness, throughput, pool/resource headroom, queue age and recovery budgets.
+Test on isolated production-shaped hosted infrastructure representative of
+the declared pilot envelope; stress and destructive faults require an approved
+isolated target. Maintain a full before/after operational ledger and
+cross-system request/event correlation.
+
+Verify *each supported, pilot-in-scope pipeline and their interactions*:
+
+1. **Source and integration:** supported webhooks, CSV, scheduled pull and
+   direct APIs as applicable; JSON/field normalization, credentials, duplicate
+   identities, tenant/warehouse mapping, malformed/stale inputs, disabled
+   connectors, rejected inputs and bounded retries.
+2. **Operational truth and lifecycle:** catalog, orders/lines, stock
+   reservation, inventory conservation, fulfillment/partial dispatch,
+   delivery, cancel/return, reconciliation and authoritative source readback
+   under normal and concurrent updates.
+3. **Intelligence and control:** demand/pressure assessment, risk/prediction,
+   alert condition creation/resolution, prioritization, advisory recommendation
+   currentness, supported operator decision/routing/escalation and observed
+   result. Recommendations cannot be presented as completed source actions.
+4. **Governance:** hypothetical Scenario preview, save, revision, assignment,
+   review, final approval where required, rejection and SLA escalation.
+   Demonstrate authority and non-execution: planning cannot mutate live
+   Orders, Inventory or Fulfillment or fabricate live alerts.
+5. **Events, realtime and UI convergence:** persisted audit and dispatch,
+   Redis/SockJS/STOMP, tenant-scoped REST snapshots and rendered browser
+   state. Exercise dropped/duplicate/out-of-order events, reconnects,
+   multiple tabs, scope/role changes, slow requests and authoritative REST
+   reconciliation.
+6. **Complete UI/UX:** every pilot-in-scope page and cross-page operator
+   journey against real APIs and roles; navigation, information hierarchy,
+   controls, accessibility and supported viewports, loading/empty/error,
+   degraded/stale, high-volume, conflict, pending and recovery states.
+   No false healthy status, unsupported execution affordance, hidden records
+   or success before authoritative readback.
+7. **Security and isolation:** session lifecycle, origin/CSRF/CORS,
+   tenant/warehouse IDOR, role and approval boundaries, WebSocket and
+   event authorization, platform/tenant separation, credentials, caches
+   and background context. Rejected actions must not leak or mutate data.
+8. **Performance, capacity and concurrency:** realistic mixed read/write/
+   import/replay/scheduler/realtime/operator traffic with overlapping
+   tenants/warehouses; measure user and source-to-screen latency, errors,
+   CPU/heap/GC/threads, SQL/locks, Hikari acquisition/hold/headroom, Redis,
+   queue growth and operating costs. Include approved ramp, bounded stress
+   and representative operating-shift soak.
+9. **Failure, replay, restoration and supportability:** safely interrupt
+   sources, worker, DB, Redis, network, session and deployment; verify
+   idempotent recovery, no lost/doubled effects, visible degraded state,
+   backlog catch-up, current-schema backup and isolated restore, operational
+   reconciliation, observability/request IDs, runbooks and rollback.
+
+Execute at least five **complete connected journeys**, not just a checklist
+of component tests: normal source-to-operator; cross-domain pressure and
+intelligence; governed authorization without execution; integration failure
+to Replay and reconciled readback; and mixed concurrency or dependency
+failure through recovery. Run interacting pipelines together to expose
+shared transaction, pool, scheduler, dispatch, security and UI interference.
+Exercise two tenant scopes and multiple warehouse scopes as required by
+the pilot contract. Clearly mark future/unsupported capabilities as out of
+scope rather than pretending that they work.
+
+**Acceptance evidence:** An independent reviewer inspects a coverage matrix
+linking every in-scope pipeline and interconnection to exact-SHA/served-build
+tests, request IDs, timestamps, input/output assertions, API/DB/event/browser
+traces, security and UX findings, resource and load metrics, before/after
+per-tenant operational ledger, recovery measurements, failures, reruns,
+exclusions and residual limitations. All agreed numeric budgets must be
+measured; a health endpoint, passing CI or visual demo alone is insufficient.
+
+**Failure and correction:** Preserve the first failed run and stop on unsafe
+state or unexplained degradation. Return to the relevant M1/M3/M4/M5 lane
+for a smallest justified fix; rerun the affected tests and any invalidated
+end-to-end journeys. Do not add hidden retries, relax criteria, bypass
+security, shrink representative work or raise timeouts to manufacture a pass.
+
+**Pass gate:** Every supported, pilot-in-scope connected journey passes
+repeatably on the final frozen candidate with accepted correctness,
+isolation, UX, performance, freshness, concurrency and recovery. Zero
+unresolved pilot blockers, zero Critical and zero in-scope High defects;
+remaining bounded limitations require explicit scope, mitigation, owner and
+acceptance. Only then may the owner sign **technical pilot readiness** for
+the specified build, environment and workload. This does not authorize
+customer traffic.
+
+**Exit artifact:** Signed *Final Connected-Engine Acceptance Record* with
+build/config manifest, cross-pipeline coverage and causal traces, M1-M5
+evidence, ledger reconciliation, measured capacity, findings and limits,
+independent review, support/recovery plan and owner decision. Material
+subsequent changes invalidate the affected proof.
+
+**Next:** M7, including a scoped rerun of all applicable connected journeys
+on the approved customer-specific, always-on pilot deployment before
+owner/customer launch authorization.
 
 ## 12. M7 - Customer integration, packaging and launch
 
@@ -605,7 +705,11 @@ governance coverage, initial data reconciliation, policies, training and support
 are delivered/recoverable, no open blocker, and rollback/recovery/exit are agreed.
 Before launch, owner-approved always-on paid sizing must cover the measured
 company workload with justified headroom and cost; the frozen candidate must
-pass the required hosted checks again on that environment.
+pass the required hosted checks again on that environment. Specifically,
+rerun applicable M6 connected-engine journeys using the real approved
+customer source mappings, operators, tenant/warehouse scope, workload,
+UI/realtime traffic, security, recovery and capacity criteria. Generic M6
+proof does not substitute for this customer-specific launch proof.
 **Stop condition:** unsupported source format/action, ambiguous ledger ownership,
 missing reviewer coverage, no backup/support owner or expanding load without proof.
 **Exit criteria:** owner and company approve the launch checklist and observation
