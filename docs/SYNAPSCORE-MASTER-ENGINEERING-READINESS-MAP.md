@@ -6,6 +6,10 @@ This is the canonical engineering progression and pilot-readiness decision map.
 It governs the journey; linked evidence records establish what individual checks
 proved. The [hosted timeout recovery map](hosted-timeout-recovery-map.md) remains
 the detailed runtime investigation playbook within this program.
+The [Q4 2026 pilot acquisition blueprint](pilot-acquisition-blueprint-2026-q4.md)
+records the parallel commercial path beginning Monday October 5, 2026;
+research, discovery and conditional discussions do not bypass M1-M6 technical
+acceptance or M7 customer-specific launch authorization.
 
 | Field | Recorded state |
 | --- | --- |
