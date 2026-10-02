@@ -21,6 +21,10 @@ Prefer operationally complex retailers, distributors, warehouse operators, 3PLs 
 
 Initial research candidates, not verified opportunities or claims of need: Mr Price Group; TFG/Sportscene; Ackermans/Pepkor; Boxer; and qualifying Gauteng/Pretoria distributors or fulfillment operators. Before adding any prospect to the active list, verify the legal entity, applicable operations, relevant department and appropriate contact channel. Do not invent named personnel, private addresses or operational problems.
 
+## Research evidence
+
+Working prospect evidence is maintained in [Pilot Prospect Research — Operational Dossiers](pilot-prospect-research-2026-10-03.md). The dossier separates verified public facts from SynapseCore hypotheses and discovery questions; inclusion there is not customer qualification.
+
 ## People and qualification
 
 Seek (1) an operational sponsor who owns the business problem and approval path, (2) an operational champion who understands exceptions and daily workflows, and (3) a technical/security contact who controls source-system access and integration feasibility. Where required, include procurement/legal and privacy stakeholders.
