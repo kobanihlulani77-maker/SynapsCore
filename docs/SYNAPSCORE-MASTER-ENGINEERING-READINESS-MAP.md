@@ -14,15 +14,15 @@ acceptance or M7 customer-specific launch authorization.
 | Field | Recorded state |
 | --- | --- |
 | Original source census | 2026-09-27, Africa/Johannesburg; baseline `a5f1982eee5f2366c082060d496352169af5b337`, `Adopt evidence-efficient timeout workflow` |
-| Control update | 2026-10-03: bounded dispatch recovery/failure accounting; two naturally slow hosted reads exposed an H1/H2 attribution gap, now recorded in [warm-read evidence](evidence/warm-read-coalescing-and-platform-overview-2026-10-03.md). Neither is an M1 exit decision. |
+| Control update | 2026-10-03: bounded dispatch recovery/failure accounting; naturally slow hosted reads exposed an H1/H2 attribution gap. Request coalescing and platform section timing diagnostics are in `main`, with exact-SHA CI green; the latest diagnostic revision has no confirmed hosted result ([warm-read evidence](evidence/warm-read-coalescing-and-platform-overview-2026-10-03.md)). None is an M1 exit decision. |
 | Repository verification | The September 27 local `main` and freshly fetched `origin/main` matched the original baseline then. Subsequent revisions are assessed only within their recorded scope; a documentation successor is not a newly verified application release. |
 | Current phase | M1: performance, concurrency, correctness, and runtime hardening - OPEN |
 | Current sub-workstream | H1/H2/H7: warm hosted latency, connection demand, and measured resource envelope; Replay convergence is a dependent H8 question |
 | Immediate objective | Explain the latest warm hosted failure using request timing, pool overlap, transaction ownership, and resource evidence; identify one justified next correction or bounded capacity experiment |
 | Next gate | M2: repeatable hosted verification; entry BLOCKED until M1's in-scope hardening gates pass |
 | Pilot authorization | NOT GRANTED by this map; current candidate is not accepted for customer operations |
-| Last verified live backend | `a123bca595643cb4800b7981ae38d33924ea5e46`, observed Live in Render deploy `dep-db0gogg473hc738514sg` on October 3; six read-only connection flags passed, but observed dispatch scans processed no work ([boundary](evidence/operational-dispatch-claim-recovery-2026-10-03.md)) |
-| Latest scoped CI evidence | GitHub Actions run `37128570340` succeeded for exact SHA `a123bca` on October 3, including backend, frontend build, Compose validation and PostgreSQL dispatch-claim tests; no process-crash, hosted browser/load or full M1 proof |
+| Last verified live backend | `9974937fa3baeb3816ee4c3b35dcc0bde3a7d187`, observed Live in Render on October 3; a naturally slow platform overview returned 200 in 5,115 ms with 30 ms HTTP-thread CPU and no Hikari waiters at completion ([warm-read evidence](evidence/warm-read-coalescing-and-platform-overview-2026-10-03.md)). The later application revision `f7cd9b6` is not yet confirmed Live. The six read-only connection flags passed again after its push, but do not identify the serving SHA. |
+| Latest scoped CI evidence | [GitHub Actions run `37130850308`](https://github.com/kobanihlulani77-maker/SynapsCore/actions/runs/37130850308) succeeded for exact SHA `f7cd9b6518de79861c99748568a121d7b0b64b28` on October 3: `verify` (backend tests, frontend build, Compose validation) and `dispatch-postgres` (focused PostgreSQL claim/reclaim). No hosted result for that SHA, process-crash, hosted browser/load or full M1 proof follows from this. |
 | Local test artifacts | September 23 Surefire aggregate: 390 tests. The latest dispatch correction passed a 70-suite/403-test full backend run with zero failures/errors/skips and production packaging locally; its injected terminal-write failure was exercised in the H2 test profile, not PostgreSQL ([dispatch record](evidence/operational-dispatch-claim-recovery-2026-10-03.md)). |
 | Worktree boundary | Unrelated frontend Dockerfile edit, `.gitattributes`, two untracked Scenario evidence files, and raw CSV captures are not part of this assessment's committed implementation. |
 
@@ -348,7 +348,7 @@ it does not authorize changes to every downstream page.
 
 | ID | Purpose and present evidence/risk | Required work and exit evidence |
 | --- | --- | --- |
-| H1 - Request/holder ownership | Historical starvation proven; a warm hosted 2026-09-27 sample captured `10/10` Hikari active with one waiter and slow requests, but not the ten holders ([evidence](evidence/warm-runtime-pool-pressure-2026-09-27.md)). On deployed `487b012`, one warm snapshot request took 18,799 ms wall and 559 ms current-thread CPU; composition took 14,803/415 ms, with Hikari 1 active/9 idle at completion ([evidence](evidence/snapshot-cpu-wall-observability-2026-09-30.md)). That rules down CPU execution on this HTTP thread, not DB/network/off-thread wait or historical Hikari ownership. The bounded slow-snapshot stack sampler passed exact-SHA CI and is Live on `50fca48`; its October 3 warm control returned a 4,007 ms snapshot, below the diagnostic trigger, so no sampled wait category was captured ([diagnostic and control](evidence/snapshot-wait-sampling-2026-09-30.md)). Two other October 3 hosted reads took 6.6 and 5.4 seconds with low CPU and no pool waiters at completion; their causal boundary remains open ([warm-read evidence](evidence/warm-read-coalescing-and-platform-overview-2026-10-03.md)). | For a representative slow request/job map UTC, request/thread, controller/service, transaction owner, acquisition wait, JDBC PID, SQL/lock state, non-SQL work, commit/rollback and response. Exit when the failing overlap has a defensible explanation or the missing instrumentation is precisely specified. Low thread CPU or sampled JDBC frames alone do not prove a PostgreSQL wait or CPU throttling. |
+| H1 - Request/holder ownership | Historical starvation proven; a warm hosted 2026-09-27 sample captured `10/10` Hikari active with one waiter and slow requests, but not the ten holders ([evidence](evidence/warm-runtime-pool-pressure-2026-09-27.md)). On deployed `487b012`, one warm snapshot request took 18,799 ms wall and 559 ms current-thread CPU; composition took 14,803/415 ms, with Hikari 1 active/9 idle at completion ([evidence](evidence/snapshot-cpu-wall-observability-2026-09-30.md)). That rules down CPU execution on this HTTP thread, not DB/network/off-thread wait or historical Hikari ownership. The bounded slow-snapshot stack sampler passed exact-SHA CI and is Live on `50fca48`; its October 3 warm control returned a 4,007 ms snapshot, below the diagnostic trigger, so no sampled wait category was captured ([diagnostic and control](evidence/snapshot-wait-sampling-2026-09-30.md)). Two other October 3 hosted reads took 6.6 and 5.4 seconds with low CPU and no pool waiters at completion. The later deployed `9974937` read took 5,115 ms; subsequent application code adds earlier section breakdown logging but has no confirmed hosted sample ([warm-read evidence](evidence/warm-read-coalescing-and-platform-overview-2026-10-03.md)). | For a representative slow request/job map UTC, request/thread, controller/service, transaction owner, acquisition wait, JDBC PID, SQL/lock state, non-SQL work, commit/rollback and response. Exit when the failing overlap has a defensible explanation or the missing instrumentation is precisely specified. Low thread CPU or sampled JDBC frames alone do not prove a PostgreSQL wait or CPU throttling. |
 | H2 - Query/composition efficiency | Batching and request-local reuse implemented; platform overview's per-tenant count fan-out was replaced by seven grouped counts ([evidence](evidence/platform-tenant-count-query-bounds-2026-09-30.md)). Connector telemetry batching passed 396/396 local backend tests and exact-SHA CI, then showed 58-connector direct-read client latency of 2,022 ms versus an earlier 9,233 ms sample and connector snapshot section time of 499 ms versus 8,532 ms ([evidence](evidence/connector-telemetry-batching-2026-09-30.md)). The same hosted snapshot still took 17,363 ms at the client across many sections; H2 is not closed. | Correlate residual warm snapshot/login time with H1/H7 acquisition/hold and resource measurements before another correction. Inspect PostgreSQL plans only if measured SQL state points there. Also count queries/transactions and payload size for login, summary, snapshot, Runtime, Replay, catalog, platform overview and scoped reads at realistic sizes. Exit with measured budgets and no unexplained query amplification; preserve tenant/role/scope cache keys. |
 | H3 - Atomic writes and locks | Product/identity and Order/Replay double-borrow seams have focused proofs; the inventory first-row race test now synchronizes the actual missing-row boundary without changing production behavior ([evidence](evidence/inventory-first-row-race-proof-2026-09-27.md)) | Recheck top-level and ambient transaction callers; lock ordering, sequence repair under concurrent inserts, rollback on constraint failure, PostgreSQL aborted-transaction handling and inventory conservation. Exit with real PostgreSQL races producing documented success/conflict outcomes, exactly one durable result, released pool, and no partial side effects. |
 | H4 - Background overlap | One main scheduler, separate recommendation worker, guarded dispatch drain; local budget documented. A source-code gap left claimed `PROCESSING` dispatch items outside the `PENDING`-only drain after a process stop. Lease-based reclaim and attempt-guarded terminal updates passed local and disposable PostgreSQL 17 CI tests. A follow-up red/green test found that a successful broadcast followed by a failed completion write could falsely mark work `FAILED`; the correction preserves lease recovery and reports scheduler failure. Final `a123bca` passed 403 local backend tests, exact-SHA CI and deployment/read-only health, but only idle dispatch scans were observed. PostgreSQL terminal-write failure injection, controlled crash/restart, multi-instance notification, backlog and headroom behavior are not yet proven ([evidence](evidence/operational-dispatch-claim-recovery-2026-10-03.md)). | Map main scheduler jobs, recommendation pass, async drain, HTTP and deploy overlap. Prove dispatch PENDING/PROCESSING/FAILED recovery on PostgreSQL after a controlled crash, starvation/fairness across tenants, backlog age, failure accounting, lease overlap, thread-local cleanup. Exit with bounded headroom and recoverable queue state; at-least-once notification and process-local guards must not be described as exactly-once or multi-node coordination. |
@@ -360,6 +360,27 @@ it does not authorize changes to every downstream page.
 | H10 - Governance determinism | Scenario non-execution, assignment, SLA and V14 lineage established in code/tests | Preserve requester identity; independent review; escalated final approval; overdue review/final-stage SLA ownership; rejection/revision races; same-warehouse linear successors; deterministic timestamp ties. Exit with exactly one legal transition/evidence result under conflict and unchanged operational counts for preview/save/approve. |
 | H11 - Failure/recovery and deployment | Replay and restore tooling exist; production-shaped recovery evidence incomplete | Rehearse dependency loss/restart and deployment interruption in isolated environment, then queue/session/cache recovery and authoritative reconciliation. Validate migrations V1-V14 on representative upgrade data, duplicate-lineage preflight, constraint/index plans, backup checksum and isolated restore. Exit with no lost/doubled business effects and measured recovery times. |
 | H12 - Observability and credential continuity | Request IDs, scheduler pool telemetry and tenant-event correction implemented; bounded slow-HTTP filter timing and pool snapshot deployed on `4f91d89` and observed during a warm proof, but JDBC owner mapping remains open ([evidence](evidence/warm-runtime-pool-pressure-2026-09-27.md)) | Prove rejection/audit paths under DB failure do not amplify starvation; distinguish actorless scheduled work from missing tenant ownership. Preserve early auth timing, event tenant, warehouse where relevant, deploy instance and correlation. Establish safe proof-secret backup and supported lost-admin recovery ownership. Rotate any still-valid credentials previously exposed in chat/logs through approved operations; verify without printing them. Exit when support can reconstruct an incident and regain authorized access without data deletion or bypass. |
+
+### Cross-workstream dependency and ordering
+
+H1/H2/H7/H12 share the HTTP-to-transaction-to-PostgreSQL boundary. A slow
+snapshot or login cannot be attributed to SQL, Java work, host capacity, or
+Hikari acquisition from HTTP wall time or a pool-at-completion sample alone.
+H4 workers and H6 Replay/pull may compete for that same pool and scheduler
+threads; H3/H5/H10 writes then depend on their transaction/lock ordering and
+failure accounting. H11 restart or dependency loss can strand H4/H6 work and
+delay H8 REST repair. H9 tenant/scope keys and H10 hypothetical-versus-live
+boundaries constrain any H2 cache/batch, H8 event, or H4 retry optimization.
+An apparent H8 stale page is not a frontend defect until authoritative HTTP
+timing and payload are separated from rendering. Conversely, fixing H1 latency
+does not prove H8 convergence, H3 atomicity, or H11 recovery.
+
+Prioritize the shared H1/H2/H7/H12 attribution boundary because it can invalidate
+several downstream performance claims. In parallel, use isolated PostgreSQL
+and failure-injection fixtures for H3/H4/H6/H11 so a healthy live window is not
+mistaken for recovery proof. Do not promote the historical 10/10 Hikari point
+sample into proof of ten identified holders, or the old five-minute local read
+soak into a current hosted operating-day envelope.
 
 ### Hardening workload and numeric acceptance contract
 
@@ -385,8 +406,11 @@ establish exact SQL totals. Report sampled estimates and bounds honestly.
 
 **H2 connector batching is verified on its exact hosted revision. The later
 `487b012` hosted CPU/wall trace found 18,799 ms wall versus 559 ms CPU on one
-slow HTTP request; attribute that wait before another behavioral or capacity change.
-H1/H7, broader H2 and M1 remain open.**
+slow HTTP request. Subsequent warm reads, including one on deployed `9974937`,
+remain slow without pool waiters at completion. Application revision `f7cd9b6` has
+green exact-SHA CI and earlier section-breakdown logging, but has no confirmed
+hosted breakdown. Attribute the wait before another behavioral or capacity
+change. H1/H7, broader H2 and M1 remain open.**
 
 The [September 30 warm hosted trace](evidence/hosted-connector-telemetry-amplification-2026-09-30.md)
 provides the before-state: 58 connector summaries, nine telemetry queries per
@@ -402,11 +426,12 @@ not close H1 or establish that the historical ten Hikari holders were connectors
    as the warm-pressure reference. The ten holder identities were not captured;
    do not infer them from dispatch telemetry or completion-time pool snapshots.
 2. The [bounded snapshot wait sampler](evidence/snapshot-wait-sampling-2026-09-30.md)
-   is deployed on exact revision `50fca48`, but the October 3 warm control was
-   below its trigger. At the next naturally slow warm request, use its
-   request-ID-matched Hikari/JDBC/Redis/Java category to select the next precise
-   acquisition/hold, PostgreSQL or service-owner measurement; it cannot supply
-   exact SQL duration or a PostgreSQL PID.
+   was deployed on exact revision `50fca48`, but the October 3 warm control was
+   below its trigger. Confirm the serving revision before using the newer
+   [coalescing/section breakdown](evidence/warm-read-coalescing-and-platform-overview-2026-10-03.md)
+   on a naturally slow request. Correlate the request ID and any Hikari/JDBC/
+   Redis/Java sample with the composing-versus-waiting classification. Neither
+   diagnostic supplies exact SQL duration or a PostgreSQL PID by itself.
 3. At the first warm `active=10, idle=0, waiting>0` recurrence, capture the
    request/scheduler threads, JDBC ownership, PostgreSQL session state and
    CPU/GC/resource window together. Stop traffic at the trigger. Classify

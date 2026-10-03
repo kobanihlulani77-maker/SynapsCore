@@ -76,7 +76,14 @@ test observed its own supplier result. The test now waits until the waiter
 thread is actually blocked before releasing the composer. The coordinator
 suite then passed twice consecutively (3/3 each run). This is a test
 synchronization correction, not evidence of a production coalescing defect.
-Full exact-SHA CI for this follow-up is pending.
+Exact-SHA [GitHub Actions run `37130850308`](https://github.com/kobanihlulani77-maker/SynapsCore/actions/runs/37130850308)
+completed successfully for `f7cd9b6518de79861c99748568a121d7b0b64b28`:
+both `verify` and `dispatch-postgres` jobs passed. The `verify` job runs
+backend tests, frontend build and Compose validation; the PostgreSQL job
+exercises dispatch claim/reclaim, not slow-read timing. The six-flag public
+connection check passed after the push, but it does not identify the deployed
+backend revision. Render Live status and a naturally slow hosted breakdown for
+`f7cd9b6` remain unconfirmed; CI success must not be counted as hosted proof.
 
 ## Next evidence needed
 
