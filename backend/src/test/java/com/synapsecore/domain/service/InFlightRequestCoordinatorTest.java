@@ -72,4 +72,48 @@ class InFlightRequestCoordinatorTest {
 
         assertThat(coordinator.execute("tenant|actor", () -> "retry")).isEqualTo("retry");
     }
+
+    @Test
+    void identifiesTheComposingRequestAndTheCoalescedWaiter() throws Exception {
+        InFlightRequestCoordinator<String> coordinator = new InFlightRequestCoordinator<>();
+        CountDownLatch supplierStarted = new CountDownLatch(1);
+        CountDownLatch releaseSupplier = new CountDownLatch(1);
+        ExecutorService executor = Executors.newSingleThreadExecutor();
+        try {
+            Future<InFlightRequestCoordinator.Execution<String>> composer = executor.submit(() ->
+                coordinator.executeWithRole("tenant|actor", () -> {
+                    supplierStarted.countDown();
+                    try {
+                        if (!releaseSupplier.await(5, TimeUnit.SECONDS)) {
+                            throw new AssertionError("Timed out waiting to release composer");
+                        }
+                    } catch (InterruptedException exception) {
+                        Thread.currentThread().interrupt();
+                        throw new AssertionError(exception);
+                    }
+                    return "snapshot";
+                }));
+            assertThat(supplierStarted.await(5, TimeUnit.SECONDS)).isTrue();
+            Thread releaser = new Thread(() -> {
+                try {
+                    Thread.sleep(100);
+                } catch (InterruptedException exception) {
+                    Thread.currentThread().interrupt();
+                } finally {
+                    releaseSupplier.countDown();
+                }
+            });
+            releaser.start();
+
+            InFlightRequestCoordinator.Execution<String> waiter =
+                coordinator.executeWithRole("tenant|actor", () -> "unexpected");
+            assertThat(waiter.value()).isEqualTo("snapshot");
+            assertThat(waiter.coalescedWait()).isTrue();
+            assertThat(composer.get(5, TimeUnit.SECONDS).coalescedWait()).isFalse();
+            releaser.join(5_000);
+        } finally {
+            releaseSupplier.countDown();
+            executor.shutdownNow();
+        }
+    }
 }

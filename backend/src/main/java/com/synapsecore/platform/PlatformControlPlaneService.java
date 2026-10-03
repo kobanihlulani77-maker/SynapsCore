@@ -18,6 +18,7 @@ import com.synapsecore.domain.repository.IntegrationReplayRecordRepository;
 import com.synapsecore.domain.repository.TenantRepository;
 import com.synapsecore.domain.repository.TenantCount;
 import com.synapsecore.domain.service.SystemRuntimeService;
+import com.synapsecore.observability.ThreadCpuTiming;
 import com.synapsecore.platform.dto.PlatformActivityResponse;
 import com.synapsecore.platform.dto.PlatformOverviewResponse;
 import com.synapsecore.platform.dto.PlatformRuntimeResponse;
@@ -25,17 +26,24 @@ import com.synapsecore.platform.dto.PlatformTenantSummary;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Comparator;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.stream.Collectors;
+import java.util.function.Supplier;
 import lombok.RequiredArgsConstructor;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 @Service
 @RequiredArgsConstructor
 public class PlatformControlPlaneService {
+
+    private static final Logger log = LoggerFactory.getLogger(PlatformControlPlaneService.class);
+    private static final long SLOW_OVERVIEW_NANOS = 5_000_000_000L;
 
     private final TenantRepository tenantRepository;
     private final AccessUserRepository accessUserRepository;
@@ -49,12 +57,33 @@ public class PlatformControlPlaneService {
     private final SystemRuntimeService systemRuntimeService;
 
     public PlatformOverviewResponse getOverview() {
-        return new PlatformOverviewResponse(
-            getRuntime(),
-            getTenants(),
-            getActivity(),
-            Instant.now()
-        );
+        long startedAt = System.nanoTime();
+        Map<String, Long> sectionsMs = new LinkedHashMap<>();
+        Map<String, Long> sectionsCpuMs = new LinkedHashMap<>();
+        try {
+            PlatformRuntimeResponse runtime = timedOverviewSection(sectionsMs, sectionsCpuMs, "runtime", this::getRuntime);
+            List<PlatformTenantSummary> tenants = timedOverviewSection(sectionsMs, sectionsCpuMs, "tenants", this::getTenants);
+            List<PlatformActivityResponse> activity = timedOverviewSection(sectionsMs, sectionsCpuMs, "activity", this::getActivity);
+            return new PlatformOverviewResponse(runtime, tenants, activity, Instant.now());
+        } finally {
+            long elapsed = System.nanoTime() - startedAt;
+            if (elapsed >= SLOW_OVERVIEW_NANOS) {
+                log.warn("Slow platform overview composition totalMs={} sectionsMs={} sectionsCpuMs={}",
+                    elapsed / 1_000_000, sectionsMs, sectionsCpuMs);
+            }
+        }
+    }
+
+    private <T> T timedOverviewSection(Map<String, Long> sectionsMs, Map<String, Long> sectionsCpuMs,
+                                       String section, Supplier<T> read) {
+        long startedAt = System.nanoTime();
+        long cpuStartedAt = ThreadCpuTiming.currentNanos();
+        try {
+            return read.get();
+        } finally {
+            sectionsMs.put(section, (System.nanoTime() - startedAt) / 1_000_000);
+            sectionsCpuMs.put(section, ThreadCpuTiming.elapsedMillis(cpuStartedAt));
+        }
     }
 
     @Transactional(readOnly = true)

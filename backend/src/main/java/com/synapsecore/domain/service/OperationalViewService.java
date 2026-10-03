@@ -250,13 +250,17 @@ public class OperationalViewService {
 
     public DashboardSnapshotResponse getSnapshot() {
         long startedAt = System.nanoTime();
+        Boolean coalescedWait = null;
         try {
-            return snapshotRequests.execute(snapshotRequestKey(), this::buildSnapshot);
+            InFlightRequestCoordinator.Execution<DashboardSnapshotResponse> execution =
+                snapshotRequests.executeWithRole(snapshotRequestKey(), this::buildSnapshot);
+            coalescedWait = execution.coalescedWait();
+            return execution.value();
         } finally {
             long elapsed = System.nanoTime() - startedAt;
             if (elapsed >= SLOW_SNAPSHOT_NANOS) {
-                log.warn("Slow dashboard snapshot request totalMs={} (includes coalesced wait when applicable)",
-                    elapsed / 1_000_000);
+                log.warn("Slow dashboard snapshot request totalMs={} coalescedWait={}",
+                    elapsed / 1_000_000, coalescedWait);
             }
         }
     }

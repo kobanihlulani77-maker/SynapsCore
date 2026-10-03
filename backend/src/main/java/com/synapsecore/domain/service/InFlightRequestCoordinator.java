@@ -8,19 +8,26 @@ import java.util.function.Supplier;
 /** Coalesces identical concurrent reads without retaining completed results. */
 final class InFlightRequestCoordinator<T> {
 
+    record Execution<T>(T value, boolean coalescedWait) {
+    }
+
     private final ConcurrentHashMap<String, CompletableFuture<T>> inFlight = new ConcurrentHashMap<>();
 
     T execute(String key, Supplier<T> supplier) {
+        return executeWithRole(key, supplier).value();
+    }
+
+    Execution<T> executeWithRole(String key, Supplier<T> supplier) {
         CompletableFuture<T> created = new CompletableFuture<>();
         CompletableFuture<T> existing = inFlight.putIfAbsent(key, created);
         if (existing != null) {
-            return await(existing);
+            return new Execution<>(await(existing), true);
         }
 
         try {
             T result = supplier.get();
             created.complete(result);
-            return result;
+            return new Execution<>(result, false);
         } catch (RuntimeException | Error exception) {
             created.completeExceptionally(exception);
             throw exception;
