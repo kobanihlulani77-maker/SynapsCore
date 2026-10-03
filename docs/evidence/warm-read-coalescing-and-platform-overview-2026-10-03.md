@@ -46,14 +46,37 @@ was changed in response.
 - A slow platform overview now records wall and current-thread CPU time for
   `runtime`, `tenants`, and `activity` separately. Its response contract and
   query path are unchanged.
-- Both logs use a five-second slow threshold and the request
-  ID already in MDC. No payload, credential, tenant data, or per-request normal
-  path detail is logged.
+- The outer slow snapshot request retains its five-second threshold. Snapshot
+  composition and platform overview section breakdown use a two-second
+  diagnostic threshold, so a near-five-second method can still be correlated
+  to a slow HTTP request. The logs use the request ID already in MDC. No
+  payload, credential, tenant data, or normal-path detail is logged.
 
 Focused local checks: `InFlightRequestCoordinatorTest` (3) and
 `PlatformTenantAccessBoundaryIntegrationTest` (36) passed with zero failures or
 errors on the diagnostic source. These tests exercise concurrency attribution
 and existing platform authority behavior; they are not hosted latency proof.
+
+On exact-SHA CI-green deployment `9974937`, Render marked the backend Live at
+14:34 UTC and the six-flag readiness gate returned true. A naturally occurring
+`GET /api/platform/overview` completed at 14:35:48.855 UTC under request ID
+`ea2d17d9-22a5-4a0e-9856-062a2b47ad85`: status 200, 5,115 ms wall, 30 ms
+current-thread CPU, Hikari total 10 / active 2 / idle 8 / waiting 0 at
+completion. Its method did not emit a five-second section log. This does not
+prove the delay was outside that method: the method could have run just under
+five seconds, with the remaining time in authentication, filter, controller,
+or response processing. That observation justified lowering only the internal
+breakdown threshold. No new breakdown has yet been observed after this
+threshold correction.
+
+The first local rerun of the threshold correction returned 38/39: all 36
+platform boundary tests passed, but the new coordinator test failed once.
+Its fixed 100 ms test release sometimes ran before the waiter joined, so the
+test observed its own supplier result. The test now waits until the waiter
+thread is actually blocked before releasing the composer. The coordinator
+suite then passed twice consecutively (3/3 each run). This is a test
+synchronization correction, not evidence of a production coalescing defect.
+Full exact-SHA CI for this follow-up is pending.
 
 ## Next evidence needed
 

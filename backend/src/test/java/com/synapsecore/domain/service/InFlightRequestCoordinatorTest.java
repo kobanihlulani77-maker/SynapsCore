@@ -10,6 +10,7 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicReference;
 import org.junit.jupiter.api.Test;
 
 class InFlightRequestCoordinatorTest {
@@ -78,13 +79,13 @@ class InFlightRequestCoordinatorTest {
         InFlightRequestCoordinator<String> coordinator = new InFlightRequestCoordinator<>();
         CountDownLatch supplierStarted = new CountDownLatch(1);
         CountDownLatch releaseSupplier = new CountDownLatch(1);
-        ExecutorService executor = Executors.newSingleThreadExecutor();
+        ExecutorService executor = Executors.newFixedThreadPool(2);
         try {
             Future<InFlightRequestCoordinator.Execution<String>> composer = executor.submit(() ->
                 coordinator.executeWithRole("tenant|actor", () -> {
                     supplierStarted.countDown();
                     try {
-                        if (!releaseSupplier.await(5, TimeUnit.SECONDS)) {
+                        if (!releaseSupplier.await(15, TimeUnit.SECONDS)) {
                             throw new AssertionError("Timed out waiting to release composer");
                         }
                     } catch (InterruptedException exception) {
@@ -94,23 +95,24 @@ class InFlightRequestCoordinatorTest {
                     return "snapshot";
                 }));
             assertThat(supplierStarted.await(5, TimeUnit.SECONDS)).isTrue();
-            Thread releaser = new Thread(() -> {
-                try {
-                    Thread.sleep(100);
-                } catch (InterruptedException exception) {
-                    Thread.currentThread().interrupt();
-                } finally {
-                    releaseSupplier.countDown();
-                }
+            AtomicReference<Thread> waiterThread = new AtomicReference<>();
+            Future<InFlightRequestCoordinator.Execution<String>> waiter = executor.submit(() -> {
+                waiterThread.set(Thread.currentThread());
+                return coordinator.executeWithRole("tenant|actor", () -> "unexpected");
             });
-            releaser.start();
+            long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(10);
+            while (System.nanoTime() < deadline
+                && (waiterThread.get() == null || waiterThread.get().getState() != Thread.State.WAITING)) {
+                Thread.sleep(10);
+            }
+            assertThat(waiter.isDone()).isFalse();
+            assertThat(waiterThread.get()).isNotNull();
+            assertThat(waiterThread.get().getState()).isEqualTo(Thread.State.WAITING);
+            releaseSupplier.countDown();
 
-            InFlightRequestCoordinator.Execution<String> waiter =
-                coordinator.executeWithRole("tenant|actor", () -> "unexpected");
-            assertThat(waiter.value()).isEqualTo("snapshot");
-            assertThat(waiter.coalescedWait()).isTrue();
+            assertThat(waiter.get(5, TimeUnit.SECONDS).value()).isEqualTo("snapshot");
+            assertThat(waiter.get(5, TimeUnit.SECONDS).coalescedWait()).isTrue();
             assertThat(composer.get(5, TimeUnit.SECONDS).coalescedWait()).isFalse();
-            releaser.join(5_000);
         } finally {
             releaseSupplier.countDown();
             executor.shutdownNow();

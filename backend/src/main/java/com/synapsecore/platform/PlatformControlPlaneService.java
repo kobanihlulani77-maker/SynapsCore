@@ -43,7 +43,7 @@ import org.springframework.transaction.annotation.Transactional;
 public class PlatformControlPlaneService {
 
     private static final Logger log = LoggerFactory.getLogger(PlatformControlPlaneService.class);
-    private static final long SLOW_OVERVIEW_NANOS = 5_000_000_000L;
+    private static final long SLOW_OVERVIEW_NANOS = 2_000_000_000L;
 
     private final TenantRepository tenantRepository;
     private final AccessUserRepository accessUserRepository;

@@ -63,6 +63,7 @@ import org.springframework.stereotype.Service;
 public class OperationalViewService {
 
     private static final long SLOW_SNAPSHOT_NANOS = 5_000_000_000L;
+    private static final long SLOW_SNAPSHOT_COMPOSITION_NANOS = 2_000_000_000L;
 
     private final AlertScopeService alertScopeService;
     private final RecommendationRepository recommendationRepository;
@@ -307,7 +308,7 @@ public class OperationalViewService {
         } finally {
             waitSampler.close();
             long elapsed = System.nanoTime() - startedAt;
-            if (elapsed >= SLOW_SNAPSHOT_NANOS) {
+            if (elapsed >= SLOW_SNAPSHOT_COMPOSITION_NANOS) {
                 log.warn("Slow dashboard snapshot composition totalMs={} cpuMs={} sectionsMs={} sectionsCpuMs={} waitSamples={}",
                     elapsed / 1_000_000, ThreadCpuTiming.elapsedMillis(cpuStartedAt), sectionsMs, sectionsCpuMs,
                     waitSampler.summary());
