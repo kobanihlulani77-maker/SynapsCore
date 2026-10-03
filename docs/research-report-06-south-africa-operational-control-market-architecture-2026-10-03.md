@@ -240,3 +240,8 @@ The first meeting should be an operational walkthrough, not a product pitch.
 3. Identify additional South African buyers whose operating outcome spans several internal systems **and** several external providers.
 4. Study internal-control-team job roles to understand who owns this capability when companies do not outsource it.
 5. Turn the three founder dossiers into outreach-ready briefs after founder review.
+
+
+---
+
+**Continued buyer-side research:** [Research Report 07 — South Africa Buyer-Side Ownership Map](research-report-07-south-africa-buyer-side-ownership-map-2026-10-03.md). It identifies the operational sponsor, control-room/user, planning and systems/data roles that own different parts of the control problem and defines the recommended founder entry sequence.
