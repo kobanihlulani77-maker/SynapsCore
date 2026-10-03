@@ -396,3 +396,8 @@ The next challenge is no longer proving that the category exists. It is proving:
 4. whether a controlled first customer can measure enough value to continue.
 
 That is the research direction from this point.
+
+
+---
+
+**Continued first-wave analysis:** [Research Report 05 — First-Wave Deep Dive: Matus, Masterparts, Bidfood](research-report-05-first-wave-deep-dive-matus-masterparts-bidfood-2026-10-03.md). This report updates the discovery sequence after deeper system, operating-model and public-process research.
