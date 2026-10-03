@@ -27,3 +27,11 @@
 
 ### Monitoring
 A reply watch is active for the first-wave outreach. Meaningful replies should be summarized with the sender's request, implications, and recommended next action.
+
+
+### Macsteel — sent 2026-10-03
+- Route: info@macsteel.co.za (official business contact)
+- Subject: South African operational intelligence and control research — Macsteel
+- Status: Sent / awaiting reply
+- Framing: product-first, South African founder, broader cross-functional operational control; explicitly not SAP/WMS/production replacement.
+- Discovery ask: broader Gauteng operations / supply-chain / cross-functional operational performance owner.
