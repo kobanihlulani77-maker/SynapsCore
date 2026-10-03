@@ -35,3 +35,19 @@ A reply watch is active for the first-wave outreach. Meaningful replies should b
 - Status: Sent / awaiting reply
 - Framing: product-first, South African founder, broader cross-functional operational control; explicitly not SAP/WMS/production replacement.
 - Discovery ask: broader Gauteng operations / supply-chain / cross-functional operational performance owner.
+
+
+### Famous Brands — sent 2026-10-03
+- Route: companysecretary@famousbrands.co.za (official published corporate route)
+- Requested recipient: Andrew Mundell, Group Executive – Supply Chain
+- Subject: For Andrew Mundell — South African operational intelligence and control research
+- Status: Sent / awaiting reply or internal routing
+- Framing: complete SynapseCore product; Manufacturing + Logistics + Retail operating context; explicitly not WMS/planning/ordering replacement.
+
+
+### Bearings International — sent 2026-10-03
+- Route: info@bearings.co.za (official business route)
+- Requested recipient: Laura Van Rooyen, Supply-Chain Director, or appropriate operational-performance owner
+- Subject: South African operational intelligence and control research — Bearings International
+- Status: Sent / awaiting reply
+- Framing: full product-first SynapseCore positioning; branch + engineering + field service + supplier/customer uptime context; explicitly not ERP/inventory/ordering replacement.
