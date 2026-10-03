@@ -1,6 +1,7 @@
 package com.synapsecore.event;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import com.synapsecore.audit.RequestTraceContext;
 import com.synapsecore.config.SynapseRealtimeProperties;
@@ -223,11 +224,14 @@ class OperationalDispatchQueueServiceTest {
             new ScheduledTaskExecutionDiagnostics(null)
         );
 
-        assertThat(service.processPendingWork()).isZero();
+        assertThatThrownBy(service::drainOnSchedule)
+            .isInstanceOf(IllegalStateException.class)
+            .hasMessage("completion write unavailable");
         assertThat(realtimeService.operationalBroadcasts).isEqualTo(1);
         assertThat(item.getStatus()).isEqualTo(OperationalDispatchStatus.PROCESSING);
         assertThat(item.getAttemptCount()).isEqualTo(1);
         assertThat(failedWrites).hasValue(0);
+        assertThat(service.isDraining()).isFalse();
     }
 
     @Test

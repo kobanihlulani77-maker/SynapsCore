@@ -161,7 +161,7 @@ public class OperationalDispatchQueueService {
                         + "in tenant {} request {}; unfinished claims remain lease-recoverable: {}",
                     claimedItems.size(), dispatchBatch.surface(), dispatchBatch.tenantCode(),
                     representativeItem.getRequestId(), exception.getMessage());
-                return 0;
+                throw exception;
             }
             log.debug("Operational dispatch queue processed {} {} item(s) for tenant {} using request {}",
                 claimedItems.size(), dispatchBatch.surface(), dispatchBatch.tenantCode(), representativeItem.getRequestId());

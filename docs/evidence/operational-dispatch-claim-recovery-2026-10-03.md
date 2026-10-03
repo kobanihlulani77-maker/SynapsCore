@@ -42,8 +42,9 @@ A regression test reproduced it before the correction: one broadcast occurred,
 the completion write threw, and the item became `FAILED` instead of remaining
 `PROCESSING`. The worker now handles publication and terminal-recording errors
 separately. A publication error still marks the claim `FAILED`; a terminal
-recording error reports zero completed work and leaves unfinished claims under
-the existing lease/reclaim path. Successfully recorded items in a partly
+recording error propagates so scheduler diagnostics report `FAILED` and the
+drain stops; it leaves unfinished claims under the existing lease/reclaim path.
+Successfully recorded items in a partly
 completed batch remain `COMPLETED`. Re-publication after a lease may be a
 duplicate notification; authoritative REST state remains the source of truth.
 
