@@ -1,4 +1,6 @@
 # Pilot Prospect Research — Operational Dossiers
+
+**Governing foundation:** [Product, Problem and Market Research Foundation](synapsecore-product-problem-market-research-foundation-2026-10.md). Read company hypotheses through the whole-product lens; earlier narrow wording is superseded by this foundation.
 **Date:** 2026-10-03  
 **Status:** Working research, not customer qualification.  
 **Purpose:** Identify organizations whose real operating complexity may expose a meaningful SynapseCore control/intelligence problem. Facts, hypotheses and open questions are deliberately separated.
