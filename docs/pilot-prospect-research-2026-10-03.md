@@ -293,3 +293,66 @@ For a first customer, define one consequential *cross-domain operating journey* 
 - Separate *strategic market fit* from *current implementation feasibility*; put unsupported multi-system ingestion in a roadmap/technical review column rather than denying the broader need or promising it.
 - Do not treat past local or hosted proofs as final acceptance; no external formal pilot offer implies M6 sign-off or M7 launch authorization.
 - Next owner action: approve appropriate business discovery approach; next Codex action: check each hypothesized minimum-data journey against source routes/contracts, supported role/governance flows, source readback and capacity evidence. No prospect contact has occurred yet.
+
+---
+
+## Phase 4 — competitive market entry and widened prospect discovery (2026-10-03)
+
+### Commercial correction and operating thesis
+Entry is not conditional on a prospective customer having broken ERP/WMS/inventory software or lacking all decision intelligence. Functioning specialist systems are valuable sources; other operational intelligence and control vendors exist, and a customer may legitimately buy or add a differentiated platform even in a mature category.
+
+Investigate **incremental, company-specific adoption value**: which relevant systems, teams, operating units and third parties must produce a shared operational outcome; whether the current combined truth, risk, prioritisation, governance, intervention, recovery and proof of outcome are sufficiently supported; and whether a SynapseCore deployment could provide measurable improvement or better operating fit without creating another fragmentation problem.
+
+Do not falsely claim SynapseCore is the only cross-system control/intelligence platform, that existing competitors lack governance, or that every human coordination role reveals failure. Compete on demonstrated relevant fit, accountable operator experience, supported integrations, reliability, pilot economics and measured outcomes. Full long-term product vision is distinct from current supported deployment contract.
+
+### Competitor and adjacent product verification
+- **Aera Decision Cloud** publicly positions itself as an agentic decision intelligence platform, unifying real-time enterprise/external data, decisions, actions and outcomes; reports 200+ prebuilt integrations: https://www.aeratechnology.com/aera-decision-cloud/
+- **Blue Yonder Supply Chain Command Center** publicly offers end-to-end network visibility, risk/impact analysis, prescriptive action and multi-party coordination: https://blueyonder.com/solutions/supply-chain-command-center
+- **Kinaxis Maestro** publicly positions concurrent planning and decision synchronization, with predictive/generative/agentic AI and extensible workflows: https://www.kinaxis.com/en/solutions/platform
+- **Netstock** provides inventory/demand planning, forecasting, optimization and ERP integrations: https://www.netstock.com/
+- These public descriptions concern vendor-advertised capabilities and are not independent performance tests. We cannot claim SynapseCore feature parity or superiority merely from positioning. Learn how vendors articulate customer outcomes and find an *actual specific* pilot operating lane that SynapseCore supports.
+
+### Newly investigated operating models — facts vs hypotheses
+
+**Renttech SA (Bidvest)**
+- Public facts: industrial welding/construction equipment sold and rented; 14-branch national network, customer/project support, maintained rental equipment, equipment delivery/service responsibilities: https://renttechsa.co.za/about-us/ ; https://renttechsa.co.za/services/
+- 2026 public careers show a rental administrator role, alongside sales and support roles: https://renttechsa.co.za/careers/
+- Research hypothesis: cross-branch rental availability, sales, customer/project deadlines, returned equipment, maintenance readiness and service communication may create cross-domain coordination events.
+- Current implementation boundary: SynapseCore has no verified native rental assets, maintenance telemetry, equipment condition workflows or general-purpose rental connector. Full market opportunity may be relevant, but this is **not** a current-capability first-pilot assertion. Investigate whether a meaningful supported order/availability/fulfilment subset exists before offering anything.
+
+**Matus (Bidvest)**
+- Public facts: wholesale-only network selling through authorized distributors, sourcing 220+ brands locally and internationally, regional locations, national deliveries: https://www.matus.co.za/ ; https://www.matus.co.za/contact-us/
+- Matus explicitly reports investment in CRM and ERP: https://www.matus.co.za/about-us/
+- Its FAQ states some buy-out orders take 5–7 working days, special-stock orders may use air freight, site stock views have qualification/limitations, and delivery terms vary: https://www.matus.co.za/faq/
+- Research hypothesis: cross-functional coordination of procurement, distributor commitments, regional stock, special sourcing, customer communications and fulfillment could justify a connected operating slice. Do not infer documented shortcomings from customer-service caveats.
+- Discovery: system/data access, cross-regional priority conflicts, authorization, order promise changes, existing exception workflows and source confirmation.
+
+**Plumblink (Bidvest)**
+- Public facts: over 160 branches, 10,000+ products, more than 600 suppliers: https://www.plumblink.co.za/about-us
+- Netstock's **historical customer case study** reports that Plumblink previously had disconnected spreadsheet and platform silos as it evolved from decentralized buying to central DC operations, and then deliberately selected **Netstock for inventory** and **CQuential for warehouse management** to integrate with ERP: https://www.netstock.com/blog/plumblinks-warehouse-and-inventory-management-journey/
+- The case study says leadership involved IT, operations, DC managers, finance, HR and sales in change management; it reported meaningful warehouse/inventory benefits. These were historical outcomes at the time of the case study, not a current unresolved-pain claim.
+- Research hypothesis: even with sound ERP + WMS + inventory optimization, the network may have additional needs spanning procurement, suppliers, branch demand, business priority, exception authority, incident recovery, customer promises and audit. Ask how these are governed today. Plumblink is a **concrete best-of-breed architecture case**, not proof of current fragmentation.
+- Discovery: owner of cross-platform business outcomes, which processes Netstock/CQuential/ERP already automate, current cross-domain operating visibility and decision ownership, data contracts and appetite for incremental control layer.
+
+**Bidvest Afcom**
+- Public facts: 9 branches, 1 sales depot, 3 manufacturing facilities, supplying end-of-line packaging/fastening equipment and consumables plus after-sales support to multiple sectors: https://www.bidvestafcom.co.za/about-us
+- Research hypothesis: coordination between customer requests, production, technical equipment/services, parts/consumables, branch distribution and commitments. Investigate existing solutions and domain fit.
+- Current boundary: manufacturing machine state, field service, equipment maintenance and engineering-specific data have no assumed native SynapseCore contracts; first pilot needs independently proven supported slice.
+
+**Bidvest umbrella:** multiple commercial-products businesses cover manufacturing, distribution, rentals and trading. These are independent operating units; do not pitch group-wide integration or presume data-sharing rights from common ownership: https://bidvest.co.za/divisional-information
+
+### Research-to-sales discipline
+1. Lead with customer's cross-system outcomes, not an ERP/WMS deficiency.
+2. For every prospect, map their *already working* systems and control processes; ask where a supplementary or alternative control layer would add incremental value.
+3. Validate the concrete scope, operating sponsor, quantified baseline, acceptable change burden and approval rights.
+4. Distinguish customer problem + full strategic product fit from **currently supported integration and domain fit**.
+5. Never promise real-world automated execution from governed hypothetical Scenario approval, arbitrary external domain integrations, autonomous source writes or unproved deployment time.
+6. First outreach is discovery, not an unsupported enterprise-wide promise or a hard sell. Present verified capability, appropriate confidentiality, evidence and next-step options.
+7. Do not stop exploring a company because one use case is solved; investigate other legitimate connected journeys, but equally do not manufacture a problem where the customer sees no incremental value.
+
+### Actionable next investigation
+- Develop a current cross-platform architecture/decision-loop map for **Plumblink** as the clearest public example of intentionally integrated best-of-breed systems.
+- Investigate **Matus** order promise/exception operations and **Bidvest Afcom** production-to-distribution dependencies using current official or operating-role evidence.
+- Investigate Renttech's full strategic opportunity separately from near-term supported pilot feasibility.
+- Retain BMG, VKB and Masterparts; no named organization is yet a qualified prospective customer.
+- Give Codex an exact endpoint/field/role/gate feasibility test for proposed minimum data journeys before any technical promise.
