@@ -23,6 +23,7 @@ import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.List;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.IntSupplier;
 import org.junit.jupiter.api.Test;
 import org.slf4j.MDC;
@@ -189,6 +190,67 @@ class OperationalDispatchQueueServiceTest {
         assertThat(service.processPendingWork()).isZero();
         assertThat(failed.getStatus()).isEqualTo(OperationalDispatchStatus.FAILED);
         assertThat(realtimeService.operationalBroadcasts).isZero();
+    }
+
+    @Test
+    void completionWriteFailureAfterBroadcastLeavesClaimForLeaseRecovery() {
+        OperationalDispatchWorkItem item = workItem(
+            1L, "PILOT-TENANT", OperationalUpdateType.ORDER_FLOW, "order-api", "dispatch-request"
+        );
+        AtomicInteger failedWrites = new AtomicInteger();
+        OperationalDispatchWorkItemRepository repository = repositoryProxy(
+            OperationalDispatchWorkItemRepository.class,
+            (method, args) -> switch (method.getName()) {
+                case "findReadyForDispatch" -> List.of(item);
+                case "claimForDispatch" -> 1;
+                case "completeDispatch" -> throw new IllegalStateException("completion write unavailable");
+                case "failDispatch" -> {
+                    failedWrites.incrementAndGet();
+                    item.setStatus(OperationalDispatchStatus.FAILED);
+                    yield 1;
+                }
+                default -> defaultValue(method.getReturnType());
+            }
+        );
+        RecordingRealtimeService realtimeService = new RecordingRealtimeService();
+        OperationalDispatchQueueService service = new OperationalDispatchQueueService(
+            repository,
+            new StaticObjectProvider<>(new RecordingDashboardService()),
+            new StaticObjectProvider<>(realtimeService),
+            new RequestTraceContext(),
+            noOpMetricsService(),
+            null,
+            new ScheduledTaskExecutionDiagnostics(null)
+        );
+
+        assertThat(service.processPendingWork()).isZero();
+        assertThat(realtimeService.operationalBroadcasts).isEqualTo(1);
+        assertThat(item.getStatus()).isEqualTo(OperationalDispatchStatus.PROCESSING);
+        assertThat(item.getAttemptCount()).isEqualTo(1);
+        assertThat(failedWrites).hasValue(0);
+    }
+
+    @Test
+    void broadcastFailureStillMarksTheClaimFailed() {
+        OperationalDispatchWorkItem item = workItem(
+            1L, "PILOT-TENANT", OperationalUpdateType.ORDER_FLOW, "order-api", "dispatch-request"
+        );
+        RecordingRealtimeService realtimeService = new RecordingRealtimeService();
+        realtimeService.failOperationalBroadcast = true;
+        OperationalDispatchQueueService service = new OperationalDispatchQueueService(
+            inMemoryRepository(List.of(item)),
+            new StaticObjectProvider<>(new RecordingDashboardService()),
+            new StaticObjectProvider<>(realtimeService),
+            new RequestTraceContext(),
+            noOpMetricsService(),
+            null,
+            new ScheduledTaskExecutionDiagnostics(null)
+        );
+
+        assertThat(service.processPendingWork()).isZero();
+        assertThat(realtimeService.operationalBroadcasts).isEqualTo(1);
+        assertThat(item.getStatus()).isEqualTo(OperationalDispatchStatus.FAILED);
+        assertThat(item.getAttemptCount()).isEqualTo(1);
     }
 
     private OperationalDispatchWorkItemRepository inMemoryRepository(List<OperationalDispatchWorkItem> workItems) {
@@ -393,6 +455,7 @@ class OperationalDispatchQueueServiceTest {
         private int integrationBroadcasts;
         private String lastOperationalTenantCode;
         private String lastIntegrationTenantCode;
+        private boolean failOperationalBroadcast;
 
         private RecordingRealtimeService() {
             super(null, null, null, null, null);
@@ -402,6 +465,9 @@ class OperationalDispatchQueueServiceTest {
         public void broadcastOperationalUpdates(String tenantCode) {
             operationalBroadcasts++;
             lastOperationalTenantCode = tenantCode;
+            if (failOperationalBroadcast) {
+                throw new IllegalStateException("broadcast unavailable");
+            }
         }
 
         @Override

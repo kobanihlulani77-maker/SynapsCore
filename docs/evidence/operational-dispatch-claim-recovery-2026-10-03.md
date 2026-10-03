@@ -30,6 +30,31 @@ publication. `FAILED` remains excluded from automatic recovery and visible
 through the existing incident path. A database outage while recording the
 terminal state leaves `PROCESSING` eligible for a later lease-based retry.
 
+## Follow-up: successful broadcast with failed terminal recording
+
+A later source inspection found that the worker's single `try/catch` covered
+both realtime publication and the subsequent `COMPLETED` database update.
+If publication succeeded but the terminal write threw, that catch called
+`failDispatch` and could durably label an already-published item `FAILED`.
+This is a code-proven failure boundary, not an observed hosted incident.
+
+A regression test reproduced it before the correction: one broadcast occurred,
+the completion write threw, and the item became `FAILED` instead of remaining
+`PROCESSING`. The worker now handles publication and terminal-recording errors
+separately. A publication error still marks the claim `FAILED`; a terminal
+recording error reports zero completed work and leaves unfinished claims under
+the existing lease/reclaim path. Successfully recorded items in a partly
+completed batch remain `COMPLETED`. Re-publication after a lease may be a
+duplicate notification; authoritative REST state remains the source of truth.
+
+The corrected focused queue/claim tests passed locally. The complete backend
+suite on the changed files passed 70 suites and 403 tests, zero failures,
+errors or skips, using the H2 test profile. Production packaging with tests
+skipped exited zero. This does not prove an injected PostgreSQL terminal-write
+failure, hosted recovery after process interruption, or dispatch headroom under
+backlog. The exact new revision's CI and hosted deployment must be recorded
+separately; H4 and M1 remain OPEN.
+
 ## Verification boundary
 
 The final focused local run passed seven tests, zero failures/errors: the

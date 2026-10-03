@@ -139,22 +139,33 @@ public class OperationalDispatchQueueService {
         MDC.put(TENANT_MDC_KEY, representativeItem.getTenantCode());
 
         try {
-            if (dispatchBatch.surface() == DispatchSurface.INTEGRATION) {
-                realtimeServiceProvider.getObject().broadcastIntegrationUpdates(dispatchBatch.tenantCode());
-            } else {
-                dashboardServiceProvider.getObject().refreshSummary();
-                realtimeServiceProvider.getObject().broadcastOperationalUpdates(dispatchBatch.tenantCode());
+            try {
+                if (dispatchBatch.surface() == DispatchSurface.INTEGRATION) {
+                    realtimeServiceProvider.getObject().broadcastIntegrationUpdates(dispatchBatch.tenantCode());
+                } else {
+                    dashboardServiceProvider.getObject().refreshSummary();
+                    realtimeServiceProvider.getObject().broadcastOperationalUpdates(dispatchBatch.tenantCode());
+                }
+            } catch (RuntimeException exception) {
+                markDispatchBatchFailed(claimedItems, exception);
+                log.warn("Operational dispatch queue failed {} {} item(s) for tenant {} request {}: {}",
+                    claimedItems.size(), dispatchBatch.surface(), dispatchBatch.tenantCode(),
+                    representativeItem.getRequestId(), exception.getMessage());
+                return 0;
             }
-            markDispatchBatchCompleted(claimedItems);
+
+            try {
+                markDispatchBatchCompleted(claimedItems);
+            } catch (RuntimeException exception) {
+                log.warn("Operational dispatch broadcast succeeded but terminal recording failed for {} {} item(s) "
+                        + "in tenant {} request {}; unfinished claims remain lease-recoverable: {}",
+                    claimedItems.size(), dispatchBatch.surface(), dispatchBatch.tenantCode(),
+                    representativeItem.getRequestId(), exception.getMessage());
+                return 0;
+            }
             log.debug("Operational dispatch queue processed {} {} item(s) for tenant {} using request {}",
                 claimedItems.size(), dispatchBatch.surface(), dispatchBatch.tenantCode(), representativeItem.getRequestId());
             return claimedItems.size();
-        } catch (RuntimeException exception) {
-            markDispatchBatchFailed(claimedItems, exception);
-            log.warn("Operational dispatch queue failed {} {} item(s) for tenant {} request {}: {}",
-                claimedItems.size(), dispatchBatch.surface(), dispatchBatch.tenantCode(),
-                representativeItem.getRequestId(), exception.getMessage());
-            return 0;
         } finally {
             restoreTrace(callerTrace);
         }
