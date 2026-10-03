@@ -130,7 +130,7 @@ These are research stakeholders; exact job titles and delegated authority vary b
 
 **Not established:** any named prospect's actual unaddressed problem; demand for SynapseCore at any given price; independently proved advantages against competing platforms; native support for arbitrary procurement/production/transport/rental feeds; finished M6 acceptance; commercial ROI; customer willingness to adopt.
 
-## 8. Research work to perform next — no artificial niche
+**Continued research:** [Report 03 — Integrated Production + Distribution Operational Control](research-report-03-integrated-production-distribution-control-2026-10-03.md), examining multiple operational clocks, production/supply dependencies, quality state, logistics constraints, cross-domain decisions and customer outcomes.\n\n## 8. Research work to perform next — no artificial niche
 
 1. **Second operating model:** production + distribution (VKB-style, without attributing hypothetical events to VKB): follow demand change, supplier input constraints, production scheduling, finished stock, transport and customer commitments through the same three loops. Label required unsupported future domain feeds.
 2. **Third operating model:** multi-client logistics: follow customer authority, partner feeds, subcontractor events, multi-tenancy and SLA conflict under real-world handoffs.
