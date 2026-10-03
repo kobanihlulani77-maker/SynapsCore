@@ -461,3 +461,8 @@ The next operating structure is **multi-party logistics / 3PL / fulfillment**, w
 In parallel, begin a **competitive architecture map** that compares complete operating loops—not feature counts—across Aera, Blue Yonder, Kinaxis, SAP and other genuine alternatives. The purpose is not to force SynapseCore to be different; it is to understand how the market currently solves operational truth, intelligence, authority, action, feedback and recovery.
 
 **Lock rule:** if research starts collapsing back into inventory-only, WMS-only, connector-only, "above systems" slogans, or competitor-by-competitor imitation, return to the complete operational loop and the enterprise outcome.
+
+
+---
+
+**Continued South Africa market research:** [Research Report 04 — South Africa Market Map and Target Portfolio](research-report-04-south-africa-market-map-and-target-portfolio-2026-10-03.md), which separates customer buyers from control-tower competitors/partners and establishes the first discovery portfolio.
