@@ -464,3 +464,8 @@ This protects credibility and gives us information.
 5. When a real company conversation occurs, replace hypotheses with company-confirmed facts immediately.
 
 **Lock rule:** organisational-door research exists to improve access to the full SynapseCore problem. It must not reduce SynapseCore to logistics, fulfilment, planning or any single buyer role.
+
+
+---
+
+**Continued commercial/qualification research:** [Research Report 08 — South Africa Second-Wave Targets, Commercial Model and Pilot Qualification Gates](research-report-08-south-africa-second-wave-commercial-model-and-pilot-gates-2026-10-03.md). It selects Plumblink/VKB/BMG handling, defines the supervised pilot commercial model, and establishes ten pilot qualification gates.
