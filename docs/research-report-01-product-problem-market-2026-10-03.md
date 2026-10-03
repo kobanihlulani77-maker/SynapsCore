@@ -74,6 +74,8 @@ Assess **total outcome value** rather than "how much is one alert worth." Baseli
 
 Purchase alternatives have costs: enterprise incumbent licence/implementation, suite extension, custom system, existing manual coordination and maintaining existing tools. A legitimate sales case may involve complementing current platforms, competing for the same outcome or replacing a less suitable control layer; none is ruled in or out by the presence of a functioning ERP/WMS. The full product-market story is assessed independent of short-lived M1 release limitations; an actual pilot offer remains bound to M6/M7 acceptance and verified customer integration.
 
+**Continued research:** [Report 02 — Full Operating Day and Connected Operational Control](research-report-02-full-operating-day-and-control-loop-2026-10-03.md), with six operating periods, normal/exception/governance/recovery journeys, external business cases, causal economics and adoption risks.
+
 ## 6. Findings, uncertainty and work that follows
 
 **Supported now by research:** a documented, integrated product contract exists; a real commercial category targets cross-functional/cross-enterprise intelligence and orchestration; credible incumbents already address substantial parts of this problem; South African industry discussion recognizes multi-party operating challenges and the need for synchronized decisions.
