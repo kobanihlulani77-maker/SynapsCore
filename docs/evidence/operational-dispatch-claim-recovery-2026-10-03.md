@@ -44,8 +44,8 @@ the completion write threw, and the item became `FAILED` instead of remaining
 separately. A publication error still marks the claim `FAILED`; a terminal
 recording error propagates so scheduler diagnostics report `FAILED` and the
 drain stops; it leaves unfinished claims under the existing lease/reclaim path.
-Successfully recorded items in a partly
-completed batch remain `COMPLETED`. Re-publication after a lease may be a
+Successfully recorded items in a partly completed batch remain `COMPLETED`.
+Re-publication after a lease may be a
 duplicate notification; authoritative REST state remains the source of truth.
 
 The corrected focused queue/claim tests passed locally. The complete backend
@@ -53,8 +53,17 @@ suite on the changed files passed 70 suites and 403 tests, zero failures,
 errors or skips, using the H2 test profile. Production packaging with tests
 skipped exited zero. This does not prove an injected PostgreSQL terminal-write
 failure, hosted recovery after process interruption, or dispatch headroom under
-backlog. The exact new revision's CI and hosted deployment must be recorded
-separately; H4 and M1 remain OPEN.
+backlog. For final production revision `a123bca595643cb4800b7981ae38d33924ea5e46`,
+[CI run `37128570340`](https://github.com/kobanihlulani77-maker/SynapsCore/actions/runs/37128570340)
+completed both `verify` and `dispatch-postgres` successfully. The PostgreSQL
+job repeats claim/reclaim tests; it does not inject a terminal-write failure.
+Render showed that exact SHA as the last successful deployment and marked
+`dep-db0gogg473hc738514sg` Live. The six-flag read-only connection gate
+reported frontend, backend, database readiness, auth, WebSocket and proof
+allowance true. Visible post-deploy dispatch logs showed only idle scans with
+`processed=0` and `hikariWaiting=0` in the inspected slice. These establish
+build/deployment health, not broadcast-to-terminal-write recovery or sustained
+headroom. H4 and M1 remain OPEN.
 
 ## Verification boundary
 
