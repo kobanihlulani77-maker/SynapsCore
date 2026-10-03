@@ -175,3 +175,49 @@ This is not a ranking or selection. It records what each prospect teaches us.
 4. Define the minimum SynapseCore data inputs required to demonstrate the hypothesised value.
 5. Define measurable baseline questions: detection time, investigation effort, exception age, escalation latency, recovery time, missed/late commitments and manual coordination burden.
 6. Keep Goldwagen and AFGRI active as secondary dossiers; broaden the market search beyond these five rather than assuming one must become Company 1.
+
+---
+
+## Phase 2 — existing-control audit (2026-10-03)
+
+**Method:** Public operating/technology evidence is a capability clue, not evidence of an unresolved customer pain. Distinguish selected software from verified live rollout; an existing WMS/ERP/BI function from an end-to-end control loop; and hypothetical benefit from current SynapseCore proof. No named company has confirmed a problem or agreed to a pilot.
+
+### BMG: what is already covered
+- November 12, 2025, Supply Chain Junction announced BMG's selection of Manhattan SCALE to modernize warehouse systems and improve efficiency and delivery: https://www.scjunction.com/blog/bmg-selects-manhattan-scale-to-drive-supply-chain-efficiency
+- Current FY2026 Invicta reporting identifies operational optimisation, inventory positioning and working-capital management as group concerns: https://invictaholdings.co.za/executive-review-of-performance/
+- Official BMG business contact route: BMG World, 38 Droste Crescent, Jeppestown, Johannesburg; main telephone +27 11 620 1500; customercare@bmgworld.net. This is a general business route, not a verified operations sponsor: https://bmgworld.net/branch-locator
+
+**Audit interpretation:** Do not pitch warehouse management, basic stock visibility, order processing or generic control-tower concepts without establishing an uncovered use case. Selection of Manhattan SCALE is verified; current live implementation breadth, dates and enterprise integration are not verified by the announcement alone.
+
+**Decisive discovery test:** Trace a cross-branch/VMI urgent-customer conflict through ERP, WMS, service commitments, decision authority, escalation and resolution. Ask how exceptions are ranked by consequence, who owns the case and whether the final result is verified in authoritative systems. An existing satisfactory cross-network decision platform or no supported source-data path disqualifies the proposed pilot lane.
+
+### VKB / Multi Green: what is already covered
+- Multi Green Operations Coordinator posting June 24, 2026 lists order-to-fulfilment ownership, production scheduling/bottlenecks, stock and demand visibility, procurement and real-time communication between production, sales and logistics. Lists Excel and **Business Central**: https://www.myjobmag.co.za/job/operations-coordinator-multi-green-villiers-vkb-group
+- Microsoft documents that Business Central includes supply planning, MPS/MRP and planned purchase, transfer or production orders. Availability of the product features does **not** demonstrate whether Multi Green has configured/uses them: https://learn.microsoft.com/en-us/dynamics365/business-central/production-planning
+- VKB's official Multi Green page describes a fertiliser mixing and distribution operation serving an agent network: https://www.vkb.co.za/index.php/en/agriculture/companies/multi-green
+- Official general contact: VKB head office +27 58 863 8111; official Multi Green number 058 821 1087. These are business channels only, not confirmed pilot contacts: https://www.vkb.co.za/index.php/en/?id=19&view=category
+
+**Audit interpretation:** Do not pitch production planning or forecasting features that Business Central may already provide. Investigate the distinct coordination layer: which cross-functional exceptions remain difficult to explain, prioritize, assign, govern, escalate and verify across existing systems and operators.
+
+**Decisive discovery test:** Ask a Multi Green/selected-division operations owner to walk through a recent demand/procurement/production/logistics conflict, the actual systems/screens used, decision history, resolution time and whether any part remains materially manual or delayed. A complete, sufficient workflow in existing software or dependence on unsupported manufacturing telemetry disqualifies the proposed pilot lane.
+
+### Masterparts: what is already covered
+- Account-holder online ordering is documented: https://www.masterparts.com/online-shop-2/
+- Masterparts documented SkyNet customer order tracking and its value for workshop estimates in its August 14, 2018 post: https://www.masterparts.com/blog/auto-parts-online-convenient-new-tracking-system-our-customers/
+- Modderfontein is a distribution centre with no sales counter; other Gauteng branches are Hennopspark, Montana and Randburg: https://www.masterparts.com/branches/
+- Modderfontein warehouse-role advertisement dated October 2, 2026 lists bulk receiving, picking, packing, freight preparation and stock counts: https://jobs.recruite.co.za/job/stores-person
+- Official business entry: Modderfontein DC/call centre +27 10 630 0757; head office Epping +27 21 505 5757. These are general contact routes, not a confirmed operations sponsor: https://www.masterparts.com/contact/
+
+**Audit interpretation:** Do not pitch customer tracking, basic ordering or a replacement warehouse platform. Internal inter-branch exception management, decision ownership and priority handling remain unverified; absence of public evidence cannot be used as proof of a gap.
+
+**Decisive discovery test:** Ask about a recent urgent customer part request that could not be satisfied normally. How did branch/DC staff determine alternatives and competing priority; who approved a change; how was the commitment updated; what confirmed completion? Reject this lane if existing tools already deliver sufficient joined-up coordination, incidents are too infrequent, or the source system is not integrable within the approved pilot.
+
+### Cross-company minimum useful proof and boundary
+For any qualified opportunity, require a documented abnormal operational event, an initial authoritative source/data path that SynapseCore supports, relevant company-approved stock/warehouse/fulfilment reference data, clear operator authority and a baseline for detection, assignment, decision, resolution, and manual investigation effort. Hypothetical scenarios remain nonexecuting/advisory. Recommendations and approvals cannot be sold as autonomous source-system actions. Cross-system observability not covered by supported contracts cannot be implied from an order webhook alone. Codex must verify necessary endpoints, mapping, data lifecycle, roles, concurrency and realistic volume before an offer; M6 and M7 gates remain mandatory.
+
+### Current status and follow-up
+- BMG: confirmed warehouse-platform investment; specific enterprise control-layer gap and rollout state unknown.
+- VKB/Multi Green: explicit cross-functional coordinator and Business Central evidence; unresolved coordination burden unknown.
+- Masterparts: account ordering and courier tracking confirmed; internal exception/orchestration capability unknown.
+- No engagement or formal company qualification has occurred.
+- Next: interview/research decision-owner roles, prepare a five-question problem-validation script per candidate, check minimal data compatibility with Codex, expand operating-model search outside the first three and only then seek appropriate introductions.
