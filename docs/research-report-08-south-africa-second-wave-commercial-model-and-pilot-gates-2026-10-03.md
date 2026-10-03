@@ -368,3 +368,8 @@ South Africa is showing a credible market with three simultaneous truths:
 3. **Therefore SynapseCore must prove incremental operational/economic value rather than merely prove that the problem exists.**
 
 That is the standard we should maintain.
+
+
+---
+
+**Continued target expansion:** [Research Report 09 — Expanded South Africa Target Map](research-report-09-south-africa-expanded-target-map-2026-10-03.md). It adds Macsteel, Famous Brands, Motus Aftermarket Parts, Dis-Chem and Food Lover's Market to the market map and moves Macsteel into active discovery.
