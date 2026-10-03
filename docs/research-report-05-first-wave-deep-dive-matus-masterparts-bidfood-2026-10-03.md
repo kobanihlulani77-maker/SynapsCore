@@ -322,3 +322,15 @@ Continue in two directions:
 2. **Build the South African competitor/alternative architecture map** — especially Transnova, Unitrans, DSV, Vector Logistics and specialist systems — to understand how local customers already buy operational control and what implementation/commercial expectations SynapseCore will face.
 
 Do not send outreach until the founder reviews the discovery dossiers.
+
+
+---
+
+## Founder-use discovery material
+
+Before any outreach, use these concise operational dossiers:
+- [Matus founder discovery dossier](discovery-dossier-matus-2026-10-03.md)
+- [Masterparts founder discovery dossier](discovery-dossier-masterparts-2026-10-03.md)
+- [Bidfood Pretoria founder discovery dossier](discovery-dossier-bidfood-pretoria-2026-10-03.md)
+
+For market context, use [South African Operational-Control Market Architecture](research-report-06-south-africa-operational-control-market-architecture-2026-10-03.md), covering Transnova, DSV, Unitrans, Vector and TSI and the recommended supervised Customer-1 delivery model.
