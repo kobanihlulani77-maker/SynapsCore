@@ -28,6 +28,7 @@ import org.junit.jupiter.api.Test;
 import org.slf4j.MDC;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.data.domain.Pageable;
+import org.springframework.test.util.ReflectionTestUtils;
 
 class OperationalDispatchQueueServiceTest {
 
@@ -37,7 +38,7 @@ class OperationalDispatchQueueServiceTest {
         OperationalDispatchWorkItemRepository repository = repositoryProxy(
             OperationalDispatchWorkItemRepository.class,
             (method, args) -> {
-                if (method.getName().equals("findByStatusInOrderByCreatedAtAsc")) {
+                if (method.getName().equals("findReadyForDispatch")) {
                     stages.add("queue-selection");
                     return List.of();
                 }
@@ -132,13 +133,97 @@ class OperationalDispatchQueueServiceTest {
         }
     }
 
+    @Test
+    void staleProcessingWorkIsReclaimedButFreshProcessingWorkIsNot() {
+        OperationalDispatchWorkItem stale = workItem(
+            1L, "PILOT-TENANT", OperationalUpdateType.ORDER_FLOW, "order-api", "stale-request"
+        );
+        stale.setStatus(OperationalDispatchStatus.PROCESSING);
+        stale.setAttemptCount(1);
+        stale.setUpdatedAt(Instant.now().minusSeconds(600));
+        OperationalDispatchWorkItem fresh = workItem(
+            2L, "PILOT-TENANT", OperationalUpdateType.ORDER_FLOW, "order-api", "fresh-request"
+        );
+        fresh.setStatus(OperationalDispatchStatus.PROCESSING);
+        fresh.setAttemptCount(1);
+        fresh.setUpdatedAt(Instant.now().minusSeconds(120));
+
+        RecordingRealtimeService realtimeService = new RecordingRealtimeService();
+        OperationalDispatchQueueService service = new OperationalDispatchQueueService(
+            inMemoryRepository(List.of(stale, fresh)),
+            new StaticObjectProvider<>(new RecordingDashboardService()),
+            new StaticObjectProvider<>(realtimeService),
+            new RequestTraceContext(),
+            noOpMetricsService(),
+            null,
+            new ScheduledTaskExecutionDiagnostics(null)
+        );
+        ReflectionTestUtils.setField(service, "processingLeaseMs", 300_000L);
+
+        assertThat(service.processPendingWork()).isEqualTo(1);
+        assertThat(stale.getStatus()).isEqualTo(OperationalDispatchStatus.COMPLETED);
+        assertThat(stale.getAttemptCount()).isEqualTo(2);
+        assertThat(fresh.getStatus()).isEqualTo(OperationalDispatchStatus.PROCESSING);
+        assertThat(fresh.getAttemptCount()).isEqualTo(1);
+        assertThat(realtimeService.operationalBroadcasts).isEqualTo(1);
+    }
+
+    @Test
+    void failedWorkIsNotSilentlyReplayed() {
+        OperationalDispatchWorkItem failed = workItem(
+            1L, "PILOT-TENANT", OperationalUpdateType.ORDER_FLOW, "order-api", "failed-request"
+        );
+        failed.setStatus(OperationalDispatchStatus.FAILED);
+        failed.setUpdatedAt(Instant.now().minusSeconds(600));
+        RecordingRealtimeService realtimeService = new RecordingRealtimeService();
+        OperationalDispatchQueueService service = new OperationalDispatchQueueService(
+            inMemoryRepository(List.of(failed)),
+            new StaticObjectProvider<>(new RecordingDashboardService()),
+            new StaticObjectProvider<>(realtimeService),
+            new RequestTraceContext(),
+            noOpMetricsService(),
+            null,
+            new ScheduledTaskExecutionDiagnostics(null)
+        );
+
+        assertThat(service.processPendingWork()).isZero();
+        assertThat(failed.getStatus()).isEqualTo(OperationalDispatchStatus.FAILED);
+        assertThat(realtimeService.operationalBroadcasts).isZero();
+    }
+
     private OperationalDispatchWorkItemRepository inMemoryRepository(List<OperationalDispatchWorkItem> workItems) {
         return repositoryProxy(OperationalDispatchWorkItemRepository.class, (method, args) -> {
             return switch (method.getName()) {
-                case "findByStatusInOrderByCreatedAtAsc" -> workItems.stream()
-                    .filter(workItem -> workItem.getStatus() == OperationalDispatchStatus.PENDING)
+                case "findReadyForDispatch" -> workItems.stream()
+                    .filter(workItem -> workItem.getStatus() == OperationalDispatchStatus.PENDING
+                        || (workItem.getStatus() == OperationalDispatchStatus.PROCESSING
+                            && !workItem.getUpdatedAt().isAfter((Instant) args[2])))
                     .toList();
-                case "save" -> args[0];
+                case "claimForDispatch" -> {
+                    OperationalDispatchWorkItem item = workItems.stream()
+                        .filter(workItem -> workItem.getId().equals(args[0]))
+                        .findFirst().orElseThrow();
+                    Instant expiredBefore = (Instant) args[4];
+                    if (item.getAttemptCount() != (int) args[1]
+                        || (item.getStatus() != OperationalDispatchStatus.PENDING
+                            && (item.getStatus() != OperationalDispatchStatus.PROCESSING
+                                || item.getUpdatedAt().isAfter(expiredBefore)))) {
+                        yield 0;
+                    }
+                    yield 1;
+                }
+                case "completeDispatch", "failDispatch" -> {
+                    OperationalDispatchWorkItem item = workItems.stream()
+                        .filter(workItem -> workItem.getId().equals(args[0]))
+                        .findFirst().orElseThrow();
+                    if (item.getStatus() != OperationalDispatchStatus.PROCESSING
+                        || item.getAttemptCount() != (int) args[1]) {
+                        yield 0;
+                    }
+                    item.setStatus(method.getName().equals("completeDispatch")
+                        ? OperationalDispatchStatus.COMPLETED : OperationalDispatchStatus.FAILED);
+                    yield 1;
+                }
                 case "countByStatusIn", "countByTenantCodeIgnoreCaseAndStatusIn" -> 0L;
                 case "findTopByStatusInOrderByCreatedAtAsc",
                      "findTopByTenantCodeIgnoreCaseAndStatusInOrderByCreatedAtAsc",

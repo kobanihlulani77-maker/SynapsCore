@@ -21,7 +21,6 @@ import lombok.extern.slf4j.Slf4j;
 import org.slf4j.MDC;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.beans.factory.ObjectProvider;
-import org.springframework.orm.ObjectOptimisticLockingFailureException;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
@@ -48,6 +47,9 @@ public class OperationalDispatchQueueService {
 
     @Value("${synapsecore.queue.batch-size:16}")
     private int batchSize;
+
+    @Value("${synapsecore.queue.processing-lease-ms:300000}")
+    private long processingLeaseMs;
 
     public void enqueue(OperationalStateChangedEvent event) {
         OperationalDispatchWorkItem workItem = OperationalDispatchWorkItem.builder()
@@ -78,10 +80,12 @@ public class OperationalDispatchQueueService {
             return 0;
         }
 
-        int processedCount = 0;
         try {
-            List<OperationalDispatchWorkItem> pendingItems = operationalDispatchWorkItemRepository.findByStatusInOrderByCreatedAtAsc(
-                List.of(OperationalDispatchStatus.PENDING),
+            Instant expiredBefore = Instant.now().minusMillis(Math.max(processingLeaseMs, 60_000));
+            List<OperationalDispatchWorkItem> pendingItems = operationalDispatchWorkItemRepository.findReadyForDispatch(
+                OperationalDispatchStatus.PENDING,
+                OperationalDispatchStatus.PROCESSING,
+                expiredBefore,
                 PageRequest.of(0, Math.max(batchSize, 1))
             );
             if (pendingItems.isEmpty()) {
@@ -196,12 +200,18 @@ public class OperationalDispatchQueueService {
     private List<OperationalDispatchWorkItem> claimDispatchBatch(List<OperationalDispatchWorkItem> workItems) {
         List<OperationalDispatchWorkItem> claimedItems = new ArrayList<>();
         for (OperationalDispatchWorkItem workItem : workItems) {
-            workItem.setStatus(OperationalDispatchStatus.PROCESSING);
-            workItem.setAttemptCount(workItem.getAttemptCount() + 1);
-            try {
-                operationalDispatchWorkItemRepository.save(workItem);
+            Instant claimedAt = Instant.now();
+            int claimed = operationalDispatchWorkItemRepository.claimForDispatch(
+                workItem.getId(), workItem.getAttemptCount(),
+                OperationalDispatchStatus.PENDING, OperationalDispatchStatus.PROCESSING,
+                claimedAt.minusMillis(Math.max(processingLeaseMs, 60_000)), claimedAt
+            );
+            if (claimed == 1) {
+                workItem.setStatus(OperationalDispatchStatus.PROCESSING);
+                workItem.setAttemptCount(workItem.getAttemptCount() + 1);
+                workItem.setUpdatedAt(claimedAt);
                 claimedItems.add(workItem);
-            } catch (ObjectOptimisticLockingFailureException lockingFailureException) {
+            } else {
                 log.debug("Operational dispatch work item {} was already claimed by another worker before processing started.",
                     workItem.getId());
             }
@@ -212,13 +222,14 @@ public class OperationalDispatchQueueService {
     private void markDispatchBatchCompleted(List<OperationalDispatchWorkItem> workItems) {
         Instant processedAt = Instant.now();
         for (OperationalDispatchWorkItem workItem : workItems) {
-            workItem.setStatus(OperationalDispatchStatus.COMPLETED);
-            workItem.setProcessedAt(processedAt);
-            workItem.setLastError(null);
-            try {
-                operationalDispatchWorkItemRepository.save(workItem);
+            int completed = operationalDispatchWorkItemRepository.completeDispatch(
+                workItem.getId(), workItem.getAttemptCount(),
+                OperationalDispatchStatus.PROCESSING, OperationalDispatchStatus.COMPLETED,
+                processedAt
+            );
+            if (completed == 1) {
                 operationalMetricsService.recordDispatchProcessed(workItem.getTenantCode(), workItem.getUpdateType());
-            } catch (ObjectOptimisticLockingFailureException lockingFailureException) {
+            } else {
                 log.debug("Operational dispatch work item {} was already completed by another worker.",
                     workItem.getId());
             }
@@ -228,12 +239,14 @@ public class OperationalDispatchQueueService {
     private void markDispatchBatchFailed(List<OperationalDispatchWorkItem> workItems, RuntimeException exception) {
         String errorMessage = limit(exception.getMessage());
         for (OperationalDispatchWorkItem workItem : workItems) {
-            workItem.setStatus(OperationalDispatchStatus.FAILED);
-            workItem.setLastError(errorMessage);
-            try {
-                operationalDispatchWorkItemRepository.save(workItem);
+            int failed = operationalDispatchWorkItemRepository.failDispatch(
+                workItem.getId(), workItem.getAttemptCount(),
+                OperationalDispatchStatus.PROCESSING, OperationalDispatchStatus.FAILED,
+                errorMessage, Instant.now()
+            );
+            if (failed == 1) {
                 operationalMetricsService.recordDispatchFailure(workItem.getTenantCode(), workItem.getUpdateType());
-            } catch (ObjectOptimisticLockingFailureException lockingFailureException) {
+            } else {
                 log.debug("Operational dispatch work item {} was already updated by another worker while recording failure.",
                     workItem.getId());
             }
