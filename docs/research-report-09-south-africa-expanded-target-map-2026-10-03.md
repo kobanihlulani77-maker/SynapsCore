@@ -327,3 +327,8 @@ It does not prove universal demand. Each company still needs customer-specific d
 6. Compare each target against the ten pilot qualification gates before proposing any pilot.
 
 **Lock rule:** target expansion must remain driven by the complete SynapseCore operating loop, not by whichever domain has the easiest public data.
+
+
+---
+
+**Continued industrial expansion:** [Research Report 10 — Industrial Expansion and Executive Entry](research-report-10-industrial-expansion-and-executive-entry-2026-10-03.md). It deepens Macsteel, identifies Famous Brands' Group Supply Chain executive route, adds Bearings International to active discovery, and maps ACTOM/AECI/Hudaco as industrial targets and benchmarks.
