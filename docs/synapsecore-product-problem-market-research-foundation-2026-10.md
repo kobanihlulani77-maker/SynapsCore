@@ -5,6 +5,18 @@
 **Pilot implementation boundary:** [company-integration-setup-runbook.md](company-integration-setup-runbook.md).  
 **Company-level evidence:** [pilot-prospect-research-2026-10-03.md](pilot-prospect-research-2026-10-03.md).
 
+## Governing distinction: end-M product, not the M1 snapshot
+
+**SynapseCore's identity is the complete operational intelligence and control system the founder has defined.** The M0-M8 engineering and adoption programme is the route to delivering, hardening, proving and introducing it; the system's meaning does not shrink to whatever the currently deployed M1 revision can do.
+
+**Our primary research baseline is the finished, connected product as specified in the canonical master roadmap:** supported company facts and trustworthy operational state; intelligence, risk/pressure, prioritisation and advice; operator visibility and control; explicit authority, review, approval and escalation; supported real operational actions/external handoff; verification of outcomes; integrations and failure/replay/recovery; real-time convergence, audit, security and tenant isolation. Understand these functions together and in ordinary operations, not as a stack of isolated feature pitches. The finished product is not merely a blueprint or a dashboard: it has a working operational lifecycle, human roles, correct state transitions, enforcement, observability, and measurable results.
+
+**Stages have distinct meanings:** M1-M5 complete reliability, repeatable proof, UI/operator experience, adversarial review and remediation; **M6 accepts the finished connected engine** against every supported pilot-in-scope interaction; **M7** establishes and re-verifies the selected company configuration/integration on the approved operating environment; **M8** observes actual company usefulness during the controlled pilot. Completing stages does not silently add unspecified adapters, execute hypothetical scenarios, or make every future industry-specific domain native; separately envisioned capabilities require an explicit engineering scope decision.
+
+**Research order:** investigate the full end-M product and the entire fragmentation/coordination/control problem first; research incumbents, adjacent alternatives and the market on equal terms; then test how a company could benefit and plan a technically credible pilot. The current M1 connector posture belongs in a delivery/readiness ledger, not in the definition of SynapseCore or a premature restriction of its market.
+
+---
+
 ## 1. Correct mandate
 
 Research must proceed in this order, iteratively:
@@ -14,9 +26,9 @@ Do not reverse-engineer a small market niche from a conveniently available conne
 
 Working ERP, WMS, supply planning, transport, BI, middleware, control tower and human processes are all possible inputs and alternatives. The research object is the **complete operating outcome** and how different systems, people, functions, authorities, decisions and actions achieve it. A good existing departmental subsystem is neither proof of fragmentation nor a reason to exclude a prospect.
 
-## 2. Full product model — documented current behavior vs intended breadth
+## 2. Full connected product — intended finished M-programme system and implementation ledger
 
-### End-to-end operational loop
+### Complete end-to-end operational loop of the specified finished product
 1. **External facts and trust:** supported inbound order webhook/CSV/scheduled pull and direct operational APIs; source identity, validation, tenant/warehouse authorization, connector telemetry and freshness.
 2. **Operational truth:** accepted order, catalog, inventory, reservation, fulfillment and relevant integration facts maintained with correct lifecycle and tenant/warehouse isolation.
 3. **Operational synthesis:** tenant/role/scope-relevant combined snapshot, status, condition, dependency and cross-domain pressure. Real-time signals are notifications, not the durable source of truth.
@@ -31,7 +43,7 @@ Working ERP, WMS, supply planning, transport, BI, middleware, control tower and 
 ### Broader problem/direction that should be investigated
 The strategic need spans *the connection* among orders, inventory, demand, fulfillment, procurement/supply, production, logistics, external partners, operator decisions, customer commitments, approvals, integration reliability, recovery, operational trust and organizational oversight as relevant to the industry. These are domains to research, **not claims that every domain is currently implemented or ingestible**. More source systems and domains may be needed for the full future proposition in some industries.
 
-### Current demonstrated scope and explicit boundaries
+### Implementation and delivery evidence — not the product definition
 - Canonical engineering map states Java/Spring Boot, PostgreSQL, Redis/realtime, operational snapshots, supported order/inventory/fulfillment operations, condition alerts, recommendations, governance, Replay, platform/workspace UI and bounded multi-tenant/role controls.
 - Company integration runbook states connector types are `WEBHOOK_ORDER` and `CSV_ORDER_IMPORT`; modes include realtime push, batch CSV and limited scheduled pull; this is **not** a general ETL connector platform or universal ERP/WMS/production/fleet/finance integration. No arbitrary mapping UI and no dedicated outbound auth for scheduled pulls. Additional approved direct operational APIs and catalog/inventory onboarding have separate contracts.
 - Recommendation is not proof of action. Hypothetical Scenario approval never creates an order, mutates inventory or performs fulfillment; its execute endpoint returns 410. Real company systems remain authoritative unless a specific supported workflow is approved.
@@ -106,7 +118,7 @@ Maintain three evidence labels: **verified public fact, research hypothesis, com
 
 ## 7. Immediate research work packages
 
-**P1 — Product X-ray:** Codex/assistant examine source and current API/contracts to produce a capability-by-capability implementation map: implemented, bounded, unproven, planned. Include data provenance, governance semantics, recovery and hardening evidence.
+**P1 — Product X-ray:** First reconstruct the complete specified end-M product and its fully connected operational loop from product intent, architecture and the canonical acceptance contract. Then inspect code, APIs and evidence to track which pieces have been implemented, which require hardening/proof, which are accepted at M6 and which are explicitly separate future expansion. Include provenance, governance, recovery, authority and operational outcomes. Never use the current delivery ledger to redefine the finished product.
 
 **P2 — Problem X-ray:** Build causal maps of fragmented truth, priority, decision, action and recovery across at least industrial distribution, integrated production/agribusiness, multi-party logistics and critical-service coordination. Distinguish structural opportunity from company-verified pain.
 
@@ -117,4 +129,4 @@ Maintain three evidence labels: **verified public fact, research hypothesis, com
 **P5 — Customer validation:** Prepare consequence-focused discovery, map decision makers, validate existing satisfactory capability and possible incremental value, and document supported minimum connected pilot data and acceptance criteria for the owner.
 
 ### Governing test
-**Does this work improve our understanding of the complete SynapseCore operational mechanism, the actual enterprise operating problem, the realistic market and the evidence a customer needs to make a decision?** If not, change the work—not the product identity.
+**Does this work improve our understanding of the full intended end-M SynapseCore operational mechanism, the enterprise-wide operating problem, the entire realistic market, and the evidence required for customer adoption?** If not, change the research approach—not SynapseCore's identity. Current code-readiness findings inform release engineering and factual promises; they do not restrict the market thesis.
