@@ -13,17 +13,17 @@ acceptance or M7 customer-specific launch authorization.
 
 | Field | Recorded state |
 | --- | --- |
-| Assessment date | 2026-09-27, Africa/Johannesburg |
-| Assessed source baseline | `a5f1982eee5f2366c082060d496352169af5b337`, `Adopt evidence-efficient timeout workflow` |
-| Repository verification | Local `main` and freshly fetched `origin/main` matched the baseline on this date. This document's later commit is a documentation successor, not a newly verified application release. |
+| Original source census | 2026-09-27, Africa/Johannesburg; baseline `a5f1982eee5f2366c082060d496352169af5b337`, `Adopt evidence-efficient timeout workflow` |
+| Control update | 2026-10-03: inspected the master gate contract and the committed dispatch-recovery evidence. This is not a fresh full-system assessment or an M1 exit decision. |
+| Repository verification | The September 27 local `main` and freshly fetched `origin/main` matched the original baseline then. Subsequent revisions are assessed only within their recorded scope; a documentation successor is not a newly verified application release. |
 | Current phase | M1: performance, concurrency, correctness, and runtime hardening - OPEN |
 | Current sub-workstream | H1/H2/H7: warm hosted latency, connection demand, and measured resource envelope; Replay convergence is a dependent H8 question |
 | Immediate objective | Explain the latest warm hosted failure using request timing, pool overlap, transaction ownership, and resource evidence; identify one justified next correction or bounded capacity experiment |
 | Next gate | M2: repeatable hosted verification; entry BLOCKED until M1's in-scope hardening gates pass |
 | Pilot authorization | NOT GRANTED by this map; current candidate is not accepted for customer operations |
-| Last reported live backend | `487b012213aed3cbecc5641a5a22ab23f2359429`, observed Live in Render deploy `dep-daug6d7f3r2c73etcb30` on September 30; this is not a pilot approval |
-| Current CI | GitHub Actions run `36716270938` succeeded for exact SHA `487b012` on September 30; CI does not include hosted browser/load proof |
-| Local test artifacts | Existing September 23 Surefire XML totals: 390 tests, 0 failures, 0 errors, 0 skips. Inspected, not rerun for this documentation task. |
+| Last verified live backend | `a172a68ecbc460729b9beafbaeba8111426e7072`, observed Live in Render deploy `dep-db0ftvojo6nc739jer90` on October 3; the observed idle dispatch scan is not a recovery or pilot proof ([boundary](evidence/operational-dispatch-claim-recovery-2026-10-03.md)) |
+| Latest scoped CI evidence | GitHub Actions run `37126166095` succeeded for exact SHA `30a6dc1` on October 3, including PostgreSQL dispatch-claim tests; CI does not include process-crash, hosted browser/load or full M1 proof |
+| Local test artifacts | September 23 Surefire aggregate: 390 tests, 0 failures/errors/skips. The dispatch production change passed a subsequent 401-test full backend run and focused tests; scope and later test edit are detailed in the [dispatch record](evidence/operational-dispatch-claim-recovery-2026-10-03.md). No suite was rerun for this control update. |
 | Worktree boundary | Unrelated frontend Dockerfile edit, `.gitattributes`, two untracked Scenario evidence files, and raw CSV captures are not part of this assessment's committed implementation. |
 
 The project already implements a substantial operational system. Its immediate
@@ -86,6 +86,39 @@ reviewer and owner decision. Credentials and customer payloads stay out of Git.
 An existing raw artifact may be inspected without rerunning work. A copied
 statement without an inspectable artifact is labeled session-reported. A passing
 run after a failing run must preserve the failure and explain what changed.
+
+### Binding M-stage closure rule
+
+M0-M8 are engineering gates, not dates or progress markers. Before work starts
+on an exit decision, record the stage's intended claim, all applicable acceptance
+criteria, approved workload and numeric budgets, environment, failure cases,
+and required evidence. Inspect the implementation and dependencies that exist
+at the candidate revision; older documentation or an earlier pass cannot stand
+in for that inspection. Include negative, concurrency, authority, isolation,
+degraded and recovery paths wherever the stage's claim depends on them.
+
+Close a stage only when **every** in-scope criterion has inspectable,
+revision-bound proof at the environment required by that criterion, the
+predeclared repeatability standard is met, failures and intermittent outcomes
+are explained and re-proven after any material fix, and the stage's explicit
+pass gate and exit artifact are accepted. Local, CI, hosted and pilot-environment
+results remain distinct. One successful run is not repeatability; local proof
+cannot satisfy a hosted or company-environment criterion. Missing evidence,
+unexplained failure, a TBD budget, or a serious unknown leaves the stage OPEN
+or BLOCKED even when much of the implementation works. A bounded limitation
+may be accepted only with demonstrated scope, consequence, mitigation and owner;
+it cannot waive an in-scope Critical/High defect or unsafe authority/data state.
+
+The sequence is **diagnose -> root cause -> smallest justified fix -> affected
+regression and broader impact proof -> evidence -> gate decision -> next stage**.
+Do not hide failure behind retries, relaxed thresholds, disabled work or an
+unattributed infrastructure change. Preparation for a later stage may occur,
+but it earns no exit credit and does not authorize entering that stage. A
+material code, schema, configuration, infrastructure, fixture, workload or
+customer-mapping change invalidates the affected proof; record the impact and
+rerun it. New contradictory evidence reopens a previously closed gate and
+blocks downstream decisions that depended on it until re-proven. Keep the
+original failure and the reason for reopening in the evidence ledger.
 
 ### Infrastructure and evidence policy
 
@@ -268,12 +301,12 @@ Broader documentation reconciliation belongs to M3/M6, with history preserved.
 | M0 - Baseline and control map | Source/evidence inspection complete for this document; live state explicitly date-bound | M1 focused work using the objective below |
 | M1 - Runtime and operational hardening | OPEN, current | M2 repeatability on a candidate with cleared in-scope hardening risks |
 | M2 - Repeatable hosted verification | BLOCKED by M1 | M3 operator experience engineering |
-| M3 - Operator experience engineering | Planned; page inventory below is preparation only | M4 adversarial review of the finished candidate |
+| M3 - Operator experience engineering | BLOCKED by M2; page inventory below is preparation only | M4 adversarial review of the finished candidate |
 | M4 - Full adversarial verification | BLOCKED by M2/M3 | M5 remediation with ranked, reproducible findings |
-| M5 - Remediation and independent re-verification | Planned | M6 technical pilot-readiness decision |
+| M5 - Remediation and independent re-verification | BLOCKED by M4 | M6 technical pilot-readiness decision |
 | M6 - Final connected-engine acceptance and technical pilot-readiness gate | BLOCKED; mandatory post-remediation whole-system proof not yet run | M7 customer integration and pilot packaging only after integrated acceptance and owner sign-off |
-| M7 - Company packaging and launch gate | Planned; existing runbooks reused | M8 controlled real-company pilot, only after owner/customer sign-off |
-| M8 - Controlled pilot and measured value | Not started | Separate decision on production reliance or expansion |
+| M7 - Company packaging and launch gate | BLOCKED by M6; existing runbooks are preparation only | M8 controlled real-company pilot, only after frozen-candidate proof in the actual pilot environment and owner/customer sign-off |
+| M8 - Controlled pilot and measured value | BLOCKED by M7 | Separate decision on production reliance or expansion |
 
 Phase IDs here are M0-M8. They do not renumber historical domain phases or the
 timeout map's phases 0-11. Legacy Consistency Phase 5.1 remains open until its
@@ -715,6 +748,16 @@ rerun applicable M6 connected-engine journeys using the real approved
 customer source mappings, operators, tenant/warehouse scope, workload,
 UI/realtime traffic, security, recovery and capacity criteria. Generic M6
 proof does not substitute for this customer-specific launch proof.
+
+Record the exact frozen frontend/backend revisions, migrations, configuration,
+infrastructure, source mappings and data baseline actually serving that pilot
+environment. Prove its end-to-end outcomes, operator readback, resource budgets
+and recovery there, not merely on a similar staging tenant. A deployment or
+customer-mapping change after the proof reopens the affected M7 checks; an
+M7 discovery that contradicts M6 also reopens the affected M6 claim. No real
+company reliance begins until the actual-environment record passes and the
+owner and company authorize it.
+
 **Stop condition:** unsupported source format/action, ambiguous ledger ownership,
 missing reviewer coverage, no backup/support owner or expanding load without proof.
 **Exit criteria:** owner and company approve the launch checklist and observation
