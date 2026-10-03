@@ -40,9 +40,8 @@ production code passed 70 suites and 401 tests with zero failures, errors,
 or skips. The last subsequent edit only strengthened the stale-versus-fresh
 test; its focused rerun passed. Production packaging also exited zero.
 
-This is H2 in-memory database test evidence, **not** a real PostgreSQL race or
-hosted restart proof. Docker Desktop's daemon was unavailable locally on
-October 3, so no isolated PostgreSQL container was used. [Exact-SHA CI for
+The local run used H2, not PostgreSQL. Docker Desktop's daemon was unavailable
+locally on October 3, so no local PostgreSQL container was used. [Exact-SHA CI for
 `a172a68`](https://github.com/kobanihlulani77-maker/SynapsCore/actions/runs/37125342253)
 completed successfully. Render subsequently showed
 `a172a68ecbc460729b9beafbaeba8111426e7072` as the last successfully
@@ -52,7 +51,16 @@ post-deploy `operational-dispatch` scans completed in 3-98 ms with
 idle scheduler control, not a recovery exercise or a sustained headroom
 measurement.
 
-Crash timing, PostgreSQL concurrent claims, backlog recovery time,
+The follow-up [CI run for `30a6dc1`](https://github.com/kobanihlulani77-maker/SynapsCore/actions/runs/37126166095)
+completed both `verify` and `dispatch-postgres` successfully. The focused job
+used a disposable PostgreSQL 17.11 service, applied Flyway migrations V1-V14,
+and passed both repository integration tests with zero failures or errors.
+This proves the conditional claim, stale reclaim, and old-attempt rejection
+on PostgreSQL, including two simultaneous claim callers with one winner.
+Those callers were threads in one test process, not separate application
+instances.
+
+Controlled process-stop timing, multi-instance drain behavior, backlog recovery time,
 pool headroom under actual dispatch work, and duplicate-signal effects remain
 to verify. H4 and M1 stay open. The next production-shaped proof should run
 on isolated PostgreSQL data or a safe disposable tenant, compare queue
