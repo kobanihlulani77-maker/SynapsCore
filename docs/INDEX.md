@@ -125,6 +125,7 @@ This index links the main product, architecture, runbook, proof, and operator do
 
 ## Security / Trust
 
+- [M4 Security Command Plan and Adversarial Acceptance](m4-security-command-plan.md) — complete security ownership, attack campaign, evidence and M4–M7 release gates; planned, not yet executed
 - [platform-control-plane-access-boundary.md](platform-control-plane-access-boundary.md)
 - [role-authority-hardening-gate.md](role-authority-hardening-gate.md)
 - [templates/platform-tenant-access-boundary-record.md](templates/platform-tenant-access-boundary-record.md)
