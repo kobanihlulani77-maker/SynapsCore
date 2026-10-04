@@ -15,6 +15,7 @@ acceptance or M7 customer-specific launch authorization.
 | --- | --- |
 | Original source census | 2026-09-27, Africa/Johannesburg; baseline `a5f1982eee5f2366c082060d496352169af5b337`, `Adopt evidence-efficient timeout workflow` |
 | Control update | 2026-10-03: bounded dispatch recovery/failure accounting; naturally slow hosted reads exposed an H1/H2 attribution gap. Request coalescing and platform section timing diagnostics are in `main`, with exact-SHA CI green; the latest diagnostic revision has no confirmed hosted result ([warm-read evidence](evidence/warm-read-coalescing-and-platform-overview-2026-10-03.md)). None is an M1 exit decision. |
+| Security plan update | 2026-10-04: M4 now has a full [SEC-01–SEC-25 security command plan](m4-security-command-plan.md) and explicit M5–M7 handoffs. Documentation only: M1 remains OPEN, M4 has not been executed, and no pilot authorization is implied. |
 | Repository verification | The September 27 local `main` and freshly fetched `origin/main` matched the original baseline then. Subsequent revisions are assessed only within their recorded scope; a documentation successor is not a newly verified application release. |
 | Current phase | M1: performance, concurrency, correctness, and runtime hardening - OPEN |
 | Current sub-workstream | H1/H2/H7: warm hosted latency, connection demand, and measured resource envelope; Replay convergence is a dependent H8 question |
@@ -302,7 +303,7 @@ Broader documentation reconciliation belongs to M3/M6, with history preserved.
 | M1 - Runtime and operational hardening | OPEN, current | M2 repeatability on a candidate with cleared in-scope hardening risks |
 | M2 - Repeatable hosted verification | BLOCKED by M1 | M3 operator experience engineering |
 | M3 - Operator experience engineering | BLOCKED by M2; page inventory below is preparation only | M4 adversarial review of the finished candidate |
-| M4 - Full adversarial verification | BLOCKED by M2/M3 | M5 remediation with ranked, reproducible findings |
+| M4 - Security and full adversarial verification | BLOCKED by M2/M3; [security command plan](m4-security-command-plan.md) is preparation only | M5 remediation with ranked, reproducible findings |
 | M5 - Remediation and independent re-verification | BLOCKED by M4 | M6 technical pilot-readiness decision |
 | M6 - Final connected-engine acceptance and technical pilot-readiness gate | BLOCKED; mandatory post-remediation whole-system proof not yet run | M7 customer integration and pilot packaging only after integrated acceptance and owner sign-off |
 | M7 - Company packaging and launch gate | BLOCKED by M6; existing runbooks are preparation only | M8 controlled real-company pilot, only after frozen-candidate proof in the actual pilot environment and owner/customer sign-off |
@@ -568,7 +569,9 @@ close to the action. Validate keyboard navigation, focus return, labels, contras
 reduced motion and live announcements. Test 1366x768, normal laptops, large
 desktops and narrow windows; mobile readiness is not claimed without its own scope.
 
-## 9. M4 - Adversarial examination of the finished candidate
+## 9. M4 - Security and full adversarial verification of the finished candidate
+
+**Formal security command:** [M4 Security Command Plan and Adversarial Acceptance](m4-security-command-plan.md) defines the full SEC-01–SEC-25 control and threat register, critical assets and trust boundaries, owner/security lead/reviewer authority, authorized test scope and containment, role/tenant/warehouse/API coverage, security-specific acceptance oracles, secrets, privacy, supply chain, incident readiness and evidence deliverables. This M4 program is a **plan, not performed verification**. M1 remains the active gate; security defects discovered in earlier work must not be postponed to M4. M4 entry still requires M2/M3 proof on the finished candidate. M4 examination hands findings to M5; pilot security acceptance requires independent M5 closure, M6 integrated proof and M7 customer-environment authorization.
 
 **Purpose:** Find reasons the system must not enter a company. **Current
 evidence:** existing lifecycle/Layer 2/security/load suites are inputs, not this
@@ -608,6 +611,8 @@ ledger. **Next:** M5, including when no code defect is found.
 | Test strategy | Challenge assertions, skipped/serial-aborted cases, unstable concurrency barriers, synthetic fixture bias, H2/prod differences, missing browser state coverage and absent durable artifacts |
 | Documentation | Reconcile readiness claims, roles, source authority, Scenario wording, actual hosting, recovery/known limitations and company SOP against candidate behavior |
 
+The security lead must maintain a route/role and tenant/warehouse/object matrix plus an evidence ledger mapped to every applicable SEC control. For each denied action verify **zero** unauthorized data, business mutation, event, cache effect or approval transition; test role/session revocation, platform separation, hostile integration inputs, STOMP subscriptions and full connected-engine side effects. Predeclare numeric workload, revocation and recovery budgets and the independent reviewer before assault. M4 closes only after all pilot-in-scope tests have inspectable results and all unknown critical paths are resolved as findings or verified exclusions; a completed assessment may contain defects, which M5 must close. See the linked security command plan for detailed severity, stop rules and sign-offs.
+
 High-load and destructive fault/restore work targets an isolated production-shaped
 environment with explicit resource limits and stop thresholds. A hosted E2E
 authorization is not authorization to overload or erase the shared hosted DB.
@@ -616,6 +621,8 @@ fulfillment, replay outcomes, intelligence identities, governance, audit/event
 counts, dispatch state and browser readback per tenant/warehouse.
 
 ## 10. M5 - Remediation and re-verification
+
+**Security handoff:** Resolve and independently re-verify all findings in the [M4 security command plan](m4-security-command-plan.md), including any pilot-blocking Medium finding. A signed M4 assessment does not authorize a pilot, and security approval requires subsequent M6 whole-engine and M7 company-environment evidence.
 
 **Purpose:** Resolve findings, not merely publish an audit. **Current evidence:**
 prior focused correction history provides the working pattern. **Open risks:**
