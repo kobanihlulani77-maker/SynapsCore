@@ -200,3 +200,6 @@ No outreach email is evidence of qualification or customer interest.
 3. Research Shoprite/Checkers and another large South African operator under the corrected whole-picture rule without assuming its enterprise stack makes it unsuitable.
 4. Build a discovery comparison specifically for prospects that already have control-tower capability: what they control, what data/domains they combine, authority model, actions, outcome verification and recovery.
 5. Keep engineering truth strict: the company pilot still requires the supported connected engine, M6 acceptance and M7 company-specific verification.
+---
+
+**Large-scale strategic continuation:** [Research Report 16 — Large-Scale Whole-Picture Test: Shoprite Group](research-report-16-shoprite-whole-picture-strategic-test-2026-10-07.md) applies the corrected targeting rule to a highly sophisticated South African operator and moves Shoprite into active discovery through the Chief Supply Chain Officer route.
