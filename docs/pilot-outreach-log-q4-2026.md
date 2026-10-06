@@ -149,3 +149,11 @@ Matus, Masterparts, Bidfood Pretoria, Macsteel, Famous Brands, Bearings Internat
 - Framing: whole-picture SynapseCore control model across a selected operating scope; not an ERP/MRP/inventory/logistics replacement and not a single order feed.
 - Discovery question: whether authoritative connected operational data across the relevant domains can support the full SynapseCore control loop for a meaningful Multi Green scope.
 - Senior escalation/participation: Jannie Willemse, Managing Director, if appropriate.
+
+### Shoprite Group — sent 2026-10-07
+- Route: companysecretary@shoprite.co.za (published corporate secretary route)
+- Requested recipient: Andrew Havinga, Chief Supply Chain Officer, or appropriate senior cross-functional operational-control owner
+- Subject: For Andrew Havinga — South African operational intelligence and control research
+- Status: SENT / awaiting reply or internal routing
+- Framing: whole-picture SynapseCore control system over an agreed company slice; acknowledges Shoprite's mature centralised supply chain, inventory systems, predictive analytics and digital operations; does not assume a gap.
+- Why targeted: a hard strategic test of whether SynapseCore adds incremental cross-domain control value above a highly sophisticated existing enterprise stack.
