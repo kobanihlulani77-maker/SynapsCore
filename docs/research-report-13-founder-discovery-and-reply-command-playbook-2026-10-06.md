@@ -375,3 +375,38 @@ Every conversation must move the evidence state forward:
 **public hypothesis -> company-confirmed operating truth -> quantified/observable control gap (if one exists) -> source/authority feasibility -> bounded pilot thesis -> engineering/commercial gate decision**
 
 If the conversation does not improve evidence, we are merely selling noise.
+
+---
+
+## 18. Control-tower-capable prospect discovery
+
+Use this when a prospect already has, is building, or buys a control-tower/command-centre capability.
+
+Do **not** respond by claiming SynapseCore is broader or better before evidence.
+
+First establish:
+1. What is the current control tower's exact scope: transport/logistics, supply chain, or wider operations?
+2. Which operational domains and source systems are represented?
+3. Which facts are authoritative and how fresh are they?
+4. How are cross-domain consequences and competing priorities calculated?
+5. Does the platform only surface exceptions, or also recommend/optimise/assign decisions?
+6. Who owns decision authority and escalation?
+7. Which actions are directly managed from the control tower versus handed back to source systems/teams?
+8. How is the real outcome reconciled back into the control picture?
+9. What happens when a source feed, integration, dependency or the control-tower platform itself fails?
+10. Can operators reconstruct who knew what, decided what, and what actually happened?
+11. What people/service/technology cost is required to operate the current control model?
+12. Which important operating decisions still happen outside the current control picture, if any?
+
+### Required conclusion
+
+Classify the account as one of:
+- **Already closes the whole loop sufficiently** — no current SynapseCore case;
+- **Complementary gap** — SynapseCore may sit above/between existing controls for a specific whole-picture scope;
+- **Direct competitive alternative** — customer could choose SynapseCore or extend/buy another control-tower solution;
+- **Future product gap** — customer need is real but requires unsupported SynapseCore domains/integrations;
+- **Insufficient evidence** — continue discovery.
+
+Never call an existing control tower a dashboard unless the company itself demonstrates that it is one.
+
+See [Research Report 17 — Control-Tower Comparison and Discovery Test](research-report-17-control-tower-comparison-and-discovery-test-2026-10-07.md).
