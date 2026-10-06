@@ -245,3 +245,8 @@ This is valuable because the repeated hypothesis is not an industry label. It is
 5. Continue searching for non-retail industrial/service environments.
 6. Prepare discovery-response playbooks for positive replies, referrals, requests for information and "we already have this" objections.
 7. Keep commercial discovery separate from engineering authorization: M1 remains open and no pilot launch is authorized.
+
+
+---
+
+**Operational follow-through:** [Research Report 13 — Founder Discovery and Reply Command Playbook](research-report-13-founder-discovery-and-reply-command-playbook-2026-10-06.md). This defines how replies, referrals, demo requests, existing-system objections, integration/security questions, pricing questions and discovery meetings are handled without narrowing SynapseCore or bypassing qualification gates.
