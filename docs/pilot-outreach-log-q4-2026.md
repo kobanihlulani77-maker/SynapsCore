@@ -134,3 +134,18 @@ Matus, Masterparts, Bidfood Pretoria, Macsteel, Famous Brands, Bearings Internat
 - Bounded scope limits company footprint, workload and unnecessary records/fields; it does not reduce the pilot to one domain.
 - The pilot must exercise the applicable connected engine across operational truth, intelligence, recommendations, governance/operator control, outcome/readback, audit/realtime and recovery.
 - Same-thread clarification sent to BMG and Goldwagen because their initial 2026-10-07 messages used wording that could be read too narrowly.
+
+### Food Lover's Market — sent 2026-10-07
+- Route/recipient: edeyzel@fvc.co.za — Edwin Deyzel, National Logistics Manager (public business address used in Food Lover's Market control-tower recruitment)
+- Subject: South African operational intelligence and control research — Food Lover’s Market
+- Status: SENT / awaiting reply
+- Framing: whole-picture SynapseCore control model; explicitly acknowledges Food Lover's existing control-tower work and does not assume a gap or pitch another logistics dashboard.
+- Discovery question: how far the existing control-tower view reaches across the wider operation, what remains outside it, and whether broader cross-domain SynapseCore control adds value.
+
+### Multi Green — sent 2026-10-07
+- Route/recipient: jaco@multigreen.co.za — Jaco van den Berg, Operations Manager (public Fertasa business contact; VKB identifies him as Operations Manager)
+- Subject: South African operational intelligence and control research — Multi Green
+- Status: SENT / awaiting reply
+- Framing: whole-picture SynapseCore control model across a selected operating scope; not an ERP/MRP/inventory/logistics replacement and not a single order feed.
+- Discovery question: whether authoritative connected operational data across the relevant domains can support the full SynapseCore control loop for a meaningful Multi Green scope.
+- Senior escalation/participation: Jannie Willemse, Managing Director, if appropriate.
