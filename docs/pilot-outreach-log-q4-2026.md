@@ -63,3 +63,31 @@ A reply watch is active for the first-wave outreach. Meaningful replies should b
 - Subject: South African operational intelligence and control research — Bearings International
 - Status: Sent / awaiting reply
 - Framing: full product-first SynapseCore positioning; branch + engineering + field service + supplier/customer uptime context; explicitly not ERP/inventory/ordering replacement.
+
+
+## 2026-10-06 — Outreach restart and expansion
+
+### Pipeline status check
+- Gmail was checked for Matus, Masterparts, Bidfood Pretoria, Macsteel, Famous Brands and Bearings International.
+- No meaningful inbound replies were found as of the restart check.
+- No company is treated as interested, qualified or pilot-ready merely because outreach was sent.
+
+### Plumblink — sent 2026-10-06
+- Route: info@plumblink.co.za (official business contact)
+- Requested recipient: Nicci Henderson, Operations Director, or the appropriate senior cross-functional operational-performance owner
+- Subject: South African operational intelligence and control research — Plumblink
+- Status: SENT / awaiting reply or internal routing
+- Framing: complete SynapseCore product first; acknowledges Plumblink's mature technology and operating environment; explicitly not an ERP/WMS/inventory replacement.
+- Why targeted: national branch footprint, regional warehousing, broad supplier base, digital customer channels and known history of deliberate best-of-breed operational technology adoption.
+
+### ACTOM Electrical Machines — sent 2026-10-06
+- Route: antonio.teixeira@actom.co.za (official ACTOM Electrical Machines business contact)
+- Recipient: Antonio Teixeira, General Manager
+- Subject: South African operational intelligence and control research — ACTOM Electrical Machines
+- Status: SENT / awaiting reply
+- Framing: complete SynapseCore product first; manufacturing/supply + spares + regional distribution + installation/commissioning + after-sales/service context; explicitly not ERP/manufacturing/WMS/service-system replacement.
+- Why targeted: bounded ACTOM unit with connected manufacturing, supply, branch, service and customer-outcome responsibilities.
+
+### Monitoring update
+The active reply watch now covers eight accounts:
+Matus, Masterparts, Bidfood Pretoria, Macsteel, Famous Brands, Bearings International, Plumblink and ACTOM Electrical Machines.
