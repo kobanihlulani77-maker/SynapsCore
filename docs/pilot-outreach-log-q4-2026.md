@@ -109,3 +109,21 @@ Matus, Masterparts, Bidfood Pretoria, Macsteel, Famous Brands, Bearings Internat
 - Status: SENT / awaiting reply
 - Framing: complete product-first SynapseCore positioning; national branches + central purchasing/distribution + specialist industrial divisions + projects/contracts; explicitly not ERP/inventory/WMS/branch-ordering replacement.
 - Why targeted: a different industrial distribution operating model that can test whether the cross-domain control problem repeats beyond Macsteel/Bearings.
+
+## 2026-10-07 — Sidecar-model requalification
+
+### BMG — sent 2026-10-07
+- Route: customercare@bmgworld.net (official BMG contact)
+- Requested recipient: Robin Briggs, Managing Director, or appropriate senior operations/supply-chain owner
+- Subject: South African operational intelligence and control research — BMG
+- Status: SENT / awaiting reply or internal routing
+- Framing: explicitly sidecar/advisory pilot; BMG's existing WMS/ERP remains authoritative; SynapseCore needs only a bounded approved operational data set.
+- Requalification reason: active WMS modernisation is **not** a disqualifier. The decision now depends on minimum data sufficiency, operator usefulness and bounded control scope.
+
+### Goldwagen — sent 2026-10-07
+- Route: info@goldwagen.com (official Goldwagen contact)
+- Requested recipient: senior central-distribution / supply-chain / network-operations / operational-performance owner
+- Subject: South African operational intelligence and control research — Goldwagen
+- Status: SENT / awaiting reply
+- Framing: explicitly sidecar/advisory pilot; no need to replace or access every ERP/warehouse/franchise/transport system.
+- Requalification reason: warehouse automation and strong IT are **not** disqualifiers. Goldwagen's central DC + franchise network + own distribution capability create a strong bounded control environment if minimum data can be provided.
