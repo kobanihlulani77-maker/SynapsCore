@@ -263,3 +263,7 @@ That strengthens the market thesis but raises the bar:
 > SynapseCore must demonstrate that its complete connected control loop produces a better operational/economic result for the selected scope than the customer's existing control model or the alternatives they could buy.
 
 That is the standard for discovery, pilot qualification and eventual pricing.
+
+---
+
+**Federated-retail extension:** [Research Report 18 — SPAR Southern Africa Whole-Picture Strategic Test](research-report-18-spar-whole-picture-strategic-test-2026-10-07.md) applies the control model to a six-DC, 2,000+ independent-retailer network undergoing active ERP/WMS/logistics transformation.
