@@ -122,14 +122,14 @@ Before sending any first-contact message, confirm:
 
 If #4 is yes or any other answer is no, do not send.
 
-## 9. Sidecar pilot clarification
+## 9. Whole-picture pilot clarification
 
-When a prospect has a mature ERP/WMS/TMS/automation environment, do **not** frame that maturity as a reason SynapseCore may not fit.
+Do not describe SynapseCore as a small sidecar, analytics layer, dashboard or single-domain helper merely because the pilot limits data volume.
 
-Where useful, clarify:
+Use this distinction:
 
-> SynapseCore works alongside your existing systems. A controlled pilot does not require access to every platform or replacement of the systems that run the business. We connect only the approved operational facts needed for a bounded scope; SynapseCore builds the operational control picture and advisory intelligence while your people and source systems retain authority.
+> SynapseCore sits above the operational systems you already use and builds one connected control picture for the agreed operating scope. We do not need to replicate your entire technology estate or ingest all company data. We connect only the authoritative records and fields needed across the relevant operational domains, and SynapseCore uses that combined state to understand what is happening, identify pressure and priorities, produce recommendations, support governed decisions, and keep outcomes and recovery visible.
 
-System names should appear only to reassure the prospect that SynapseCore is not a replacement and to establish source authority/data feasibility.
+Existing ERP/WMS/TMS/automation remains authoritative for the functions it owns. The limitation is on **unnecessary data volume and company footprint**, not on SynapseCore's whole-picture control role.
 
-Do not turn first-contact email into an integration-architecture discussion.
+Pre-send check: if the email could make the prospect think we are proposing order analytics, inventory analytics, fulfillment monitoring, a dashboard, or a small bolt-on tool, rewrite it.
