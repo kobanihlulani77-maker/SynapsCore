@@ -150,3 +150,6 @@ It must prove:
 for the agreed company slice and supported domains.
 
 That is how we reduce data burden without reducing SynapseCore.
+---
+
+**Applied target expansion:** [Research Report 15 — Whole-Picture Expansion: Food Lover's Market and Multi Green](research-report-15-whole-picture-food-lovers-multi-green-2026-10-07.md) applies this corrected rule to a company already developing control-tower capability and to a production/distribution operation with explicit cross-domain coordination responsibilities.
