@@ -17,15 +17,19 @@
 
 ---
 
-## Pilot-sidecar qualification rule — 2026-10-07
+## Whole-picture pilot data-scope rule — 2026-10-07
 
-For near-term pilot selection, **do not disqualify a company because it already has SAP, ERP, WMS, TMS, automation, a control tower, strong internal IT, or large scale**. SynapseCore's current pilot posture is a bounded sidecar control deployment: source systems remain authoritative; SynapseCore receives only the minimum approved operational facts needed for the selected scope, maintains its own operational state, evaluates conditions/pressure/priorities, and produces advisory recommendations for authorized human operators.
+For near-term pilot selection, **do not disqualify a company because it already has SAP, ERP, WMS, TMS, automation, a control tower, strong internal IT, or large scale**. Those systems can remain authoritative sources.
 
-Company-system research is used to establish **source authority, minimum data availability, freshness, mapping/security constraints and observable outcome paths**. It is not a proxy for whether SynapseCore has value. A sophisticated incumbent stack may be complementary, substitutive, or already sufficient; only discovery can establish that.
+The pilot rule is **whole-picture control system, selective data footprint**. SynapseCore does not need every company system, every historical record or full database replication. However, the selected data contract must be sufficient to exercise the connected SynapseCore operating picture across the relevant supported domains — not merely prove one connector, one order, one inventory feed or one dashboard metric.
 
-The near-term technical question is therefore: **Can a meaningful bounded operating scope be represented using current supported order ingestion plus the applicable approved catalog/inventory/fulfillment onboarding/API contracts, without requiring SynapseCore to replace or integrate the customer's entire stack?**
+`Bounded` describes the selected company footprint/workload (for example a region, DC plus connected sites, agreed operating volume, and only required records/fields). It does **not** shrink SynapseCore's role. Within that footprint, the objective remains connected operational truth, intelligence/pressure, prioritisation/recommendations, operator control, governance/authority, outcome observation, audit/realtime convergence and recovery.
 
-See [Research Report 14 — Sidecar Advisory Pilot Model and Prospect Requalification](research-report-14-sidecar-advisory-pilot-and-prospect-requalification-2026-10-07.md).
+Company-system research therefore establishes source authority, data availability, freshness, mapping/security constraints and outcome readback. Existing technology maturity is not a proxy for whether SynapseCore has value.
+
+The technical question is: **Can the authoritative data required across the relevant supported domains for a meaningful company slice reach SynapseCore through approved contracts, so the full connected control loop can be demonstrated without replicating the customer's whole technology estate?**
+
+See [Research Report 14 — Whole-Picture Control Pilot and Prospect Requalification](research-report-14-sidecar-advisory-pilot-and-prospect-requalification-2026-10-07.md).
 
 ## 1. Correct mandate
 
