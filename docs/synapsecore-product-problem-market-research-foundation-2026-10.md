@@ -17,6 +17,16 @@
 
 ---
 
+## Pilot-sidecar qualification rule — 2026-10-07
+
+For near-term pilot selection, **do not disqualify a company because it already has SAP, ERP, WMS, TMS, automation, a control tower, strong internal IT, or large scale**. SynapseCore's current pilot posture is a bounded sidecar control deployment: source systems remain authoritative; SynapseCore receives only the minimum approved operational facts needed for the selected scope, maintains its own operational state, evaluates conditions/pressure/priorities, and produces advisory recommendations for authorized human operators.
+
+Company-system research is used to establish **source authority, minimum data availability, freshness, mapping/security constraints and observable outcome paths**. It is not a proxy for whether SynapseCore has value. A sophisticated incumbent stack may be complementary, substitutive, or already sufficient; only discovery can establish that.
+
+The near-term technical question is therefore: **Can a meaningful bounded operating scope be represented using current supported order ingestion plus the applicable approved catalog/inventory/fulfillment onboarding/API contracts, without requiring SynapseCore to replace or integrate the customer's entire stack?**
+
+See [Research Report 14 — Sidecar Advisory Pilot Model and Prospect Requalification](research-report-14-sidecar-advisory-pilot-and-prospect-requalification-2026-10-07.md).
+
 ## 1. Correct mandate
 
 Research must proceed in this order, iteratively:
