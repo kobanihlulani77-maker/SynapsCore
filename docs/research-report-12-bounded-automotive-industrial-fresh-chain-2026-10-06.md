@@ -250,3 +250,7 @@ This is valuable because the repeated hypothesis is not an industry label. It is
 ---
 
 **Operational follow-through:** [Research Report 13 — Founder Discovery and Reply Command Playbook](research-report-13-founder-discovery-and-reply-command-playbook-2026-10-06.md). This defines how replies, referrals, demo requests, existing-system objections, integration/security questions, pricing questions and discovery meetings are handled without narrowing SynapseCore or bypassing qualification gates.
+
+---
+
+**Prospect-model correction:** [Research Report 14 — Sidecar Advisory Pilot Model and Prospect Requalification](research-report-14-sidecar-advisory-pilot-and-prospect-requalification-2026-10-07.md) supersedes any implication in earlier target reports that mature ERP/WMS/automation or company scale is itself a reason to hold a prospect. Near-term pilot fit is now judged by minimum authoritative data sufficiency, bounded control usefulness, operator ownership and safe advisory scope.
