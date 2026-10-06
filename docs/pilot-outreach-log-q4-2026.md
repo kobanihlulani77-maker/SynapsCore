@@ -91,3 +91,21 @@ A reply watch is active for the first-wave outreach. Meaningful replies should b
 ### Monitoring update
 The active reply watch now covers eight accounts:
 Matus, Masterparts, Bidfood Pretoria, Macsteel, Famous Brands, Bearings International, Plumblink and ACTOM Electrical Machines.
+
+
+### Motus Aftermarket Parts South Africa — sent 2026-10-06
+- Route: information@motus.co.za (published Motus head-office business route)
+- Requested recipient: Michelle Raw, CEO — South Africa Aftermarket Parts, or appropriate senior operational owner
+- Subject: For Michelle Raw — South African operational intelligence and control research
+- Status: SENT / awaiting reply or internal routing
+- Framing: complete product-first SynapseCore positioning; bounded to Aftermarket Parts South Africa; explicitly not ERP/warehouse/retail/parts-system replacement.
+- Why targeted: wholesale distribution + owned/franchised retail channels + sourcing + distribution points + service/speed/customer outcome under one business segment.
+
+
+### Stewarts & Lloyds — sent 2026-10-06
+- Route: info@sltrading.co.za (official company profile/contact route)
+- Requested recipient: senior operations / supply-chain / central-distribution / cross-functional operational-performance owner
+- Subject: South African operational intelligence and control research — Stewarts & Lloyds
+- Status: SENT / awaiting reply
+- Framing: complete product-first SynapseCore positioning; national branches + central purchasing/distribution + specialist industrial divisions + projects/contracts; explicitly not ERP/inventory/WMS/branch-ordering replacement.
+- Why targeted: a different industrial distribution operating model that can test whether the cross-domain control problem repeats beyond Macsteel/Bearings.
