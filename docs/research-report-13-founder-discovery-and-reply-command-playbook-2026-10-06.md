@@ -410,3 +410,8 @@ Classify the account as one of:
 Never call an existing control tower a dashboard unless the company itself demonstrates that it is one.
 
 See [Research Report 17 — Control-Tower Comparison and Discovery Test](research-report-17-control-tower-comparison-and-discovery-test-2026-10-07.md).
+
+
+---
+
+**First-wave follow-up execution:** [Research Report 19 — First-Wave Follow-Up Readiness and Route Quality](research-report-19-first-wave-follow-up-readiness-2026-10-07.md) defines route-specific follow-up handling for the October 3 accounts after the three-full-business-day threshold.
