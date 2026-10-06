@@ -196,3 +196,8 @@ The work remains centered on the complete SynapseCore operating loop:
 **authoritative operational truth → cross-domain context → intelligence/pressure → priority → recommendation/options → human authority/governance → supported action or accountable handoff → authoritative outcome → realtime convergence → audit → replay/recovery**
 
 A prospect, buyer role, workflow, connector, industry or competitor is evidence about where this loop matters. None of them is allowed to redefine the product by itself.
+
+
+---
+
+**Continued execution:** [Research Report 12 — Bounded Automotive, Industrial Distribution and Fresh-Chain Decisions](research-report-12-bounded-automotive-industrial-fresh-chain-2026-10-06.md). It isolates Motus Aftermarket Parts South Africa, moves Stewarts & Lloyds into active discovery, and holds Food Lover's Market/FVC for a safer ownership/scope investigation before outreach.
