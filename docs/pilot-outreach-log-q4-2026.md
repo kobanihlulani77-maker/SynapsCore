@@ -117,13 +117,20 @@ Matus, Masterparts, Bidfood Pretoria, Macsteel, Famous Brands, Bearings Internat
 - Requested recipient: Robin Briggs, Managing Director, or appropriate senior operations/supply-chain owner
 - Subject: South African operational intelligence and control research — BMG
 - Status: SENT / awaiting reply or internal routing
-- Framing: explicitly sidecar/advisory pilot; BMG's existing WMS/ERP remains authoritative; SynapseCore needs only a bounded approved operational data set.
-- Requalification reason: active WMS modernisation is **not** a disqualifier. The decision now depends on minimum data sufficiency, operator usefulness and bounded control scope.
+- Framing correction: whole-picture SynapseCore control system over a selected BMG operating scope; existing WMS/ERP remains authoritative; limit unnecessary records/fields and footprint, not the connected domains/control loop.
+- Requalification reason: active WMS modernisation is **not** a disqualifier. The decision depends on whether enough authoritative cross-domain operational data can feed a meaningful whole-picture control scope.
 
 ### Goldwagen — sent 2026-10-07
 - Route: info@goldwagen.com (official Goldwagen contact)
 - Requested recipient: senior central-distribution / supply-chain / network-operations / operational-performance owner
 - Subject: South African operational intelligence and control research — Goldwagen
 - Status: SENT / awaiting reply
-- Framing: explicitly sidecar/advisory pilot; no need to replace or access every ERP/warehouse/franchise/transport system.
-- Requalification reason: warehouse automation and strong IT are **not** disqualifiers. Goldwagen's central DC + franchise network + own distribution capability create a strong bounded control environment if minimum data can be provided.
+- Framing correction: whole-picture SynapseCore control system over a selected Goldwagen network scope; no need to replicate every ERP/warehouse/franchise/transport dataset.
+- Requalification reason: warehouse automation and strong IT are **not** disqualifiers. The relevant test is whether sufficient authoritative operational data across the connected pilot domains can create the full control picture for a selected DC/franchise scope.
+
+### 2026-10-07 whole-picture wording correction
+- The phrase `sidecar/minimum data` was corrected because it could understate SynapseCore as a small analytical add-on.
+- Binding rule: **whole-picture control system, selective data footprint**.
+- Bounded scope limits company footprint, workload and unnecessary records/fields; it does not reduce the pilot to one domain.
+- The pilot must exercise the applicable connected engine across operational truth, intelligence, recommendations, governance/operator control, outcome/readback, audit/realtime and recovery.
+- Same-thread clarification sent to BMG and Goldwagen because their initial 2026-10-07 messages used wording that could be read too narrowly.
