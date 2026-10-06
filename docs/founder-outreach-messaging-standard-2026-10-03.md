@@ -121,3 +121,15 @@ Before sending any first-contact message, confirm:
 8. Are specific examples clearly examples, not product identity?
 
 If #4 is yes or any other answer is no, do not send.
+
+## 9. Sidecar pilot clarification
+
+When a prospect has a mature ERP/WMS/TMS/automation environment, do **not** frame that maturity as a reason SynapseCore may not fit.
+
+Where useful, clarify:
+
+> SynapseCore works alongside your existing systems. A controlled pilot does not require access to every platform or replacement of the systems that run the business. We connect only the approved operational facts needed for a bounded scope; SynapseCore builds the operational control picture and advisory intelligence while your people and source systems retain authority.
+
+System names should appear only to reassure the prospect that SynapseCore is not a replacement and to establish source authority/data feasibility.
+
+Do not turn first-contact email into an integration-architecture discussion.
