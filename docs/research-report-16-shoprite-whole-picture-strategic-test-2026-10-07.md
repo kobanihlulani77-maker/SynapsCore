@@ -132,3 +132,7 @@ If not, the discovery will show us what a best-in-class internal operating stack
 Current October active discovery now contains **15 accounts**.
 
 No sent email is treated as qualification, interest or pilot authorization.
+
+---
+
+**Control-tower comparison:** [Research Report 17 — Control-Tower Comparison and Discovery Test](research-report-17-control-tower-comparison-and-discovery-test-2026-10-07.md) compares Food Lover's, Shoprite and Famous Brands against mature Transnova/Tiger Brands and DSV control-tower operating models, and defines the discovery evidence required before claiming incremental SynapseCore value.
