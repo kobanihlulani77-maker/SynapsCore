@@ -157,3 +157,11 @@ Matus, Masterparts, Bidfood Pretoria, Macsteel, Famous Brands, Bearings Internat
 - Status: SENT / awaiting reply or internal routing
 - Framing: whole-picture SynapseCore control system over an agreed company slice; acknowledges Shoprite's mature centralised supply chain, inventory systems, predictive analytics and digital operations; does not assume a gap.
 - Why targeted: a hard strategic test of whether SynapseCore adds incremental cross-domain control value above a highly sophisticated existing enterprise stack.
+
+### SPAR Southern Africa — sent 2026-10-07
+- Route: intcontact@spar.co.za (published SPAR Group head-office contact)
+- Requested recipient: Arno Haigh, National Logistics Executive, or appropriate senior cross-functional operational-control owner
+- Subject: For Arno Haigh — South African operational intelligence and control research
+- Status: SENT / awaiting reply or internal routing
+- Framing: whole-picture SynapseCore control model; acknowledges SPAR's ERP/WMS, predictive analytics, automation and national technology transformation without treating them as a disqualifier.
+- Why targeted: six regional DCs, 2,000+ independent retailers, central wholesale/distribution, digital channels and distributed retailer authority create a distinct whole-operation control environment.
