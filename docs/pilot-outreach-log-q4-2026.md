@@ -165,3 +165,14 @@ Matus, Masterparts, Bidfood Pretoria, Macsteel, Famous Brands, Bearings Internat
 - Status: SENT / awaiting reply or internal routing
 - Framing: whole-picture SynapseCore control model; acknowledges SPAR's ERP/WMS, predictive analytics, automation and national technology transformation without treating them as a disqualifier.
 - Why targeted: six regional DCs, 2,000+ independent retailers, central wholesale/distribution, digital channels and distributed retailer authority create a distinct whole-operation control environment.
+
+
+## 2026-10-07 — First-wave routing follow-ups sent
+- Matus: same-thread routing follow-up sent for Johannesburg/Germiston operations/distribution.
+- Masterparts: same-thread routing follow-up sent for Gauteng distribution/DC operations.
+- Bidfood Pretoria: Billy Mokoena asked whether he owns the broader cross-functional operating picture or can route to the correct owner.
+- Macsteel: same-thread routing follow-up sent for Gauteng/Mac City operations/supply chain.
+- Famous Brands: Company Secretary asked to confirm routing to Andrew Mundell or the appropriate senior owner.
+- Bearings International: same-thread routing follow-up sent requesting Laura Van Rooyen or the appropriate broader operational owner.
+- Fresh Gmail check found no meaningful company replies and no mailer-daemon/postmaster delivery failures before follow-up.
+- Status remains no response / route unresolved; silence is not recorded as rejection.
