@@ -6,6 +6,8 @@ import java.sql.Connection;
 import java.sql.ResultSet;
 import java.sql.Statement;
 import javax.sql.DataSource;
+import org.flywaydb.core.Flyway;
+import org.flywaydb.database.postgresql.PostgreSQLConfigurationExtension;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -18,8 +20,14 @@ class PlatformActivityReadIndexPostgresProof {
     @Autowired
     private DataSource dataSource;
 
+    @Autowired
+    private Flyway flyway;
+
     @Test
     void migratedAuditIndexIsValidAndSupportsNewestFirstRead() throws Exception {
+        assertThat(flyway.getConfiguration()
+            .getConfigurationExtension(PostgreSQLConfigurationExtension.class)
+            .isTransactionalLock()).isFalse();
         try (Connection connection = dataSource.getConnection(); Statement statement = connection.createStatement()) {
             assertThat(connection.getMetaData().getDatabaseProductName()).containsIgnoringCase("PostgreSQL");
             try (ResultSet result = statement.executeQuery("""

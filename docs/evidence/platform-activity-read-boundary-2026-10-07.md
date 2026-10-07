@@ -73,6 +73,18 @@ silently accepted as success. After a safe merge/deploy, compare the same
 activity/SQL timings and check for fresh pool or startup failures. Do not
 claim M1 or H1 closure from faster platform activity alone.
 
+The first disposable-PostgreSQL branch run, [CI 37611684372](https://github.com/kobanihlulani77-maker/SynapsCore/actions/runs/37611684372),
+passed `verify` but remained at the V15 non-transactional migration line for
+over six minutes. It was canceled rather than treating the stalled migration
+as a pass. Flyway's default PostgreSQL transactional advisory lock is
+incompatible with `CREATE INDEX CONCURRENTLY` ([Flyway PostgreSQL driver
+documentation](https://documentation.red-gate.com/flyway/reference/database-driver-reference/postgresql-database)).
+The branch now configures Flyway's PostgreSQL session-level advisory lock and
+asserts that setting in the PostgreSQL proof. This is a migration coordination
+setting, not an application/Hikari transaction change. The corrected branch
+still needs an exact-SHA PostgreSQL CI pass before merge; no hosted V15
+migration or after-timing is claimed.
+
 ## Verification and limit
 
 The existing `PlatformTenantAccessBoundaryIntegrationTest` exercises platform
@@ -85,5 +97,5 @@ then passed as recorded above. The V15 branch passed the 36-test focused
 H2-backed platform boundary suite with zero failures/errors/skips and Maven
 exit 0 after the migration was added. That checks the H2 no-op path and
 response/authority behavior, not PostgreSQL concurrent-index creation.
-Disposable-PostgreSQL CI, a safe deployment, and a repeated hosted
+Corrected disposable-PostgreSQL CI, a safe deployment, and a repeated hosted
 before/after comparison remain pending. H1/H2/H7/H12 and M1 remain OPEN.
