@@ -10,6 +10,17 @@ try {
     if (-not (Get-Command docker -ErrorAction SilentlyContinue)) {
         throw 'Docker is required for the temporary PostgreSQL client.'
     }
+    $previousErrorAction = $ErrorActionPreference
+    try {
+        $ErrorActionPreference = 'Continue'
+        docker info --format '{{.ServerVersion}}' 2>$null | Out-Null
+        $dockerExitCode = $LASTEXITCODE
+    } finally {
+        $ErrorActionPreference = $previousErrorAction
+    }
+    if ($dockerExitCode -ne 0) {
+        throw 'Docker Desktop is not running. Start it before entering the database URL.'
+    }
 
     $secureUrl = Read-Host 'Render External Database URL' -AsSecureString
     $passwordPointer = [Runtime.InteropServices.Marshal]::SecureStringToBSTR($secureUrl)
@@ -54,5 +65,6 @@ from audit_logs order by created_at desc fetch first 20 rows only;
     if ($passwordPointer -ne [IntPtr]::Zero) {
         [Runtime.InteropServices.Marshal]::ZeroFreeBSTR($passwordPointer)
     }
-    Remove-Variable secureUrl, databaseUrl, parsedUrl, sql, query, auditRead -ErrorAction SilentlyContinue
+    Remove-Variable secureUrl, databaseUrl, parsedUrl, sql, query, auditRead,
+        previousErrorAction, dockerExitCode -ErrorAction SilentlyContinue
 }
