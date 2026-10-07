@@ -149,9 +149,14 @@ signed-in Render database Metrics page exposed no recent query-duration data,
 and its Connect menu provided connection strings rather than a SQL console.
 The supported alternative is [the read-only audit SQL probe](../../scripts/measure-platform-audit-sql.ps1):
 it prompts locally for the Render External Database URL, uses a temporary
-PostgreSQL client, verifies the V15 index metadata, then executes one warmup
+Java/JDBC PostgreSQL client and the backend's cached driver, verifies the V15
+index metadata, then executes one warmup
 and five bounded `EXPLAIN (ANALYZE, BUFFERS)` samples of the exact platform
 audit-order SELECT. It neither logs in to SynapseCore nor returns audit rows.
+Docker Desktop is not needed; its local engine was unavailable during probe
+preparation. The Java client sets a read-only transaction, TLS-required
+connection and bounded connection/query timeouts. The URL is passed to the
+child process over stdin, not in process arguments or a file.
 Its natural planner choice and PostgreSQL execution times can establish a
 database-side after-sample without consuming the application login bucket.
 **The SQL probe has not yet been run on hosted PostgreSQL.** It cannot measure

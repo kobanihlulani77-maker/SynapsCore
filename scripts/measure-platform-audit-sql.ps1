@@ -5,21 +5,16 @@ param(
 
 $ErrorActionPreference = 'Stop'
 $passwordPointer = [IntPtr]::Zero
+$process = $null
 
 try {
-    if (-not (Get-Command docker -ErrorAction SilentlyContinue)) {
-        throw 'Docker is required for the temporary PostgreSQL client.'
-    }
-    $previousErrorAction = $ErrorActionPreference
-    try {
-        $ErrorActionPreference = 'Continue'
-        docker info --format '{{.ServerVersion}}' 2>$null | Out-Null
-        $dockerExitCode = $LASTEXITCODE
-    } finally {
-        $ErrorActionPreference = $previousErrorAction
-    }
-    if ($dockerExitCode -ne 0) {
-        throw 'Docker Desktop is not running. Start it before entering the database URL.'
+    $java = Get-Command java -ErrorAction Stop
+    $sourcePath = Join-Path $PSScriptRoot 'MeasurePlatformAuditSql.java'
+    $driverJar = Get-ChildItem -LiteralPath (Join-Path $HOME '.m2\repository\org\postgresql\postgresql') `
+        -Filter 'postgresql-*.jar' -Recurse -ErrorAction SilentlyContinue |
+        Sort-Object FullName -Descending | Select-Object -First 1 -ExpandProperty FullName
+    if (-not $driverJar) {
+        throw 'The PostgreSQL JDBC driver is not cached. Build the backend dependencies before running this probe.'
     }
 
     $secureUrl = Read-Host 'Render External Database URL' -AsSecureString
@@ -32,39 +27,35 @@ try {
         throw 'Expected a Render External PostgreSQL URL. The URL was not printed.'
     }
 
-    $query = @'
-select to_char(clock_timestamp() at time zone 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"') as sampled_at_utc,
-       current_database() as database_name,
-       pg_backend_pid() as postgres_pid,
-       i.indisvalid as audit_index_valid
-from pg_class c join pg_index i on i.indexrelid = c.oid
-where c.relname = 'idx_audit_logs_created_at_desc'
-  and c.relnamespace = (select oid from pg_namespace where nspname = current_schema());
-'@
-    $auditRead = @'
-explain (analyze, buffers)
-select id, action, actor, created_at, details, request_id,
-       source, status, target_ref, target_type, tenant_code
-from audit_logs order by created_at desc fetch first 20 rows only;
-'@
-    $sql = "\set ON_ERROR_STOP on`nBEGIN READ ONLY;`nSET LOCAL statement_timeout = '5000ms';`n"
-    $sql += $query + "`n\echo WARMUP`n" + $auditRead + "`n"
-    for ($sample = 1; $sample -le $Samples; $sample++) {
-        $sql += "\echo SAMPLE_$sample`n" + $auditRead + "`n"
+    $startInfo = New-Object System.Diagnostics.ProcessStartInfo
+    $startInfo.FileName = $java.Source
+    $startInfo.Arguments = '-cp "{0}" "{1}" {2}' -f $driverJar, $sourcePath, $Samples
+    $startInfo.UseShellExecute = $false
+    $startInfo.CreateNoWindow = $true
+    $startInfo.RedirectStandardInput = $true
+    $startInfo.RedirectStandardOutput = $true
+    $startInfo.RedirectStandardError = $true
+    $process = New-Object System.Diagnostics.Process
+    $process.StartInfo = $startInfo
+    if (-not $process.Start()) { throw 'Could not start the local Java PostgreSQL client.' }
+    $outputTask = $process.StandardOutput.ReadToEndAsync()
+    $errorTask = $process.StandardError.ReadToEndAsync()
+    $process.StandardInput.WriteLine($databaseUrl)
+    $process.StandardInput.Close()
+    if (-not $process.WaitForExit(120000)) {
+        $process.Kill()
+        throw 'The bounded PostgreSQL measurement exceeded two minutes.'
     }
-    $sql += "COMMIT;`n"
-
-    Write-Output 'Running one read-only warmup and bounded audit SQL samples; no Platform Owner login.'
-    $databaseUrl + "`n" + $sql |
-        docker run --rm -i -e PGSSLMODE=require postgres:17 sh -c `
-            'IFS= read -r uri; psql "$uri" -X -v ON_ERROR_STOP=1 -P pager=off -f -'
-    if ($LASTEXITCODE -ne 0) {
-        throw "PostgreSQL measurement failed with client exit code $LASTEXITCODE."
+    $output = $outputTask.Result.TrimEnd()
+    $errorOutput = $errorTask.Result.TrimEnd()
+    if ($output) { Write-Output $output }
+    if ($process.ExitCode -ne 0) {
+        throw "PostgreSQL measurement failed. $errorOutput"
     }
 } finally {
+    if ($process) { $process.Dispose() }
     if ($passwordPointer -ne [IntPtr]::Zero) {
         [Runtime.InteropServices.Marshal]::ZeroFreeBSTR($passwordPointer)
     }
-    Remove-Variable secureUrl, databaseUrl, parsedUrl, sql, query, auditRead,
-        previousErrorAction, dockerExitCode -ErrorAction SilentlyContinue
+    Remove-Variable secureUrl, databaseUrl, parsedUrl, output, errorOutput -ErrorAction SilentlyContinue
 }
