@@ -176,3 +176,18 @@ Matus, Masterparts, Bidfood Pretoria, Macsteel, Famous Brands, Bearings Internat
 - Bearings International: same-thread routing follow-up sent requesting Laura Van Rooyen or the appropriate broader operational owner.
 - Fresh Gmail check found no meaningful company replies and no mailer-daemon/postmaster delivery failures before follow-up.
 - Status remains no response / route unresolved; silence is not recorded as rejection.
+
+
+### Renttech SA — sent 2026-10-07
+- Recipient: d.whitehead@renttechsa.co.za — Duncan Whitehead, Managing Director (public Renttech business/PAIA contact)
+- Subject: South African operational intelligence and control research — Renttech SA
+- Status: SENT / awaiting reply
+- Framing: whole-picture SynapseCore control across a selected rental/service operating scope; explicitly not K8/ERP/rental/inventory/service-system replacement.
+- Why targeted: 14-branch rental/sales network + equipment availability + spares + service/repair + deliveries + project/site outcomes creates a distinct asset-service control archetype.
+
+### AfriSam — sent 2026-10-07
+- Recipient: glenn.johnson@za.afrisam.com — Glenn Johnson, Construction Materials Operations Executive (public AfriSam statutory business contact)
+- Subject: South African operational intelligence and control research — AfriSam
+- Status: SENT / awaiting reply
+- Framing: whole-picture SynapseCore control across a selected construction-material operating scope; acknowledges ClickToGo and existing planning systems; not ERP/order/dispatch/fleet replacement.
+- Why targeted: production plants + quarries/aggregate + readymix + depots + customer commitments + fleet/delivery + technical support create a distinct construction-material control environment.
