@@ -134,14 +134,31 @@ public class PlatformControlPlaneService {
 
     @Transactional(readOnly = true)
     public List<PlatformActivityResponse> getActivity() {
-        List<PlatformActivityResponse> activity = new ArrayList<>();
-        businessEventRepository.findTop20ByOrderByCreatedAtDesc().forEach(event -> activity.add(toBusinessEventActivity(event)));
-        auditLogRepository.findTop20ByOrderByCreatedAtDesc().forEach(log -> activity.add(toAuditActivity(log)));
-        return activity.stream()
-            .sorted(Comparator.comparing(PlatformActivityResponse::observedAt,
-                Comparator.nullsLast(Comparator.reverseOrder())))
-            .limit(20)
-            .toList();
+        long startedAt = System.nanoTime();
+        Map<String, Long> stepsMs = new LinkedHashMap<>();
+        Map<String, Long> stepsCpuMs = new LinkedHashMap<>();
+        try {
+            List<BusinessEvent> events = timedOverviewSection(stepsMs, stepsCpuMs, "events",
+                businessEventRepository::findTop20ByOrderByCreatedAtDesc);
+            List<AuditLog> audits = timedOverviewSection(stepsMs, stepsCpuMs, "audits",
+                auditLogRepository::findTop20ByOrderByCreatedAtDesc);
+            return timedOverviewSection(stepsMs, stepsCpuMs, "merge", () -> {
+                List<PlatformActivityResponse> activity = new ArrayList<>();
+                events.forEach(event -> activity.add(toBusinessEventActivity(event)));
+                audits.forEach(audit -> activity.add(toAuditActivity(audit)));
+                return activity.stream()
+                    .sorted(Comparator.comparing(PlatformActivityResponse::observedAt,
+                        Comparator.nullsLast(Comparator.reverseOrder())))
+                    .limit(20)
+                    .toList();
+            });
+        } finally {
+            long elapsed = System.nanoTime() - startedAt;
+            if (elapsed >= SLOW_OVERVIEW_NANOS) {
+                log.warn("Slow platform activity read totalMs={} stepsMs={} stepsCpuMs={}",
+                    elapsed / 1_000_000, stepsMs, stepsCpuMs);
+            }
+        }
     }
 
     public PlatformRuntimeResponse getRuntime() {
