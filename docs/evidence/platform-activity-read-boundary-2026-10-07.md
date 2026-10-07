@@ -62,12 +62,12 @@ The fast event stage does not justify changing `business_events`. An unindexed
 sort/scan is the leading explanation for the measured audit SQL time, but its
 physical plan and the contribution of database resource pressure are unproven.
 
-The smallest justified correction under review is a PostgreSQL-only concurrent
+The smallest justified correction is a PostgreSQL-only concurrent
 index on `audit_logs(created_at DESC)` in V15, with a disposable-PostgreSQL CI
 proof that the migrated index is valid and supports the actual order/limit
 query. This avoids a write-blocking index build and leaves application query,
 response, transaction, Hikari, scheduler and infrastructure behavior unchanged.
-The migration is in a separate branch, not yet a hosted result. A failed
+The migration was merged in PR #1. A failed
 concurrent build must be diagnosed; an invalid leftover index must not be
 silently accepted as success. After a safe merge/deploy, compare the same
 activity/SQL timings and check for fresh pool or startup failures. Do not
@@ -79,11 +79,35 @@ over six minutes. It was canceled rather than treating the stalled migration
 as a pass. Flyway's default PostgreSQL transactional advisory lock is
 incompatible with `CREATE INDEX CONCURRENTLY` ([Flyway PostgreSQL driver
 documentation](https://documentation.red-gate.com/flyway/reference/database-driver-reference/postgresql-database)).
-The branch now configures Flyway's PostgreSQL session-level advisory lock and
-asserts that setting in the PostgreSQL proof. This is a migration coordination
-setting, not an application/Hikari transaction change. The corrected branch
-still needs an exact-SHA PostgreSQL CI pass before merge; no hosted V15
-migration or after-timing is claimed.
+The branch configured Flyway's PostgreSQL session-level advisory lock and
+asserted that setting in the PostgreSQL proof. This is a migration coordination
+setting, not an application/Hikari transaction change. Its exact-SHA branch CI
+passed before merge. Merged-main [CI run 37613626785](https://github.com/kobanihlulani77-maker/SynapsCore/actions/runs/37613626785)
+then passed both `verify` and `dispatch-postgres` jobs at
+`5c321c1d638cd8ceb87b55d3f77f982f76b660bc`.
+
+## Hosted V15 rollout, October 7
+
+Render deployment `dep-db32mr6q1p3s73f13400` showed the exact merged SHA
+`5c321c1d638cd8ceb87b55d3f77f982f76b660bc` as **Live** after a 5m15s
+deploy. Instance `57mtj` logged the non-transactional migration start at
+11:24:56.881 UTC and `Successfully applied 1 migration ... now at version v15`
+at 11:24:59.381 UTC; Flyway reported 2.278 seconds of execution. The first
+six-flag connection gate ran across the cutover and reported health/readiness/
+liveness timeouts, so it was not treated as a pass. A fresh gate after Render
+showed Live passed all six flags: frontend, backend, database readiness, auth,
+WebSocket and proof allowed. An authenticated Chrome Platform Activity page
+then rendered 20 metadata-only signals on the new revision.
+
+This confirms deployment and functional rendering, **not** the magnitude or
+repeatability of the index's latency effect. No post-index browser request
+duration, PostgreSQL audit SELECT duration, hosted EXPLAIN, or concurrency
+sample was captured in a way suitable for a before/after comparison. The
+browser log view became unavailable during that comparison. Do not infer that
+the old 2.0-2.9 second query is eliminated merely because no slow warning was
+seen. The next bounded check is to time the same authenticated activity read
+and ordered audit SQL on this Live revision, with warm baseline and concurrent
+load noted. H1 historical Hikari starvation remains a separate open question.
 
 ## Verification and limit
 
@@ -97,5 +121,6 @@ then passed as recorded above. The V15 branch passed the 36-test focused
 H2-backed platform boundary suite with zero failures/errors/skips and Maven
 exit 0 after the migration was added. That checks the H2 no-op path and
 response/authority behavior, not PostgreSQL concurrent-index creation.
-Corrected disposable-PostgreSQL CI, a safe deployment, and a repeated hosted
-before/after comparison remain pending. H1/H2/H7/H12 and M1 remain OPEN.
+Corrected disposable-PostgreSQL CI and safe deployment passed as above. A
+repeated hosted before/after latency comparison remains pending. H1/H2/H7/H12
+and M1 remain OPEN.
