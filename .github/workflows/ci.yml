@@ -97,4 +97,4 @@ jobs:
           SPRING_DATASOURCE_DRIVER_CLASS_NAME: org.postgresql.Driver
           SPRING_DATASOURCE_USERNAME: synapsecore_test
           SPRING_DATASOURCE_PASSWORD: synapsecore_test
-        run: ./mvnw -B -Dtest=OperationalDispatchClaimIntegrationTest test
+        run: ./mvnw -B -Dtest=OperationalDispatchClaimIntegrationTest,PlatformActivityReadIndexPostgresProof test

@@ -21,24 +21,69 @@ thread for this section, but does not distinguish SQL, JDBC acquisition,
 network, scheduling, or other wait. It does not explain the historical 10/10
 Hikari incident.
 
-## Source boundary and next measurement
+## Exact-revision activity and PostgreSQL timing
+
+Commit `74fa2d26a243faa2def0afe99dc129ae0b911752` passed [exact-SHA CI
+run 37610152541](https://github.com/kobanihlulani77-maker/SynapsCore/actions/runs/37610152541):
+both `verify` and disposable-PostgreSQL `dispatch-postgres` succeeded. Render
+then showed that SHA as its last successfully deployed, Live backend. The
+six-flag read-only connection gate passed afterward. This confirms the
+diagnostic is running, not that activity latency is fixed.
+
+The newly separated stage timing and the Render PostgreSQL duration log
+captured repeated naturally slow reads on instance `rmdbp`:
+
+| App warning UTC | Request ID | Activity / events / audits / merge wall (ms) | Audits CPU (ms) | Nearby PostgreSQL audit SELECT duration (ms) |
+| --- | --- | --- | --- | --- |
+| 10:56:32.498 | `77462c56-fa40-4b16-8805-9f9a91ec47fd` | 3,197 / 198 / 2,943 / 55 | 5 | 2,936.438 |
+| 10:56:33.701 | `5f6203b3-f27c-4d20-8587-05275e66fd64` | 2,201 / 99 / 2,100 / 1 | 4 | 2,039.839 |
+| 10:56:39.039 | `f4336521-025f-42f7-8439-b576f343187b` | 2,237 / 96 / 2,140 / 0 | 3 | 2,037.253 |
+| 10:56:40.136 | `5a13ea33-4650-493b-93fc-3ac21d7f549e` | 2,337 / 103 / 2,233 / 0 | 3 | 2,199.968 |
+
+The PostgreSQL log names the executed SQL: `SELECT ... FROM audit_logs
+ORDER BY created_at DESC FETCH FIRST $1 ROWS ONLY`. Its duration closely
+accounts for the Java `audits` wall time in this window. The PostgreSQL log
+does not carry the HTTP request ID, so the matching rows are temporal and
+query-shape correlations, not a proven one-to-one JDBC PID mapping. No
+EXPLAIN plan, blocker trace, or table-row count is available; the Render
+database Metrics view reported no data for the recent window. These samples
+attribute the slow section primarily to PostgreSQL execution of the audit
+read, not to the Java merge or the historical ten-connection holder event.
+
+## Source boundary and targeted correction
 
 `PlatformControlPlaneService.getOverview()` composes Runtime, tenant summaries
 and activity sequentially without an outer transaction. Its same-class call
 to `getActivity()` does not pass through the Spring transactional proxy.
 `getActivity()` reads the newest 20 business events, then the newest 20 audit
 logs, maps them to metadata-only responses, sorts, and returns 20. The schema
-baseline contains no `created_at` index on those two tables. A scan/sort at
-large row counts is a plausible cause, not a proven query plan or reason for
-this 3.4-second observation. No PostgreSQL PID, EXPLAIN plan, table sizes, or
-per-query timing was captured in the hosted window.
+baseline and mapped entity contain no `created_at` index on `audit_logs`.
+The fast event stage does not justify changing `business_events`. An unindexed
+sort/scan is the leading explanation for the measured audit SQL time, but its
+physical plan and the contribution of database resource pressure are unproven.
 
-The smallest next diagnostic separates `events`, `audits`, and `merge` wall and
-current-thread CPU durations when activity itself exceeds two seconds. It
-does not change the queries, transaction boundary, response, Hikari settings,
-or infrastructure. At the next naturally slow exact-revision request, identify
-which read consumed the time and correlate a safe PostgreSQL EXPLAIN/ANALYZE or
-session sample before proposing an index or other production correction.
+The smallest justified correction under review is a PostgreSQL-only concurrent
+index on `audit_logs(created_at DESC)` in V15, with a disposable-PostgreSQL CI
+proof that the migrated index is valid and supports the actual order/limit
+query. This avoids a write-blocking index build and leaves application query,
+response, transaction, Hikari, scheduler and infrastructure behavior unchanged.
+The migration is in a separate branch, not yet a hosted result. A failed
+concurrent build must be diagnosed; an invalid leftover index must not be
+silently accepted as success. After a safe merge/deploy, compare the same
+activity/SQL timings and check for fresh pool or startup failures. Do not
+claim M1 or H1 closure from faster platform activity alone.
+
+The first disposable-PostgreSQL branch run, [CI 37611684372](https://github.com/kobanihlulani77-maker/SynapsCore/actions/runs/37611684372),
+passed `verify` but remained at the V15 non-transactional migration line for
+over six minutes. It was canceled rather than treating the stalled migration
+as a pass. Flyway's default PostgreSQL transactional advisory lock is
+incompatible with `CREATE INDEX CONCURRENTLY` ([Flyway PostgreSQL driver
+documentation](https://documentation.red-gate.com/flyway/reference/database-driver-reference/postgresql-database)).
+The branch now configures Flyway's PostgreSQL session-level advisory lock and
+asserts that setting in the PostgreSQL proof. This is a migration coordination
+setting, not an application/Hikari transaction change. The corrected branch
+still needs an exact-SHA PostgreSQL CI pass before merge; no hosted V15
+migration or after-timing is claimed.
 
 ## Verification and limit
 
@@ -47,6 +92,10 @@ overview and activity response/authority, including metadata-only output.
 The focused local run passed 36 tests, zero failures/errors/skips, with H2 in
 the production Spring profile. The subsequent full `mvnw test` run completed;
 its 70 Surefire XML reports record 404 tests, zero failures, zero errors, and
-zero skips. These are local behavior checks, not a PostgreSQL query-plan or
-hosted latency proof. PostgreSQL query-plan proof, exact-revision CI, and
-deployment of this diagnostic remain pending. H1/H2/H7/H12 and M1 remain OPEN.
+zero skips. The diagnostic's exact-SHA CI, Live deployment and six-flag gate
+then passed as recorded above. The V15 branch passed the 36-test focused
+H2-backed platform boundary suite with zero failures/errors/skips and Maven
+exit 0 after the migration was added. That checks the H2 no-op path and
+response/authority behavior, not PostgreSQL concurrent-index creation.
+Corrected disposable-PostgreSQL CI, a safe deployment, and a repeated hosted
+before/after comparison remain pending. H1/H2/H7/H12 and M1 remain OPEN.
