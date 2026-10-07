@@ -310,3 +310,8 @@ No contact is considered qualified until company-confirmed discovery moves it th
 3. Continue RCL FOODS as a strategic research account, especially post-Vector control structure.
 4. Keep Goscor as a comparison account until the equipment-service archetype needs a second live test.
 5. Search for one non-retail field-service/maintenance operation where customer asset uptime is the primary outcome.
+
+
+---
+
+**Strategic benchmarks:** [Research Report 23 — RCL FOODS and Barloworld Equipment](research-report-23-rcl-barloworld-strategic-benchmarks-2026-10-07.md) keeps two high-value comparison accounts in research without inflating cold outreach volume.
