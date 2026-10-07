@@ -109,6 +109,39 @@ seen. The next bounded check is to time the same authenticated activity read
 and ordered audit SQL on this Live revision, with warm baseline and concurrent
 load noted. H1 historical Hikari starvation remains a separate open question.
 
+## After-measurement continuation
+
+On October 7, a fresh Render Deploys inspection again showed
+`5c321c1d638cd8ceb87b55d3f77f982f76b660bc` as the last successfully
+deployed, **Live** backend revision (`dep-db32mr6q1p3s73f13400`). Local
+`main` and `origin/main` were `f2a0eff6c16c4f8fa73af420ab2b8893e425ecd7`;
+that later commit changed evidence and the readiness map, not the deployed
+application code. The signed-in Chrome Platform Activity page displayed 20
+signals. This is a fresh functional observation, not a client timing sample.
+
+The Render PostgreSQL log search for `audit_logs` showed the earlier 2-3
+second ordered reads and the V15 index build; it did not provide a duration
+for a successful post-index read. The log threshold means absence of a new
+duration entry cannot be converted into a numerical query result. Browser
+automation exposed the rendered page but not resource-timing entries, and its
+debugging connection later became unavailable. No request ID was mapped to a
+post-index PostgreSQL PID. The Live instance observed in application logs was
+`57mtj`; a fast request cannot be assigned to that instance from page render
+alone.
+
+The bounded alternative is [the secure local Activity probe](../../scripts/measure-platform-activity.ps1).
+It records readiness and unauthenticated-session warm checks, prompts locally
+for Platform Owner credentials, then times authenticated login, warm-up, and
+five serial overview/Activity pairs. Output contains UTC start/end, endpoint,
+status, client duration, request ID and Activity count, but no credential,
+cookie or response body. Login/logout still create their normal audit events.
+The probe is not a PostgreSQL query timer, load test, or proof of the historical
+Hikari holders. **No probe result has been supplied yet, so the hosted
+after-measurement and before/after comparison remain OPEN.** If the read
+remains slow, capture the hosted plan and wait/resource state before another
+production correction. If it is fast, measure the same ordered SQL with a
+bounded read-only method before claiming a database-duration comparison.
+
 ## Verification and limit
 
 The existing `PlatformTenantAccessBoundaryIntegrationTest` exercises platform
