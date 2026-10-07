@@ -142,6 +142,26 @@ remains slow, capture the hosted plan and wait/resource state before another
 production correction. If it is fast, measure the same ordered SQL with a
 bounded read-only method before claiming a database-duration comparison.
 
+The first attempted probe login received SynapseCore Platform Owner HTTP 429.
+Do not repeat login attempts to force a measurement or reinterpret the rate
+limit as Activity latency. The Chrome application tab was signed out; the
+signed-in Render database Metrics page exposed no recent query-duration data,
+and its Connect menu provided connection strings rather than a SQL console.
+The supported alternative is [the read-only audit SQL probe](../../scripts/measure-platform-audit-sql.ps1):
+it prompts locally for the Render External Database URL, uses a temporary
+PostgreSQL client, verifies the V15 index metadata, then executes one warmup
+and five bounded `EXPLAIN (ANALYZE, BUFFERS)` samples of the exact platform
+audit-order SELECT. It neither logs in to SynapseCore nor returns audit rows.
+Its natural planner choice and PostgreSQL execution times can establish a
+database-side after-sample without consuming the application login bucket.
+**The SQL probe has not yet been run on hosted PostgreSQL.** It cannot measure
+HTTP request/Activity composition duration or establish request-to-PID
+identity; those remain open until an existing authenticated session or a
+normal, non-rate-limited login is available. Do not compare a direct SQL
+measurement with the earlier Java `audits` wall time as if they were the same
+metric. Compare direct SQL only with the pre-index PostgreSQL SQL durations,
+noting that workload and cache state differ.
+
 ## Verification and limit
 
 The existing `PlatformTenantAccessBoundaryIntegrationTest` exercises platform
