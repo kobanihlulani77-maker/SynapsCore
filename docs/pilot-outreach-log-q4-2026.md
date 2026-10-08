@@ -191,3 +191,15 @@ Matus, Masterparts, Bidfood Pretoria, Macsteel, Famous Brands, Bearings Internat
 - Status: SENT / awaiting reply
 - Framing: whole-picture SynapseCore control across a selected construction-material operating scope; acknowledges ClickToGo and existing planning systems; not ERP/order/dispatch/fleet replacement.
 - Why targeted: production plants + quarries/aggregate + readymix + depots + customer commitments + fleet/delivery + technical support create a distinct construction-material control environment.
+
+
+## 2026-10-08 — Meaningful outreach reply
+
+### Motus Aftermarket Parts — meaningful reply 2026-10-08
+- Original route: information@motus.co.za, requesting Michelle Raw / senior operational owner.
+- Internal routing: Cindy McKechnie, Executive Assistant to Michelle Raw (CEO), forwarded the SynapseCore note internally to Selven Naicker and Paul Goosen.
+- Reply received from: Paul Goosen, Wholesale Executive – Motus Aftermarket Parts.
+- Message: "Please can they send us contact details."
+- Status: ROUTED / ENGAGED — first meaningful company response in the current outreach programme.
+- Interpretation: positive routing/engagement signal, not yet pilot qualification, buying intent, or meeting confirmation.
+- Immediate next action: send founder contact details and request a short 20–30 minute operational discussion. Do not send a long deck or technical material unless requested.
