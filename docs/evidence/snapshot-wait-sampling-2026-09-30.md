@@ -87,3 +87,26 @@ test's incidental thread-state assertion was removed to avoid coupling the
 cadence check to scheduler timing; the production code did not change. The
 focused final-file test passed: 2 tests, zero failures or errors. Neither
 local check is exact-SHA CI or hosted runtime proof of the correction.
+
+## October 8 promotion and hosted boundary
+
+[PR #3](https://github.com/kobanihlulani77-maker/SynapsCore/pull/3) merged the
+bounded sampler correction as `edc63f04ff910ed4aef0bd048af80a9eefb6ca20`
+after two successful exact-candidate CI runs for `494124a`
+([branch](https://github.com/kobanihlulani77-maker/SynapsCore/actions/runs/37798771432),
+[PR](https://github.com/kobanihlulani77-maker/SynapsCore/actions/runs/37798885105)).
+The [merged-main run](https://github.com/kobanihlulani77-maker/SynapsCore/actions/runs/37799874183)
+also passed. Render showed deploy `dep-db3r9849v7es73an3300` Live at
+`2026-10-08T15:25:22Z` on instance `84jp4`; the application startup log at
+`15:25:16.295Z` reported 221.196 seconds. The post-cutover six-flag
+connection check returned true for frontend, backend, database readiness,
+auth, websocket and proof allowance.
+
+A signed-in Platform Owner Activity page still rendered 20 signals. This is
+functional UI observation, **not** authenticated HTTP duration measurement.
+The browser connection did not expose response timings or headers, and the
+bounded Render log search found no post-deploy slow-snapshot composition to
+classify at the time of inspection. The cadence change is deployed but its
+diagnostic yield, request-to-PostgreSQL mapping, historical ten Hikari holders
+and the cause of warm latency remain unproven. M1 remains open; no pool,
+timeout, scheduler, transaction or infrastructure setting was changed.
