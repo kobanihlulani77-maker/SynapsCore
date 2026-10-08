@@ -16,7 +16,7 @@ import java.time.Instant;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.beans.factory.support.StaticListableBeanFactory;
+import org.springframework.beans.factory.support.DefaultListableBeanFactory;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.context.ActiveProfiles;
@@ -46,11 +46,11 @@ class OperationalDispatchTerminalWritePostgresProof {
             .occurredAt(Instant.now())
             .build());
         RecordingRealtimeService realtime = new RecordingRealtimeService();
-        StaticListableBeanFactory realtimeBeans = new StaticListableBeanFactory();
-        realtimeBeans.addBean("realtime", realtime);
+        DefaultListableBeanFactory realtimeBeans = new DefaultListableBeanFactory();
+        realtimeBeans.registerSingleton("realtime", realtime);
         OperationalDispatchQueueService service = new OperationalDispatchQueueService(
             repository,
-            new StaticListableBeanFactory().getBeanProvider(DashboardService.class),
+            new DefaultListableBeanFactory().getBeanProvider(DashboardService.class),
             realtimeBeans.getBeanProvider(RealtimeService.class),
             new RequestTraceContext(),
             metrics,
