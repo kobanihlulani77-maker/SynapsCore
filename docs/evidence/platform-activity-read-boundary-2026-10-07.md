@@ -193,6 +193,40 @@ authenticated Activity/overview timing are still required. Platform Owner
 login had returned HTTP 429, so do not retry to force a client sample. H1,
 broader H2/H7/H12, historical Hikari starvation and M1 remain open.
 
+### October 8 Live and authenticated browser continuation
+
+Render Deploys showed `d58db984ac427e07ec58da27d064279c28420cbb`
+(`dep-db38ktu7bikc73c1aqu0`) as the last successfully deployed, **Live**
+backend revision on October 8. Its intervening changes since V15
+`5c321c1` do not modify the backend or frontend application; they add probe
+scripts and documentation. The six-flag read-only connection gate passed.
+This establishes the currently served application code lineage, not a
+request-duration result at the earlier October 7 SQL-probe timestamp.
+
+The owner reconnected a signed-in Chrome Platform Owner session. At about
+14:23-14:24 UTC, Platform Overview and Platform Activity both rendered, and
+Activity displayed 20 metadata-only signals. Five serial Overview/Activity
+navigation pairs were observed in the warm session. The automation's
+navigation-plus-accessibility-observation elapsed times were 471-1,055 ms
+for Overview and 641-1,606 ms for Activity. One Activity observation occurred
+before its 20-signal state was visible; four showed 20 signals at the first
+observation. These are **UI automation elapsed times**, including browser
+control and rendering. They are not HTTP response durations or TTFB, and
+the missing initial state in one pair was not followed by a request trace.
+The browser control available in this session did not expose request timing
+entries or response headers. Render's filtered current log view returned no
+matching `Slow platform activity read` entry, but its warning threshold does
+not measure successful fast reads. No request ID, pool sample or PostgreSQL
+PID can be assigned to the navigation pairs.
+
+Therefore the direct SQL before/after comparison above is supported, while
+the like-for-like hosted Activity/overview HTTP after-measurement is still
+**OPEN**. Use the already prepared secure local Activity probe for five warm
+authenticated read pairs when a normal, non-rate-limited login is available;
+do not force a new login or substitute UI elapsed time for client HTTP time.
+The separate October 8 warm snapshot latency evidence is recorded in
+[the warm read continuation](warm-runtime-read-2026-10-08.md).
+
 ## Verification and limit
 
 The existing `PlatformTenantAccessBoundaryIntegrationTest` exercises platform
