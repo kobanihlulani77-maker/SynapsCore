@@ -159,13 +159,39 @@ connection and bounded connection/query timeouts. The URL is passed to the
 child process over stdin, not in process arguments or a file.
 Its natural planner choice and PostgreSQL execution times can establish a
 database-side after-sample without consuming the application login bucket.
-**The SQL probe has not yet been run on hosted PostgreSQL.** It cannot measure
+The SQL probe result is recorded below. It cannot measure
 HTTP request/Activity composition duration or establish request-to-PID
 identity; those remain open until an existing authenticated session or a
 normal, non-rate-limited login is available. Do not compare a direct SQL
 measurement with the earlier Java `audits` wall time as if they were the same
 metric. Compare direct SQL only with the pre-index PostgreSQL SQL durations,
 noting that workload and cache state differ.
+
+### Hosted direct PostgreSQL after-sample
+
+The owner ran the read-only probe against the Render External PostgreSQL URL
+at `2026-10-07T12:32:51.208830Z` (probe PID `1162351`). It reported
+`AUDIT_INDEX_VALID=true`. PostgreSQL's natural plan for the ordered 20-row
+audit read used `idx_audit_logs_created_at_desc` and returned 20 rows. The
+warm-up execution took 0.076 ms; five subsequent `EXPLAIN (ANALYZE, BUFFERS)`
+executions took **0.061, 0.048, 0.055, 0.049 and 0.055 ms** (range
+**0.048-0.061 ms**). Each subsequent plan recorded five shared-buffer hits;
+planning time ranged from 0.081 to 0.086 ms. The planner estimated 233,463
+audit rows. These are database execution times, not HTTP client durations.
+
+The pre-index PostgreSQL duration logs for the same ordered audit-read shape
+were 2,936.438, 2,039.839, 2,037.253 and 2,199.968 ms. The after-sample
+strongly supports that the V15 index removes the observed ordered-read scan
+cost in this warm, direct-query window. It does **not** establish a matched
+before/after HTTP request, identical bind/plan/cache/concurrency conditions,
+or the current deployed application SHA at the probe timestamp. The earlier
+duration logs came from application queries with a bind parameter; the direct
+probe used a literal limit and a separate JDBC session. No PostgreSQL PID was
+matched to an HTTP request ID. The last separately verified Live application
+revision remains `5c321c1`; a current Render revision check and bounded warm
+authenticated Activity/overview timing are still required. Platform Owner
+login had returned HTTP 429, so do not retry to force a client sample. H1,
+broader H2/H7/H12, historical Hikari starvation and M1 remain open.
 
 ## Verification and limit
 
@@ -180,5 +206,5 @@ H2-backed platform boundary suite with zero failures/errors/skips and Maven
 exit 0 after the migration was added. That checks the H2 no-op path and
 response/authority behavior, not PostgreSQL concurrent-index creation.
 Corrected disposable-PostgreSQL CI and safe deployment passed as above. A
-repeated hosted before/after latency comparison remains pending. H1/H2/H7/H12
+repeated hosted HTTP before/after latency comparison remains pending. H1/H2/H7/H12
 and M1 remain OPEN.
