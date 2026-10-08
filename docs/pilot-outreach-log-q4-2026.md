@@ -165,3 +165,51 @@ Matus, Masterparts, Bidfood Pretoria, Macsteel, Famous Brands, Bearings Internat
 - Status: SENT / awaiting reply or internal routing
 - Framing: whole-picture SynapseCore control model; acknowledges SPAR's ERP/WMS, predictive analytics, automation and national technology transformation without treating them as a disqualifier.
 - Why targeted: six regional DCs, 2,000+ independent retailers, central wholesale/distribution, digital channels and distributed retailer authority create a distinct whole-operation control environment.
+
+
+## 2026-10-07 — First-wave routing follow-ups sent
+- Matus: same-thread routing follow-up sent for Johannesburg/Germiston operations/distribution.
+- Masterparts: same-thread routing follow-up sent for Gauteng distribution/DC operations.
+- Bidfood Pretoria: Billy Mokoena asked whether he owns the broader cross-functional operating picture or can route to the correct owner.
+- Macsteel: same-thread routing follow-up sent for Gauteng/Mac City operations/supply chain.
+- Famous Brands: Company Secretary asked to confirm routing to Andrew Mundell or the appropriate senior owner.
+- Bearings International: same-thread routing follow-up sent requesting Laura Van Rooyen or the appropriate broader operational owner.
+- Fresh Gmail check found no meaningful company replies and no mailer-daemon/postmaster delivery failures before follow-up.
+- Status remains no response / route unresolved; silence is not recorded as rejection.
+
+
+### Renttech SA — sent 2026-10-07
+- Recipient: d.whitehead@renttechsa.co.za — Duncan Whitehead, Managing Director (public Renttech business/PAIA contact)
+- Subject: South African operational intelligence and control research — Renttech SA
+- Status: SENT / awaiting reply
+- Framing: whole-picture SynapseCore control across a selected rental/service operating scope; explicitly not K8/ERP/rental/inventory/service-system replacement.
+- Why targeted: 14-branch rental/sales network + equipment availability + spares + service/repair + deliveries + project/site outcomes creates a distinct asset-service control archetype.
+
+### AfriSam — sent 2026-10-07
+- Recipient: glenn.johnson@za.afrisam.com — Glenn Johnson, Construction Materials Operations Executive (public AfriSam statutory business contact)
+- Subject: South African operational intelligence and control research — AfriSam
+- Status: SENT / awaiting reply
+- Framing: whole-picture SynapseCore control across a selected construction-material operating scope; acknowledges ClickToGo and existing planning systems; not ERP/order/dispatch/fleet replacement.
+- Why targeted: production plants + quarries/aggregate + readymix + depots + customer commitments + fleet/delivery + technical support create a distinct construction-material control environment.
+
+
+## 2026-10-08 — Meaningful outreach reply
+
+### Motus Aftermarket Parts — meaningful reply 2026-10-08
+- Original route: information@motus.co.za, requesting Michelle Raw / senior operational owner.
+- Internal routing: Cindy McKechnie, Executive Assistant to Michelle Raw (CEO), forwarded the SynapseCore note internally to Selven Naicker and Paul Goosen.
+- Reply received from: Paul Goosen, Wholesale Executive – Motus Aftermarket Parts.
+- Message: "Please can they send us contact details."
+- Status: ROUTED / ENGAGED — first meaningful company response in the current outreach programme.
+- Interpretation: positive routing/engagement signal, not yet pilot qualification, buying intent, or meeting confirmation.
+- Immediate next action: send founder contact details and request a short 20–30 minute operational discussion. Do not send a long deck or technical material unless requested.
+
+
+### Motus contact-details response sent 2026-10-08
+- Reply sent to Paul Goosen, Wholesale Executive – Motus Aftermarket Parts.
+- CC: Cindy McKechnie, Executive Assistant to Michelle Raw (CEO), and Selven Naicker.
+- Founder details provided: Hlulani Kobani, Founder — SynapseCore, Pretoria, Gauteng, South Africa, mobile 078 179 8726, email kobanihlulani77@gmail.com.
+- Message thanked the Motus team for taking the outreach seriously and routing it internally.
+- Product framing preserved: SynapseCore is the whole connected operational intelligence and control system above existing authoritative systems; not an ERP/WMS/retail/parts replacement and not a single-domain dashboard.
+- Motus relevance explained across wholesale distribution, sourcing, inventory, fulfilment, retail/franchise channels, workshops and customer-service outcomes.
+- Requested next step: 20–30 minute operational discussion; no system access/customer data requested at this stage.
