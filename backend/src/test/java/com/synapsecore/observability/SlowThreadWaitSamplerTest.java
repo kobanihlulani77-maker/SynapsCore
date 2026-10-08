@@ -2,9 +2,21 @@ package com.synapsecore.observability;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import java.util.concurrent.TimeUnit;
 import org.junit.jupiter.api.Test;
 
 class SlowThreadWaitSamplerTest {
+
+    @Test
+    void samplesBeforeTheOldFiveSecondBlindWindow() throws InterruptedException {
+        try (SlowThreadWaitSampler sampler = SlowThreadWaitSampler.start()) {
+            long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(4);
+            while (sampler.summary().samples() < 2 && System.nanoTime() < deadline) {
+                Thread.sleep(100);
+            }
+            assertThat(sampler.summary().samples()).isGreaterThanOrEqualTo(2);
+        }
+    }
 
     @Test
     void distinguishesPoolAcquisitionFromJdbcAndJavaWaits() {

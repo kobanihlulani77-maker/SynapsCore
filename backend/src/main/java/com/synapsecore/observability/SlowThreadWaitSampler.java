@@ -21,7 +21,7 @@ public final class SlowThreadWaitSampler implements AutoCloseable {
 
     private SlowThreadWaitSampler(Thread observedThread) {
         this.observedThread = observedThread;
-        this.task = SAMPLER.scheduleAtFixedRate(this::sample, 5, 1, TimeUnit.SECONDS);
+        this.task = SAMPLER.scheduleAtFixedRate(this::sample, 1, 1, TimeUnit.SECONDS);
     }
 
     public static SlowThreadWaitSampler start() {

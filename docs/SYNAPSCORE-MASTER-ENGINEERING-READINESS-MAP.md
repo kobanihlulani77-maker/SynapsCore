@@ -370,9 +370,13 @@ additional active-runtime latency samples, **not** evidence that the pool
 never saturated earlier in the requests or that Free-tier throttling caused
 them. The section-level and sampled JDBC evidence is insufficient to map a
 whole request to a connection/SQL/Java wait owner
-([capture](evidence/warm-runtime-read-2026-10-08.md)). Authenticated
-Platform Activity still renders 20 signals on the Live V15 code lineage;
-Chrome UI navigation elapsed time is not a substitute for HTTP timing
+([capture](evidence/warm-runtime-read-2026-10-08.md)).
+The 5,602 ms composition yielded only one stack sample because sampling began
+after five seconds. An earlier first sample has passed local verification; it
+improves the next diagnostic opportunity but does not identify the holder or
+close H1/H12 ([sampler evidence](evidence/snapshot-wait-sampling-2026-09-30.md)).
+Authenticated Platform Activity still renders 20 signals on the Live V15 code
+lineage; Chrome UI navigation elapsed time is not a substitute for HTTP timing
 ([activity continuation](evidence/platform-activity-read-boundary-2026-10-07.md)).
 The merged H4 PostgreSQL terminal-write test is CI-green; it does not clear
 worker-crash, multi-instance or hosted recovery gates. Render's Free service
