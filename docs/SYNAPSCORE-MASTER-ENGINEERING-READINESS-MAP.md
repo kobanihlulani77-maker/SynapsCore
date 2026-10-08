@@ -23,8 +23,8 @@ acceptance or M7 customer-specific launch authorization.
 | Next gate | M2: repeatable hosted verification; entry BLOCKED until M1's in-scope hardening gates pass |
 | Pilot authorization | NOT GRANTED by this map; current candidate is not accepted for customer operations |
 | Last verified live backend | Render showed `d58db984ac427e07ec58da27d064279c28420cbb` Live on October 8 (`dep-db38ktu7bikc73c1aqu0`). No backend/frontend application files changed since V15 `5c321c1`; the six-flag gate passed. This is deployment/readiness proof, not authenticated HTTP latency or M1 closure ([activity boundary](evidence/platform-activity-read-boundary-2026-10-07.md)). |
-| Pending scoped recovery proof | [PR #2](https://github.com/kobanihlulani77-maker/SynapsCore/pull/2) is ready for review at `bdf46bd`; both exact-SHA CI runs [37791142973](https://github.com/kobanihlulani77-maker/SynapsCore/actions/runs/37791142973) and [37791136167](https://github.com/kobanihlulani77-maker/SynapsCore/actions/runs/37791136167) passed `verify` and disposable-PostgreSQL `dispatch-postgres`. This is unmerged test/CI work, not hosted dispatch recovery proof. |
-| Latest scoped CI evidence | [GitHub Actions run `37613626785`](https://github.com/kobanihlulani77-maker/SynapsCore/actions/runs/37613626785) succeeded for exact SHA `5c321c1d638cd8ceb87b55d3f77f982f76b660bc`: `verify` (backend tests, frontend build, Compose validation) and `dispatch-postgres` (focused PostgreSQL claim/reclaim and V15 index validity/plan proof). Worker-crash recovery, hosted latency repeatability, browser/load and full M1 proof are not covered by this run. |
+| Scoped recovery proof | [PR #2](https://github.com/kobanihlulani77-maker/SynapsCore/pull/2) merged as `16f44753f1cc90c21d3dbe6accc59a51d575c798`. The new disposable-PostgreSQL test rejects the terminal `COMPLETED` write after broadcast, verifies the claim remains recoverable, then reclaims/completes it after lease expiry with an explicit second broadcast. It changes only test/CI files; controlled process-stop, multi-instance and hosted recovery remain OPEN ([dispatch evidence](evidence/operational-dispatch-claim-recovery-2026-10-03.md)). |
+| Latest scoped CI evidence | [Merged-main GitHub Actions run `37793495899`](https://github.com/kobanihlulani77-maker/SynapsCore/actions/runs/37793495899) succeeded for exact SHA `16f44753f1cc90c21d3dbe6accc59a51d575c798`: `verify` and `dispatch-postgres` both passed. The latter includes claim/reclaim, injected terminal-write failure and V15 index proof. Worker-crash recovery, hosted latency repeatability, browser/load and full M1 proof are not covered by this run. |
 | Local test artifacts | September 23 Surefire aggregate: 390 tests. The dispatch correction passed a 70-suite/403-test full backend run with zero failures/errors/skips and production packaging locally; its injected terminal-write failure was exercised in the H2 test profile, not PostgreSQL ([dispatch record](evidence/operational-dispatch-claim-recovery-2026-10-03.md)). On October 7, the activity-read diagnostic passed 36 focused tests and a full 70-suite/404-test H2-backed backend regression with zero failures/errors/skips ([activity boundary](evidence/platform-activity-read-boundary-2026-10-07.md)). |
 | Worktree boundary | Unrelated frontend Dockerfile edit, `.gitattributes`, two untracked Scenario evidence files, and raw CSV captures are not part of this assessment's committed implementation. |
 
@@ -374,8 +374,12 @@ whole request to a connection/SQL/Java wait owner
 Platform Activity still renders 20 signals on the Live V15 code lineage;
 Chrome UI navigation elapsed time is not a substitute for HTTP timing
 ([activity continuation](evidence/platform-activity-read-boundary-2026-10-07.md)).
-The ready-but-unmerged H4 PostgreSQL terminal-write test PR is CI-green;
-it does not clear worker-crash, multi-instance or hosted recovery gates.
+The merged H4 PostgreSQL terminal-write test is CI-green; it does not clear
+worker-crash, multi-instance or hosted recovery gates. Render's Free service
+Metrics page exposed only limits (512 MB and 0.15 CPU), not application
+CPU/memory charts; the production actuator filter intentionally permits
+health only. H7 resource attribution therefore still lacks synchronized
+host/JVM measurements, and a plan upgrade remains unapproved.
 
 ### Cross-workstream dependency and ordering
 

@@ -102,3 +102,36 @@ on isolated PostgreSQL data or a safe disposable tenant, compare queue
 status/attempts before and after a controlled worker interruption, and
 preserve both authoritative state and realtime readback without mutating
 customer operations.
+
+## PostgreSQL terminal-write failure proof, October 8
+
+[PR #2](https://github.com/kobanihlulani77-maker/SynapsCore/pull/2) merged as
+`16f44753f1cc90c21d3dbe6accc59a51d575c798`. It adds one focused test
+and includes that test in the existing disposable-PostgreSQL CI job; it does
+not change production code, schema, scheduler settings or infrastructure.
+The test creates a uniquely named pending dispatch item and a PostgreSQL
+trigger that rejects its `COMPLETED` update after a recorded realtime
+broadcast. It asserts that the processing attempt propagates the PostgreSQL
+failure, does not falsely become `FAILED`, and releases the drain guard. It
+then removes the trigger, ages the claim beyond the lease, and asserts that a
+later drain reclaims and completes the item on attempt 2. The recording
+realtime service sees two broadcasts, making the at-least-once consequence
+explicit rather than claiming exactly-once publication.
+
+The first branch CI attempt exposed a test-fixture error: a static bean
+factory could not supply the realtime `ObjectProvider`. Replacing it with a
+registered singleton in a `DefaultListableBeanFactory` fixed only that
+fixture. The focused H2 local queue suite passed 7/7. At exact head
+`bdf46bd99e66e2ffa738de2fe7717ade6fcee453`, both
+[CI 37791142973](https://github.com/kobanihlulani77-maker/SynapsCore/actions/runs/37791142973)
+and [CI 37791136167](https://github.com/kobanihlulani77-maker/SynapsCore/actions/runs/37791136167)
+passed `verify` and `dispatch-postgres`. The merged-main
+[CI 37793495899](https://github.com/kobanihlulani77-maker/SynapsCore/actions/runs/37793495899)
+completed successfully at exact SHA `16f4475`: both `dispatch-postgres`
+and `verify` passed. This checks the disposable-PostgreSQL failure/reclaim
+path and the normal CI regression lanes, not an actual hosted worker stop.
+
+This is disposable-PostgreSQL transaction/reclaim proof under a test-owned
+trigger, not a process kill, independent JVM, hosted delivery, duplicate
+consumer, sustained backlog or resource-headroom proof. H4 and M1 remain
+**OPEN**.
