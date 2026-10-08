@@ -61,3 +61,29 @@ If Hikari acquisition dominates, capture pool overlap and holders; if JDBC
 dominates, inspect PostgreSQL state and query timing; if another category
 dominates, trace that service path. Do not infer a plan change from low
 current-thread CPU or a single stack sample. H1/H7 and M1 remain open.
+
+## October 8 diagnostic cadence follow-through
+
+The [October 8 warm read capture](warm-runtime-read-2026-10-08.md) includes a
+5,602 ms snapshot composition with only one `POSTGRES_JDBC` stack sample.
+Source inspection showed the sampler started with a five-second initial delay,
+then sampled once per second. This left a five-second blind window in exactly
+the duration range we need to classify; the single JDBC frame cannot explain
+the whole request.
+
+The bounded diagnostic correction moves the first sample to one second after
+composition begins. The one-second cadence and 60-sample cap stay unchanged;
+only compositions exceeding the existing slow threshold emit an aggregate.
+The focused test requires two samples before the old five-second window and
+passed locally (2 tests, 0 failures/errors). This is **local diagnostic proof**,
+not deployed request attribution. It does not measure connection hold time,
+SQL execution time, a PostgreSQL PID, or the transaction owner, and it does
+not establish that historical Hikari starvation is resolved. A naturally slow
+hosted request still needs request-ID-matched stack, pool, SQL and Java evidence.
+
+The backend suite also passed locally on the diagnostic production change:
+70 suites, 405 tests, zero failures, errors, or skips. After that run, the new
+test's incidental thread-state assertion was removed to avoid coupling the
+cadence check to scheduler timing; the production code did not change. The
+focused final-file test passed: 2 tests, zero failures or errors. Neither
+local check is exact-SHA CI or hosted runtime proof of the correction.
