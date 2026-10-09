@@ -213,3 +213,37 @@ Matus, Masterparts, Bidfood Pretoria, Macsteel, Famous Brands, Bearings Internat
 - Product framing preserved: SynapseCore is the whole connected operational intelligence and control system above existing authoritative systems; not an ERP/WMS/retail/parts replacement and not a single-domain dashboard.
 - Motus relevance explained across wholesale distribution, sourcing, inventory, fulfilment, retail/franchise channels, workshops and customer-service outcomes.
 - Requested next step: 20–30 minute operational discussion; no system access/customer data requested at this stage.
+
+
+## 2026-10-09 — Parallel outreach expansion and full-engine target correction
+
+### Commercial rule — full operating loop, not one domain
+- Founder reaffirmed that logistics, warehouse activity or distribution alone is not a sufficient basis for a first end-M SynapseCore pilot. They can be important input domains, but the selected company scope needs multiple connected, consequential operational domains and the full supported closed loop.
+- Every first-contact message should present the entire SynapseCore identity: company-specific authoritative source systems and trust/freshness; unified real-time operational picture across systems/sites/people/partners; cross-domain dependencies/pressure; prioritisation, alerts and recommendations; human roles, permissions, governed decisions and escalation; accountable supported action or external handoff; verified outcomes, audit and safe replay/recovery.
+- The founder's examples and corrective emphasis do not replace the rest of the product. The product pitch remains broad and integrated, not rewritten around the most recently mentioned component.
+- Avoid needless defensive positioning such as saying what SynapseCore does not replace. Describe its positive role and customer operating value confidently.
+- Distinguish complete end-M product direction from currently accepted supported pilot contracts. Engineering M6 and customer-specific M7 gates remain mandatory; research is not proof that production, procurement, farm, healthcare or other industry-specific source integrations already exist.
+
+### New outreaches confirmed sent in Gmail (2026-10-09)
+| Company | Recipient and routing | Research basis, company-specific | Status / next action |
+| --- | --- | --- | --- |
+| Super Group / SG Consumer | shaun.day@supergrp.com, for Shaun Day | Warehousing, distribution, inventory planning and consumer fulfilment; lower priority for first full-domain pilot until connection to demand and customer outcomes is established | SENT, Gmail id `1a1224f3e0c8e709`; await initial response |
+| Omnia Group | info@omnia.co.za; request group Operations / Supply Chain executive | Manufacturing, agriculture, mining/chemicals and distribution; potentially broad multi-function picture | SENT, Gmail id `1a1224f45100ba63`; seek appropriate cross-domain owner |
+| UPD (Clicks Group) | info@upd.co.za; for Trevor McCoy or appropriate executive | Pharmaceutical supply/stock, distribution centres, retail/hospital/customer service outcomes; regulatory and integration burden to qualify | SENT, Gmail id `1a1224f4e35c269a`; route internally |
+| Libstar | info@libstar.co.za; for Cornél Lodewyks, Group COO | Multiple food manufacturing units, production and perishable/ambient stock, retail/food-service/wholesale demand, distribution and operating performance; COO appointed 1 Aug 2026 to strengthen cross-business collaboration | SENT, Gmail id `1a1225484a5c5b04`; seek sponsor and plausible integrated business-unit pilot |
+| Astral Foods | contactus@astralfoods.com; for Nikki Moodley, Operations Improvement Executive | Feed manufacturing -> breeding/farms -> processing -> finished-product stock -> retail/wholesale/QSR commitments -> distribution. Distinct full-company operating loop, with safety-critical boundary needing careful pilot exclusion | SENT, Gmail id `1a122548b9d37af6`; seek cross-functional owner |
+| Woolworths Holdings | Governance@woolworths.co.za; request referral to Bradley Nitsckie, COO | July 2026 operating reset joined supply chain, stores, retail operations, logistics; online/data/technology in a Digital and Technology division, with Food and FBH commercial flows | SENT, Gmail id `1a1225494de4b322`; request appropriate senior sponsor |
+
+### Public source references supporting 9 October prospect selection
+- Libstar: https://www.libstar.co.za/about-us/leadership/ ; https://www.libstar.co.za/contact-us/ ; https://www.libstar.co.za/press-releases/
+- Astral: https://www.astralfoods.com/about-us/ ; https://www.astralfoods.com/about-us/leadership/ ; https://www.astralfoods.com/contact/ ; official 2025 corporate reporting confirms contactus@astralfoods.com.
+- Woolworths: https://www.woolworthsholdings.co.za/woolworths-announces-organisational-reset/ ; https://www.woolworthsholdings.co.za/directorate/directors/ ; https://www.woolworthsholdings.co.za/whl-fy26-results-woolworths-operational-resilience-delivers-credible-results-increases-turnover-in-every-segment-and-declares-total-dividend-of-r1-9-billion/
+- Earlier 9 October messages to Super Group/Omnia/UPD are verified in Gmail; require full-domain qualification before treating them as pilot candidates.
+
+### Researched — NOT contacted in this wave
+- RCL FOODS: Groceries, Baking, Sugar and shared services across manufacturing/stock/supply/demand/customer fulfilment. Public route is primarily official contact form; identify valid executive operations contact before outreach. https://rclfoods.com/our-business/our-business-structure/ ; https://rclfoods.com/investor-center/executive-team/ ; https://rclfoods.com/contact-us/
+- Premier Group: milling/baking, consumer grocery categories, distribution and integration following the 2026 RFG combination. Confirm appropriate business recipient; investor mailbox is not assumed to be an operations introduction channel. https://www.premierfmcg.com/investors/results-reports
+- Tiger Brands: broad national manufacturing/distribution footprint; confirm current cross-division decision owners and usable entry route before first message.
+
+### Next qualification
+Do not treat the six sent introductions as qualified pilots. During discovery seek verified cross-domain source authority, demand/order/stock/fulfilment interactions, actual constraints and competing priorities, existing tools' strengths, human decision/approval owners, action and outcome observation, integration/recovery, measurable outcome and customer acceptance boundaries. Favor a bounded footprint with a complete connected operating loop over a narrow workflow or arbitrary company size. Continue Motus relationship follow-up separately, respecting response time.
