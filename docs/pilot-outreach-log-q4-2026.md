@@ -287,3 +287,10 @@ Existing Takealot introductions in September (do not double-count or blindly rep
 - **AFGRI:** earlier attempted mail was blocked and was not in Gmail's sent mailbox; remains **NOT SENT**. Do not count or silently retry.
 
 **Next actions:** wait an appropriate interval before pursuing Takealot's same route further; seek more precise group-wide sponsor through a verified published route or company-approved referral, not guessed personal email. Monitor Motus/Takealot and all other companies for real engagement. Investigate Senwes/KAL/Premier and medium-size vertical operators while checking prior contacts. Distinguish a bounded customer footprint from narrowing the whole supported operational loop. Confirm role/systems/access/security/data/outcome sources before any M7 pilot integration; all M1-M6 and M7 gates still apply.
+
+
+### Tiger Brands — new corporate secretary introduction
+- **Verified sent 2026-10-09:** `Companysecretary@tigerbrands.com`; Gmail id `1a1226dcbf4df397`; formal recipient from Tiger Brands' own March 2026 interim company information: https://tigerbrands-ir-digital.com/results/2026/interims-2026/company-information.php .
+- Executive requested: cross-functional manufacturing / operations / commercial supply and distribution performance owner.
+- Why: Tiger Brands' FY26 consumer-product operations link demand, sourcing, plant performance, stock, distribution and market channels. Reuters June 1, 2026 reports company-acknowledged supply-chain cost pressures, expanding transport routes and risks from external disruption. Source: https://www.reuters.com/world/africa/south-africas-tiger-brands-reports-marginal-rise-half-year-earnings-2026-06-01/
+- Intro conveys full operational truth -> dependencies/pressure -> recommendations/governed operator decisions -> supported action/handoff -> observed outcome/reconciliation/audit/recovery; no system criticism or presumed gap. Await internal referral; SENT is not a positive response.
