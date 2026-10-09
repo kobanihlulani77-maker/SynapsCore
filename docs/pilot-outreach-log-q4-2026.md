@@ -247,3 +247,26 @@ Matus, Masterparts, Bidfood Pretoria, Macsteel, Famous Brands, Bearings Internat
 
 ### Next qualification
 Do not treat the six sent introductions as qualified pilots. During discovery seek verified cross-domain source authority, demand/order/stock/fulfilment interactions, actual constraints and competing priorities, existing tools' strengths, human decision/approval owners, action and outcome observation, integration/recovery, measurable outcome and customer acceptance boundaries. Favor a bounded footprint with a complete connected operating loop over a narrow workflow or arbitrary company size. Continue Motus relationship follow-up separately, respecting response time.
+
+
+## 2026-10-09 — Full-loop qualification extension, second wave
+
+The founder specified continuous target expansion across large and moderately sized operations, with full-loop proof in an approved footprint. Prospecting now additionally uses *hypothesised* operational pain signals inferred from scale, network dependencies, service promises and user-reported complaints, **without falsely attributing internal defects**. The last product example never replaces full product meaning. New detailed [Research Report 15](research-report-15-public-operational-signals-and-full-loop-prospects-2026-10-09.md) records sources, Takealot public complaints and system scale, existing alternatives, target qualification and updated buyer hypotheses.
+
+### Verified new sends
+- **Boxer Retail:** `CompanySecretary@boxer.co.za` — referral requested to Justin Galloway, Group Executive: Supply Chain, and cross-functional operations owner. Boxer: procurement/promotion demand -> DC stock -> meat production -> store availability/customer outcomes. Mail id `1a1225f450e9a37d`; SENT confirmed. Public source: https://boxerinvestor.co.za/media/boxer-opens-tongaat-distribution-centre-expanding-supply-chain-strength-and-capacity
+- **Italtile Group:** `bronwyn.muller@merchantec.com` — 2026 published external corporate-secretary route to Brandon Wood, CEO/operations; manufacturing/import/distribution -> CTM/TopT/Italtile retail and online network. Mail id `1a1225f4a94bf338`; SENT confirmed. Public 2026 source: https://www4.sharenet.co.za/v3/sens_display.php?scode=&seq=6&tdate=20260824071500
+
+### Attempted but NOT SENT
+- **AFGRI:** attempted `afgri@afgri.co.za`; mail action blocked; separate Gmail sent-folder search found **no sent email**. Maintain **RESEARCHED, NOT CONTACTED**, no assumed recipient or delivery. Research supports multi-domain interest but do not silently retry failed sending.
+
+### Additional researched prospects — NOT contacted
+- **Agrico:** 3 factories, 42 branches, stocked components, design/installation/service, owner Walter Andrag; `info@agrico.co.za` published. Especially attractive connected mid-enterprise corridor, subject to supported integration contracts. https://agrico.co.za/about/
+- **Dairy Group:** farmer/raw-milk supply -> quality -> processing/production -> sales/stock/distribution/customer delivery; published operations contact Ryno Bosch `ryno.bosch@dairy.co.za`. https://www.dairygroup.co.za/contact-us/
+- **Clover:** manufacturing sites, milk depots, distribution and connected customer service; secretary `companysec@clover.co.za`; https://www.clover.co.za/contact-us/
+- **Senwes:** grain/retail/inputs/finance/equipment ecosystem; https://www.senwes.co.za/
+- **KAL Group:** 268 retail/fuel/convenience sites; business-unit scope requires current organizational validation; https://www.kalgroup.co.za/
+- **Mr Price Group:** supply/store/digital businesses; official group contact form; https://mrpricegroup.com/contact-us/
+
+### Takealot signal-driven strategic review
+Existing Takealot introductions in September (do not double-count or blindly repeat). FY26 company/Naspers reporting confirms broad marketplace, seller, order and external logistics network; TFS publishes existing mature source systems, tracking, warehouse, returns and refund capabilities. Individual September–October 2026 Hellopeter complaints allege timing, refund, cancellation and source-status inconsistency; these are **unverified allegations**, not operational diagnoses. Map hypothetical customer promise -> seller/source inventory -> warehouse -> delivery -> contact centre -> governed decision -> customer outcome and recovery, then test what the existing Takealot tools already solve and where incremental value could exist. Sources and questions in Research Report 15. No Takealot follow-up send in this wave.
