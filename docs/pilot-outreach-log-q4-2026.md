@@ -294,3 +294,14 @@ Existing Takealot introductions in September (do not double-count or blindly rep
 - Executive requested: cross-functional manufacturing / operations / commercial supply and distribution performance owner.
 - Why: Tiger Brands' FY26 consumer-product operations link demand, sourcing, plant performance, stock, distribution and market channels. Reuters June 1, 2026 reports company-acknowledged supply-chain cost pressures, expanding transport routes and risks from external disruption. Source: https://www.reuters.com/world/africa/south-africas-tiger-brands-reports-marginal-rise-half-year-earnings-2026-06-01/
 - Intro conveys full operational truth -> dependencies/pressure -> recommendations/governed operator decisions -> supported action/handoff -> observed outcome/reconciliation/audit/recovery; no system criticism or presumed gap. Await internal referral; SENT is not a positive response.
+
+
+## 2026-10-10 — Reply check and prospecting
+
+- **Inbox checked, October 10:** No new substantive human enterprise reply observed after Motus's October 8 contact request. Clover's October 9 email remains administrative auto-routing, not a commercial rejection.
+- **Quantum Foods:** official `info@quantumfoods.co.za`, routed for supply-chain executive Roelof Viljoen or CEO Adel van der Merwe. New message confirmed in Gmail Sent id `1a127850106287d2`. Company-specific research: https://quantumfoods.co.za/about-us/
+- **Senwes:** official `info@senwes.co.za`, routed for CEO Debbie Bester or Grainlink managing executive Kobus Strauss. New message confirmed in Gmail Sent id `1a127850c5eb4052`. Research: https://www.senwes.com/company-overview
+- **AVI Limited:** possible target researched at https://www.avi.co.za/fact-sheet/ ; send attempt did not succeed; NOT CONTACTED in this wave.
+- **New automatic responses:** Quantum Foods confirmed its general inquiries can be forwarded to a responsible manager and asked for 2–5 working days; NOT a positive buying signal. Senwes-related OneAgri service desk sent an account-activation email automatically; NOT a human referral and no account activation was requested. Do not follow authentication links.
+- **Research continuation:** KAL Group current CEO Johann le Roux; cross-domain Agrimark and fuel/convenience business, published corporate contact form only: https://www.kalgroup.co.za/contact-us
+- **Next:** Hold individual Friday October 9 recipients for a reasonable working-day interval, pursue higher-quality verified executive routes rather than repeating the same email, and continue researched new-company acquisition in parallel. New weekday SynapseCore prospecting schedule created; existing four-hour reply watch remains enabled but push/email notifications must be enabled separately by user.
