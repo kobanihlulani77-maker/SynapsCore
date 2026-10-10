@@ -133,3 +133,16 @@ Use this distinction:
 Existing ERP/WMS/TMS/automation remains authoritative for the functions it owns. The limitation is on **unnecessary data volume and company footprint**, not on SynapseCore's whole-picture control role.
 
 Pre-send check: if the email could make the prospect think we are proposing order analytics, inventory analytics, fulfillment monitoring, a dashboard, or a small bolt-on tool, rewrite it.
+
+
+## 10. 2026-10-10 Response-first outreach operating discipline
+
+The commercial objective is an enterprise conversation with an accountable operational decision-maker, not a high number of sent emails. A mature technology stack does not reduce whole-loop fit. A prospect may have hundreds of functioning specialist systems while still benefitting from a trusted cross-system operating picture, recommendations, governed coordination, action evidence and resilience. Value remains a hypothesis requiring customer discovery.
+
+**First contact:** verify current executive, official contact route and researched company-specific operating structure; prefer an appropriate business/operations route rather than compliance, press or legal inboxes. Use an approximately 150–200 word, positive founder-led message: complete SynapseCore identity; why the company is a relevant cross-domain environment; one thoughtful operational question; a low-friction 15–20 minute conversation; founder's South African contact details. Describe a selected meaningful pilot footprint without narrowing the product to logistics, stock or a dashboard. Verify every recipient against Gmail's Sent history before writing.
+
+**Follow-up:** a useful follow-up adds new evidence, a specific question or a better executive path. Wait 3–5 working days following an introduction where appropriate, allow one or two respectful follow-ups, and honor negative responses. Seek alternative verified routes rather than repeatedly chasing the same general inbox. Never assume a sent email reached its executive recipient.
+
+**Reply classification:** human answer/internal referral > automated routing with named next step > generic acknowledgment > silence. An automatic response is not a qualified lead. Log the exact route and how to proceed, not an inferred interest. For software prospecting use only relevant business channels; do not activate unrelated customer-support accounts created automatically by help-desk integrations without explicit need.
+
+**Current communications boundary:** never promise that intended future cross-industry adapters, automatic write-back or simulation execution are already implemented. First secure an operational discovery discussion; technical verification and company-specific permission precede pilot authorization under M6 and M7.
