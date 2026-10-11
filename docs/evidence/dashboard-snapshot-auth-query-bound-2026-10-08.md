@@ -144,7 +144,7 @@ neither can substitute for snapshot HTTP or Platform Activity measurements.
 Warm snapshot latency remains material, and historical Hikari `10/10` holder
 identity remains unknown. M1/H1/H2/H7/H12 stay open.
 
-## Snapshot HTTP boundary diagnostic candidate, October 11
+## Snapshot HTTP boundary diagnostic and Live after-sample, October 11
 
 The five warm client reads above fell mostly below the existing five-second
 `RequestTraceFilter` warning threshold. Three composition logs were captured,
@@ -168,8 +168,61 @@ errors or skips**. `ReplayOrderConnectionDemandIntegrationTest` passed its
 three repetitions in this run; that does not explain its earlier intermittent
 full-suite failure. A stale failed Surefire report from October 8 remains on
 disk and is excluded by report modification time rather than hidden as a
-current failure. Exact-head CI and hosted same-request correlation remain
-required. This candidate does not claim a latency improvement or M1 closure.
+current failure. Exact-head PR runs `38136231545` and `38136213070` passed
+both `verify` and `dispatch-postgres`. PR #6 merged as
+`62b5d681d7eb3500876e3fa9e52f82eb79b01799`; merged-main CI
+`38136507060` passed both jobs. Render showed that exact SHA Live after a
+4m56s auto-deploy. The post-cutover six-flag gate returned true.
+
+On Live instance `msjqm`, the same read-only synthetic-tenant probe used one
+login and five serial warm summary/snapshot pairs. Readiness and anonymous
+session preflight returned 200 in 622 and 435 ms. Login returned 200 in
+2,845 ms; initial summary and snapshot returned 200 in 2,557 and 4,688 ms.
+Those calls establish warm-up, not the warm sample range.
+`WARM_BASELINE_UTC=2026-10-11T11:48:25.380Z`.
+
+| Warm sample | Snapshot UTC start | Summary client ms | Snapshot client ms | Snapshot ID suffix | Same-ID HTTP wall / CPU ms | Same-ID composition wall / CPU ms |
+| --- | --- | ---: | ---: | --- | ---: | ---: |
+| 1 | 11:48:26.069 | 688 | 3,510 | `f6b71e37` | 3,059 / 142 | 2,292 / 100 |
+| 2 | 11:48:30.571 | 992 | 3,234 | `f24c0a77` | 2,647 / 120 | not captured |
+| 3 | 11:48:34.679 | 873 | 3,000 | `e49d8786` | 2,514 / 134 | not captured |
+| 4 | 11:48:38.282 | 603 | 3,014 | `dd4864a2` | 2,612 / 112 | 2,097 / 85 |
+| 5 | 11:48:42.205 | 908 | 3,008 | `6f0debc4` | 2,516 / 112 | not captured |
+
+All ten warm reads returned 200. The unrounded client snapshot range was
+2,999.5-3,510.0 ms; same-ID server HTTP range was 2,514-3,059 ms. Client
+minus server wall was approximately 402-587 ms. For the two warm requests
+with composition logs, server wall minus composition was 767 and 515 ms.
+These differences bound unmeasured work; they do not identify network,
+serialization, acquisition or a particular SQL statement. The initial
+snapshot `ea3a0d6a-77c7-43ef-9e84-8a1a06b14e0d` had 4,307 ms HTTP wall,
+3,195 ms composition and 203 ms HTTP-thread CPU. It is excluded from the
+warm range.
+
+All six snapshot HTTP logs were emitted by the new 2-second threshold and
+reported Hikari `total=10 active=0 idle=10 waiting=0` **at response
+completion**. They do not establish pool state during each request, nor
+explain historical `10/10` starvation. The five warm HTTP-thread CPU times
+were 112-142 ms against 2.5-3.1 seconds wall. Three composition logs were
+captured in the six-snapshot probe; the others must not be treated as zero
+composition time. Two sparse warm composition samplers landed in PostgreSQL
+JDBC frames, including fulfillment assessment and alert visibility paths.
+They are not measured SQL duration, PostgreSQL PID/lock evidence or a
+connection-hold timeline. Nearby operational-dispatch scans processed zero
+work and sampled zero waiters; this is not a representative busy-worker test.
+The new threshold produced six HTTP warnings plus three composition warnings
+in this bounded run. Log volume under sustained operator traffic is still
+unmeasured.
+
+This closes the **missing same-request HTTP-versus-composition observation**
+for this warm control, not warm-latency root cause or M1. The similar older
+3.0-3.8 second warm-client range was on a different deployment/instance and
+is not a like-for-like causal improvement comparison. The current data place
+most client wall inside the server handler, with low current-thread CPU;
+they do not distinguish PostgreSQL round trips, Java off-CPU waits, host
+throttling or pool acquisition during the request. Platform Owner Activity
+HTTP after-measurement remains separate and unavailable from this tenant
+probe. No performance fix was applied.
 
 ## Exit still required
 
