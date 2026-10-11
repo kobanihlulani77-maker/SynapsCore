@@ -17,12 +17,15 @@ import java.time.Instant;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Optional;
+import java.util.function.Supplier;
 import lombok.extern.slf4j.Slf4j;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.context.request.RequestContextHolder;
+import org.springframework.web.context.request.ServletRequestAttributes;
 import org.springframework.web.server.ResponseStatusException;
 
 @Service
@@ -36,6 +39,7 @@ public class AuthSessionService {
     public static final String SESSION_AUTHENTICATED_AT_KEY = "synapsecore.auth.authenticatedAt";
     public static final String SESSION_USER_SESSION_VERSION_KEY = "synapsecore.auth.userSessionVersion";
     public static final String SESSION_TENANT_SECURITY_POLICY_VERSION_KEY = "synapsecore.auth.tenantSecurityPolicyVersion";
+    private static final String SNAPSHOT_IDENTITY_KEY = AuthSessionService.class.getName() + ".snapshotIdentity";
 
     private final AccessUserRepository accessUserRepository;
     private final PasswordEncoder passwordEncoder;
@@ -171,7 +175,48 @@ public class AuthSessionService {
         if (session == null || !hasSessionIdentity(session)) {
             return Optional.empty();
         }
-        return validateSession(session, false, null);
+        SnapshotIdentity snapshotIdentity = snapshotIdentity();
+        if (snapshotIdentity != null && snapshotIdentity.session == session && snapshotIdentity.resolved != null) {
+            return snapshotIdentity.resolved;
+        }
+        Optional<AuthenticatedSession> resolved = validateSession(session, false, null);
+        if (snapshotIdentity != null && resolved.isPresent()) {
+            snapshotIdentity.session = session;
+            snapshotIdentity.resolved = resolved;
+        }
+        return resolved;
+    }
+
+    // Only the already-authorized dashboard read opts into this request-local identity snapshot.
+    public <T> T withSnapshotIdentity(Supplier<T> read) {
+        if (!(RequestContextHolder.getRequestAttributes() instanceof ServletRequestAttributes attributes)) {
+            return read.get();
+        }
+        var request = attributes.getRequest();
+        Object previous = request.getAttribute(SNAPSHOT_IDENTITY_KEY);
+        request.setAttribute(SNAPSHOT_IDENTITY_KEY, new SnapshotIdentity());
+        try {
+            return read.get();
+        } finally {
+            if (previous == null) {
+                request.removeAttribute(SNAPSHOT_IDENTITY_KEY);
+            } else {
+                request.setAttribute(SNAPSHOT_IDENTITY_KEY, previous);
+            }
+        }
+    }
+
+    private SnapshotIdentity snapshotIdentity() {
+        if (RequestContextHolder.getRequestAttributes() instanceof ServletRequestAttributes attributes
+            && attributes.getRequest().getAttribute(SNAPSHOT_IDENTITY_KEY) instanceof SnapshotIdentity identity) {
+            return identity;
+        }
+        return null;
+    }
+
+    private static final class SnapshotIdentity {
+        private jakarta.servlet.http.HttpSession session;
+        private Optional<AuthenticatedSession> resolved;
     }
 
     public AuthenticatedSession requireAuthenticatedSession(jakarta.servlet.http.HttpSession session,

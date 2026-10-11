@@ -1,6 +1,7 @@
 package com.synapsecore.api.controller;
 
 import com.synapsecore.access.AccessControlService;
+import com.synapsecore.auth.AuthSessionService;
 import com.synapsecore.domain.dto.DashboardSnapshotResponse;
 import com.synapsecore.domain.dto.DashboardSummaryResponse;
 import com.synapsecore.domain.service.DashboardService;
@@ -10,9 +11,11 @@ import com.synapsecore.domain.dto.FulfillmentOverviewResponse;
 import java.time.Instant;
 import java.util.List;
 import lombok.RequiredArgsConstructor;
+import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.server.ResponseStatusException;
 
 @RestController
 @RequestMapping("/api/dashboard")
@@ -20,6 +23,7 @@ import org.springframework.web.bind.annotation.RestController;
 public class DashboardController {
 
     private final AccessControlService accessControlService;
+    private final AuthSessionService authSessionService;
     private final DashboardService dashboardService;
     private final OperationalViewService operationalViewService;
 
@@ -32,7 +36,7 @@ public class DashboardController {
     @GetMapping("/snapshot")
     public DashboardSnapshotResponse getSnapshot() {
         var actor = accessControlService.requireWorkspaceAccess("view dashboard snapshots");
-        DashboardSnapshotResponse snapshot = operationalViewService.getSnapshot();
+        DashboardSnapshotResponse snapshot = authSessionService.withSnapshotIdentity(operationalViewService::getSnapshot);
         var fulfillmentItems = snapshot.fulfillment().activeFulfillments().stream()
             .filter(item -> actor.canAccessWarehouse(item.warehouseCode()))
             .toList();
@@ -47,7 +51,7 @@ public class DashboardController {
         boolean integrationAccess = actor.roles().contains(SynapseAccessRole.INTEGRATION_ADMIN)
             || actor.roles().contains(SynapseAccessRole.INTEGRATION_OPERATOR);
 
-        return new DashboardSnapshotResponse(
+        DashboardSnapshotResponse result = new DashboardSnapshotResponse(
             snapshot.summary(),
             snapshot.alerts(),
             snapshot.recommendations(),
@@ -69,5 +73,10 @@ public class DashboardController {
             snapshot.recentScenarios().stream().filter(item -> actor.canAccessWarehouse(item.warehouseCode())).toList(),
             snapshot.generatedAt()
         );
+        if (!actor.equals(accessControlService.requireWorkspaceAccess("view dashboard snapshots"))) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN,
+                "Dashboard snapshot authority changed during the read. Refresh and try again.");
+        }
+        return result;
     }
 }
