@@ -52,3 +52,49 @@ Score /25 possible: (a) multiple consequential operational domains 0–5; (b) cr
 - **Fourth:** allow Friday/Saturday/Sunday messages a few business days; do not chase immediately; follow Quantum Foods after the 2–5 working day guidance.
 - **Fifth:** measure movement through researched -> valid route -> sent -> auto routed -> human acknowledged/referral -> discovery booked -> business value hypothesis -> integration feasibility -> conditional pilot. Don't conflate counts with opportunity.
 - **Sixth:** improve first-contact text with a single decisive question and clear next step: 'How does your team maintain one trustworthy, actionable view across these functions, especially when something changes—and verify that the resulting decision worked?' Use this to invite short operator-oriented discussion, not to imply existing technology failure.
+
+
+## 5. Second research and outreach pass — Dutoit, Lona, BexGroup, Brito's
+**Same date, 2026-10-11 SAST — commercial research and send verification; NOT proof of customer system faults, value capture, recipient reading, pilot readiness, or accepted capability.**
+
+### Dutoit Group — direct CEO outreach SENT
+Public evidence: integrated farming, growing, packhouses, cold and controlled-atmosphere storage, specialist sorting, transport, domestic and export markets. Current official corporate site cites c. 250,000 tonnes of fresh produce annually and a portfolio spanning farm/packing/distribution/marketing. Novo Packing & Cooling joined Dutoit in Dec 2024, adding third-party exporter and cold-storage flows. Its 'Packing Facilities' page describes a flexible pre-season plan jointly updated by operations and the marketing team according to demand and logistics conditions. Dutoit's official corporate contact directory names Hennie du Toit (CEO) and `hennie@dutoit.com`, Wardo Conradie (Supply Chain Manager), Morné Kritzinger (Head of Operations Fruit Packing), and Pieter Schikkerling (Head IT); names/addresses are **publicly listed**, not inferred formats.
+Sources:
+- https://www.dutoit.com/contact/
+- https://www.dutoit.com/packing-facilities/
+- https://www.dutoit.com/dutoit-group/
+- https://www.dutoit.com/about/what-we-do/
+
+**Gmail SENT:** `hennie@dutoit.com`, subject `Dutoit Group — operational picture across farming, packing, cold storage and markets`, message id **`1a12c5313b8f8711`**; asks 20-min operating-picture discovery and appropriate operations referral.
+
+**Plausible end-to-end proof (only after an actual technical/operational authorization):** seasonal orchard/harvest forecasts -> available crop/quality -> packhouse line/capacity and grade yields -> cold store slots/timing -> domestic and export customer demands -> constrained stock/pack/logistics priority conflict -> operator recommendations/authority/escalations and accountable system handoffs -> verified shipments, market/customer acceptance, backlog/outcome state -> source-truth reconciliation, audit and recovery. Capture normal routine working state too, not just deviations. Safety/quality and controls must remain in company-owned specialist systems; integrate only approved authoritative facts. Start one Ceres farm/packhouse/storage/commercial shipment corridor if access and business ownership permit, not full 250kt activity.
+
+### Lona Group — appropriate business routing SENT
+Public facts: farming/citrus, fresh-produce sourcing, packhouses, processing, branded foods, cold stores, logistics and market/export networks. Official story provides footprint categories at least 12 farms, seven packhouses, three cold stores, four food-processing locations (site counts published by Lona, revalidate before external proposals). Official leadership: Spencer Johnson Group MD, Heinrich Stassen LonaFresh MD, Anton van Zyl Lona Foods MD, Hans Christiaan Muylaert-Gelein Unlimited Group MD. Noteworthy: Hans says he is interested in using data to improve decisions in complex supply chains; **this is a public perspective, not an indication of willingness to buy SynapseCore.**
+Sources:
+- https://www.lona.co.za/our-story/
+- https://www.lona.co.za/leadership/
+- https://www.lona.co.za/contact-us/
+
+**Gmail SENT:** official `info@lona.co.za`, requesting Spencer Johnson or cross-functional operations owner; subject `For Spencer Johnson / Lona operations — one connected operational control picture`; message **`1a12c5329f9f4262`**; asks 20-min discovery.
+
+**Plausible closed-loop pilot:** farm/supplier harvest and produce grade -> packhouse/yield/capacity -> cold storage inventory/freshness -> shipping/export order -> service outcome and customer commitments -> available-options/priorities -> authorised choice -> actual shipment and current state readback -> audit/recovery. Need contractual data access across subsidiaries, independent source truth, and current supported connector feasibility. Multi-business group does not automatically imply a shared data owner.
+
+### BexGroup — new high-quality next-wave prospect; RESEARCHED ONLY
+Official family-owned holding company 23 divisions / four business sectors / 1,517 employees as published: agriculture trading, logistics, manufacturing/storage and farming. Current public executive management names CEO Ammie Louw, **Operations Executive Ryan Coldman**, CIO Charl Theron. Official corporate office lists `info@bexgroup.co.za`. This is a potentially *better* company-owner alignment than vague legal-secretarial inboxes: ask specifically for Operations Executive and CIO co-sponsor. No email sent on this date.
+Source https://www.bexgroup.co.za/
+**Pilot hypothesis:** producer/farm crop condition -> sourcing/trading order exposure -> storage/manufacturing condition -> logistics -> actual export/customer commitment -> enterprise coordination and outcome verification. Determine which company/subsidiaries actually form one operational transaction and who authorizes source data; do not blindly combine unrelated holdings. Contact on an appropriate working day after dedup check.
+
+### Brito's Group — vertically integrated mid-enterprise option; RESEARCHED ONLY
+Official company material says trading/imports (~100,000 metric tons commodities annually), two production facilities, sizeable cold stores, meat processing, own distribution trucks and **26 retail meat outlets**, plus wholesale clients. Founder/CEO John de Brito da Silva (official). General group office `info@britos.co.za` is publicly listed, as are trading and meat ordering contacts; use group-office route, **not sales/HR roles**. No email sent in this pass.
+Sources:
+- https://corporate.britos.co.za/
+- https://corporate.britos.co.za/about-us/
+- https://corporate.britos.co.za/contact-us/
+- https://corporate.britos.co.za/import-and-trading/
+- https://corporate.britos.co.za/retail/
+
+**Pilot hypothesis:** global supplier shipment -> import clearance/quality release -> cold storage -> production/raw material/stock -> own transport -> 26 retail stores and wholesale orders -> governed priority decisions when capacity or supplier conditions change -> source-confirmed store availability/customer supply outcome and recovery. **Potential complication:** regulated food-safety, veterinary clearance, and separate group subdivisions; don't promise automated product disposition.
+
+### Next action priority and cadence
+First route any real human replies to discovery quickly, especially Motus. Friday 9 Oct sends shouldn't be chased Sunday; follow-ups should be spaced at 3–5 **working** days and contain new researched relevance or a question about cross-domain ownership. Monday Oct 12 prospecting can check the Dutoit/Lona replies, research BexGroup/Brito's, and consider one or two fresh introductions; not barrage new recipients or duplicate Sunday sends. Record sent/automatic/real reply/referral/meeting/technical qualification states separately.
