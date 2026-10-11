@@ -5,6 +5,7 @@ import java.util.Set;
 
 public record SynapseActorContext(
     String actorName,
+    String tenantCode,
     Set<SynapseAccessRole> roles,
     List<String> warehouseScopes
 ) {

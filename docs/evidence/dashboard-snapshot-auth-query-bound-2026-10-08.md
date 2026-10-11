@@ -25,7 +25,7 @@ while it reads the dashboard snapshot does `AuthSessionService` retain the
 first validated non-strict identity on the servlet request. The scope is
 removed in `finally`; a different session cannot reuse that value. A failed
 identity resolution is never cached. The controller rechecks current authority
-after composition and refuses the response if the actor/roles/scopes changed
+after composition and refuses the response if the tenant/actor/roles/scopes changed
 during the read. Early `RequestTraceFilter` lookups and subsequent HTTP
 requests remain outside the scope. No session-wide cache, timeout, pool,
 schema or infrastructure setting changed.
@@ -48,11 +48,15 @@ requests. A focused final-code run passed the new query-bound test, the
 snapshot-reuse test, seven security tests and three Replay/Order connection
 demand repetitions (12 tests total, zero failures/errors). Two direct
 controller tests passed: an unchanged actor receives the snapshot, while a
-scope change during composition returns 403. A complete backend run against
-the final production code passed **71 reports/406 tests, zero failures,
-errors or skips**. The two direct controller tests were added after that
-run's test compilation and passed separately. Exact-revision CI and hosted
-results are pending.
+scope change during composition returns 403. PR review exposed that identical
+actor names and grants in different tenants must not compare equal. The actor
+context now carries tenant code, and a third direct test checks that a tenant
+switch during composition returns 403. The focused H2 query-bound, seven
+security and three controller tests passed on this revision. A complete
+backend run on the revised production code passed **72 reports/409 tests,
+zero failures, errors or skips**. The earlier 406-test full run and exact-SHA
+CI run `37808651263` passed on commit `9dfd2e8`, before the tenant-context
+follow-up. Exact-SHA CI for that follow-up and hosted results are pending.
 
 An earlier full-backend attempt, started before the final authority recheck,
 **failed** in `ReplayOrderConnectionDemandIntegrationTest`: repetition 2
@@ -62,7 +66,7 @@ snapshot endpoint. Its subsequent focused 3/3 pass does not resolve the
 intermittency under the full-suite workload. The barrier waits 10 seconds;
 whether the failure reflects test scheduling, resource pressure or an
 application contention path is not established. The full final-code suite
-was repeated with a retained log and passed, including this test's three
+was repeated and passed, including this test's three
 repetitions. The preceding intermittent failure remains unexplained; H3/H6
 and M1 must not be marked closed based on a later green run.
 

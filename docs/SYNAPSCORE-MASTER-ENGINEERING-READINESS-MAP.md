@@ -394,11 +394,12 @@ snapshot issued 78 SQL statements, 21 touching `access_users`; repeated
 non-strict session validation accounted for 20 of those user reads. A narrowly
 scoped snapshot identity reuse plus final authority recheck measured 53 total
 SQL statements and five user reads in the same local fixture. The candidate
-retains fresh authorization on the next request and rechecks authority before
-returning a composition
+retains fresh authorization on the next request and rechecks tenant, actor,
+role and warehouse-scope authority before returning a composition
 ([query-bound evidence](evidence/dashboard-snapshot-auth-query-bound-2026-10-08.md)).
-The complete backend run passed 406 tests, but a preceding run had an
-unexplained Replay/Order barrier failure; exact-SHA CI and hosted
+The revised complete backend run passed 409 tests and the initial candidate's
+exact-SHA CI passed both jobs, but a preceding run had an unexplained
+Replay/Order barrier failure; CI for the tenant-context follow-up and hosted
 after-measurements remain separate gates. This does not explain the entire
 warm latency or identify historical Hikari holders.
 

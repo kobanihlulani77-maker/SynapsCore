@@ -23,13 +23,24 @@ import org.springframework.web.server.ResponseStatusException;
 class DashboardSnapshotAuthorityConsistencyTest {
 
     private static final SynapseActorContext TENANT_WIDE =
-        new SynapseActorContext("Operations Lead", Set.of(SynapseAccessRole.TENANT_ADMIN), List.of());
+        new SynapseActorContext("Operations Lead", "TENANT-A", Set.of(SynapseAccessRole.TENANT_ADMIN), List.of());
     private static final SynapseActorContext NORTH_ONLY =
-        new SynapseActorContext("Operations Lead", Set.of(SynapseAccessRole.TENANT_ADMIN), List.of("WH-NORTH"));
+        new SynapseActorContext("Operations Lead", "TENANT-A", Set.of(SynapseAccessRole.TENANT_ADMIN), List.of("WH-NORTH"));
+    private static final SynapseActorContext OTHER_TENANT =
+        new SynapseActorContext("Operations Lead", "TENANT-B", Set.of(SynapseAccessRole.TENANT_ADMIN), List.of());
 
     @Test
     void rejectsSnapshotWhenWarehouseAuthorityChangesDuringComposition() {
         DashboardController controller = controller(TENANT_WIDE, NORTH_ONLY);
+
+        assertThatThrownBy(controller::getSnapshot)
+            .isInstanceOfSatisfying(ResponseStatusException.class, exception ->
+                assertThat(exception.getStatusCode()).isEqualTo(HttpStatus.FORBIDDEN));
+    }
+
+    @Test
+    void rejectsSnapshotWhenSessionSwitchesToSameNamedActorInAnotherTenant() {
+        DashboardController controller = controller(TENANT_WIDE, OTHER_TENANT);
 
         assertThatThrownBy(controller::getSnapshot)
             .isInstanceOfSatisfying(ResponseStatusException.class, exception ->

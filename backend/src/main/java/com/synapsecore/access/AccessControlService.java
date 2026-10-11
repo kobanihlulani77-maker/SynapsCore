@@ -54,7 +54,7 @@ public class AccessControlService {
     public SynapseActorContext requireIntegrationRead(String actionDescription) {
         AccessOperator operator = requireCurrentOperator(actionDescription);
         if (operator == null) {
-            return new SynapseActorContext("dev-anonymous", Set.of(), java.util.List.of());
+            return new SynapseActorContext("dev-anonymous", null, Set.of(), java.util.List.of());
         }
         if (operator.getRoles().stream().noneMatch(role ->
                 role == SynapseAccessRole.INTEGRATION_ADMIN || role == SynapseAccessRole.INTEGRATION_OPERATOR)) {
@@ -94,7 +94,7 @@ public class AccessControlService {
     public SynapseActorContext requireTenantAdminControl(String actionDescription) {
         AccessOperator operator = requireCurrentOperator(actionDescription);
         if (operator == null) {
-            return new SynapseActorContext("dev-anonymous", Set.of(), java.util.List.of());
+            return new SynapseActorContext("dev-anonymous", null, Set.of(), java.util.List.of());
         }
         if (!operator.getRoles().contains(SynapseAccessRole.TENANT_ADMIN)) {
             throw new ResponseStatusException(HttpStatus.FORBIDDEN,
@@ -109,7 +109,7 @@ public class AccessControlService {
     public SynapseActorContext requireWorkspaceAccess(String actionDescription) {
         AccessOperator operator = requireCurrentOperator(actionDescription);
         if (operator == null) {
-            return new SynapseActorContext("dev-anonymous", Set.of(), java.util.List.of());
+            return new SynapseActorContext("dev-anonymous", null, Set.of(), java.util.List.of());
         }
         return actorContext(operator, operator.getRoles());
     }
@@ -117,7 +117,7 @@ public class AccessControlService {
     public SynapseActorContext requireWorkspaceWarehouseAccess(String warehouseCode, String actionDescription) {
         AccessOperator operator = requireCurrentOperator(actionDescription);
         if (operator == null) {
-            return new SynapseActorContext("dev-anonymous", Set.of(), java.util.List.of());
+            return new SynapseActorContext("dev-anonymous", null, Set.of(), java.util.List.of());
         }
         accessDirectoryService.requireWarehouseAccess(operator, warehouseCode, actionDescription);
         return actorContext(operator, operator.getRoles());
@@ -269,6 +269,7 @@ public class AccessControlService {
     private SynapseActorContext actorContext(AccessOperator operator, Set<SynapseAccessRole> roles) {
         return new SynapseActorContext(
             operator.getActorName(),
+            operator.getTenant() == null ? null : operator.getTenant().getCode(),
             roles,
             accessDirectoryService.getWarehouseScopes(operator)
         );
