@@ -34,6 +34,7 @@ public class RequestTraceFilter extends OncePerRequestFilter {
     private static final String ACTOR_MDC_KEY = "actor";
     private static final String TENANT_MDC_KEY = "tenant";
     private static final long SLOW_REQUEST_THRESHOLD_NANOS = 5_000_000_000L;
+    private static final long SLOW_SNAPSHOT_THRESHOLD_NANOS = 2_000_000_000L;
 
     private final RequestTraceContext requestTraceContext;
     private final SynapseAccessProperties accessProperties;
@@ -113,7 +114,13 @@ public class RequestTraceFilter extends OncePerRequestFilter {
 
     void logSlowRequest(HttpServletRequest request, int status, long elapsedNanos, long identityNanos,
                         long cpuMillis, long identityCpuMillis) {
-        if (elapsedNanos < SLOW_REQUEST_THRESHOLD_NANOS || !request.getRequestURI().startsWith("/api/")) {
+        String requestUri = request.getRequestURI();
+        if (!requestUri.startsWith("/api/")) {
+            return;
+        }
+        long threshold = "GET".equals(request.getMethod()) && "/api/dashboard/snapshot".equals(requestUri)
+            ? SLOW_SNAPSHOT_THRESHOLD_NANOS : SLOW_REQUEST_THRESHOLD_NANOS;
+        if (elapsedNanos < threshold) {
             return;
         }
         Object matchedRoute = request.getAttribute(HandlerMapping.BEST_MATCHING_PATTERN_ATTRIBUTE);

@@ -144,6 +144,33 @@ neither can substitute for snapshot HTTP or Platform Activity measurements.
 Warm snapshot latency remains material, and historical Hikari `10/10` holder
 identity remains unknown. M1/H1/H2/H7/H12 stay open.
 
+## Snapshot HTTP boundary diagnostic candidate, October 11
+
+The five warm client reads above fell mostly below the existing five-second
+`RequestTraceFilter` warning threshold. Three composition logs were captured,
+but the matching request-level identity/handler wall and CPU fields were not.
+This prevents a same-ID split of server time from client/network time for
+ordinary 3-second snapshots. A candidate narrows the **logging threshold only**
+for `GET /api/dashboard/snapshot` to two seconds; all other API routes keep
+five seconds. The request ID, matched route, phase timings and pool snapshot
+are already part of the existing bounded log format. No timeout, pool,
+scheduler, transaction, response or authorization behavior changes. The
+completion-time Hikari sample remains only a point-in-time observation, not
+connection-holder proof. The lower threshold may increase warning volume if
+snapshots are routinely slow; hosted log volume must be observed before this
+diagnostic is treated as an acceptable permanent setting.
+
+The focused `RequestTraceFilterTest` passed 14/14 locally, including the
+snapshot threshold boundary, unchanged five-second threshold on another
+route, and payload omission. The complete local backend command exited zero;
+reports written in this run totalled **72 suites/410 tests, zero failures,
+errors or skips**. `ReplayOrderConnectionDemandIntegrationTest` passed its
+three repetitions in this run; that does not explain its earlier intermittent
+full-suite failure. A stale failed Surefire report from October 8 remains on
+disk and is excluded by report modification time rather than hidden as a
+current failure. Exact-head CI and hosted same-request correlation remain
+required. This candidate does not claim a latency improvement or M1 closure.
+
 ## Exit still required
 
 - Preserve the passed full backend and exact-SHA CI checks; investigate the
