@@ -98,3 +98,53 @@ Sources:
 
 ### Next action priority and cadence
 First route any real human replies to discovery quickly, especially Motus. Friday 9 Oct sends shouldn't be chased Sunday; follow-ups should be spaced at 3–5 **working** days and contain new researched relevance or a question about cross-domain ownership. Monday Oct 12 prospecting can check the Dutoit/Lona replies, research BexGroup/Brito's, and consider one or two fresh introductions; not barrage new recipients or duplicate Sunday sends. Record sent/automatic/real reply/referral/meeting/technical qualification states separately.
+
+
+## 6. Third pass — executed BexGroup and Brito's; new industrial and vertically integrated prospects
+**Sunday 11 October 2026, after prior Dutoit/Lona messages.** Research is based on public company claims and separate hypothetical customer discovery questions. It does not establish actual customer coordination deficiencies, readiness of unsupported manufacturing/quality service adapters, or buyer interest.
+
+**BexGroup — SENT, verified in Gmail**
+- Public official operating structure: four sectors, 23 divisions and 1,517 employees in agricultural trading, logistics, manufacturing/storage and farming. The company names Ryan Coldman Executive Head: Operations and Charl Theron CIO. https://www.bexgroup.co.za/ ; https://www.bexgroup.co.za/companies .
+- Sent to the **official head-office general address** `info@bexgroup.co.za`, asking referral to Ryan Coldman and Charl Theron. Gmail id **`1a12c57d90c3eacf`**, `SENT` confirmed. This does not establish internal referral/read.
+- Potential **real** full loop must be chosen with one business owner: grower/seller -> commodity purchase and quality/grade -> available grain/stock/capacity -> production/warehouse if a particular subsidiary actually uses it -> logistics dispatch and customer promise -> risk/priority -> approved operator decision and accountable partner handoff -> source-verified receipt -> audited reconciled current state. Do NOT pretend all 23 divisions are one actual transaction; operating correlation and data rights are **discovery questions**.
+- Strongest commercial contact next: wait for a referral, then ask operations sponsor whether one group-adjacent trade/storage/distribution corridor exists across distinct systems and can show a complete end-to-end outcome.
+
+**Brito's Group — SENT, verified in Gmail**
+- Public company operations: import and trade over 100,000 metric tons annually through Cape Town/Durban ports; two manufacturing sites, about 10,000 mt combined low-temp/chilled storage, processing, own retail Meat Centres and wholesale distribution; currently quoted 26 Meat Centres on corporate overview, but corporate store locator says 25; **avoid treating outlet count as audited without reconciliation**.
+Sources: https://corporate.britos.co.za/ ; https://corporate.britos.co.za/about-us/ ; https://corporate.britos.co.za/import-and-trading/ ; https://stores.britos.co.za/stores/ .
+- Official group headquarters `info@britos.co.za`; asked referral to founder/CEO John de Brito da Silva or end-to-end operations owner. Gmail id **`1a12c57e90bc4293`**, `SENT` confirmed.
+- Strong full-loop example: purchase order/import shipment/available batch -> actual clearance + safety/quality release (provided as *read-only* authoritative compliance status, not automated disposition) -> cold-store available inventory -> manufacturing consumption and finished product -> branch/wholesale order commitments -> prioritised dispatch by responsible person -> actual receipt/invoice/customer outcome -> source-readback, audit, retry and recovery. **What to ask:** Which systems own inventory at import, cold storage, manufacturing and retail; who decides when competing customers need scarce released stock; when can a decision be marked truly completed? Avoid implying food safety system control.
+- South African mid-enterprise archetype: sufficient division diversity and transaction volume, perhaps tractable regional footprint; no buyer engagement yet.
+
+### Newly investigated, no send in this pass
+
+**Aberdare Cables — HIGH large industrial full-loop fit and geographically relevant**
+- Official site lists three SA cable manufacturing sites (Pietermaritzburg, Gqeberha, Gauteng), regional customer service centres including Germiston head-office/group logistics, engineering support and export customers. Approx. 1,500 employees claimed. Company-owned email `info@aberdare.co.za`; the site also lists quotes/orders/technical inboxes which are NOT appropriate for founder outreach. https://www.aberdare.co.za/about/who-are-we/ ; https://www.aberdare.co.za/contact/ .
+- Hypothesis: project/customer demand and due date -> conductor/raw-material supply -> manufacturing schedule/capacity and QA -> finished-reel availability -> regional stock/distribution -> site/customer handover -> operator trade-off between manufacturing and delivery -> actual fulfillment/readback and exception recovery. Do not promise direct OT/SCADA or plant controls; start accepted status events and existing operator systems.
+- Appropriate outreach: published group operations info mail requesting production/supply/distribution decision-maker; no private or guessed leadership email. **NOT SENT**.
+
+**Atlantis Foods — HIGH integrated national seafood and foodservice outcome coverage**
+- Official site documents international seafood sourcing from >26 countries; in-house import clearing and forwarding; *three* cold stores with >12,000 pallets; processing/packaging via **strategic partners** (do not mislabel partner plants as fully owned); about 44,000 tons annually distributed through wholesale, restaurants/foodservice and major retailers, using nationwide distribution. Published `info@atlantisfoods.co.za`; Paula Nicholls is the named contact for wholesale and food-service divisions, not necessarily the group COO. https://atlantisfoods.co.za/operations/ ; https://atlantisfoods.co.za/our-operations/ ; https://atlantisfoods.co.za/contact-us/ .
+- Hypothesis: supplier import -> customs clearance -> cold store and processing partner allocation -> national distribution -> retailer/food-service availability and customer commitments -> pressure/priority -> authorised intervention/handoff -> source-confirmed goods and outcomes. Require partners' consent for data and hold cold-chain safety processes with their authoritative owners. **NOT SENT**.
+
+**Palman Foods Group — MEDIUM promising 'smaller but whole-loop' archetype**
+- Public site names four integrated businesses (foodservice, wholesale distribution, CPT Cold Storage, Danilo's Pasta), physically sharing a Cape Town base; official company enquiry `info@palmanfoods.co.za`. https://www.palmanfoods.co.za/ .
+- Hypothesis: customer food order + production and frozen/chilled requirements -> manufacturing/partner stock -> cold store and distribution availability -> choice of priority -> operator acceptance -> delivered verified order. However the shared single site and unknown number of distinct systems/decisions can make this **too trivial** as an enterprise whole-loop pilot. Verify domains, data separation, transaction and concurrency volume, operational owner and commercial ability before prioritising. **NOT SENT**.
+
+**Eagle Distribution — MEDIUM potential multi-domain fuel operating system**
+- Public September 2026 figures: 32 owned tankers, 5m litres owned bulk storage, 28 fuel retail sites; supply, storage, customer dispatch, fleet telemetry and infrastructure services. https://eagledistr.co.za/Default.aspx ; https://eagledistr.co.za/Services.aspx .
+- Potential fuel purchase/supply -> owned bulk storage -> customer/site stock forecast -> legal/safety dispatch -> delivery volume -> on-site service and verified commercial outcome. Existing Geo-Tab and electronic metering show functional tooling but do not answer full cross-business picture questions. Highly regulated hazardous material and safety controls are excluded from any unproven SynapseCore write path; begin operational *read-only* coordination if a controlled customer scope qualifies. **NOT SENT**.
+
+### Priority order for subsequent business-day work
+1. **Real human reply first:** Motus, then any others; prioritize discovery over more volume.
+2. **High-fit not yet approached:** Aberdare (Gauteng), Atlantis Foods (complex customer commitments), in2food (confirmed business-enquiry form; no actual submission through available tool yet), Rainbow Chicken (CEO Marthinus Stander, COO Wouter de Wet; 2026 fully integrated group; needs proper route). 
+3. **Conditional additional breadth:** Palman for smaller multi-business trial only if cross-domain systems and baseline complexity are meaningful; Eagle fuel if restricted to safe observational/business-control flows.
+4. Existing **BexGroup/Brito's SENT** today: no instant second email. Follow up after a few working days with specific shared-context question, honoring any 'stop' response.
+
+### Proposed qualification proof questions
+- Can the customer name the same real decision across at least *three independent operational domains* with clear source records and human owners?
+- What does the normal operating day look like? What changes between source facts, forecasts, actual inventory/capacity and customer commitments?
+- What is the observable exception and cost **if any**; who sees it first and who owns cross-team priority?
+- Can a recommended decision be approved and actually handed to an existing company system/operator, with a provably returned source state, rather than simply marking 'completed' inside SynapseCore?
+- Can the company share **authorized non-sensitive sample data** for a scoped technical feasibility assessment after NDA and M6/M7 readiness; does it match current connector contracts, or require future adapter work?
+- Which accepted baseline measures response time, correct prioritization, verified outcomes, availability/service and source-data currentness? No speculative guaranteed ROI.
