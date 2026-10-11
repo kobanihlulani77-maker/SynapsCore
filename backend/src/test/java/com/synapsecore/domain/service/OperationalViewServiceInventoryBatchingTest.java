@@ -165,6 +165,7 @@ class OperationalViewServiceInventoryBatchingTest {
             null,
             null,
             tenantContextService,
+            null,
             null
         );
     }
