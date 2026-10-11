@@ -96,7 +96,7 @@ class OperationalViewServiceSnapshotReuseTest {
 
         OperationalViewService service = new OperationalViewService(
             null, null, null, null, null, null, null, dashboardService, null, null,
-            incidentService, null, null, null, null, null, tenantContextService, accessDirectoryService
+            incidentService, null, null, null, null, null, tenantContextService, accessDirectoryService, null
         ) {
             @Override List<Alert> loadVisibleActiveAlerts() {
                 activeAlertCompositions.incrementAndGet();

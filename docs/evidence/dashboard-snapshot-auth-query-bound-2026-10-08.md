@@ -224,6 +224,35 @@ throttling or pool acquisition during the request. Platform Owner Activity
 HTTP after-measurement remains separate and unavailable from this tenant
 probe. No performance fix was applied.
 
+## In-flight pool observation candidate, October 11
+
+The evidence-only PR #7 merged as `0000a9fe2513ce0a67fb1dae389a5adf8a60a23f`;
+both merged-main CI jobs passed. Render's manual deploy of that exact SHA became
+Live after 5m04s. Its startup validated all 15 migrations, reported schema
+version 15 with no migration necessary, and the post-cutover six-flag gate
+returned true. This deployment changed documents only, not the runtime code
+that produced the warm trace above.
+
+Source inspection found no enclosing `@Transactional` boundary on the
+snapshot composer. Its sections call separate services, including a
+read-only transaction for alert visibility. The completion-time pool readings
+therefore cannot be read as a single connection held throughout composition.
+
+A **not-yet-deployed diagnostic candidate** extends the existing one-second,
+60-sample snapshot composition stack sampler to also capture the maximum
+global Hikari active/waiting counts and minimum idle count while it samples.
+The values are logged only with a slow composition. A missing/non-Hikari pool
+is reported as unknown (`-1`), not as healthy zero. The sampling performs no
+database query, changes no transaction, pool size or timeout, and records no
+tenant payload or SQL text. Focused sampler/snapshot/realtime tests passed,
+followed by a complete local H2-profile backend run: 72 Surefire reports,
+411 tests, zero failures, errors or skips. The docs link check found 1,020
+local links and no missing target. This is not PostgreSQL, CI or hosted proof.
+It may miss sub-second pressure, its pool counts
+are global and non-atomic, and it cannot map a pool connection to a PostgreSQL
+PID or identify a transactional owner. CI and hosted results for this
+candidate are still missing.
+
 ## Exit still required
 
 - Preserve the passed full backend and exact-SHA CI checks; investigate the
@@ -234,3 +263,6 @@ probe. No performance fix was applied.
   host resource context instead of inferring it from sparse stack samples.
 - Preserve tenant/role/scope and revocation behavior in hosted verification.
   A local H2 query count cannot close H1, H2, H7, H12 or M1.
+- If the in-flight pool diagnostic is deployed, correlate its samples with
+  the same request ID and section timing; obtain separate PostgreSQL PID/SQL
+  and Java transaction evidence before attributing a holder or applying a fix.

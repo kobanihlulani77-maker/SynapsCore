@@ -22,6 +22,8 @@ import com.synapsecore.integration.dto.IntegrationImportRunResponse;
 import com.synapsecore.integration.dto.IntegrationReplayRecordResponse;
 import com.synapsecore.observability.ThreadCpuTiming;
 import com.synapsecore.observability.SlowThreadWaitSampler;
+import com.zaxxer.hikari.HikariDataSource;
+import com.zaxxer.hikari.HikariPoolMXBean;
 import com.synapsecore.scenario.ScenarioHistoryService;
 import com.synapsecore.scenario.dto.ScenarioNotificationResponse;
 import com.synapsecore.scenario.dto.ScenarioRunResponse;
@@ -51,6 +53,7 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.function.Supplier;
 import java.util.stream.Collectors;
+import javax.sql.DataSource;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -85,6 +88,7 @@ public class OperationalViewService {
     private final FulfillmentService fulfillmentService;
     private final TenantContextService tenantContextService;
     private final AccessDirectoryService accessDirectoryService;
+    private final DataSource dataSource;
     private final InFlightRequestCoordinator<DashboardSnapshotResponse> snapshotRequests = new InFlightRequestCoordinator<>();
 
     public AlertFeedResponse getAlertFeed() {
@@ -269,7 +273,7 @@ public class OperationalViewService {
     private DashboardSnapshotResponse buildSnapshot() {
         long startedAt = System.nanoTime();
         long cpuStartedAt = ThreadCpuTiming.currentNanos();
-        SlowThreadWaitSampler waitSampler = SlowThreadWaitSampler.start();
+        SlowThreadWaitSampler waitSampler = SlowThreadWaitSampler.start(snapshotPool());
         Map<String, Long> sectionsMs = new LinkedHashMap<>();
         Map<String, Long> sectionsCpuMs = new LinkedHashMap<>();
         try {
@@ -313,6 +317,15 @@ public class OperationalViewService {
                     elapsed / 1_000_000, ThreadCpuTiming.elapsedMillis(cpuStartedAt), sectionsMs, sectionsCpuMs,
                     waitSampler.summary());
             }
+        }
+    }
+
+    private HikariPoolMXBean snapshotPool() {
+        try {
+            return dataSource instanceof HikariDataSource hikari && hikari.isRunning()
+                ? hikari.getHikariPoolMXBean() : null;
+        } catch (RuntimeException ignored) {
+            return null;
         }
     }
 

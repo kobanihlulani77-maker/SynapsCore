@@ -2,6 +2,8 @@ package com.synapsecore.observability;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import com.zaxxer.hikari.HikariPoolMXBean;
+import java.lang.reflect.Proxy;
 import java.util.concurrent.TimeUnit;
 import org.junit.jupiter.api.Test;
 
@@ -9,12 +11,33 @@ class SlowThreadWaitSamplerTest {
 
     @Test
     void samplesBeforeTheOldFiveSecondBlindWindow() throws InterruptedException {
-        try (SlowThreadWaitSampler sampler = SlowThreadWaitSampler.start()) {
+        HikariPoolMXBean pool = (HikariPoolMXBean) Proxy.newProxyInstance(
+            HikariPoolMXBean.class.getClassLoader(), new Class<?>[]{HikariPoolMXBean.class},
+            (proxy, method, args) -> switch (method.getName()) {
+                case "getActiveConnections" -> 8;
+                case "getThreadsAwaitingConnection" -> 2;
+                case "getIdleConnections" -> 0;
+                default -> throw new UnsupportedOperationException(method.getName());
+            });
+        try (SlowThreadWaitSampler sampler = SlowThreadWaitSampler.start(pool)) {
             long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(4);
-            while (sampler.summary().samples() < 2 && System.nanoTime() < deadline) {
+            while (sampler.summary().poolSamples() < 2 && System.nanoTime() < deadline) {
                 Thread.sleep(100);
             }
             assertThat(sampler.summary().samples()).isGreaterThanOrEqualTo(2);
+            assertThat(sampler.summary().maxPoolActive()).isEqualTo(8);
+            assertThat(sampler.summary().maxPoolWaiting()).isEqualTo(2);
+            assertThat(sampler.summary().minPoolIdle()).isZero();
+        }
+    }
+
+    @Test
+    void missingPoolLeavesPressureUnknownRatherThanReportingZero() {
+        try (SlowThreadWaitSampler sampler = SlowThreadWaitSampler.start()) {
+            assertThat(sampler.summary().poolSamples()).isZero();
+            assertThat(sampler.summary().maxPoolActive()).isEqualTo(-1);
+            assertThat(sampler.summary().maxPoolWaiting()).isEqualTo(-1);
+            assertThat(sampler.summary().minPoolIdle()).isEqualTo(-1);
         }
     }
 

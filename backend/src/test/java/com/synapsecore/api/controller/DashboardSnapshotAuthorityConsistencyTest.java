@@ -70,7 +70,7 @@ class DashboardSnapshotAuthorityConsistencyTest {
         };
         OperationalViewService view = new OperationalViewService(
             null, null, null, null, null, null, null, null, null, null,
-            null, null, null, null, null, null, null, null
+            null, null, null, null, null, null, null, null, null
         ) {
             @Override
             public DashboardSnapshotResponse getSnapshot() {

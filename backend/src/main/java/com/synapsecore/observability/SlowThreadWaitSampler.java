@@ -1,5 +1,6 @@
 package com.synapsecore.observability;
 
+import com.zaxxer.hikari.HikariPoolMXBean;
 import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.Map;
@@ -13,25 +14,36 @@ public final class SlowThreadWaitSampler implements AutoCloseable {
     private static final ScheduledThreadPoolExecutor SAMPLER = createSampler();
 
     private final Thread observedThread;
+    private final HikariPoolMXBean pool;
     private final Map<String, Integer> counts = new LinkedHashMap<>();
     private final Map<String, String> representativeFrames = new LinkedHashMap<>();
     private final ScheduledFuture<?> task;
     private int samples;
+    private int poolSamples;
+    private int maxPoolActive = -1;
+    private int maxPoolWaiting = -1;
+    private int minPoolIdle = -1;
     private boolean closed;
 
-    private SlowThreadWaitSampler(Thread observedThread) {
+    private SlowThreadWaitSampler(Thread observedThread, HikariPoolMXBean pool) {
         this.observedThread = observedThread;
+        this.pool = pool;
         this.task = SAMPLER.scheduleAtFixedRate(this::sample, 1, 1, TimeUnit.SECONDS);
     }
 
     public static SlowThreadWaitSampler start() {
-        return new SlowThreadWaitSampler(Thread.currentThread());
+        return start(null);
+    }
+
+    public static SlowThreadWaitSampler start(HikariPoolMXBean pool) {
+        return new SlowThreadWaitSampler(Thread.currentThread(), pool);
     }
 
     public synchronized Summary summary() {
         return new Summary(samples,
             Collections.unmodifiableMap(new LinkedHashMap<>(counts)),
-            Collections.unmodifiableMap(new LinkedHashMap<>(representativeFrames)));
+            Collections.unmodifiableMap(new LinkedHashMap<>(representativeFrames)),
+            poolSamples, maxPoolActive, maxPoolWaiting, minPoolIdle);
     }
 
     @Override
@@ -52,6 +64,15 @@ public final class SlowThreadWaitSampler implements AutoCloseable {
             samples++;
             counts.merge(category, 1, Integer::sum);
             representativeFrames.putIfAbsent(category, representativeFrame(category, frames));
+            if (pool != null) {
+                int active = pool.getActiveConnections();
+                int waiting = pool.getThreadsAwaitingConnection();
+                int idle = pool.getIdleConnections();
+                maxPoolActive = Math.max(maxPoolActive, active);
+                maxPoolWaiting = Math.max(maxPoolWaiting, waiting);
+                minPoolIdle = minPoolIdle < 0 ? idle : Math.min(minPoolIdle, idle);
+                poolSamples++;
+            }
         } catch (RuntimeException ignored) {
             // A diagnostic sample must not interfere with request processing.
         }
@@ -127,6 +148,7 @@ public final class SlowThreadWaitSampler implements AutoCloseable {
     }
 
     public record Summary(int samples, Map<String, Integer> categories,
-                          Map<String, String> representativeFrames) {
+                          Map<String, String> representativeFrames,
+                          int poolSamples, int maxPoolActive, int maxPoolWaiting, int minPoolIdle) {
     }
 }
