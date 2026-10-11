@@ -94,6 +94,17 @@ The readiness and anonymous session preflight took 933 and 1,102 ms. Login
 took 5,896 ms; the initial summary and snapshot took 4,264 and 7,604 ms.
 Those initial calls are **warm-up/cutover-adjacent**, not included in the
 five-sample warm range. `WARM_BASELINE_UTC=2026-10-11T10:51:12.357Z`.
+The same-ID Render log for login `a776eeea-338b-43ba-8acf-8128ee38e8a9`
+reported 5,100 ms HTTP wall, 215 ms thread CPU and Hikari 1 active/9 idle/0
+waiting at completion. The initial snapshot
+`4cdd4877-e4de-4237-b7ea-cfec38e54a8a` reported 6,996 ms HTTP wall,
+4,795 ms composition, 215 ms HTTP-thread CPU, and Hikari 0 active/10 idle/0
+waiting at completion. Its four sparse composition stack samples included
+two PostgreSQL JDBC, one Redis client and one Java/other. Client minus server
+wall was approximately 608 ms; server wall minus composition was 2,201 ms.
+Those differences are arithmetic boundaries, not an attribution of the
+unmeasured stages. The completion-time pool snapshot does not prove that the
+pool was uncongested throughout the request.
 
 | Warm sample | Summary client ms | Snapshot client ms | Snapshot request ID |
 | --- | ---: | ---: | --- |
