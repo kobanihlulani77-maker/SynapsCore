@@ -19,12 +19,12 @@ acceptance or M7 customer-specific launch authorization.
 | Repository verification | The September 27 local `main` and freshly fetched `origin/main` matched the original baseline then. Subsequent revisions are assessed only within their recorded scope; a documentation successor is not a newly verified application release. |
 | Current phase | M1: performance, concurrency, correctness, and runtime hardening - OPEN |
 | Current sub-workstream | H1/H2/H7: warm hosted latency, connection demand, and measured resource envelope; Replay convergence is a dependent H8 question |
-| Immediate objective | Live `edc63f0` and the direct hosted audit SQL after-sample are recorded. Obtain bounded warm authenticated Activity/overview **HTTP** timings and request IDs; Chrome rendering is not HTTP duration. Use the earlier-sampling diagnostic on a naturally slow snapshot/workspace request to attribute pool acquisition, JDBC, Java wait and host resources before any further correction ([activity boundary](evidence/platform-activity-read-boundary-2026-10-07.md), [sampler boundary](evidence/snapshot-wait-sampling-2026-09-30.md)). |
+| Immediate objective | A bounded five-read hosted snapshot after-sample on Live `117cdb1` is recorded, but warm snapshots still took 2,982-3,803 ms and historical Hikari holder identity is unknown ([H2 after-sample](evidence/dashboard-snapshot-auth-query-bound-2026-10-08.md)). Obtain warm authenticated Platform Activity/overview **HTTP** timings and request IDs; Chrome rendering is not HTTP duration. Use the earlier-sampling diagnostic on a naturally slow request to attribute pool acquisition, JDBC, Java wait and host resources before another correction ([activity boundary](evidence/platform-activity-read-boundary-2026-10-07.md), [sampler boundary](evidence/snapshot-wait-sampling-2026-09-30.md)). |
 | Next gate | M2: repeatable hosted verification; entry BLOCKED until M1's in-scope hardening gates pass |
 | Pilot authorization | NOT GRANTED by this map; current candidate is not accepted for customer operations |
-| Last verified live backend | Render showed `edc63f04ff910ed4aef0bd048af80a9eefb6ca20` Live on October 8 (`dep-db3r9849v7es73an3300`, instance `84jp4`); the six-flag gate passed. Since V15 `5c321c1`, the only backend production change is the bounded sampler's earlier first sample. This is deployment/readiness proof, not authenticated HTTP latency, Hikari-holder attribution or M1 closure ([sampler boundary](evidence/snapshot-wait-sampling-2026-09-30.md)). |
+| Last verified live backend | Render showed merged PR #4 `117cdb1d4b8d6e6f8b5295d5c7845798c6b95e7f` Live on October 11 (`dep-db5mh26k1f9s73egsdfg`, sampled log instance `7zzr9`); the six-flag gate passed. One synthetic proof tenant's five warm summary/snapshot read pairs returned 200, with snapshots 2,982-3,803 ms. This is deployment and bounded authenticated HTTP evidence, not historical Hikari-holder attribution, repeatable load proof or M1 closure ([H2 after-sample](evidence/dashboard-snapshot-auth-query-bound-2026-10-08.md)). |
 | Scoped recovery proof | [PR #2](https://github.com/kobanihlulani77-maker/SynapsCore/pull/2) merged as `16f44753f1cc90c21d3dbe6accc59a51d575c798`. The new disposable-PostgreSQL test rejects the terminal `COMPLETED` write after broadcast, verifies the claim remains recoverable, then reclaims/completes it after lease expiry with an explicit second broadcast. It changes only test/CI files; controlled process-stop, multi-instance and hosted recovery remain OPEN ([dispatch evidence](evidence/operational-dispatch-claim-recovery-2026-10-03.md)). |
-| Latest scoped CI evidence | [Merged-main GitHub Actions run `37799874183`](https://github.com/kobanihlulani77-maker/SynapsCore/actions/runs/37799874183) succeeded for exact SHA `edc63f04ff910ed4aef0bd048af80a9eefb6ca20`, following two green exact-candidate runs for `494124a` ([branch](https://github.com/kobanihlulani77-maker/SynapsCore/actions/runs/37798771432), [PR](https://github.com/kobanihlulani77-maker/SynapsCore/actions/runs/37798885105)). CI validates the diagnostic code and existing suite, not hosted latency repeatability, historical Hikari ownership or M1 closure. |
+| Latest scoped CI evidence | [Merged-main GitHub Actions run `38133025146`](https://github.com/kobanihlulani77-maker/SynapsCore/actions/runs/38133025146) succeeded for exact SHA `117cdb1d4b8d6e6f8b5295d5c7845798c6b95e7f` (`verify` and `dispatch-postgres`), after green exact-PR CI `38132661078`. CI validates the query-bound change and existing suite, not hosted latency repeatability, historical Hikari ownership or M1 closure ([H2 after-sample](evidence/dashboard-snapshot-auth-query-bound-2026-10-08.md)). |
 | Local test artifacts | September 23 Surefire aggregate: 390 tests. The dispatch correction passed a 70-suite/403-test full backend run with zero failures/errors/skips and production packaging locally; its injected terminal-write failure was exercised in the H2 test profile, not PostgreSQL ([dispatch record](evidence/operational-dispatch-claim-recovery-2026-10-03.md)). On October 7, the activity-read diagnostic passed 36 focused tests and a full 70-suite/404-test H2-backed backend regression with zero failures/errors/skips ([activity boundary](evidence/platform-activity-read-boundary-2026-10-07.md)). |
 | Worktree boundary | Unrelated frontend Dockerfile edit, `.gitattributes`, two untracked Scenario evidence files, and raw CSV captures are not part of this assessment's committed implementation. |
 
@@ -389,7 +389,7 @@ CPU/memory charts; the production actuator filter intentionally permits
 health only. H7 resource attribution therefore still lacks synchronized
 host/JVM measurements, and a plan upgrade remains unapproved.
 
-**October 8 H2 query-amplification candidate:** One local authenticated
+**October 11 H2 query-amplification continuation:** One local authenticated
 snapshot issued 78 SQL statements, 21 touching `access_users`; repeated
 non-strict session validation accounted for 20 of those user reads. A narrowly
 scoped snapshot identity reuse plus final authority recheck measured 53 total
@@ -397,11 +397,15 @@ SQL statements and five user reads in the same local fixture. The candidate
 retains fresh authorization on the next request and rechecks tenant, actor,
 role and warehouse-scope authority before returning a composition
 ([query-bound evidence](evidence/dashboard-snapshot-auth-query-bound-2026-10-08.md)).
-The revised complete backend run passed 409 tests and the initial candidate's
-exact-SHA CI passed both jobs, but a preceding run had an unexplained
-Replay/Order barrier failure; CI for the tenant-context follow-up and hosted
-after-measurements remain separate gates. This does not explain the entire
-warm latency or identify historical Hikari holders.
+The revised complete backend run passed 409 tests, final-candidate and
+merged-main CI passed both jobs, and `117cdb1` was confirmed Live. Five warm
+hosted snapshot reads returned 200 in 2,982-3,803 ms; three matching Render
+request IDs show 2,006-2,091 ms composition with 94-104 ms HTTP-thread CPU.
+This is [bounded after-evidence](evidence/dashboard-snapshot-auth-query-bound-2026-10-08.md),
+not a matched causal before/after result or a connection-hold trace. A preceding
+full run had an unexplained Replay/Order barrier failure. Neither that
+intermittency, the remaining warm latency nor historical Hikari holders are
+closed by a later green run.
 
 ### Cross-workstream dependency and ordering
 

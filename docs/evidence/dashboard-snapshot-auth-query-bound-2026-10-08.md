@@ -56,7 +56,9 @@ security and three controller tests passed on this revision. A complete
 backend run on the revised production code passed **72 reports/409 tests,
 zero failures, errors or skips**. The earlier 406-test full run and exact-SHA
 CI run `37808651263` passed on commit `9dfd2e8`, before the tenant-context
-follow-up. Exact-SHA CI for that follow-up and hosted results are pending.
+follow-up. Exact-SHA PR CI `38132661078` passed both jobs for `c2eaf32`;
+PR #4 merged as `117cdb1d4b8d6e6f8b5295d5c7845798c6b95e7f`, and merged-main CI
+`38133025146` passed both `verify` and `dispatch-postgres` jobs.
 
 An earlier full-backend attempt, started before the final authority recheck,
 **failed** in `ReplayOrderConnectionDemandIntegrationTest`: repetition 2
@@ -77,12 +79,67 @@ hosted HTTP improvement. In particular, the older sampled
 request and did not establish how much wall time this path consumed. The
 V15 direct audit SQL measurement is a separate boundary.
 
+## Bounded hosted after-sample, October 11
+
+Render showed merge `117cdb1` Live as deploy `dep-db5mh26k1f9s73egsdfg`
+before the probe. The frontend, backend health, readiness, liveness, anonymous
+auth session and SockJS checks all returned 200; the six-flag gate was true.
+Existing synthetic tenant `HOSTED-PROOF-5-20260902-144935` was used for
+read-only requests with one authenticated login. Run from `frontend/` using
+`node tests/measure-hosted-snapshot.mjs`. No broad E2E or data mutation ran.
+The probe emitted
+only UTC, endpoint, status, duration and request ID, not credentials or body.
+
+The readiness and anonymous session preflight took 933 and 1,102 ms. Login
+took 5,896 ms; the initial summary and snapshot took 4,264 and 7,604 ms.
+Those initial calls are **warm-up/cutover-adjacent**, not included in the
+five-sample warm range. `WARM_BASELINE_UTC=2026-10-11T10:51:12.357Z`.
+
+| Warm sample | Summary client ms | Snapshot client ms | Snapshot request ID |
+| --- | ---: | ---: | --- |
+| 1 | 895 | 3,794 | `6b9d94a6-f653-4d6a-8ae0-b6e43d3c9c69` |
+| 2 | 708 | 3,803 | `80c44aa2-0bbd-4954-a5d5-807a8f35abd3` |
+| 3 | 1,054 | 3,078 | `c1ef66ff-182e-460c-a3f7-104b2b991c03` |
+| 4 | 675 | 2,982 | `75d79bab-dc45-4b48-a4b7-4e6055e26dfc` |
+| 5 | 1,103 | 3,342 | `6585be39-11c2-45c2-b006-bf0f04996c1a` |
+
+All ten warm reads returned 200. Summary range: 675-1,103 ms; snapshot
+range: 2,982-3,803 ms. These are serial Playwright API client durations,
+not browser-render time or a load/soak distribution. Render application logs
+for instance `7zzr9` matched the exact snapshot request IDs for samples 3-5:
+
+| ID suffix | HTTP thread | Composition wall / thread CPU ms | Largest sections | Sampled wait |
+| --- | --- | ---: | --- | --- |
+| `c1ef66ff` | `exec-9` | 2,091 / 99 | fulfillment 303, inventory 295, connectors 205 | one PostgreSQL JDBC frame, one Java/other frame |
+| `75d79bab` | `exec-7` | 2,087 / 104 | fulfillment 305, inventory 303, connectors 205 | one PostgreSQL JDBC frame, one Java/other frame |
+| `6585be39` | `exec-5` | 2,006 / 94 | fulfillment 406, inventory 305, connectors 299 | two Java/other frames |
+
+Each wait category is a sparse stack sample, not measured SQL duration,
+connection-hold time or proof of a PostgreSQL lock. The difference between
+client duration and composition wall time includes work outside that stage and
+network overhead; it has not been apportioned. Nearby operational-dispatch
+start/completion logs on the same instance showed Hikari `total=10`, typically
+`active=0-1`, `idle=9-10`, `waiting=0`, and `processed=0`. Those are sampled
+scheduler boundaries, **not** the Hikari state inside each HTTP request.
+No request-to-PostgreSQL-PID/SQL timeline or synchronized host CPU/heap chart
+was captured.
+
+Historical hosted snapshots around 5-19 seconds were taken on other revisions,
+tenants and load windows. The present 3.0-3.8 second range is a bounded current
+after-sample, **not** a like-for-like causal improvement estimate for the
+identity-reuse change. The older 2.0-2.9 second ordered audit SQL baseline and
+V15's 0.048-0.061 ms direct SQL after-sample describe a different query;
+neither can substitute for snapshot HTTP or Platform Activity measurements.
+Warm snapshot latency remains material, and historical Hikari `10/10` holder
+identity remains unknown. M1/H1/H2/H7/H12 stay open.
+
 ## Exit still required
 
-- Pass the full backend regression suite and exact-SHA CI, including the
-  existing PostgreSQL lane; preserve any failure evidence.
-- After an approved merge and confirmed new Live revision, compare repeated
-  warm authenticated snapshot HTTP timings and section breakdowns with a
-  comparable earlier window. Capture request IDs and resource/pool context.
+- Preserve the passed full backend and exact-SHA CI checks; investigate the
+  intermittent Replay/Order connection-demand failure rather than treating
+  the later green run as closure.
+- Obtain a comparable before/after hosted window or another attribution method
+  for the specific auth-query change. Measure PostgreSQL/connection hold and
+  host resource context instead of inferring it from sparse stack samples.
 - Preserve tenant/role/scope and revocation behavior in hosted verification.
   A local H2 query count cannot close H1, H2, H7, H12 or M1.
