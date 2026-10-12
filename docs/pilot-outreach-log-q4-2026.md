@@ -345,3 +345,16 @@ Full researched operating-loop dossiers, source links and Monday conversion plan
 - **Additional researched, NOT SENT:** Aberdare Cables (three SA plants, multiple customer hubs; official info@aberdare.co.za), Atlantis Foods (three cold stores, nationwide distribution and external processing partners; info@atlantisfoods.co.za), Palman Foods Group (four integrated units in one shared Cape Town facility; info@palmanfoods.co.za), Eagle Distribution (owned petroleum storage, fleet and retail sites; high safety/regulatory boundary; info@eagledistr.co.za).
 - **Current latest Gmail reply check:** no additional substantive human company reply since Paul Goosen at Motus; no documented meeting booked. Friday/Saturday/Sunday approaches await first business-day processing.
 - Full updated dossiers with exact source links, pilot-scenario hypotheses, qualified owner questions and technical boundaries: [11 October whole-loop research](outreach-research-2026-10-11-operational-loop-prospects.md). Group inboxes are merely first routes, never proof of personal delivery or interest.
+
+
+## 2026-10-12 — Verified Gmail response audit, qualified research, unsent drafts
+
+**Reviewed after normal SA business hours. No new messages sent today.**
+- **Motus:** Paul Goosen's Thu 8 Oct human request for founder contact details remains the strongest live conversation; founder replied same day (Gmail SENT ID `1a11af3a75f72271`). No later positive reply in reviewed Gmail. Prepared same-thread, question-led follow-up Gmail draft; **NOT SENT**. Earliest appropriate next-send review Tue 13 Oct.
+- **Bell Equipment:** Nomfundo Nxele from Marketing responded on Mon 12 Oct with a human receipt acknowledgment and will revert only if a requirement arises. **Not a qualified lead or referral; do not chase now.**
+- **Quantum Foods:** automated internal-routing acknowledgment and explicit 2–5 business-day response guidance; **not buyer engagement**.
+- **Sea Harvest:** automated Communications routing only; **no human handoff proven**. PPC and Sea Harvest original Saturday 10 Oct sends remain current; not yet due for follow-up.
+- **Clover:** automated restriction confirms its company-secretarial mailbox is for legal/media/secretariat; **discontinue this channel**.
+- Gmail pre-send duplicate check found **no prior messages to Aberdare or Atlantis Foods**. Saved two tailored **unsent drafts** to publicly published business addresses `info@aberdare.co.za` and `info@atlantisfoods.co.za`, addressing verified responsible executives and asking for a short operational discovery, no technical claims. They are drafts, not sent.
+- Refreshed candidate dossiers: Aberdare, Atlantis Foods, in2food (pending Woolworths acquisition), Rainbow Chicken, TFG, KAL/Agrimark, Sea Harvest and PPC. No new customer-confirmed operational gaps, data rights, actual pilot candidate or meeting.
+- Durable evidence and exact official public sources: [12 October enterprise acquisition research command](outreach-research-2026-10-12-acquisition-command.md). All examples are hypotheses; existing systems are not disqualifiers; signed M6/M7 acceptance remains mandatory before live customer pilots.
