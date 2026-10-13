@@ -135,3 +135,24 @@ This is disposable-PostgreSQL transaction/reclaim proof under a test-owned
 trigger, not a process kill, independent JVM, hosted delivery, duplicate
 consumer, sustained backlog or resource-headroom proof. H4 and M1 remain
 **OPEN**.
+
+## Fresh-worker abort simulation candidate, October 13
+
+A test-only candidate extends the existing disposable-PostgreSQL proof class.
+It commits a `PROCESSING` claim, then throws a deliberate `Error` immediately
+before the integration notification is published. This bypasses the worker's
+ordinary `RuntimeException` failure handler, modeling loss of that worker
+between claim and publication. A newly constructed queue service sees the
+unexpired claim as ineligible. After the test ages the claim beyond the lease,
+that fresh service reclaims it, publishes once, and records `COMPLETED` on
+attempt 2. The assertions cover the durable status, attempt count, processed
+timestamp, and notification count on isolated test data.
+
+The changed test class compiled and the local focused queue/claim suite passed
+9/9. Docker Desktop's daemon was unavailable locally, so the new test's
+PostgreSQL behavior has **not** yet run here; the existing CI job selects this
+class against disposable PostgreSQL. Exact-head CI remains required. An
+exception in one JVM followed by a fresh service object is **not** an actual
+process kill, separate JVM, multi-instance race, hosted delivery, lease
+overlap, or backlog/headroom proof. H4/H11 and M1 remain OPEN regardless of
+this candidate's CI result.
