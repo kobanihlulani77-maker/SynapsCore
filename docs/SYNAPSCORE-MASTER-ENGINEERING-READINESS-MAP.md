@@ -429,6 +429,11 @@ This rules down pool saturation **during those samples**, not unsampled
 intervals or the historical 10/10 holder problem. It is a bounded diagnostic,
 not a latency correction or M1 exit. H1/H2/H7/H12 and M1 stay OPEN
 ([boundary](evidence/dashboard-snapshot-auth-query-bound-2026-10-08.md)).
+An October 13 H2 test-only first-table SQL census of the 53-statement local
+snapshot found operator/Scenario/auth reads prominent, but no durations,
+bind-value equivalence or hosted PostgreSQL ownership. It does not justify
+removing authority checks or attributing warm hosted latency to one query
+family; same-request SQL/connection timing remains the next H1/H2 boundary.
 
 ### Cross-workstream dependency and ordering
 
