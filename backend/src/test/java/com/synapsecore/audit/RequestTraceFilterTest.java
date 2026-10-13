@@ -155,6 +155,50 @@ class RequestTraceFilterTest {
         }
     }
 
+    @Test
+    void platformOwnerLoginUsesFocusedSlowRequestThresholdWithoutLoggingCredentials() {
+        request.setMethod("POST");
+        request.setRequestURI("/api/platform/session/login");
+        request.setQueryString("password=must-not-enter-logs");
+        Logger logger = (Logger) LoggerFactory.getLogger(RequestTraceFilter.class);
+        ListAppender<ILoggingEvent> appender = new ListAppender<>();
+        appender.start();
+        logger.addAppender(appender);
+        try {
+            filter.logSlowRequest(request, 200, 1_999_000_000L, 100_000_000L, 700, 20);
+            assertThat(appender.list).isEmpty();
+
+            filter.logSlowRequest(request, 200, 2_000_000_000L, 100_000_000L, 700, 20);
+            assertThat(appender.list).hasSize(1);
+            String message = appender.list.get(0).getFormattedMessage();
+            assertThat(message).contains("route=/api/platform/session/login", "durationMs=2000",
+                "identityMs=100", "handlerMs=1900", "hikariTotal=-1");
+            assertThat(message).doesNotContain("must-not-enter-logs");
+        } finally {
+            logger.detachAppender(appender);
+            appender.stop();
+        }
+    }
+
+    @Test
+    void tenantLoginKeepsGeneralSlowRequestThreshold() {
+        request.setMethod("POST");
+        request.setRequestURI("/api/auth/session/login");
+        Logger logger = (Logger) LoggerFactory.getLogger(RequestTraceFilter.class);
+        ListAppender<ILoggingEvent> appender = new ListAppender<>();
+        appender.start();
+        logger.addAppender(appender);
+        try {
+            filter.logSlowRequest(request, 200, 2_000_000_000L, 0, 100, 0);
+            assertThat(appender.list).isEmpty();
+            filter.logSlowRequest(request, 200, 5_000_000_000L, 0, 100, 0);
+            assertThat(appender.list).hasSize(1);
+        } finally {
+            logger.detachAppender(appender);
+            appender.stop();
+        }
+    }
+
     @ParameterizedTest
     @ValueSource(ints = {1, 2})
     void resolutionFailureIsCorrelatedMeasuredAndCleanedUp(int failingLookup) {

@@ -10,6 +10,7 @@ import java.time.Duration;
 import java.time.Instant;
 import java.util.Optional;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
@@ -17,17 +18,20 @@ import org.springframework.web.server.ResponseStatusException;
 
 @Service
 @RequiredArgsConstructor
+@Slf4j
 public class PlatformOwnerSessionService {
 
     public static final String SESSION_USERNAME_KEY = "synapsecore.platform.username";
     public static final String SESSION_AUTHENTICATED_AT_KEY = "synapsecore.platform.authenticatedAt";
     private static final String PLATFORM_AUDIT_TENANT = "PLATFORM";
+    private static final long SLOW_SIGN_IN_THRESHOLD_NANOS = 2_000_000_000L;
 
     private final SynapsePlatformOwnerProperties properties;
     private final PasswordEncoder passwordEncoder;
     private final AuditLogPersistenceService auditLogPersistenceService;
 
     public PlatformSessionResponse signIn(HttpServletRequest request, String username, String password) {
+        long startedAtNanos = System.nanoTime();
         if (!properties.isConfigured()) {
             throw new ResponseStatusException(HttpStatus.SERVICE_UNAVAILABLE,
                 "Platform-owner sign-in is not configured for this environment.");
@@ -43,6 +47,7 @@ public class PlatformOwnerSessionService {
             );
             throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Invalid platform-owner credentials.");
         }
+        long credentialsVerifiedAtNanos = System.nanoTime();
 
         HttpSession existingSession = request.getSession(false);
         if (existingSession != null) {
@@ -53,13 +58,28 @@ public class PlatformOwnerSessionService {
         session.setAttribute(SESSION_USERNAME_KEY, properties.getUsername().trim());
         session.setAttribute(SESSION_AUTHENTICATED_AT_KEY, authenticatedAt.toString());
         session.setMaxInactiveInterval((int) Duration.ofMinutes(properties.getSessionTimeoutMinutes()).getSeconds());
+        long sessionReadyAtNanos = System.nanoTime();
         recordAudit(
             "PLATFORM_AUTH_LOGIN",
             properties.getUsername().trim(),
             AuditStatus.SUCCESS,
             "Platform-owner session established."
         );
+        logSlowSignIn(startedAtNanos, credentialsVerifiedAtNanos, sessionReadyAtNanos, System.nanoTime());
         return signedIn(authenticatedAt);
+    }
+
+    void logSlowSignIn(long startedAtNanos, long credentialsVerifiedAtNanos,
+                       long sessionReadyAtNanos, long auditRecordedAtNanos) {
+        long totalNanos = auditRecordedAtNanos - startedAtNanos;
+        if (totalNanos < SLOW_SIGN_IN_THRESHOLD_NANOS) {
+            return;
+        }
+        log.warn("Slow platform owner sign-in service totalMs={} credentialsMs={} sessionMs={} auditMs={}",
+            totalNanos / 1_000_000,
+            (credentialsVerifiedAtNanos - startedAtNanos) / 1_000_000,
+            (sessionReadyAtNanos - credentialsVerifiedAtNanos) / 1_000_000,
+            (auditRecordedAtNanos - sessionReadyAtNanos) / 1_000_000);
     }
 
     public PlatformSessionResponse getCurrentSession(HttpSession session) {
