@@ -281,6 +281,12 @@ build identifier. The warm-check readiness and unauthenticated session took
 `a752e2ee-1f63-4be3-bb93-124feeb01b4d`); post-login readiness and
 authenticated session took 478.3 and 417.9 ms. Overview/Activity warmup took
 747.2/442.5 ms. All requests in the five serial read pairs returned HTTP 200.
+Render application logs matched that login request ID on instance `wttn5`,
+HTTP thread `http-nio-0.0.0.0-10000-exec-4`. Its only matching lines show
+`PlatformRealtimeNotificationService` starting at 09:23:36.067 UTC and
+completing at 09:23:36.069 UTC (`elapsedMs=1`). This bounds one late login
+stage; it does not measure or explain the preceding client wall time, Hikari
+acquisition, password verification, session work, audit write, or routing.
 
 | Pair | Overview start UTC / request ID | Overview client ms | Activity start UTC / request ID | Activity client ms |
 | --- | --- | ---: | --- | ---: |
