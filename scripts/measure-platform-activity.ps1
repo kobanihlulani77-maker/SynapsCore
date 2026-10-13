@@ -20,7 +20,7 @@ function Measure-Read {
         $watch.Stop()
         $requestId = [string]$response.Headers['X-Request-Id']
         $count = if ($Path -eq '/api/platform/activity') {
-            @($response.Content | ConvertFrom-Json).Count
+            (ConvertFrom-Json -InputObject $response.Content).Count
         } else { $null }
         [pscustomobject]@{
             stage = $Stage
@@ -94,20 +94,38 @@ try {
         durationMs = [math]::Round($loginWatch.Elapsed.TotalMilliseconds, 1)
         requestId = [string]$loginResponse.Headers['X-Request-Id']
     } | ConvertTo-Json -Compress | Write-Output
-    if ($loginWatch.Elapsed.TotalMilliseconds -ge 2000) {
-        throw 'Authenticated login was slow; do not classify subsequent reads as a warm index comparison.'
-    }
+    $slowLogin = $loginWatch.Elapsed.TotalMilliseconds -ge 2000
+
+    $postLoginCheck = @(
+        Measure-Read '/actuator/health/readiness' 'post-login-check'
+        Measure-Read '/api/platform/session' 'post-login-check'
+    )
+    $postLoginCheck | ForEach-Object { $_ | ConvertTo-Json -Compress | Write-Output }
+    $slowPostLoginCheck = @($postLoginCheck | Where-Object { $_.durationMs -ge 2000 }).Count -ne 0
 
     $warm = @(
         Measure-Read '/api/platform/overview' 'warmup'
         Measure-Read '/api/platform/activity' 'warmup'
     )
+    $warm | ForEach-Object { $_ | ConvertTo-Json -Compress | Write-Output }
     if (@($warm | Where-Object { $_.status -ne 200 }).Count -ne 0) {
         throw 'Warm baseline did not return HTTP 200 for both reads.'
     }
+    $slowWarmup = @($warm | Where-Object { $_.durationMs -ge 2000 }).Count -ne 0
     Write-Output "Live endpoint: $apiBase"
-    Write-Output "Warm baseline UTC: $((Get-Date).ToUniversalTime().ToString('o'))"
-    $warm | ForEach-Object { $_ | ConvertTo-Json -Compress | Write-Output }
+    [pscustomobject]@{
+        stage = 'baseline-classification'
+        utc = (Get-Date).ToUniversalTime().ToString('o')
+        cleanWarmBaseline = -not ($slowLogin -or $slowPostLoginCheck -or $slowWarmup)
+        slowLogin = $slowLogin
+        slowPostLoginCheck = $slowPostLoginCheck
+        slowWarmup = $slowWarmup
+        note = if ($slowLogin -or $slowPostLoginCheck -or $slowWarmup) {
+            'Diagnostic reads only; do not claim a clean warm HTTP comparison.'
+        } else {
+            'Post-login checks and warmup passed; classify each read by its measured duration.'
+        }
+    } | ConvertTo-Json -Compress | Write-Output
 
     for ($sample = 1; $sample -le $Samples; $sample++) {
         Measure-Read '/api/platform/overview' "sample-$sample" |
