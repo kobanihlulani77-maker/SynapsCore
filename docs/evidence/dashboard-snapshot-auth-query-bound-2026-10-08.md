@@ -311,6 +311,30 @@ configured limits are not a measured utilization or proof of throttling/OOM
 during this request window. Keep the approved Free plan while the available
 evidence is trustworthy; a paid-plan change requires owner approval.
 
+## October 13 local SQL-shape follow-up
+
+The focused `DashboardSnapshotAuthQueryBoundIntegrationTest` passed again on
+`main` `47385f3` using the H2 test profile. A temporary test-only
+`StatementInspector` breakdown of the first authenticated snapshot found 53
+statements: first `FROM` table was `access_operators` for 8, `scenario_runs`
+for 7, `access_users` for 5, `inventory` for 4, and `tenants`,
+`access_operator_roles`, `customer_orders`, and
+`access_operator_warehouse_scopes` for 3 each. Other statement shapes
+accounted for the remaining 17. The inspector counted statements, not query
+duration or PostgreSQL round trips; the first-table label does not include
+joined tables. Temporary instrumentation was removed after the passing run.
+
+The five `access_users` statements had the same SQL template, as did five
+operator-by-ID loads; the three repeated overdue Scenario templates may have
+different bind values. This is not evidence that their results can safely be
+reused or that any one family explains the 2.2-3.2 second hosted HTTP time.
+Request-entry and final authority validation must remain fresh, while the
+in-composition identity reuse already exists. No production optimization is
+justified from this H2 shape count alone. The next causal comparison needs
+timed PostgreSQL statements or connection acquisition/hold evidence for a
+same-ID warm hosted snapshot at representative data size. H1/H2/H7/H12 and
+M1 remain open.
+
 ## Exit still required
 
 - Preserve the passed full backend and exact-SHA CI checks; investigate the
