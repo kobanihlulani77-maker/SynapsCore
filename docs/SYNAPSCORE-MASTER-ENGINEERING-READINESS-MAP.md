@@ -434,6 +434,11 @@ snapshot found operator/Scenario/auth reads prominent, but no durations,
 bind-value equivalence or hosted PostgreSQL ownership. It does not justify
 removing authority checks or attributing warm hosted latency to one query
 family; same-request SQL/connection timing remains the next H1/H2 boundary.
+The two matching Render composition logs also show that 2.50/2.11 seconds
+accumulated across several serial sections rather than one dominant section;
+the audit section was only 16/3 ms. This narrows the current snapshot path,
+but does not allocate its low-CPU wall time to SQL, pool hold or host pressure
+([section timing](evidence/dashboard-snapshot-auth-query-bound-2026-10-08.md)).
 
 ### Cross-workstream dependency and ordering
 
