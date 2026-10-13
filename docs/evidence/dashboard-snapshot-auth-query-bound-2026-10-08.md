@@ -300,6 +300,13 @@ The matching Render composition logs break down the serial work further:
 These are same-request section wall and current-thread CPU measurements,
 not SQL timings. Neither trace has a single section that accounts for its
 2,497/2,105 ms composition; multiple serial sections accumulate the delay.
+Source inspection on merged `main` `a32f078` found no enclosing `@Transactional` on
+`DashboardController.getSnapshot`, `OperationalViewService.getSnapshot` /
+`buildSnapshot`, or `AuthSessionService.withSnapshotIdentity`; JPA
+`open-in-view` is disabled. The measured composition is therefore not
+explicitly one snapshot-wide service transaction. Nested service/repository
+calls may still open transactions and hold connections, so this source fact
+does not establish the hosted JDBC acquisition or release timeline.
 The audit section was 16/3 ms, so the earlier audit scan is not the dominant
 section in these two snapshots. The sampled zero Hikari waiters rule down
 pool exhaustion only at the sample instants. They cannot separate short
