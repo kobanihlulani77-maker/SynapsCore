@@ -305,6 +305,12 @@ host CPU/memory trace for these request IDs, no concurrent/soak proof, and no
 Platform Owner Activity HTTP after-sample in this probe. H1/H2/H7/H12 and M1
 remain OPEN.
 
+Render's Metrics view showed this Free backend's 0.15 CPU and 512 MB limits,
+but application CPU and memory graphs were unavailable on that plan. The
+configured limits are not a measured utilization or proof of throttling/OOM
+during this request window. Keep the approved Free plan while the available
+evidence is trustworthy; a paid-plan change requires owner approval.
+
 ## Exit still required
 
 - Preserve the passed full backend and exact-SHA CI checks; investigate the
