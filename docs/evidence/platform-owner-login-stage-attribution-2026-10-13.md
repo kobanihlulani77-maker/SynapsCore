@@ -53,9 +53,8 @@ The focused local `RequestTraceFilterTest,PlatformOwnerSessionServiceTest` run
 passed 17 tests with zero failures/errors/skips. It covers the two-second
 threshold, unchanged five-second threshold for unrelated routes and tenant login, stage
 arithmetic and exclusion of a synthetic secret-bearing query string from the
-outer log. The full local backend `mvnw test` run before the additional
-tenant-login regression completed with 413 tests across 73 Surefire reports,
-zero failures/errors/skips. Exact-head CI must
+outer log. The full local backend `mvnw test` run completed with 414 tests
+across 73 Surefire reports, zero failures/errors/skips. Exact-head CI must
 still pass before merge. This is local proof of diagnostic control flow,
 **not** hosted attribution.
 
