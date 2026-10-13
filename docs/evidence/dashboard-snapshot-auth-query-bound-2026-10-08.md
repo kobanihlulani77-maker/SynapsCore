@@ -238,7 +238,7 @@ snapshot composer. Its sections call separate services, including a
 read-only transaction for alert visibility. The completion-time pool readings
 therefore cannot be read as a single connection held throughout composition.
 
-A **not-yet-deployed diagnostic candidate** extends the existing one-second,
+A diagnostic extends the existing one-second,
 60-sample snapshot composition stack sampler to also capture the maximum
 global Hikari active/waiting counts and minimum idle count while it samples.
 The values are logged only with a slow composition. A missing/non-Hikari pool
@@ -250,8 +250,60 @@ followed by a complete local H2-profile backend run: 72 Surefire reports,
 local links and no missing target. This is not PostgreSQL, CI or hosted proof.
 It may miss sub-second pressure, its pool counts
 are global and non-atomic, and it cannot map a pool connection to a PostgreSQL
-PID or identify a transactional owner. CI and hosted results for this
-candidate are still missing.
+PID or identify a transactional owner. PR #8 merged as `8f5c7a9e13ae7985353e39ed7d800bf7a52595c5` after exact-head CI
+`38139246676` passed both jobs; merged-main CI `38139660104` also passed
+`verify` and `dispatch-postgres`. These checks establish build and regression
+coverage, not hosted holder attribution.
+
+## Live in-flight pool sample, October 13
+
+Render Deploys showed `8f5c7a9e13ae7985353e39ed7d800bf7a52595c5`
+**Live** as deploy `dep-db5o3p15efls73ar7bd0` after 4m58s. Later `main`
+commits changed documents only, not this backend runtime. The six-flag live
+connection gate passed. A bounded, serial, authenticated synthetic-tenant
+probe on instance `ln7dc` established `WARM_BASELINE_UTC=2026-10-13T08:03:16.774Z`
+after readiness, session, login, summary and snapshot all returned successfully.
+The initial 6,399 ms client snapshot is a warm-up observation, excluded from
+the five warm pairs below. No code, pool, timeout or infrastructure setting
+was changed for this measurement.
+
+| Warm pair | Snapshot UTC start | Request ID | Client ms | Same-ID HTTP ms / CPU ms | Composition ms / CPU ms | In-flight pool samples |
+| --- | --- | --- | ---: | ---: | ---: | --- |
+| 1 | 08:03:17.570 | `3e6d83ef-ca9a-4ad7-8771-38eac9946ec9` | 3,671.4 | 3,216 / 161 | 2,497 / 118 | 2 samples classified `JAVA_ACTIVE_OR_OTHER`, with a representative fulfillment-assessment frame; max active 0, max waiting 0, min idle 10 |
+| 2 | 08:03:21.950 | `4b706263-4f92-4941-8950-dacbb126a25b` | 2,879.4 | 2,422 / 132 | Not logged | Not logged |
+| 3 | 08:03:25.482 | `076443b3-1cf6-4651-b024-8b31e40821fe` | 2,670.3 | 2,198 / 124 | Not logged | Not logged |
+| 4 | 08:03:28.687 | `325671ab-c16c-449e-895e-ac1afced079e` | 3,355.7 | 2,695 / 124 | 2,105 / 91 | 2 samples classified `POSTGRES_JDBC`, with a representative recommendation-visibility frame; max active 1, max waiting 0, min idle 9 |
+| 5 | 08:03:33.014 | `a8ba62ca-7b16-4ab9-a4ab-c699dcdc9d70` | 3,075.2 | 2,583 / 127 | Not logged | Not logged |
+
+All five summary and snapshot requests returned 200. Warm summary client
+durations were 534.2-971.2 ms; snapshot client durations were
+2,670.3-3,671.4 ms and same-ID server HTTP durations were 2,198-3,216 ms.
+The 2-second HTTP threshold logged all five snapshots, but the composition
+sampler logged only two; a missing composition warning is not a zero duration.
+For those two, the 1-second stack sampler recorded no Hikari waiter and at
+most one active pool connection. The earlier warm-up composition had three
+samples, max active 2, max waiting 0, min idle 8. Completion-time pool
+readings for the five warm HTTP logs likewise showed no waiters. These are
+global, sparse samples, not a continuous per-request connection history.
+
+The same-ID client-minus-server wall differences were approximately
+455-661 ms. The two measured server-minus-composition differences were
+719 and 590 ms. They bound unmeasured work; they cannot be allocated to
+routing, serialization, connection acquisition or SQL without another trace.
+The `POSTGRES_JDBC` frames show where the Java thread was sampled, not actual
+SQL execution duration, PostgreSQL PID, lock wait or transaction ownership.
+Nearby operational-dispatch and replay scans processed zero items with no
+sampled waiters; this cannot prove busy-worker behavior. No new 10/10 Hikari
+event occurred in this bounded window.
+
+**Classification:** warm snapshot latency persists; Hikari saturation is
+ruled down for the sampled serial snapshot compositions, not for historical
+incidents or unsampled intervals. Low HTTP-thread CPU remains consistent with
+off-CPU time but does not distinguish PostgreSQL round trips, Java blocking,
+host throttling or network delay. There is no PostgreSQL PID/SQL timeline or
+host CPU/memory trace for these request IDs, no concurrent/soak proof, and no
+Platform Owner Activity HTTP after-sample in this probe. H1/H2/H7/H12 and M1
+remain OPEN.
 
 ## Exit still required
 

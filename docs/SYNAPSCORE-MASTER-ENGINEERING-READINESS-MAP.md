@@ -19,12 +19,12 @@ acceptance or M7 customer-specific launch authorization.
 | Repository verification | The September 27 local `main` and freshly fetched `origin/main` matched the original baseline then. Subsequent revisions are assessed only within their recorded scope; a documentation successor is not a newly verified application release. |
 | Current phase | M1: performance, concurrency, correctness, and runtime hardening - OPEN |
 | Current sub-workstream | H1/H2/H7: warm hosted latency, connection demand, and measured resource envelope; Replay convergence is a dependent H8 question |
-| Immediate objective | The `62b5d68` Live trace has five same-ID warm snapshot client/HTTP pairs: 3.0-3.5 seconds client, 2.5-3.1 seconds server, low HTTP-thread CPU and no Hikari waiters at completion. Docs-only `0000a9f` is now Live with the same runtime behavior. This closes the missing HTTP boundary, **not** the in-request connection/SQL/host attribution or historical Hikari holder identity ([H2 after-sample](evidence/dashboard-snapshot-auth-query-bound-2026-10-08.md)). Obtain warm authenticated Platform Activity/overview **HTTP** timings and request IDs; Chrome rendering is not HTTP duration. On a naturally slow request, correlate pool acquisition, JDBC PID/SQL, Java wait and host resources before another correction ([activity boundary](evidence/platform-activity-read-boundary-2026-10-07.md), [sampler boundary](evidence/snapshot-wait-sampling-2026-09-30.md)). |
+| Immediate objective | Live `8f5c7a9` now has five same-ID warm snapshot pairs: 2.67-3.67 seconds client, 2.20-3.22 seconds server, low HTTP-thread CPU. Two slow compositions had sparse in-flight pool samples with zero Hikari waiters and at most one active connection; this rules down saturation in those sampled windows, **not** historical 10/10 starvation, unsampled acquisition waits, JDBC PID/SQL or host-resource causes ([H2 after-sample](evidence/dashboard-snapshot-auth-query-bound-2026-10-08.md)). Bound the persistent serial snapshot wall time across section calls and PostgreSQL/Java wait before changing performance code. Obtain separate warm authenticated Platform Activity/overview **HTTP** timings and request IDs; Chrome rendering is not HTTP duration ([activity boundary](evidence/platform-activity-read-boundary-2026-10-07.md)). |
 | Next gate | M2: repeatable hosted verification; entry BLOCKED until M1's in-scope hardening gates pass |
 | Pilot authorization | NOT GRANTED by this map; current candidate is not accepted for customer operations |
-| Last verified live backend | Render showed PR #6 auto-deploy `62b5d68` Live after 4m56s on October 11. Live instance `msjqm` produced five warm synthetic-tenant snapshot client/HTTP pairs (all 200) with exact request IDs; completion-time Hikari was 0 active/10 idle/0 waiting in all six snapshot HTTP logs. Docs-only PR #7 merge `0000a9fe2513ce0a67fb1dae389a5adf8a60a23f` subsequently became Live in a 5m04s manual deploy; startup validated 15 migrations, schema was already at V15, and the post-cutover six-flag gate passed. The trace is bounded authenticated observation, not in-request pool history, PostgreSQL PID/SQL attribution, repeatable load proof or M1 closure ([H2 after-sample](evidence/dashboard-snapshot-auth-query-bound-2026-10-08.md)). |
+| Last verified live backend | Render Deploys showed PR #8 merge `8f5c7a9e13ae7985353e39ed7d800bf7a52595c5` Live on October 13 as `dep-db5o3p15efls73ar7bd0` after 4m58s. The six-flag gate passed. Instance `ln7dc` produced five warm synthetic-tenant same-ID snapshot client/HTTP pairs, all 200, with bounded in-flight Hikari sampling on two slow compositions. Later `main` commits changed documents only. This is not a continuous per-request pool history, PostgreSQL PID/SQL attribution, load proof or M1 closure ([H2 after-sample](evidence/dashboard-snapshot-auth-query-bound-2026-10-08.md)). |
 | Scoped recovery proof | [PR #2](https://github.com/kobanihlulani77-maker/SynapsCore/pull/2) merged as `16f44753f1cc90c21d3dbe6accc59a51d575c798`. The new disposable-PostgreSQL test rejects the terminal `COMPLETED` write after broadcast, verifies the claim remains recoverable, then reclaims/completes it after lease expiry with an explicit second broadcast. It changes only test/CI files; controlled process-stop, multi-instance and hosted recovery remain OPEN ([dispatch evidence](evidence/operational-dispatch-claim-recovery-2026-10-03.md)). |
-| Latest scoped CI evidence | PR #6 exact-head runs `38136231545` and `38136213070` and merged-main run `38136507060` passed both jobs for the snapshot-only trace threshold. Docs-only PR #7 exact-head and [merged-main run `38137428506`](https://github.com/kobanihlulani77-maker/SynapsCore/actions/runs/38137428506) also passed `verify` and `dispatch-postgres`. The new in-flight pool sampler is a local candidate, not part of those CI results. CI does not prove hosted latency repeatability, historical Hikari ownership or M1 closure ([H2 after-sample](evidence/dashboard-snapshot-auth-query-bound-2026-10-08.md)). |
+| Latest scoped CI evidence | PR #8 exact-head run `38139246676` and [merged-main run `38139660104`](https://github.com/kobanihlulani77-maker/SynapsCore/actions/runs/38139660104) passed `verify` and `dispatch-postgres` for the in-flight pool sampler. The sampler is now deployed and observed, not merely a local candidate. CI does not prove hosted latency repeatability, historical Hikari ownership or M1 closure ([H2 after-sample](evidence/dashboard-snapshot-auth-query-bound-2026-10-08.md)). |
 | Local test artifacts | September 23 Surefire aggregate: 390 tests. The dispatch correction passed a 70-suite/403-test full backend run with zero failures/errors/skips and production packaging locally; its injected terminal-write failure was exercised in the H2 test profile, not PostgreSQL ([dispatch record](evidence/operational-dispatch-claim-recovery-2026-10-03.md)). On October 7, the activity-read diagnostic passed 36 focused tests and a full 70-suite/404-test H2-backed backend regression with zero failures/errors/skips ([activity boundary](evidence/platform-activity-read-boundary-2026-10-07.md)). |
 | Worktree boundary | Unrelated frontend Dockerfile edit, `.gitattributes`, two untracked Scenario evidence files, and raw CSV captures are not part of this assessment's committed implementation. |
 
@@ -418,15 +418,16 @@ the bounded probe, with sustained-traffic log volume still unknown
 ([evidence](evidence/dashboard-snapshot-auth-query-bound-2026-10-08.md)).
 H1/H2/H7/H12 and M1 remain open.
 
-The evidence-only merge `0000a9f` is now Live after a 5m04s manual Render
-deploy; all six post-cutover connection flags passed. It did not change the
-runtime. The next narrow candidate samples **global in-flight** Hikari
-pressure during slow snapshot composition, because completion-only pool state
-misses the request window. Focused tests and the full local H2-profile backend
-suite passed 411/411. This is a bounded diagnostic, not a holder mapping or a
-latency correction; one-second samples can miss brief waits. Until exact-head
-CI and a hosted trace are recorded, use it only as local candidate evidence
-and keep H1/H2/H7/H12 and M1 OPEN
+PR #8's **global in-flight** Hikari sampler passed exact-head and merged-main
+CI and is Live as `8f5c7a9`; all six post-deploy connection flags passed.
+On October 13, five warm same-ID snapshot pairs remained slow (2.67-3.67
+seconds client; 2.20-3.22 seconds server). Two composition warnings contained
+one-second pool samples: max active 0/1, max waiting 0, min idle 10/9.
+Their sparse stack samples landed in fulfillment Java work or PostgreSQL
+JDBC recommendation visibility, without PID or measured SQL duration.
+This rules down pool saturation **during those samples**, not unsampled
+intervals or the historical 10/10 holder problem. It is a bounded diagnostic,
+not a latency correction or M1 exit. H1/H2/H7/H12 and M1 stay OPEN
 ([boundary](evidence/dashboard-snapshot-auth-query-bound-2026-10-08.md)).
 
 ### Cross-workstream dependency and ordering
