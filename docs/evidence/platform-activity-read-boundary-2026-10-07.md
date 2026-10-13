@@ -259,7 +259,8 @@ the authenticated warmup are slow, it labels the reads diagnostic only; they
 cannot be called a clean warm before/after comparison. Failed login, rate
 limit and read errors still stop
 the probe. This changes no product code, infrastructure, timeout or test
-assertion. The revised probe has not yet yielded a hosted Activity after-sample.
+assertion. The revised probe yielded the diagnostic-only hosted after-sample
+below; the earlier clean-baseline restriction remains in force.
 The PowerShell parser passed locally. Four mocked, network-free one-sample
 executions exercised fast login (`cleanWarmBaseline=true`), slow login
 (`slowLogin=true`), and slow post-login readiness
@@ -267,6 +268,50 @@ executions exercised fast login (`cleanWarmBaseline=true`), slow login
 each still produced bounded Activity/overview
 sample rows. These mocks verify control flow only, not actual hosted timing,
 rate-limit behavior or request attribution.
+
+### October 13 authenticated HTTP after-sample
+
+The owner ran the revised bounded probe on October 13. A subsequent Render
+Deploys inspection showed `8f5c7a9e13ae7985353e39ed7d800bf7a52595c5`
+as the last successfully deployed, **Live** backend revision (Free plan).
+There was no exact request-to-instance or request-to-deploy log match for these
+reads. The revision is a post-run deployment observation, not a response-header
+build identifier. The warm-check readiness and unauthenticated session took
+481.8 and 509.8 ms. Login returned HTTP 200 in **2,342.6 ms** (request ID
+`a752e2ee-1f63-4be3-bb93-124feeb01b4d`); post-login readiness and
+authenticated session took 478.3 and 417.9 ms. Overview/Activity warmup took
+747.2/442.5 ms. All requests in the five serial read pairs returned HTTP 200.
+
+| Pair | Overview start UTC / request ID | Overview client ms | Activity start UTC / request ID | Activity client ms |
+| --- | --- | ---: | --- | ---: |
+| 1 | 09:23:38.404 / `b8d3519f-b29b-409c-9a10-2a361c9ca7dd` | 486.7 | 09:23:38.894 / `da46fa03-d99d-4b7e-9ede-788d6ddb6ac6` | 1,046.8 |
+| 2 | 09:23:39.946 / `bc015ffe-5622-4ce8-9812-0012bd61d976` | 529.7 | 09:23:40.477 / `70f7047b-36ab-4f76-a9c3-9e78e14e2ffe` | 784.3 |
+| 3 | 09:23:41.266 / `f6c08978-f645-41c0-8ccf-bb538cebab43` | 540.6 | 09:23:41.806 / `a953dd19-c55c-4510-a9dd-f4dc9b68c017` | 1,520.2 |
+| 4 | 09:23:43.330 / `874caebd-691a-4c97-9d29-2f3b7d7050e1` | 1,741.7 | 09:23:45.079 / `edf83913-eb74-494d-b028-4f0efd29d0c8` | 509.0 |
+| 5 | 09:23:45.589 / `398eadf0-d04f-47be-9502-5b6acef1ca57` | 820.6 | 09:23:46.413 / `35f01d83-8cc6-493e-b117-546e1ae9ad18` | 652.3 |
+
+These are **five authenticated hosted client samples per endpoint**: Activity
+509.0-1,520.2 ms, Overview 486.7-1,741.7 ms. The probe classified the run
+`cleanWarmBaseline=false`, `slowLogin=true`, `slowPostLoginCheck=false`,
+`slowWarmup=false`. Its own rule therefore makes the read pairs diagnostic,
+not a clean warm before/after comparison. It logged out after the run. The
+printed `activityCount=1` is **invalid as a response cardinality claim**:
+Windows PowerShell 5.1's piped `ConvertFrom-Json` wraps a JSON array as one
+pipeline object (`@(...).Count` is one even for a two-element fixture). The
+read-only probe now uses `ConvertFrom-Json -InputObject` for this field; the
+existing request timings and HTTP statuses are unaffected. Actual Activity
+row count was not independently captured in this probe.
+
+The pre-index 2,201-3,197 ms measurements above are Java Activity-stage wall
+times, **not client HTTP durations**. The pre-index PostgreSQL audit SQL
+duration logs of 2,037-2,936 ms and post-index direct SQL executions of
+0.048-0.061 ms are different sessions/load conditions. This run collected no
+same-request Java stage timings, PostgreSQL PID/SQL duration, pool/resource
+context, response TTFB, or per-request instance mapping. Its sub-two-second
+Activity client times are encouraging but cannot alone assign improvement to
+V15, explain the 2.34-second login, or close H1/H2/H7/H12 or M1. Preserve
+the slow-login observation and obtain a clean baseline and attribution only
+when available without forcing repeated sign-ins.
 
 ## Verification and limit
 

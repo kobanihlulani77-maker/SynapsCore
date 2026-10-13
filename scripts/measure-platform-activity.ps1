@@ -20,7 +20,7 @@ function Measure-Read {
         $watch.Stop()
         $requestId = [string]$response.Headers['X-Request-Id']
         $count = if ($Path -eq '/api/platform/activity') {
-            @($response.Content | ConvertFrom-Json).Count
+            (ConvertFrom-Json -InputObject $response.Content).Count
         } else { $null }
         [pscustomobject]@{
             stage = $Stage
