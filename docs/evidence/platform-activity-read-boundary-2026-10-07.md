@@ -136,9 +136,9 @@ five serial overview/Activity pairs. Output contains UTC start/end, endpoint,
 status, client duration, request ID and Activity count, but no credential,
 cookie or response body. Login/logout still create their normal audit events.
 The probe is not a PostgreSQL query timer, load test, or proof of the historical
-Hikari holders. **No probe result has been supplied yet, so the hosted
-after-measurement and before/after comparison remain OPEN.** If the read
-remains slow, capture the hosted plan and wait/resource state before another
+Hikari holders. At this point no authenticated read result had been supplied,
+so the hosted after-measurement and before/after comparison remained OPEN. If
+the read remains slow, capture the hosted plan and wait/resource state before another
 production correction. If it is fast, measure the same ordered SQL with a
 bounded read-only method before claiming a database-duration comparison.
 
@@ -226,6 +226,47 @@ authenticated read pairs when a normal, non-rate-limited login is available;
 do not force a new login or substitute UI elapsed time for client HTTP time.
 The separate October 8 warm snapshot latency evidence is recorded in
 [the warm read continuation](warm-runtime-read-2026-10-08.md).
+
+### October 13 bounded probe attempts and diagnostic correction
+
+The owner ran the secure probe twice against the confirmed Live `8f5c7a9`
+application. Both attempts returned HTTP 200 for readiness, unauthenticated
+session, and Platform Owner login. The warm-check readiness/session client
+durations were 493.2/422.1 ms and 1,321.3/533.6 ms respectively. The first
+login began at `09:04:27.2196700Z`, took 3,696.7 ms, and returned request ID
+`22bc73d9-e1a8-475a-9a71-804b4e735476`. The second began at
+`09:06:06.2977141Z`, took 2,390.3 ms, and returned request ID
+`cd407382-5256-4d6c-9c4d-433542c27b71`. The first login followed the
+preflight by nearly three minutes of operator input; the second followed by
+about 19 seconds. The checks establish responsive pre-login reads, not
+continuous warm-state proof across those gaps.
+
+The original probe stopped on either successful login exceeding its 2-second
+clean-baseline gate. It therefore captured **zero** authenticated Activity or
+overview HTTP after-samples. Render application logs on instance `wttn5`
+showed same-ID notification-stage pairs on HTTP threads `exec-10` and
+`exec-3`; those stage pairs took 2 and 73 ms, not the complete login duration.
+The general slow-HTTP log threshold is 5 seconds, so no full-request warning
+was expected for these two client durations. No same-request Hikari,
+PostgreSQL PID, SQL or host-resource trace was captured. Successful login
+alone does not prove a healthy runtime or an Activity improvement.
+
+The read-only probe now retains slow login as an explicit failed clean
+warm-baseline classification, checks readiness and authenticated session
+again after login, and then performs the bounded Activity/overview warmup and
+five read pairs if those requests succeed. If login, post-login checks, or
+the authenticated warmup are slow, it labels the reads diagnostic only; they
+cannot be called a clean warm before/after comparison. Failed login, rate
+limit and read errors still stop
+the probe. This changes no product code, infrastructure, timeout or test
+assertion. The revised probe has not yet yielded a hosted Activity after-sample.
+The PowerShell parser passed locally. Four mocked, network-free one-sample
+executions exercised fast login (`cleanWarmBaseline=true`), slow login
+(`slowLogin=true`), and slow post-login readiness
+(`slowPostLoginCheck=true`), and slow Activity warmup (`slowWarmup=true`);
+each still produced bounded Activity/overview
+sample rows. These mocks verify control flow only, not actual hosted timing,
+rate-limit behavior or request attribution.
 
 ## Verification and limit
 
