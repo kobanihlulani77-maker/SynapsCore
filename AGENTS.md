@@ -5,6 +5,10 @@
 Start continuing engineering work with the
 [Master Engineering Readiness Map](docs/SYNAPSCORE-MASTER-ENGINEERING-READINESS-MAP.md),
 then verify its baseline against current source, CI, and runtime evidence.
+Before an investigation or product change, follow the
+[engineering investigation and exit protocol](docs/engineering-investigation-and-exit-protocol.md):
+name the operator outcome, reuse evidence, run one bounded discriminator, and
+stop or advance only on the resulting proof. It does not waive any M-stage gate.
 The MVP boundary below records the original product focus, not the limits of the
 current implementation. Preserve proven governance, recovery, and operational
 behavior; do not interpret the simplified inventory flow as permission to bypass
