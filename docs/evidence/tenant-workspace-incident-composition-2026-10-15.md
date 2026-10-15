@@ -53,3 +53,53 @@ sections. This diagnostic is not exact SQL timing. Full backend/CI and
 exact-revision hosted results must be appended before claiming further
 improvement. H1/H2/H7/H12, historical Hikari holder mapping, and M1 remain
 open.
+
+## Exact Live after-state, October 15
+
+PR #19 merged as `87a3e6790ba837d755dd0f0eaa24b78ad182ab11`. Render
+showed it as the last successfully deployed commit and Live before the
+authenticated probe. The six-flag gate passed. Readiness and unauthenticated
+session preflight took 1,731.2 and 758.2 ms; login took 1,172.9 ms; the
+post-login checks took 376.1 and 1,145 ms. This is a bounded active-instance
+observation, not proof of a sustained workload envelope. The authenticated
+runtime reports the configured static value `render-deploy`, so Render's
+Deploys page, not that runtime field, establishes the exact SHA.
+
+All three read-only workspace requests returned HTTP 200 with 131 connectors
+on instance `xzd26`:
+
+| Request ID | UTC start | Client ms | Composition ms / CPU ms | Incident ms / CPU ms | Scenario notification ms | Audit ms | Response/count ms |
+| --- | --- | ---: | ---: | ---: | ---: | ---: | ---: |
+| `c3272aa0-325b-46c3-b6f0-b1db67f7df09` | 11:34:43.387Z | 6,926.4 | 3,706 / 111 | 1,399 / 43 | 399 | 195 | 1,206 |
+| `056c57c4-f659-4021-855e-bdc317d6ea0d` | 11:34:50.340Z | 4,214.0 | 3,099 / 81 | 1,304 / 39 | 498 | 300 | 701 |
+| `0994428b-ba43-4b28-b4fc-6bc2925675f6` | 11:34:54.597Z | 4,344.6 | 3,101 / 79 | 1,600 / 39 | 502 | 400 | 802 |
+
+The warm-up's same-request HTTP warning reported 5,303 ms server wall,
+177 ms request-thread CPU, and Hikari total=10/active=1/idle=9/waiting=0
+**at completion**. The client/server difference and the remaining time outside
+workspace composition are not attributed. The two later requests did not
+produce a slow-HTTP warning; their client timing and composition logs share
+request IDs, but there is no matching server total to invent.
+
+The nested incident logs have **no `connectors` section** when called from
+the corrected workspace path, confirming snapshot reuse. Incident composition
+still took 1.3-1.6 seconds. Its other measured sub-sections included replay
+(109-304 ms), inbound (7-102 ms), and failed dispatch (100-200 ms). The
+pre-change three-request window was 3.3-5.6 seconds client-side with
+1.1-2.1 seconds in incidents. These separate small samples overlap and are
+not a controlled like-for-like latency improvement or regression proof.
+The two-query H2 reduction is real locally; its hosted wall-time benefit is
+unproven. This window does not reproduce historical Hikari 10/10 starvation.
+
+Source inspection shows `ScenarioHistoryService.getScenarioNotifications()`
+first scans and may apply pending SLA escalations, then reads active and
+acknowledged notifications. The 399-502 ms outer subsection does not identify
+which step dominates, whether escalation wrote anything, SQL execution time,
+or connection hold. If escalation is needed, the separate
+`ScenarioSlaEscalationService.escalateIfEligible()` method owns the short
+transaction that rechecks the row under a tenant-scoped lock and records the
+event; the hosted sample does not show that this path ran. A slow-only split
+of those existing steps is the next
+bounded diagnostic; it does not alter Scenario governance or operational
+state. Continue one causal boundary at a time. H1/H2/H7/H12 and M1 remain
+open; M2 entry remains blocked.
