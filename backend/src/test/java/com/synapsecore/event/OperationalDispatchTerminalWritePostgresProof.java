@@ -48,15 +48,7 @@ class OperationalDispatchTerminalWritePostgresProof {
         RecordingRealtimeService realtime = new RecordingRealtimeService();
         DefaultListableBeanFactory realtimeBeans = new DefaultListableBeanFactory();
         realtimeBeans.registerSingleton("realtime", realtime);
-        OperationalDispatchQueueService service = new OperationalDispatchQueueService(
-            repository,
-            new DefaultListableBeanFactory().getBeanProvider(DashboardService.class),
-            realtimeBeans.getBeanProvider(RealtimeService.class),
-            new RequestTraceContext(),
-            metrics,
-            null,
-            new ScheduledTaskExecutionDiagnostics(null)
-        );
+        OperationalDispatchQueueService service = newQueueService(realtimeBeans);
 
         try {
             jdbc.execute("""
@@ -101,6 +93,75 @@ class OperationalDispatchTerminalWritePostgresProof {
             jdbc.execute("drop function if exists test_dispatch_completion_failure()");
             repository.deleteById(item.getId());
         }
+    }
+
+    @Test
+    void freshWorkerReclaimsCommittedClaimAfterSimulatedAbruptAbort() {
+        String tenantCode = "DISPATCH-ABORT-" + UUID.randomUUID();
+        OperationalDispatchWorkItem item = repository.saveAndFlush(OperationalDispatchWorkItem.builder()
+            .tenantCode(tenantCode)
+            .updateType(OperationalUpdateType.INTEGRATION_STATE)
+            .source("postgres-abort-proof")
+            .requestId(UUID.randomUUID().toString())
+            .status(OperationalDispatchStatus.PENDING)
+            .occurredAt(Instant.now())
+            .build());
+        DefaultListableBeanFactory abortingBeans = new DefaultListableBeanFactory();
+        abortingBeans.registerSingleton("realtime", new AbortBeforeBroadcastRealtimeService());
+        OperationalDispatchQueueService stoppedWorker = newQueueService(abortingBeans);
+
+        try {
+            assertThatThrownBy(stoppedWorker::processPendingWork)
+                .isInstanceOf(SimulatedProcessStop.class);
+            OperationalDispatchWorkItem claimed = repository.findById(item.getId()).orElseThrow();
+            assertThat(claimed.getStatus()).isEqualTo(OperationalDispatchStatus.PROCESSING);
+            assertThat(claimed.getAttemptCount()).isEqualTo(1);
+            assertThat(claimed.getProcessedAt()).isNull();
+
+            RecordingRealtimeService realtime = new RecordingRealtimeService();
+            DefaultListableBeanFactory freshBeans = new DefaultListableBeanFactory();
+            freshBeans.registerSingleton("realtime", realtime);
+            OperationalDispatchQueueService freshWorker = newQueueService(freshBeans);
+            assertThat(freshWorker.processPendingWork()).isZero();
+            assertThat(realtime.integrationBroadcasts).isZero();
+
+            jdbc.update("update operational_dispatch_work_items set updated_at = ? where id = ?",
+                Timestamp.from(Instant.now().minusSeconds(600)), item.getId());
+            assertThat(freshWorker.processPendingWork()).isEqualTo(1);
+            OperationalDispatchWorkItem completed = repository.findById(item.getId()).orElseThrow();
+            assertThat(completed.getStatus()).isEqualTo(OperationalDispatchStatus.COMPLETED);
+            assertThat(completed.getAttemptCount()).isEqualTo(2);
+            assertThat(completed.getProcessedAt()).isNotNull();
+            assertThat(realtime.integrationBroadcasts).isEqualTo(1);
+        } finally {
+            repository.deleteById(item.getId());
+        }
+    }
+
+    private OperationalDispatchQueueService newQueueService(DefaultListableBeanFactory realtimeBeans) {
+        return new OperationalDispatchQueueService(
+            repository,
+            new DefaultListableBeanFactory().getBeanProvider(DashboardService.class),
+            realtimeBeans.getBeanProvider(RealtimeService.class),
+            new RequestTraceContext(),
+            metrics,
+            null,
+            new ScheduledTaskExecutionDiagnostics(null)
+        );
+    }
+
+    private static final class AbortBeforeBroadcastRealtimeService extends RealtimeService {
+        private AbortBeforeBroadcastRealtimeService() {
+            super(null, null, null, null, null);
+        }
+
+        @Override
+        public void broadcastIntegrationUpdates(String tenantCode) {
+            throw new SimulatedProcessStop();
+        }
+    }
+
+    private static final class SimulatedProcessStop extends Error {
     }
 
     private static final class RecordingRealtimeService extends RealtimeService {
