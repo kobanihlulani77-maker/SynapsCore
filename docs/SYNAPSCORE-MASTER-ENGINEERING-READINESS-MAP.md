@@ -530,6 +530,20 @@ the duplicate read explains the full incident duration; capture its nested
 sections on the exact Live correction before choosing another intervention.
 M1 and M2-entry remain OPEN/BLOCKED respectively.
 
+**October 15 exact Live follow-up:** PR #19 was Live as `87a3e67`. The
+corrected workspace reused its connector snapshot; the nested incident log
+had no second connector-read section. Three complete 131-connector responses
+still took 6.93, 4.21, and 4.34 seconds at the client, with incident
+composition at 1.30-1.60 seconds and low request-thread CPU. This small
+before/after set does **not** establish a hosted speedup or regression.
+Scenario notification reads took 399-502 ms inside incidents; source shows
+an SLA escalation scan followed by two bounded notification queries. The
+[same-request evidence](evidence/tenant-workspace-incident-composition-2026-10-15.md)
+records exact UTC/request IDs, the one paired HTTP/pool snapshot, and
+limitations. Split that notification boundary before another correction;
+do not infer SQL time, a connection hold, or a Hikari fix from section wall
+time. H1/H2/H7/H12 and M1 remain OPEN, M2 entry BLOCKED.
+
 The [September 30 warm hosted trace](evidence/hosted-connector-telemetry-amplification-2026-09-30.md)
 provides the before-state: 58 connector summaries, nine telemetry queries per
 connector, and 8.5 seconds spent in the snapshot's connector section. The
