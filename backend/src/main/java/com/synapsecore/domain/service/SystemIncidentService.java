@@ -15,22 +15,30 @@ import com.synapsecore.integration.IntegrationReplayService;
 import com.synapsecore.integration.dto.IntegrationConnectorHealthStatus;
 import com.synapsecore.integration.dto.IntegrationConnectorResponse;
 import com.synapsecore.integration.dto.IntegrationReplayRecordResponse;
+import com.synapsecore.observability.ThreadCpuTiming;
 import com.synapsecore.scenario.ScenarioHistoryService;
 import com.synapsecore.scenario.dto.ScenarioNotificationResponse;
 import com.synapsecore.scenario.dto.ScenarioNotificationType;
 import com.synapsecore.tenant.TenantContextService;
 import java.util.Comparator;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
+import java.util.function.Supplier;
 import java.util.stream.Stream;
 import lombok.RequiredArgsConstructor;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 
 @Service
 @RequiredArgsConstructor
 public class SystemIncidentService {
 
+    private static final Logger log = LoggerFactory.getLogger(SystemIncidentService.class);
     private static final int DEFAULT_LIMIT = 8;
+    private static final long SLOW_INCIDENT_NANOS = 1_000_000_000L;
 
     private final AuditLogService auditLogService;
     private final IntegrationConnectorService integrationConnectorService;
@@ -56,32 +64,59 @@ public class SystemIncidentService {
             List<IntegrationReplayRecordResponse> replaySnapshot,
             List<IntegrationConnectorResponse> connectorSnapshot,
             List<ScenarioNotificationResponse> scenarioNotificationSnapshot) {
-        Optional<com.synapsecore.domain.entity.AccessOperator> currentOperator =
-            accessDirectoryService.getCurrentOperator();
+        long startedAt = System.nanoTime();
+        long cpuStartedAt = ThreadCpuTiming.currentNanos();
+        Map<String, Long> sectionsMs = new LinkedHashMap<>();
+        Map<String, Long> sectionsCpuMs = new LinkedHashMap<>();
+        try {
+            return composeActiveIncidents(auditSnapshot, replaySnapshot, connectorSnapshot,
+                scenarioNotificationSnapshot, sectionsMs, sectionsCpuMs);
+        } finally {
+            long elapsed = System.nanoTime() - startedAt;
+            if (elapsed >= SLOW_INCIDENT_NANOS) {
+                log.warn("Slow system incident composition totalMs={} cpuMs={} sectionsMs={} sectionsCpuMs={}",
+                    elapsed / 1_000_000, ThreadCpuTiming.elapsedMillis(cpuStartedAt), sectionsMs, sectionsCpuMs);
+            }
+        }
+    }
+
+    private List<SystemIncidentResponse> composeActiveIncidents(
+            List<AuditLogResponse> auditSnapshot,
+            List<IntegrationReplayRecordResponse> replaySnapshot,
+            List<IntegrationConnectorResponse> connectorSnapshot,
+            List<ScenarioNotificationResponse> scenarioNotificationSnapshot,
+            Map<String, Long> sectionsMs, Map<String, Long> sectionsCpuMs) {
+        Optional<com.synapsecore.domain.entity.AccessOperator> currentOperator = timedIncidentSection(
+            sectionsMs, sectionsCpuMs, "operator", accessDirectoryService::getCurrentOperator);
         List<AuditLogResponse> auditLogs = auditSnapshot == null
-            ? auditLogService.getRecentAuditLogs()
+            ? timedIncidentSection(sectionsMs, sectionsCpuMs, "audit", auditLogService::getRecentAuditLogs)
             : auditSnapshot;
         List<IntegrationReplayRecordResponse> replayQueue = replaySnapshot == null
-            ? integrationReplayService.getReplayQueue()
+            ? timedIncidentSection(sectionsMs, sectionsCpuMs, "replay", integrationReplayService::getReplayQueue)
             : replaySnapshot;
         List<IntegrationConnectorResponse> connectors = connectorSnapshot == null
-            ? integrationConnectorService.getConnectors()
+            ? timedIncidentSection(sectionsMs, sectionsCpuMs, "connectors", integrationConnectorService::getConnectors)
             : connectorSnapshot;
         List<ScenarioNotificationResponse> scenarioNotifications = scenarioNotificationSnapshot == null
-            ? scenarioHistoryService.getScenarioNotifications()
+            ? timedIncidentSection(sectionsMs, sectionsCpuMs, "scenarioNotifications",
+                scenarioHistoryService::getScenarioNotifications)
             : scenarioNotificationSnapshot;
 
-        return Stream.of(
+        var inboundRecords = timedIncidentSection(sectionsMs, sectionsCpuMs, "inbound", () ->
+            integrationInboundRecordRepository.findTop8ByTenantCodeIgnoreCaseAndStatusInOrderByUpdatedAtDesc(
+                tenantContextService.getCurrentTenantCodeOrDefault(),
+                List.of(IntegrationInboundStatus.REJECTED, IntegrationInboundStatus.REPLAY_QUEUED)));
+        var failedDispatch = timedIncidentSection(sectionsMs, sectionsCpuMs, "dispatch", () ->
+            operationalDispatchWorkItemRepository.findTop8ByTenantCodeIgnoreCaseAndStatusOrderByUpdatedAtDesc(
+                tenantContextService.getCurrentTenantCodeOrDefault(), OperationalDispatchStatus.FAILED));
+
+        return timedIncidentSection(sectionsMs, sectionsCpuMs, "merge", () -> Stream.of(
                 auditLogs.stream()
                     .filter(log -> "FAILURE".equals(log.status().name()))
                     .filter(this::isOperationalAuditFailure)
                     .filter(log -> isVisibleToOperator(currentOperator, null))
                     .map(this::toAuditIncident),
-                integrationInboundRecordRepository.findTop8ByTenantCodeIgnoreCaseAndStatusInOrderByUpdatedAtDesc(
-                        tenantContextService.getCurrentTenantCodeOrDefault(),
-                        List.of(IntegrationInboundStatus.REJECTED, IntegrationInboundStatus.REPLAY_QUEUED)
-                    )
-                    .stream()
+                inboundRecords.stream()
                     .filter(record -> isVisibleToOperator(currentOperator, record.getWarehouseCode()))
                     .map(this::toInboundIncident),
                 replayQueue.stream()
@@ -91,11 +126,7 @@ public class SystemIncidentService {
                     .filter(connector -> connector.healthStatus() != IntegrationConnectorHealthStatus.LIVE)
                     .filter(connector -> isVisibleToOperator(currentOperator, connector.defaultWarehouseCode()))
                     .map(this::toConnectorIncident),
-                operationalDispatchWorkItemRepository.findTop8ByTenantCodeIgnoreCaseAndStatusOrderByUpdatedAtDesc(
-                        tenantContextService.getCurrentTenantCodeOrDefault(),
-                        OperationalDispatchStatus.FAILED
-                    )
-                    .stream()
+                failedDispatch.stream()
                     .filter(workItem -> isVisibleToOperator(currentOperator, null))
                     .map(this::toDispatchIncident),
                 scenarioNotifications.stream()
@@ -106,7 +137,19 @@ public class SystemIncidentService {
             .flatMap(stream -> stream)
             .sorted(Comparator.comparing(SystemIncidentResponse::createdAt).reversed())
             .limit(DEFAULT_LIMIT)
-            .toList();
+            .toList());
+    }
+
+    private <T> T timedIncidentSection(Map<String, Long> sectionsMs, Map<String, Long> sectionsCpuMs,
+                                       String section, Supplier<T> read) {
+        long startedAt = System.nanoTime();
+        long cpuStartedAt = ThreadCpuTiming.currentNanos();
+        try {
+            return read.get();
+        } finally {
+            sectionsMs.put(section, (System.nanoTime() - startedAt) / 1_000_000);
+            sectionsCpuMs.put(section, ThreadCpuTiming.elapsedMillis(cpuStartedAt));
+        }
     }
 
     private SystemIncidentResponse toAuditIncident(AuditLogResponse log) {

@@ -516,6 +516,20 @@ reads connector telemetry again; its actual cost remains unmeasured. The
 records the UTC/request pair and the next bounded section-timing diagnostic.
 H1/H2/H7/H12 and M1 remain OPEN.
 
+**October 15 workspace incident boundary:** The section diagnostic was
+verified Live on `30b23a8`. Three complete 131-connector workspace reads
+took 3.3-5.6 seconds at the client; incident composition was their largest
+measured section at 1.1-2.1 seconds. The paired warm-up HTTP trace had low
+request CPU and no Hikari waiters **at completion**, not an in-flight wait
+proof. Workspace incident composition redundantly re-read connectors. A
+local red/green fixture measured 31 then 29 prepared statements after passing
+the existing connector snapshot, with scoped incident visibility preserved.
+The [same-request evidence](evidence/tenant-workspace-incident-composition-2026-10-15.md)
+also describes the slow-only nested incident trace candidate. Do not claim
+the duplicate read explains the full incident duration; capture its nested
+sections on the exact Live correction before choosing another intervention.
+M1 and M2-entry remain OPEN/BLOCKED respectively.
+
 The [September 30 warm hosted trace](evidence/hosted-connector-telemetry-amplification-2026-09-30.md)
 provides the before-state: 58 connector summaries, nine telemetry queries per
 connector, and 8.5 seconds spent in the snapshot's connector section. The
