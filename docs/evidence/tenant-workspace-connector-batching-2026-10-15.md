@@ -61,13 +61,49 @@ new workspace method, that class passed. The subsequent `backend`-directory
 run passed **412 tests across 72 suites, 0 failures, 0 errors, 0 skips**. This
 is local H2 regression evidence, not PostgreSQL, CI, or hosted performance proof.
 
+## Hosted after-boundary on exact revision
+
+Render Deploys showed merge `8128fd1` Live after a 5m21s rollout; all six
+live-connection flags passed. A signed-in OWNER-ACCEPT-02 Tenant Admin browser
+tab rendered Company Settings but had zero connectors, so it could not test
+the high-volume batch. A separate bounded authenticated API probe used the
+existing ignored local proof state for `HOSTED-PROOF-5-20260902-144935` (no
+credential output or fixture mutations). At UTC 2026-10-15 10:23:28, login
+succeeded but took 4,400.9 ms, so the warm baseline is imperfect. The first
+workspace read returned HTTP 200 with 131 connectors in 3,813.5 ms. Five
+subsequent complete reads of that same tenant returned HTTP 200 and 131
+connectors each:
+
+| UTC response end | Request ID | Client ms |
+| --- | --- | ---: |
+| 10:23:42.280 | `06b22e84-f0e6-49e0-b89d-274aa803819e` | 5,061.4 |
+| 10:23:46.737 | `5049b678-c478-44ef-817a-5687c840f6fd` | 4,428.3 |
+| 10:23:51.078 | `aed756d2-9233-45e0-91ed-26aac118e6ab` | 4,325.9 |
+| 10:23:55.273 | `93be0ab0-c389-4b8c-a293-ae41b1dca3f5` | 4,186.2 |
+| 10:24:01.928 | `e525f596-49d7-43e3-aef3-549f67fb6637` | 6,639.5 |
+
+The last request matches a Render warning on new Live instance `n4b55`:
+HTTP 200, server 6,102 ms, request-thread CPU 96 ms, Hikari
+total=10/active=2/idle=8/waiting=0 **at completion**. The client/server
+duration difference is about 538 ms, but this is not a routing or network
+attribution. Completion-time pool state does not establish whether this
+request waited for a connection in flight. No 204 occurred in this sample.
+
+The earlier 25-30 second warnings were different windows and workloads, so
+this is not a controlled before/after speedup claim. The 131-connector path
+still spends material wall time with little request-thread CPU. Source
+inspection shows workspace composition also calls incident composition, which
+independently reads connector telemetry; its share of this wall time is
+unmeasured. The next bounded diagnostic records workspace composition section
+wall/CPU timing only when it exceeds two seconds. Its request ID comes from
+the existing request-trace log context; section timing alone is not exact SQL
+or JDBC connection-hold timing.
+
 ## Exit boundary
 
-No hosted after-measurement or browser result is claimed here. Before calling
-the operator path improved in production, verify an exact Live revision and
-collect bounded warm authenticated workspace client/HTTP pairs for a tenant
-with a known connector count. Confirm a complete workspace DTO and compare
-durations with the historical window, separating cold start and concurrent
-workload. A 204 must be classified by client outcome and abort reason rather
-than counted as a successful settings read. This correction does not explain
-historical Hikari 10/10 starvation or close H1/H2/H7, H4/H11, or M1.
+After the section diagnostic is Live, capture one warm same-request trace for
+a connector-bearing tenant. Investigate the dominant measured section, then
+make only the smallest justified correction and repeat. A historical 204 still
+requires client outcome and abort classification. The batching correction
+does not explain historical Hikari 10/10 starvation or close H1/H2/H7,
+H4/H11, or M1.
