@@ -85,10 +85,7 @@ public class TenantWorkspaceAdministrationService {
         List<WarehouseResponse> warehouses = warehouseRepository.findAllByTenant_CodeIgnoreCaseOrderByNameAsc(tenantCode).stream()
             .map(this::toWarehouseResponse)
             .toList();
-        List<IntegrationConnectorResponse> connectors = integrationConnectorRepository
-            .findAllByTenant_CodeIgnoreCaseOrderByTypeAscSourceSystemAsc(tenantCode).stream()
-            .map(integrationConnectorService::describeConnector)
-            .toList();
+        List<IntegrationConnectorResponse> connectors = integrationConnectorService.getTenantWorkspaceConnectors();
         List<SystemIncidentResponse> supportIncidents = systemIncidentService.getActiveIncidents();
         List<TenantWorkspaceSupportActivity> recentSupportActivity = auditLogRepository
             .findTop20ByTenantCodeIgnoreCaseOrderByCreatedAtDesc(tenantCode).stream()

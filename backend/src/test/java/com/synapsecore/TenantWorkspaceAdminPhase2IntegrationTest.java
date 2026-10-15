@@ -1,5 +1,6 @@
 package com.synapsecore;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.http.MediaType.APPLICATION_JSON;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
@@ -10,15 +11,23 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import com.synapsecore.access.SynapseAccessRole;
 import com.synapsecore.domain.entity.AccessOperator;
 import com.synapsecore.domain.entity.AccessUser;
+import com.synapsecore.domain.entity.IntegrationConnector;
+import com.synapsecore.domain.entity.IntegrationConnectorType;
 import com.synapsecore.domain.entity.Tenant;
 import com.synapsecore.domain.entity.Warehouse;
 import com.synapsecore.domain.repository.AccessOperatorRepository;
 import com.synapsecore.domain.repository.AccessUserRepository;
+import com.synapsecore.domain.repository.IntegrationConnectorRepository;
 import com.synapsecore.domain.repository.TenantRepository;
 import com.synapsecore.domain.repository.WarehouseRepository;
 import java.util.EnumSet;
+import java.util.List;
 import java.util.Set;
 import java.util.UUID;
+import java.util.stream.IntStream;
+import jakarta.persistence.EntityManager;
+import jakarta.persistence.EntityManagerFactory;
+import org.hibernate.SessionFactory;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -60,6 +69,9 @@ class TenantWorkspaceAdminPhase2IntegrationTest {
     @Autowired private WarehouseRepository warehouseRepository;
     @Autowired private AccessOperatorRepository accessOperatorRepository;
     @Autowired private AccessUserRepository accessUserRepository;
+    @Autowired private IntegrationConnectorRepository integrationConnectorRepository;
+    @Autowired private EntityManager entityManager;
+    @Autowired private EntityManagerFactory entityManagerFactory;
     @Autowired private PasswordEncoder passwordEncoder;
 
     private Tenant tenant;
@@ -80,6 +92,68 @@ class TenantWorkspaceAdminPhase2IntegrationTest {
             .fullName("Phase 2 Admin").passwordHash(passwordEncoder.encode(ADMIN_PASSWORD)).active(true)
             .operator(operator).build());
         adminSession = signIn();
+    }
+
+    @Test
+    void workspaceConnectorTelemetryDoesNotScalePerConnector() throws Exception {
+        var statistics = entityManagerFactory.unwrap(SessionFactory.class).getStatistics();
+        boolean originallyEnabled = statistics.isStatisticsEnabled();
+        statistics.setStatisticsEnabled(true);
+        try {
+            statistics.clear();
+            mockMvc.perform(get("/api/access/admin/workspace").session(adminSession))
+                .andExpect(status().isOk());
+            long emptyWorkspaceStatements = statistics.getPrepareStatementCount();
+
+            List<IntegrationConnector> connectors = IntStream.range(0, 12)
+                .mapToObj(index -> IntegrationConnector.builder()
+                    .tenant(tenant)
+                    .sourceSystem("workspace-batch-" + index)
+                    .type(IntegrationConnectorType.WEBHOOK_ORDER)
+                    .displayName("Workspace Batch " + index)
+                    .enabled(true)
+                    .build())
+                .toList();
+            integrationConnectorRepository.saveAll(connectors);
+            Tenant otherTenant = tenantRepository.save(Tenant.builder()
+                .code("D13P2-OTHER-" + UUID.randomUUID().toString().substring(0, 8).toUpperCase())
+                .name("Other Workspace Tenant")
+                .build());
+            integrationConnectorRepository.save(IntegrationConnector.builder()
+                .tenant(otherTenant)
+                .sourceSystem("workspace-batch-other")
+                .type(IntegrationConnectorType.WEBHOOK_ORDER)
+                .displayName("Other Tenant Connector")
+                .enabled(true)
+                .build());
+            entityManager.flush();
+            entityManager.clear();
+
+            statistics.clear();
+            mockMvc.perform(get("/api/access/admin/workspace").session(adminSession))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.connectors.length()").value(12));
+            long populatedWorkspaceStatements = statistics.getPrepareStatementCount();
+            assertThat(populatedWorkspaceStatements - emptyWorkspaceStatements).isLessThanOrEqualTo(12);
+
+            AccessOperator scopedAdmin = accessOperatorRepository.save(AccessOperator.builder()
+                .tenant(tenant).actorName("Scoped Workspace Admin").displayName("Scoped Workspace Admin").active(true)
+                .roles(EnumSet.of(SynapseAccessRole.TENANT_ADMIN)).warehouseScopes(Set.of("WH-NORTH")).build());
+            accessUserRepository.save(AccessUser.builder().tenant(tenant).username("phase2.scoped.admin")
+                .fullName("Scoped Workspace Admin").passwordHash(passwordEncoder.encode(ADMIN_PASSWORD)).active(true)
+                .operator(scopedAdmin).build());
+            MockHttpSession scopedSession = (MockHttpSession) mockMvc.perform(post("/api/auth/session/login")
+                    .contentType(APPLICATION_JSON)
+                    .content("""
+                        {"tenantCode":"%s","username":"phase2.scoped.admin","password":"%s"}
+                        """.formatted(tenant.getCode(), ADMIN_PASSWORD)))
+                .andExpect(status().isOk()).andReturn().getRequest().getSession(false);
+            mockMvc.perform(get("/api/access/admin/workspace").session(scopedSession))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.connectors.length()").value(12));
+        } finally {
+            statistics.setStatisticsEnabled(originallyEnabled);
+        }
     }
 
     @Test
