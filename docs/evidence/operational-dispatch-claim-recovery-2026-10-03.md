@@ -154,9 +154,14 @@ run against local PostgreSQL. On candidate `98feffb`, the
 [dispatch-postgres CI job](https://github.com/kobanihlulani77-maker/SynapsCore/actions/runs/38711425142)
 used disposable PostgreSQL 17 and passed 5/5 selected tests, including both
 methods in `OperationalDispatchTerminalWritePostgresProof`. The general `verify`
-job was still running when this evidence was updated; final-head CI must be
-checked again after the evidence commit. An
-exception in one JVM followed by a fresh service object is **not** an actual
+job was still running when this evidence was updated. The final-head
+[CI run `38711698411`](https://github.com/kobanihlulani77-maker/SynapsCore/actions/runs/38711698411)
+subsequently passed both `verify` and `dispatch-postgres` at `515c9b3`; the
+PostgreSQL job passed 5/5 selected tests. [PR #15](https://github.com/kobanihlulani77-maker/SynapsCore/pull/15)
+merged as `a17fd6141b0f71da385078f56dcbe0353ddf2414`. On October 15,
+Render Deploys showed that exact merge Live after 5m12s, and the post-deploy
+six-flag connection gate passed. This proves startup reachability, not hosted
+recovery. An exception in one JVM followed by a fresh service object is **not** an actual
 process kill, separate JVM, multi-instance race, hosted delivery, lease
 overlap, or backlog/headroom proof. H4/H11 and M1 remain OPEN regardless of
 this candidate's CI result.
