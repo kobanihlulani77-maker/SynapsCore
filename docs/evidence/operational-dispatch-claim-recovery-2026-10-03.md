@@ -149,9 +149,13 @@ attempt 2. The assertions cover the durable status, attempt count, processed
 timestamp, and notification count on isolated test data.
 
 The changed test class compiled and the local focused queue/claim suite passed
-9/9. Docker Desktop's daemon was unavailable locally, so the new test's
-PostgreSQL behavior has **not** yet run here; the existing CI job selects this
-class against disposable PostgreSQL. Exact-head CI remains required. An
+9/9. Docker Desktop's daemon was unavailable locally, so the new test did not
+run against local PostgreSQL. On candidate `98feffb`, the
+[dispatch-postgres CI job](https://github.com/kobanihlulani77-maker/SynapsCore/actions/runs/38711425142)
+used disposable PostgreSQL 17 and passed 5/5 selected tests, including both
+methods in `OperationalDispatchTerminalWritePostgresProof`. The general `verify`
+job was still running when this evidence was updated; final-head CI must be
+checked again after the evidence commit. An
 exception in one JVM followed by a fresh service object is **not** an actual
 process kill, separate JVM, multi-instance race, hosted delivery, lease
 overlap, or backlog/headroom proof. H4/H11 and M1 remain OPEN regardless of
