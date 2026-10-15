@@ -8,6 +8,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.synapsecore.access.SynapseAccessRole;
 import com.synapsecore.domain.entity.AccessOperator;
 import com.synapsecore.domain.entity.AccessUser;
@@ -72,6 +73,7 @@ class TenantWorkspaceAdminPhase2IntegrationTest {
     @Autowired private IntegrationConnectorRepository integrationConnectorRepository;
     @Autowired private EntityManager entityManager;
     @Autowired private EntityManagerFactory entityManagerFactory;
+    @Autowired private ObjectMapper objectMapper;
     @Autowired private PasswordEncoder passwordEncoder;
 
     private Tenant tenant;
@@ -111,7 +113,8 @@ class TenantWorkspaceAdminPhase2IntegrationTest {
                     .sourceSystem("workspace-batch-" + index)
                     .type(IntegrationConnectorType.WEBHOOK_ORDER)
                     .displayName("Workspace Batch " + index)
-                    .enabled(true)
+                    .defaultWarehouseCode(index == 0 ? "WH-NORTH" : index == 1 ? "WH-COAST" : null)
+                    .enabled(index > 1)
                     .build())
                 .toList();
             integrationConnectorRepository.saveAll(connectors);
@@ -135,6 +138,7 @@ class TenantWorkspaceAdminPhase2IntegrationTest {
                 .andExpect(jsonPath("$.connectors.length()").value(12));
             long populatedWorkspaceStatements = statistics.getPrepareStatementCount();
             assertThat(populatedWorkspaceStatements - emptyWorkspaceStatements).isLessThanOrEqualTo(12);
+            assertThat(populatedWorkspaceStatements).isLessThanOrEqualTo(29);
 
             AccessOperator scopedAdmin = accessOperatorRepository.save(AccessOperator.builder()
                 .tenant(tenant).actorName("Scoped Workspace Admin").displayName("Scoped Workspace Admin").active(true)
@@ -148,9 +152,16 @@ class TenantWorkspaceAdminPhase2IntegrationTest {
                         {"tenantCode":"%s","username":"phase2.scoped.admin","password":"%s"}
                         """.formatted(tenant.getCode(), ADMIN_PASSWORD)))
                 .andExpect(status().isOk()).andReturn().getRequest().getSession(false);
-            mockMvc.perform(get("/api/access/admin/workspace").session(scopedSession))
+            MvcResult scopedWorkspace = mockMvc.perform(get("/api/access/admin/workspace").session(scopedSession))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.connectors.length()").value(12));
+                .andExpect(jsonPath("$.connectors.length()").value(12))
+                .andReturn();
+            var incidentWarehouses = objectMapper.readTree(scopedWorkspace.getResponse().getContentAsString())
+                .path("supportIncidents").valueStream()
+                .filter(incident -> "CONNECTOR_DISABLED".equals(incident.path("type").asText()))
+                .map(incident -> incident.path("warehouseCode").asText())
+                .toList();
+            assertThat(incidentWarehouses).contains("WH-NORTH").doesNotContain("WH-COAST");
         } finally {
             statistics.setStatisticsEnabled(originallyEnabled);
         }

@@ -116,7 +116,7 @@ public class TenantWorkspaceAdministrationService {
         List<IntegrationConnectorResponse> connectors = timedWorkspaceSection(sectionsMs, sectionsCpuMs, "connectors",
             integrationConnectorService::getTenantWorkspaceConnectors);
         List<SystemIncidentResponse> supportIncidents = timedWorkspaceSection(sectionsMs, sectionsCpuMs, "incidents",
-            systemIncidentService::getActiveIncidents);
+            () -> systemIncidentService.getActiveIncidentsWithConnectors(connectors));
         List<TenantWorkspaceSupportActivity> recentSupportActivity = timedWorkspaceSection(sectionsMs, sectionsCpuMs,
             "supportAudit", () -> auditLogRepository.findTop20ByTenantCodeIgnoreCaseOrderByCreatedAtDesc(tenantCode)
                 .stream()
