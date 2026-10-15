@@ -96,6 +96,18 @@ public class IntegrationConnectorService {
         if (exactReadback) {
             return connectors.stream().map(this::describeConnectorForExactReadback).toList();
         }
+        return describeConnectorList(tenantCode, connectors);
+    }
+
+    @Transactional(readOnly = true)
+    public List<IntegrationConnectorResponse> getTenantWorkspaceConnectors() {
+        String tenantCode = tenantContextService.getCurrentTenantCodeOrDefault();
+        return describeConnectorList(tenantCode,
+            integrationConnectorRepository.findAllByTenant_CodeIgnoreCaseOrderByTypeAscSourceSystemAsc(tenantCode));
+    }
+
+    private List<IntegrationConnectorResponse> describeConnectorList(String tenantCode,
+                                                                     List<IntegrationConnector> connectors) {
         if (connectors.isEmpty()) {
             return List.of();
         }

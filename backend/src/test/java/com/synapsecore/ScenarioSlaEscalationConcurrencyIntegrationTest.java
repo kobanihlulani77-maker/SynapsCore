@@ -205,6 +205,7 @@ class ScenarioSlaEscalationConcurrencyIntegrationTest {
         return new IntegrationConnectorService(
             null, null, null, null, null, null, null, null, null, null, null, null, null) {
             @Override public List<IntegrationConnectorResponse> getConnectors() { return List.of(); }
+            @Override public List<IntegrationConnectorResponse> getTenantWorkspaceConnectors() { return List.of(); }
         };
     }
 
