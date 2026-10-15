@@ -504,6 +504,18 @@ probe's clean-warm gate. A like-for-like pre/post HTTP comparison and behavior
 under equivalent concurrent load remain unproven.
 H1/H7, broader H2 and M1 remain open.**
 
+**October 15 Tenant Admin workspace follow-through:** Connector batching
+landed on exact Render Live `8128fd1`, and five authenticated reads of an
+existing 131-connector proof tenant returned complete HTTP 200 workspaces in
+4,186.2-6,639.5 ms at the client. The paired last request took 6,102 ms on
+the server with 96 ms request-thread CPU and no Hikari waiter **at response
+completion**. A slow login and unlike historical workloads prevent a clean
+before/after latency claim. Workspace incident composition independently
+reads connector telemetry again; its actual cost remains unmeasured. The
+[workspace evidence](evidence/tenant-workspace-connector-batching-2026-10-15.md)
+records the UTC/request pair and the next bounded section-timing diagnostic.
+H1/H2/H7/H12 and M1 remain OPEN.
+
 The [September 30 warm hosted trace](evidence/hosted-connector-telemetry-amplification-2026-09-30.md)
 provides the before-state: 58 connector summaries, nine telemetry queries per
 connector, and 8.5 seconds spent in the snapshot's connector section. The
