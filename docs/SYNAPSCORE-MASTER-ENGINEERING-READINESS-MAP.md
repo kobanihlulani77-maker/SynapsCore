@@ -584,9 +584,15 @@ has no outer transaction; connector and incident subcalls own separate
 transactional paths. The 3.10-second composition is not automatically one
 JDBC hold. A local candidate reuses the existing one-second snapshot
 wait/Hikari sampler for slow workspace composition without changing workload
-or capacity. Focused 14/14 and full backend 412/412 passed locally. Exact-
-head CI and an exact-Live request trace remain separate gates. Even when
-Live, thread samples will classify broad waits but not exact SQL time,
+or capacity. The same candidate adds a workspace-GET-only two-second
+slow-HTTP warning so identity, handler and completion-time pool data can be
+compared with the section trace under one request ID. Its threshold regression
+failed before and passed after the change; other API routes retain five
+seconds. Focused workspace/Scenario/sampler tests passed 14/14 before the
+logging addition; the filter tests passed 15/15 and the complete backend
+rerun passed 413/413. Exact-head CI and an exact-Live request trace remain
+separate gates. Even when Live, thread samples will classify broad waits but
+not exact SQL time,
 PostgreSQL PID or the ten historical Hikari owners. See the
 [workspace evidence](evidence/tenant-workspace-incident-composition-2026-10-15.md).
 

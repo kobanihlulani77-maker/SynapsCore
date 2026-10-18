@@ -252,12 +252,23 @@ The next bounded diagnostic reuses the existing `SlowThreadWaitSampler` from
 dashboard snapshots for workspace composition. Only a workspace exceeding
 the existing two-second slow-section threshold logs its one-second request-
 thread samples and Hikari active/waiting/idle extrema, alongside the existing
-section wall/CPU times. The sampler categorizes Hikari acquisition,
+section wall/CPU times. The same candidate lowers the slow-HTTP warning
+threshold from five to two seconds for `GET /api/access/admin/workspace`
+only. This gives a same-request server HTTP total, identity/handler split,
+CPU and completion-time Hikari snapshot; writes and other API routes retain
+the five-second threshold. It may increase warning volume for this one read
+route, but does not increase request timeout or change its response. The
+HTTP threshold regression failed before the change (no two-second warning)
+and passed after it, including POST unchanged and query-string redaction.
+The sampler categorizes Hikari acquisition,
 PostgreSQL JDBC, Redis, Java monitor/wait or other work; it does not change
 query shape, transaction boundaries, pool size, scheduler cadence, timeout,
 or response contract. The relevant local workspace/Scenario/sampler tests
-passed 14/14, followed by the full backend suite at 412/412 with no failures,
-errors or skips. CI and exact-revision hosted diagnostic output are pending.
+passed 14/14 before the HTTP threshold addition. The filter regression
+passed 15/15, and the complete backend rerun passed 413/413 across 72
+Surefire reports with no failures, errors or skips. The local docs-link
+check found 1,042 links and none missing. Exact-head CI and exact-revision
+hosted diagnostic output are pending.
 
 Sampling is not a SQL profiler. One-second samples can miss short waits and
 cannot identify a PostgreSQL PID, exact query duration, acquired connection
