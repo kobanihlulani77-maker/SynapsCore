@@ -165,3 +165,39 @@ recovery. An exception in one JVM followed by a fresh service object is **not** 
 process kill, separate JVM, multi-instance race, hosted delivery, lease
 overlap, or backlog/headroom proof. H4/H11 and M1 remain OPEN regardless of
 this candidate's CI result.
+
+## Separate-JVM process-stop proof, October 18
+
+The next isolated test/CI candidate uses the existing disposable PostgreSQL
+job rather than production data. Its first guarded Maven test starts a worker,
+persists a `PROCESSING` claim, and writes that test JVM's PID only after the
+claim returns and publication is entered. The CI shell sends an OS `SIGKILL`
+to that PID, requires the first Maven invocation to fail, and starts a second
+Maven/JVM process against the same PostgreSQL database. The fresh worker must
+observe attempt 1 still `PROCESSING`, refuse to reclaim before lease expiry,
+then reclaim after the test ages only its own row and complete attempt 2 with
+one recorded broadcast. The test class is disabled unless the dedicated
+process-kill system property is set; it cannot terminate a normal local test
+run or hosted process. The adjacent local queue/claim suite passed 9/9. The
+complete local backend run exited zero with 414 reported tests across 73
+Surefire reports, zero failures/errors and two intentional guarded skips. A
+focused recompile after the PID-comparison edit again skipped both guarded
+methods. These local runs prove compilation and guard behavior, **not** the
+kill/reclaim path.
+
+At exact head `8a823e0f72de3d0c6f9385c00c23197049df5af1`, [CI run
+39120367583](https://github.com/kobanihlulani77-maker/SynapsCore/actions/runs/39120367583)
+passed both the disposable-PostgreSQL `dispatch-postgres` job and the general
+`verify` job. The CI shell sent `SIGKILL` to the marker PID after the committed
+claim; the first Maven invocation exited 137. A second Maven/JVM invocation
+read the same PostgreSQL row, confirmed attempt 1 was still `PROCESSING`,
+refused early reclaim, aged only that row's lease, then completed attempt 2
+with one test-recorded integration broadcast (`1/1` selected test passed).
+The adjacent PostgreSQL claim, terminal-write and Activity tests passed `5/5`.
+This is a real process boundary in an isolated CI service, not merely an
+in-process exception or fresh object. The test does not measure production
+WebSocket delivery or prove exactly-once publication.
+
+This candidate does not prove multi-node coordination, a live Render restart,
+backlog fairness, duplicate-signal effects after a post-broadcast crash,
+or pool headroom under dispatch load. H4/H11 and M1 remain OPEN.
