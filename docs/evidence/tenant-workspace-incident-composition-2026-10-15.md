@@ -238,3 +238,29 @@ holders. M1 and H1/H2/H7/H12 remain open. The next discriminator is measured
 SQL/connection versus non-SQL wait inside the remaining serial workspace
 sections, with a representative client outcome rather than another speculative
 timeout or capacity change.
+
+## Workspace wait sampler, local diagnostic candidate
+
+Source inspection confirms `TenantWorkspaceAdministrationService.getWorkspace()`
+has no outer read-only transaction because incident SLA reads may transition
+state. Connector description has its own read-only transaction; incident
+composition calls separate audit, Replay, Scenario, inbound and dispatch
+paths. Therefore the 3,100-ms workspace composition does not itself prove a
+3,100-ms JDBC connection hold.
+
+The next bounded diagnostic reuses the existing `SlowThreadWaitSampler` from
+dashboard snapshots for workspace composition. Only a workspace exceeding
+the existing two-second slow-section threshold logs its one-second request-
+thread samples and Hikari active/waiting/idle extrema, alongside the existing
+section wall/CPU times. The sampler categorizes Hikari acquisition,
+PostgreSQL JDBC, Redis, Java monitor/wait or other work; it does not change
+query shape, transaction boundaries, pool size, scheduler cadence, timeout,
+or response contract. The relevant local workspace/Scenario/sampler tests
+passed 14/14, followed by the full backend suite at 412/412 with no failures,
+errors or skips. CI and exact-revision hosted diagnostic output are pending.
+
+Sampling is not a SQL profiler. One-second samples can miss short waits and
+cannot identify a PostgreSQL PID, exact query duration, acquired connection
+owner or all overlapping Hikari holders. A future Live sample may rule in a
+dominant wait category in that request; it cannot by itself close historical
+Hikari 10/10 starvation, the 204 client-outcome gap, or M1.

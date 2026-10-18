@@ -579,6 +579,17 @@ sections still dominate the matched read; SQL versus wait, Hikari ownership,
 the historical 204 browser outcome and M1 exit remain open. See the
 [workspace after-state](evidence/tenant-workspace-incident-composition-2026-10-15.md).
 
+**Next bounded H1/H2/H7 diagnostic:** Source confirms the workspace read
+has no outer transaction; connector and incident subcalls own separate
+transactional paths. The 3.10-second composition is not automatically one
+JDBC hold. A local candidate reuses the existing one-second snapshot
+wait/Hikari sampler for slow workspace composition without changing workload
+or capacity. Focused 14/14 and full backend 412/412 passed locally. Exact-
+head CI and an exact-Live request trace remain separate gates. Even when
+Live, thread samples will classify broad waits but not exact SQL time,
+PostgreSQL PID or the ten historical Hikari owners. See the
+[workspace evidence](evidence/tenant-workspace-incident-composition-2026-10-15.md).
+
 The [September 30 warm hosted trace](evidence/hosted-connector-telemetry-amplification-2026-09-30.md)
 provides the before-state: 58 connector summaries, nine telemetry queries per
 connector, and 8.5 seconds spent in the snapshot's connector section. The
