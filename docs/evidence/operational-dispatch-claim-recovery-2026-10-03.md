@@ -198,6 +198,13 @@ This is a real process boundary in an isolated CI service, not merely an
 in-process exception or fresh object. The test does not measure production
 WebSocket delivery or prove exactly-once publication.
 
-This candidate does not prove multi-node coordination, a live Render restart,
+PR #24 merged as `f29bd85c7341c80feb016efb335989618eefa09a`.
+[Merged-main CI run 39121078371](https://github.com/kobanihlulani77-maker/SynapsCore/actions/runs/39121078371)
+passed both the disposable-PostgreSQL and general jobs, including a third
+isolated OS-kill/fresh-JVM recovery execution. The three passing executions
+are CI repeatability for this specific crash boundary, not a hosted service
+recovery measurement.
+
+This proof does not establish multi-node coordination, a live Render restart,
 backlog fairness, duplicate-signal effects after a post-broadcast crash,
 or pool headroom under dispatch load. H4/H11 and M1 remain OPEN.
