@@ -125,6 +125,8 @@ public class TenantWorkspaceAdministrationService {
                 .map(this::toSupportActivity)
                 .toList());
         long disabledConnectorCount = connectors.stream().filter(connector -> !connector.enabled()).count();
+        long activeUserCount = users.stream().filter(AccessUser::isActive).count();
+        long inactiveUserCount = users.size() - activeUserCount;
         long activeUsersRequiringPasswordChange = users.stream()
             .filter(AccessUser::isActive)
             .filter(AccessUser::isPasswordChangeRequired)
@@ -161,8 +163,8 @@ public class TenantWorkspaceAdministrationService {
                 warehouses.size(),
                 accessOperatorRepository.countByTenant_CodeIgnoreCaseAndActiveTrue(tenantCode),
                 accessOperatorRepository.countByTenant_CodeIgnoreCaseAndActiveFalse(tenantCode),
-                accessUserRepository.countByTenant_CodeIgnoreCaseAndActiveTrue(tenantCode),
-                accessUserRepository.countByTenant_CodeIgnoreCaseAndActiveFalse(tenantCode),
+                activeUserCount,
+                inactiveUserCount,
                 connectors.size() - disabledConnectorCount,
                 disabledConnectorCount,
                 integrationReplayRecordRepository.countByTenantCodeIgnoreCaseAndStatusIn(

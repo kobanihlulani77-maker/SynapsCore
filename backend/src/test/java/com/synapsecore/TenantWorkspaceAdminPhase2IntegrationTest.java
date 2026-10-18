@@ -135,10 +135,12 @@ class TenantWorkspaceAdminPhase2IntegrationTest {
             statistics.clear();
             mockMvc.perform(get("/api/access/admin/workspace").session(adminSession))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.connectors.length()").value(12));
+                .andExpect(jsonPath("$.connectors.length()").value(12))
+                .andExpect(jsonPath("$.supportSummary.activeUserCount").value(1))
+                .andExpect(jsonPath("$.supportSummary.inactiveUserCount").value(0));
             long populatedWorkspaceStatements = statistics.getPrepareStatementCount();
             assertThat(populatedWorkspaceStatements - emptyWorkspaceStatements).isLessThanOrEqualTo(12);
-            assertThat(populatedWorkspaceStatements).isLessThanOrEqualTo(29);
+            assertThat(populatedWorkspaceStatements).isLessThanOrEqualTo(28);
 
             AccessOperator scopedAdmin = accessOperatorRepository.save(AccessOperator.builder()
                 .tenant(tenant).actorName("Scoped Workspace Admin").displayName("Scoped Workspace Admin").active(true)
@@ -146,6 +148,12 @@ class TenantWorkspaceAdminPhase2IntegrationTest {
             accessUserRepository.save(AccessUser.builder().tenant(tenant).username("phase2.scoped.admin")
                 .fullName("Scoped Workspace Admin").passwordHash(passwordEncoder.encode(ADMIN_PASSWORD)).active(true)
                 .operator(scopedAdmin).build());
+            AccessOperator inactiveOperator = accessOperatorRepository.save(AccessOperator.builder()
+                .tenant(tenant).actorName("Inactive Workspace Admin").displayName("Inactive Workspace Admin")
+                .active(false).roles(EnumSet.of(SynapseAccessRole.TENANT_ADMIN)).warehouseScopes(Set.of()).build());
+            accessUserRepository.save(AccessUser.builder().tenant(tenant).username("phase2.inactive.admin")
+                .fullName("Inactive Workspace Admin").passwordHash(passwordEncoder.encode(ADMIN_PASSWORD)).active(false)
+                .operator(inactiveOperator).build());
             MockHttpSession scopedSession = (MockHttpSession) mockMvc.perform(post("/api/auth/session/login")
                     .contentType(APPLICATION_JSON)
                     .content("""
@@ -155,6 +163,8 @@ class TenantWorkspaceAdminPhase2IntegrationTest {
             MvcResult scopedWorkspace = mockMvc.perform(get("/api/access/admin/workspace").session(scopedSession))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.connectors.length()").value(12))
+                .andExpect(jsonPath("$.supportSummary.activeUserCount").value(2))
+                .andExpect(jsonPath("$.supportSummary.inactiveUserCount").value(1))
                 .andReturn();
             var incidentWarehouses = objectMapper.readTree(scopedWorkspace.getResponse().getContentAsString())
                 .path("supportIncidents").valueStream()

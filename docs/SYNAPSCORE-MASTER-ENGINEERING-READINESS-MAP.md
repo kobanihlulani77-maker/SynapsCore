@@ -27,7 +27,7 @@ acceptance or M7 customer-specific launch authorization.
 | Workspace connector read candidate | October 13 Render logs include 25-30-second workspace reads, in addition to the 8-19-second window. Source and a red H2 test proved the workspace still used individual connector telemetry despite the earlier general-list batch fix: 12 added connectors caused 110 additional prepared statements. A bounded correction now reuses batch telemetry without narrowing tenant-wide admin visibility; the local green bound and scoped/cross-tenant assertions passed. This is not a matched hosted latency or 204 client-outcome proof ([workspace evidence](evidence/tenant-workspace-connector-batching-2026-10-15.md)). |
 | Next gate | M2: repeatable hosted verification; entry BLOCKED until M1's in-scope hardening gates pass |
 | Pilot authorization | NOT GRANTED by this map; current candidate is not accepted for customer operations |
-| Last verified live backend | On October 15, Render Deploys showed PR #15 merge `a17fd6141b0f71da385078f56dcbe0353ddf2414` Live after 5m12s; the post-deploy six-flag connection gate passed. This merge added a test-only recovery proof and evidence, not a production behavior change. The five warm snapshot client/HTTP pairs and two in-flight Hikari samples belong to the earlier `8f5c7a9` deployment, not a new measurement of `a17fd61` ([H2 after-sample](evidence/dashboard-snapshot-auth-query-bound-2026-10-08.md)). Startup reachability does not prove hosted recovery, repeated latency, historical Hikari ownership, or M1 closure. |
+| Last verified live backend | On October 18, Render Deploys showed PR #20 merge `63e5614301c6978404cf4b025b35a26229c37afa` Live; the six-flag connection gate passed. A bounded authenticated workspace warm-up/follow-up returned complete HTTP 200 responses with 133 connectors in 4.64/1.98 seconds client-side. The warm-up's same-request composition was 2.90 seconds, spread across incidents, connectors, response/count and other sections. No same-request Hikari/SQL ownership or repeated latency proof follows from this sample ([workspace evidence](evidence/tenant-workspace-incident-composition-2026-10-15.md)). The older snapshot pool samples belong to `8f5c7a9`, not this deployment ([H2 after-sample](evidence/dashboard-snapshot-auth-query-bound-2026-10-08.md)). M1 remains OPEN. |
 | Scoped recovery proof | [PR #2](https://github.com/kobanihlulani77-maker/SynapsCore/pull/2) merged as `16f44753f1cc90c21d3dbe6accc59a51d575c798`. The new disposable-PostgreSQL test rejects the terminal `COMPLETED` write after broadcast, verifies the claim remains recoverable, then reclaims/completes it after lease expiry with an explicit second broadcast. It changes only test/CI files; controlled process-stop, multi-instance and hosted recovery remain OPEN ([dispatch evidence](evidence/operational-dispatch-claim-recovery-2026-10-03.md)). |
 | H4 abort proof | [PR #15](https://github.com/kobanihlulani77-maker/SynapsCore/pull/15) merged as `a17fd61`. Its test simulates worker loss after a committed `PROCESSING` claim but before publication, then uses a fresh service object to prove lease-gated reclaim and one subsequent test broadcast. Local adjacent queue/claim tests passed 9/9; exact-head CI passed both jobs, including 5/5 selected disposable-PostgreSQL tests. This is not a killed process, independent JVM, multi-node, hosted, or backlog proof; H4/H11 and M1 remain OPEN ([dispatch evidence](evidence/operational-dispatch-claim-recovery-2026-10-03.md)). |
 | Latest scoped CI evidence | [PR #15 exact-head run `38711698411`](https://github.com/kobanihlulani77-maker/SynapsCore/actions/runs/38711698411) passed `verify` and `dispatch-postgres` at `515c9b3`. Its PostgreSQL job selected 5/5 tests, including the fresh-worker abort simulation. The earlier [PR #8 merged-main run `38139660104`](https://github.com/kobanihlulani77-maker/SynapsCore/actions/runs/38139660104) passed both jobs for the in-flight pool sampler. Neither CI run proves actual hosted worker-crash recovery, repeated hosted latency, historical Hikari ownership, or M1 closure ([dispatch evidence](evidence/operational-dispatch-claim-recovery-2026-10-03.md); [H2 after-sample](evidence/dashboard-snapshot-auth-query-bound-2026-10-08.md)). |
@@ -543,6 +543,29 @@ records exact UTC/request IDs, the one paired HTTP/pool snapshot, and
 limitations. Split that notification boundary before another correction;
 do not infer SQL time, a connection hold, or a Hikari fix from section wall
 time. H1/H2/H7/H12 and M1 remain OPEN, M2 entry BLOCKED.
+
+**October 18 exact Live diagnostic:** PR #20 was Live as `63e5614`.
+The [workspace after-state](evidence/tenant-workspace-incident-composition-2026-10-15.md)
+records two complete 133-connector HTTP 200 reads and the warm-up's matched
+section log. The new Scenario subsection logs are distributed across SLA
+scan, active read and acknowledged read rather than one consistently slow
+step. The warm-up's outer Scenario section was only 296 ms of 2,899 ms of
+workspace composition; connector, replay, incident and response/count work
+also contributed. The 33 visible slow-only Scenario logs are not a request
+rate or SQL/connection-hold proof. Treat the shared serial read/round-trip
+cost as the next H1/H2/H7 discriminator, not a justification for weakening
+Scenario governance, increasing capacity or closing M1. Historical 204
+outcomes and Hikari holder ownership remain unresolved.
+
+**October 18 bounded H2 candidate:** The workspace response/count section
+took 593 ms in the matched Live warm-up. Two active/inactive user count
+queries were redundant with its already-loaded tenant user list. A focused
+H2 test failed at 30 statements against a new bound, then passed after
+reusing the list with a bound of at most 28 and active/inactive semantic
+assertions. The full local backend run passed 412/412; this remains local
+query-demand evidence only. Exact-head CI, deployed latency, PostgreSQL
+and historical pool ownership are separate gates. See the
+[workspace evidence](evidence/tenant-workspace-incident-composition-2026-10-15.md).
 
 The [September 30 warm hosted trace](evidence/hosted-connector-telemetry-amplification-2026-09-30.md)
 provides the before-state: 58 connector summaries, nine telemetry queries per

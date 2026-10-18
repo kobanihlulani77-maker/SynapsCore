@@ -103,3 +103,88 @@ of those existing steps is the next
 bounded diagnostic; it does not alter Scenario governance or operational
 state. Continue one causal boundary at a time. H1/H2/H7/H12 and M1 remain
 open; M2 entry remains blocked.
+
+## Scenario subsection after-state, October 18
+
+PR #20 merged as `63e5614301c6978404cf4b025b35a26229c37afa`.
+Render Deploys showed this exact commit as the last successfully deployed
+backend and **Live** before the probe; the six-flag connection gate passed.
+This deployment added slow-only wall/CPU subsection timing for the existing
+Scenario notification read. It did not change query shape, transaction
+boundaries, Hikari configuration, or functional behavior.
+
+The existing ignored hosted-proof Tenant Admin identity was used only for
+login and two `GET /api/access/admin/workspace` reads. No fixture or tenant
+data was changed. Both responses were HTTP 200 and contained 133 connectors;
+the earlier PR #19 sample contained 131, so this is **not** a like-for-like
+latency comparison. Login completed in 1,192.9 ms. The first workspace read
+was the warm-up, not a claim of a steady-state performance bound.
+
+| Stage | UTC start | Request ID | Client ms | Workspace composition ms / CPU ms | Incident ms / CPU ms | Scenario notification ms | Other measured sections |
+| --- | --- | --- | ---: | ---: | ---: | ---: | --- |
+| Warm-up | 2026-10-18 09:05:17.711Z | `8242480c-9912-493d-9aaf-8bf7c458fb06` | 4,641.7 | 2,899 / 148 | 1,305 / 70 | 296 | connectors 595; replay 408; response/count 593; support audit 194 |
+| Follow-up | 2026-10-18 09:05:22.431Z | `1a6be190-0147-4c3c-8c3c-a0939a315f95` | 1,979.6 | below the 2,000-ms composition logging threshold | no matching slow-section log | not measured | no matching HTTP/section warning |
+
+The warm-up's same-request Render section logs came from instance `258gq`;
+the follow-up did not emit a section log, so its instance is not established.
+The warm-up's incident trace also measured operator 5, audit 101, inbound
+103, dispatch 90 and merge 199 ms. The Scenario notification subsection was
+below its own 300-ms logging threshold; its 296 ms is the **outer incident
+section**, not an exact breakdown of SLA/active/acknowledged work. No matching
+slow-HTTP warning was emitted for these requests, so server-total duration,
+in-flight Hikari occupancy, PostgreSQL PID/SQL duration and the difference
+between client and composition time remain unattributed. A point-in-time
+connection gate cannot substitute for a same-request pool sample.
+
+Render's seven-day application-log search showed **33 visible**
+`Slow scenario notification read` entries from October 15 through October 17
+on the deployed diagnostic. These are threshold-selected logs, not a rate
+over all reads and not all tied to the probe tenant. Their total wall time
+ranged from 301 to 1,499 ms (median 509); median thread CPU was 9 ms. The
+largest recorded subsection was `active` in 13 entries, `slaEscalation` in
+10, `acknowledged` in 9 and `merge` in 1. Median subsection wall times were
+102, 199, 102 and 0 ms respectively; maxima were 603, 495, 604 and 294 ms.
+The largest subsection is **not** consistently the SLA scan. The trace
+provides wall and current-thread CPU time around repository/service calls,
+not exact SQL execution, connection-acquisition wait or JDBC hold time.
+It does not prove that an SLA escalation write occurred in any listed read.
+
+The first local probe attempt performed a login/read but suppressed its own
+timing output; it is excluded from this sample. A second attempt logged in
+successfully but returned workspace HTTP 403 because the temporary probe
+lost its cookie session across a PowerShell function scope. The corrected
+single-session probe produced the two HTTP 200 rows above. The 403 is a
+probe-harness failure, not evidence of a hosted authorization regression.
+
+**Decision:** Scenario notification reads can contribute hundreds of
+milliseconds and sometimes over a second, but this evidence does not make
+them the sole workspace delay or explain historical Hikari 10/10 starvation.
+The current same-request trace distributes time across connector, incident,
+replay, response/count and unmeasured HTTP overhead. Do not disable SLA
+governance or widen timeouts. The next justified H1/H2/H7 discriminator is
+to establish the round-trip/SQL-versus-wait cost of the serial workspace
+read sections, starting with the six count calls inside `response`, while
+preserving tenant/warehouse authority. Historical 204 client outcomes,
+pool-holder ownership, repeated hosted latency and M1 exit remain open.
+
+## Bounded workspace user-count correction, local candidate
+
+The response/count section of the October 18 matched workspace read took
+593 ms. Source inspection found six serial count calls in that section. Two
+of them counted active/inactive users even though the same method had already
+loaded the complete tenant-scoped user list. This is a proven redundant
+query pair, not proof that all 593 ms or the whole HTTP delay came from it.
+
+The focused H2 regression initially failed with 30 prepared statements for
+the 12-connector workspace against the proposed 27-statement bound. The
+service now derives active and inactive user counts from its already-loaded
+tenant user list; no scope predicate, transaction, API field or operator
+count query changed. A follow-up focused run passed with a tightened bound
+of at most 28 statements, and asserted the support summary for one active
+admin plus a scoped active admin and an inactive admin. The exact resulting
+statement count was not printed, so only the bound and the source-level
+removal of two repository count calls are claimed. The full local backend
+run passed 412 tests across 72 Surefire reports with zero failures, errors
+or skips; the documentation link check passed 1,041 local links. CI and an
+exact-revision hosted after-state must be checked separately. This candidate
+does not explain historical Hikari 10/10 starvation or close M1.
