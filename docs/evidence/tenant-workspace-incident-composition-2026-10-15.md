@@ -188,3 +188,53 @@ run passed 412 tests across 72 Surefire reports with zero failures, errors
 or skips; the documentation link check passed 1,041 local links. CI and an
 exact-revision hosted after-state must be checked separately. This candidate
 does not explain historical Hikari 10/10 starvation or close M1.
+
+## User-count correction, exact Live after-state, October 18
+
+[PR #21](https://github.com/kobanihlulani77-maker/SynapsCore/pull/21)
+merged as `c46635fa2db540aeaabd18379739c6a5cdbcd794` after both jobs in
+[exact-head CI run 39115324988](https://github.com/kobanihlulani77-maker/SynapsCore/actions/runs/39115324988)
+passed. Render Deploys showed that merge **Live** after a 4m39s auto-deploy;
+the post-deploy six-flag connection gate passed. This is a new production
+revision, not a measurement of the earlier `63e5614` deployment.
+
+The same ignored proof identity performed one login and three serial, read-only
+`GET /api/access/admin/workspace` requests. No fixture or tenant data was
+changed. All three returned complete HTTP 200 workspace payloads for
+`HOSTED-PROOF-5-20260902-144935`, with 133 connectors, six active users and
+zero inactive users. The first workspace request is a warm-up; the other two
+are a small bounded follow-up sample, not a repeatability or load proof.
+
+| Stage | UTC start | Request ID | Client duration | Outcome |
+| --- | --- | --- | ---: | --- |
+| Login | 2026-10-18 09:38:08.151Z | `056e69c9-fda3-4e4b-9e5c-c775bb6b8ed2` | 3,559.4 ms | HTTP 200, signed in |
+| Workspace warm-up | 2026-10-18 09:38:11.799Z | `8e638f70-5ba6-4960-8b64-375227290d2b` | 4,581.9 ms | HTTP 200, complete DTO |
+| Workspace follow-up 1 | 2026-10-18 09:38:16.509Z | `4d1f4faf-4ebe-48a9-8d50-9fb640e50f00` | 2,423.2 ms | HTTP 200, complete DTO |
+| Workspace follow-up 2 | 2026-10-18 09:38:19.013Z | `f322907b-b4c3-4481-819a-3241113e3c20` | 2,226.4 ms | HTTP 200, complete DTO |
+
+The warm-up's matched Render application logs came from instance `f48s8` on
+HTTP thread `http-nio-0.0.0.0-10000-exec-9`. Workspace composition took
+3,100 ms with 154 ms current-thread CPU. Its sections were tenant 107, users
+196, warehouses 4, connectors 808, incidents 1,399, supportAudit 6 and
+response/count 394 ms. Incident composition took 1,398 ms with 69 ms CPU:
+operator 100, audit 104, replay 304, Scenario notifications 304, inbound 95,
+dispatch 100 and merge 104 ms. The matching Scenario read split its 304 ms
+among SLA escalation 103, active 99, acknowledged 98 and merge 0 ms. These
+section timers include repository/service wall time, not exact SQL duration,
+Hikari acquisition or connection hold. The matched logs did not include a
+slow-HTTP warning; server-total time and the client/composition difference
+remain unattributed. The two follow-ups emitted no matching slow-section log,
+so their section timing and instance are not known.
+
+The preceding `63e5614` sample on the **same 133-connector tenant** measured
+4,641.7 ms warm-up and 1,979.6 ms follow-up client time. Its warm-up
+response/count section was 593 ms versus 394 ms in this single after-sample,
+while total workspace composition was 2,899 versus 3,100 ms. The local
+two-query reduction is real, but these non-concurrent, differently loaded
+samples do **not** establish a hosted latency improvement. Both deployments
+returned complete 200 workspaces in the sampled window; neither reproduces
+the historical 204 client outcome or identifies the historical Hikari 10/10
+holders. M1 and H1/H2/H7/H12 remain open. The next discriminator is measured
+SQL/connection versus non-SQL wait inside the remaining serial workspace
+sections, with a representative client outcome rather than another speculative
+timeout or capacity change.
