@@ -90,6 +90,47 @@ jobs:
           java-version: "21"
           cache: maven
 
+      - name: Prove dispatch recovery after OS-killed worker
+        working-directory: backend
+        env:
+          SPRING_DATASOURCE_URL: jdbc:postgresql://localhost:5432/synapsecore_dispatch_test
+          SPRING_DATASOURCE_DRIVER_CLASS_NAME: org.postgresql.Driver
+          SPRING_DATASOURCE_USERNAME: synapsecore_test
+          SPRING_DATASOURCE_PASSWORD: synapsecore_test
+        run: |
+          set -euo pipefail
+          key="ci-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
+          marker="$RUNNER_TEMP/dispatch-worker-$key.pid"
+          log="$RUNNER_TEMP/dispatch-worker-$key.log"
+          timeout 240s ./mvnw -B \
+            -Dtest=OperationalDispatchProcessKillPostgresProof#claimAndBlock \
+            -Dsynapsecore.process-kill-proof=true \
+            -Dsynapsecore.process-kill-key="$key" \
+            -Dsynapsecore.process-kill-pid-file="$marker" test >"$log" 2>&1 &
+          maven_pid=$!
+          for attempt in $(seq 1 180); do
+            if [[ -s "$marker" ]]; then break; fi
+            if ! kill -0 "$maven_pid" 2>/dev/null; then tail -n 80 "$log"; exit 1; fi
+            sleep 1
+          done
+          if [[ ! -s "$marker" ]]; then tail -n 80 "$log"; exit 1; fi
+          worker_pid=$(cat "$marker")
+          if [[ ! "$worker_pid" =~ ^[0-9]+$ ]]; then tail -n 80 "$log"; exit 1; fi
+          kill -0 "$worker_pid"
+          kill -KILL "$worker_pid"
+          set +e
+          wait "$maven_pid"
+          maven_status=$?
+          set -e
+          if [[ "$maven_status" -eq 0 ]]; then tail -n 80 "$log"; exit 1; fi
+          echo "Killed test worker PID $worker_pid after its committed claim; Maven exited $maven_status."
+          tail -n 15 "$log"
+          ./mvnw -B \
+            -Dtest=OperationalDispatchProcessKillPostgresProof#reclaimAfterKill \
+            -Dsynapsecore.process-kill-proof=true \
+            -Dsynapsecore.process-kill-key="$key" \
+            -Dsynapsecore.process-kill-pid-file="$marker" test
+
       - name: Prove dispatch claim and reclaim on PostgreSQL
         working-directory: backend
         env:
