@@ -54,6 +54,7 @@ import java.util.concurrent.CyclicBarrier;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
+import javax.sql.DataSource;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
@@ -171,7 +172,8 @@ class ScenarioSlaEscalationConcurrencyIntegrationTest {
             application.getBean(WarehouseRepository.class), application.getBean(IntegrationConnectorRepository.class),
             application.getBean(IntegrationReplayRecordRepository.class), runs,
             application.getBean(CustomerOrderRepository.class), application.getBean(FulfillmentTaskRepository.class),
-            application.getBean(InventoryRepository.class), incidentReader(), null, emptyConnectors());
+            application.getBean(InventoryRepository.class), incidentReader(), null, emptyConnectors(),
+            application.getBean(DataSource.class));
         TransactionInterceptor interceptor = new TransactionInterceptor();
         interceptor.setTransactionManager(transactions);
         interceptor.setTransactionAttributeSource(new AnnotationTransactionAttributeSource());

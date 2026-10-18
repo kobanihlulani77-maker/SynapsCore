@@ -41,8 +41,11 @@ import com.synapsecore.domain.repository.WarehouseRepository;
 import com.synapsecore.domain.service.SystemIncidentService;
 import com.synapsecore.integration.IntegrationConnectorService;
 import com.synapsecore.integration.dto.IntegrationConnectorResponse;
+import com.synapsecore.observability.SlowThreadWaitSampler;
 import com.synapsecore.observability.ThreadCpuTiming;
 import com.synapsecore.tenant.TenantContextService;
+import com.zaxxer.hikari.HikariDataSource;
+import com.zaxxer.hikari.HikariPoolMXBean;
 import java.net.URI;
 import java.net.URISyntaxException;
 import java.time.Duration;
@@ -54,6 +57,7 @@ import java.util.Locale;
 import java.util.List;
 import java.util.Map;
 import java.util.function.Supplier;
+import javax.sql.DataSource;
 import lombok.RequiredArgsConstructor;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -85,21 +89,34 @@ public class TenantWorkspaceAdministrationService {
     private final SystemIncidentService systemIncidentService;
     private final AuditLogService auditLogService;
     private final IntegrationConnectorService integrationConnectorService;
+    private final DataSource dataSource;
 
     // Support incidents may perform SLA transitions; do not wrap composition in a read-only transaction.
     public TenantWorkspaceResponse getWorkspace() {
         long startedAt = System.nanoTime();
         long cpuStartedAt = ThreadCpuTiming.currentNanos();
+        SlowThreadWaitSampler waitSampler = SlowThreadWaitSampler.start(workspacePool());
         Map<String, Long> sectionsMs = new LinkedHashMap<>();
         Map<String, Long> sectionsCpuMs = new LinkedHashMap<>();
         try {
             return buildWorkspace(sectionsMs, sectionsCpuMs);
         } finally {
+            waitSampler.close();
             long elapsed = System.nanoTime() - startedAt;
             if (elapsed >= SLOW_WORKSPACE_NANOS) {
-                log.warn("Slow tenant workspace composition totalMs={} cpuMs={} sectionsMs={} sectionsCpuMs={}",
-                    elapsed / 1_000_000, ThreadCpuTiming.elapsedMillis(cpuStartedAt), sectionsMs, sectionsCpuMs);
+                log.warn("Slow tenant workspace composition totalMs={} cpuMs={} sectionsMs={} sectionsCpuMs={} waitSamples={}",
+                    elapsed / 1_000_000, ThreadCpuTiming.elapsedMillis(cpuStartedAt), sectionsMs, sectionsCpuMs,
+                    waitSampler.summary());
             }
+        }
+    }
+
+    private HikariPoolMXBean workspacePool() {
+        try {
+            return dataSource instanceof HikariDataSource hikari && hikari.isRunning()
+                ? hikari.getHikariPoolMXBean() : null;
+        } catch (RuntimeException ignored) {
+            return null;
         }
     }
 
