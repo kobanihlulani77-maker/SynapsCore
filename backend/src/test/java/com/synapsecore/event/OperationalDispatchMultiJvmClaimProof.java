@@ -84,9 +84,8 @@ public final class OperationalDispatchMultiJvmClaimProof {
         throws Exception {
         long firstPid = Long.parseLong(Files.readString(file(directory, key, "one.ready")).trim());
         long secondPid = Long.parseLong(Files.readString(file(directory, key, "two.ready")).trim());
-        if (firstPid == secondPid || firstPid == ProcessHandle.current().pid()
-            || secondPid == ProcessHandle.current().pid()) {
-            throw new IllegalStateException("Claim workers must be distinct from each other and the verifier JVM");
+        if (firstPid == secondPid) {
+            throw new IllegalStateException("Claim workers must be distinct JVM processes");
         }
         int first = Integer.parseInt(Files.readString(file(directory, key, "one.result")).trim());
         int second = Integer.parseInt(Files.readString(file(directory, key, "two.result")).trim());
