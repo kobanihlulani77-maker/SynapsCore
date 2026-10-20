@@ -116,7 +116,9 @@ public final class OperationalDispatchMultiJvmWorkerProof {
             throw new IllegalStateException("Shared dispatch item did not complete exactly one attempt");
         }
         repository.deleteById(id);
-        System.out.println("Two independent queue workers produced one PostgreSQL completion and one test-recorded publication.");
+        System.out.println("Two independent queue workers produced one PostgreSQL completion and one "
+            + "test-recorded publication; results=" + first + "," + second
+            + " markers=" + firstBroadcast + "," + secondBroadcast + ".");
     }
 
     private static Path file(Path directory, String key, String suffix) {

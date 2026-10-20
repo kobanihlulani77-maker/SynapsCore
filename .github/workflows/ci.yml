@@ -207,7 +207,8 @@ jobs:
           set -euo pipefail
           classpath="$(cat target/test-classpath.txt):target/classes:target/test-classes"
           proof=com.synapsecore.event.OperationalDispatchMultiJvmWorkerProof
-          key="wk-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
+          for cycle in 1 2 3; do
+          key="wk-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}-${cycle}"
           prefix="$RUNNER_TEMP/dispatch-two-worker-$key"
           timeout 120s java -cp "$classpath" "$proof" seed "$key" "$RUNNER_TEMP"
           timeout 180s java -cp "$classpath" "$proof" drain "$key" "$RUNNER_TEMP" one >"$prefix.one.log" 2>&1 &
@@ -253,3 +254,4 @@ jobs:
             tail -n 60 "$prefix.one.log" "$prefix.two.log"
             exit 1
           fi
+          done
