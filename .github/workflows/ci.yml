@@ -139,3 +139,59 @@ jobs:
           SPRING_DATASOURCE_USERNAME: synapsecore_test
           SPRING_DATASOURCE_PASSWORD: synapsecore_test
         run: ./mvnw -B -Dtest=OperationalDispatchClaimIntegrationTest,OperationalDispatchTerminalWritePostgresProof,PlatformActivityReadIndexPostgresProof test
+
+      - name: Prove one shared dispatch claim across two JVMs
+        working-directory: backend
+        env:
+          SPRING_DATASOURCE_URL: jdbc:postgresql://localhost:5432/synapsecore_dispatch_test
+          SPRING_DATASOURCE_DRIVER_CLASS_NAME: org.postgresql.Driver
+          SPRING_DATASOURCE_USERNAME: synapsecore_test
+          SPRING_DATASOURCE_PASSWORD: synapsecore_test
+        run: |
+          set -euo pipefail
+          ./mvnw -B -DskipTests test-compile dependency:build-classpath -Dmdep.outputFile=target/test-classpath.txt
+          classpath="$(cat target/test-classpath.txt):target/classes:target/test-classes"
+          proof=com.synapsecore.event.OperationalDispatchMultiJvmClaimProof
+          key="ci-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
+          prefix="$RUNNER_TEMP/dispatch-two-jvm-$key"
+          timeout 120s java -cp "$classpath" "$proof" seed "$key" "$RUNNER_TEMP"
+          timeout 180s java -cp "$classpath" "$proof" claim "$key" "$RUNNER_TEMP" one >"$prefix.one.log" 2>&1 &
+          first_pid=$!
+          for attempt in $(seq 1 120); do
+            if [[ -s "$prefix.one.ready" ]]; then break; fi
+            if ! kill -0 "$first_pid" 2>/dev/null; then
+              tail -n 60 "$prefix.one.log"
+              exit 1
+            fi
+            sleep 1
+          done
+          if [[ ! -s "$prefix.one.ready" ]]; then
+            tail -n 60 "$prefix.one.log"
+            exit 1
+          fi
+          timeout 180s java -cp "$classpath" "$proof" claim "$key" "$RUNNER_TEMP" two >"$prefix.two.log" 2>&1 &
+          second_pid=$!
+          for attempt in $(seq 1 120); do
+            if [[ -s "$prefix.two.ready" ]]; then break; fi
+            if ! kill -0 "$first_pid" 2>/dev/null || ! kill -0 "$second_pid" 2>/dev/null; then
+              tail -n 60 "$prefix.one.log" "$prefix.two.log"
+              exit 1
+            fi
+            sleep 1
+          done
+          if [[ ! -s "$prefix.two.ready" ]]; then
+            tail -n 60 "$prefix.one.log" "$prefix.two.log"
+            exit 1
+          fi
+          touch "$prefix.release"
+          set +e
+          wait "$first_pid"
+          first_status=$?
+          wait "$second_pid"
+          second_status=$?
+          set -e
+          if [[ "$first_status" -ne 0 || "$second_status" -ne 0 ]]; then
+            tail -n 60 "$prefix.one.log" "$prefix.two.log"
+            exit 1
+          fi
+          timeout 120s java -cp "$classpath" "$proof" verify "$key" "$RUNNER_TEMP"
