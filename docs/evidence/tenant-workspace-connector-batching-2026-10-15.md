@@ -18,6 +18,25 @@ and the completion-time Hikari snapshots had zero waiters; neither observation
 locates the in-flight wait. The browser outcome and abort reason for the 204s
 remain unknown.
 
+An October 20 source check narrows the server-side meaning of those 204
+warnings. `AccessController.getWorkspace()` returns a workspace DTO, not an
+intentional no-content response. [`RequestTraceFilter`](../../backend/src/main/java/com/synapsecore/audit/RequestTraceFilter.java)
+sets 204 when an uncommitted response encounters an abort-like exception,
+including a broken pipe or connection reset; its
+[`RequestTraceFilterTest`](../../backend/src/test/java/com/synapsecore/audit/RequestTraceFilterTest.java)
+asserts that a broken-pipe path records 204 in the response and HTTP metrics.
+The [API exception handler](../../backend/src/main/java/com/synapsecore/api/controller/ApiExceptionHandler.java)
+and [framework error controller](../../backend/src/main/java/com/synapsecore/api/controller/FrameworkErrorController.java)
+also map recognized client-abort paths to 204. Thus a server-side 204 warning
+can be an abort-handling classification rather than a successful empty
+workspace. The historical logs do not identify which abort path ran, who
+closed the connection, whether any 204 reached the browser, or what the
+operator saw. This source/test finding does not explain the preceding
+18-25-second server wall time or the historical pool holders.
+The focused local `RequestTraceFilterTest` run on October 20 passed 15/15;
+that is local abort-classification evidence, not a reproduction of the
+historical hosted request.
+
 Source inspection gives a narrower conditional conclusion: if a browser
 receives a 204 for this GET, `readResponsePayload()` returns `null`, and
 `fetchAccessAdminData()` cannot read `workspace.tenantName`; its caller catches
