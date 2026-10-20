@@ -268,10 +268,55 @@ passed 14/14 before the HTTP threshold addition. The filter regression
 passed 15/15, and the complete backend rerun passed 413/413 across 72
 Surefire reports with no failures, errors or skips. The local docs-link
 check found 1,042 links and none missing. Exact-head CI and exact-revision
-hosted diagnostic output are pending.
+hosted diagnostic output are separate gates. The initial diagnostic head
+`b8150eb` passed both jobs in [combined exact-head CI run
+39121918689](https://github.com/kobanihlulani77-maker/SynapsCore/actions/runs/39121918689).
+The later evidence-only update below requires its own CI check before merge;
+the diagnostic is still not Live.
 
 Sampling is not a SQL profiler. One-second samples can miss short waits and
 cannot identify a PostgreSQL PID, exact query duration, acquired connection
 owner or all overlapping Hikari holders. A future Live sample may rule in a
 dominant wait category in that request; it cannot by itself close historical
 Hikari 10/10 starvation, the 204 client-outcome gap, or M1.
+
+## October 18 Live latency and timeout check
+
+Render Deploys showed `f29bd85` Live when this check was made. That merge
+contains the process-kill dispatch test, not the workspace wait-sampler
+candidate above. The six-flag connection gate passed. In Render application
+logs, a bounded **last-24-hours** search for `Connection is not available`
+returned no matching logs. This is a negative log-search result in that
+window, not a measured timeout rate or proof that Hikari starvation cannot
+recur. The owner reports that recent hosted E2Es pass, but no run count,
+timestamps or raw E2E output were provided for this particular comparison.
+
+The same Live application-log view did capture a warm, concurrent slow-read
+window on instance `lz9gr`, more than 14 minutes after its 10:56 UTC Hikari
+startup. These are server log durations, not browser timings:
+
+| UTC completion | Request ID | Route | Server duration | Current-thread CPU | Pool evidence |
+| --- | --- | --- | ---: | ---: | --- |
+| 11:10:47.946 | `684f557e-6697-446c-bc98-d283fc380c6a` | `GET /api/system/runtime` | 7,158 ms, HTTP 200 | 118 ms | 1 active, 9 idle, 0 waiting at completion |
+| 11:10:49.354 | `d6ef5e8b-2f13-4fc5-a619-909166fe88c0` | `GET /api/access/admin/workspace` | 7,812 ms, HTTP 200 | 105 ms | 0 active, 10 idle, 0 waiting at completion |
+| 11:10:50.945 | `258d6274-a438-4a3c-870e-d4d410189421` | `GET /api/dashboard/snapshot` | 8,602 ms, HTTP 200 | 163 ms | 3 active, 7 idle, 0 waiting at completion |
+
+The matched workspace composition for `d6ef5e8b-...` took 6,098 ms with
+70 ms CPU; incidents took 2,303 ms and response/count 1,489 ms. The matched
+snapshot composition for `258d6274-...` took 5,500 ms with 96 ms CPU.
+Its five one-second in-flight samples classified one as PostgreSQL JDBC and
+four as Java-active/other; sampled pool maximum was 7 active with 0 waiters
+and minimum 3 idle. These sparse samples rule out a *captured* 10/10 pool
+event in this snapshot, not every brief acquisition wait or slow SQL call.
+They do not establish the wait owner, JDBC PID, SQL time or host resource
+state. The three slow HTTP reads occurred close together, so shared hosted
+latency remains a live possibility even though they completed successfully.
+
+**Interpretation:** query-amplification removals and recent complete E2E
+outcomes are positive, but the available before/after samples are not a
+controlled latency comparison. Warm 7-9-second HTTP reads persist on the
+current Live revision. No new timeout was found in the bounded log search;
+historical Hikari starvation and the historical workspace 204 remain open.
+Do not close H1/H2/H7 or M1 or increase timeout/capacity on this evidence.
+The pending workspace sampler should be verified on its exact Live revision
+before using its output to choose a correction.
