@@ -208,3 +208,30 @@ recovery measurement.
 This proof does not establish multi-node coordination, a live Render restart,
 backlog fairness, duplicate-signal effects after a post-broadcast crash,
 or pool headroom under dispatch load. H4/H11 and M1 remain OPEN.
+
+## Independent-JVM claim race, October 20
+
+[PR #28](https://github.com/kobanihlulani77-maker/SynapsCore/pull/28)
+adds an isolated disposable-PostgreSQL claim proof without changing production
+code. A seed JVM commits one `PENDING` dispatch row. Two distinct Java worker
+processes then start against the same PostgreSQL service, signal readiness,
+and are released together to call the production repository's
+`claimForDispatch` compare-and-set operation for the same row and attempt.
+A verifier checks that their process IDs differ, their claim counts are
+exactly `1` and `0`, and the durable row is `PROCESSING` at attempt 1 with no
+processed timestamp. It then completes that attempt once and removes the
+test-owned row.
+
+At exact PR head `44c986d29d098dbabd6013a0db73685132f5b713`,
+[CI run 39422819210](https://github.com/kobanihlulani77-maker/SynapsCore/actions/runs/39422819210)
+passed both `dispatch-postgres` and general `verify`. The PostgreSQL job log
+reported: `Two independent JVMs produced one committed PostgreSQL claim and
+one completion.` Local `test-compile` passed; the local Docker daemon was
+unavailable, so the PostgreSQL race was not run locally. This is one
+successful isolated CI execution at this head, not repeatable hosted proof.
+
+The proof covers the database claim boundary only. It does not run two full
+dispatch workers, publish a notification, test a post-publication crash,
+measure backlog age or pool headroom, or prove live multi-instance recovery.
+It does not establish exactly-once external effects. H4/H11 and M1 remain
+OPEN.
