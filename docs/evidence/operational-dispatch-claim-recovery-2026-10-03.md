@@ -235,3 +235,41 @@ dispatch workers, publish a notification, test a post-publication crash,
 measure backlog age or pool headroom, or prove live multi-instance recovery.
 It does not establish exactly-once external effects. H4/H11 and M1 remain
 OPEN.
+
+## Independent-JVM queue drain, October 20
+
+[PR #30](https://github.com/kobanihlulani77-maker/SynapsCore/pull/30)
+extends the isolated PostgreSQL boundary from a direct repository claim to
+two independent JVMs calling the actual queue `processPendingWork()` method.
+Each JVM has a test-recording realtime service. A shared barrier releases
+both against one committed `PENDING` integration item; the verifier requires
+one worker result, a tenant-scoped publication marker from that same worker,
+and one durable `COMPLETED` attempt. No production dispatch code changes.
+
+The first candidate's PostgreSQL job failed its strict verifier. The next
+diagnostic run captured `results=0,0`, `markers=0,0`, and the proof item still
+`PENDING` at attempt 0. Its worker log showed selection of an older expired
+`DISPATCH-RACE-*` `ORDER_FLOW` item instead. The earlier
+`OperationalDispatchClaimIntegrationTest` had left that test-owned item
+`PROCESSING`; after the lease elapsed it became eligible and won the queue's
+global created-at ordering with the manual proof service's one-item batch.
+The worker then failed that unrelated operational item because the proof only
+provided an integration realtime stub, and never reached its own row. This
+was CI fixture contamination plus expected FIFO selection, not evidence of
+two publications or of a production dispatch correction. The smallest fix
+deletes the claimed row after the earlier test's assertions. The adjacent
+local queue/claim tests passed 9/9 with that cleanup.
+
+At exact candidate head `25fb755554228ec895e791efc476b15ebf086def`,
+[CI run 39428332103](https://github.com/kobanihlulani77-maker/SynapsCore/actions/runs/39428332103)
+passed both its disposable-PostgreSQL and general `verify` jobs. Three fresh queue-drain rounds each
+produced one completion and one matching test-recorded publication; the
+worker results/markers were `1,0`/`1,0`, `1,0`/`1,0`, and `0,1`/`0,1`.
+Local `test-compile` passed, but the separate-JVM PostgreSQL step ran in CI,
+not locally. A failed first candidate remains part of the red/green record.
+
+This proves a bounded one-row, no-crash worker overlap against one disposable
+PostgreSQL instance. It does not exercise real WebSocket delivery, a crash
+after the broadcast, multiple hosted service instances, a large mixed
+backlog, tenant fairness, or Hikari/resource headroom. A test-recorded marker
+is not an exactly-once external effect. H4/H11 and M1 remain OPEN.
