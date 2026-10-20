@@ -318,5 +318,69 @@ controlled latency comparison. Warm 7-9-second HTTP reads persist on the
 current Live revision. No new timeout was found in the bounded log search;
 historical Hikari starvation and the historical workspace 204 remain open.
 Do not close H1/H2/H7 or M1 or increase timeout/capacity on this evidence.
-The pending workspace sampler should be verified on its exact Live revision
-before using its output to choose a correction.
+The workspace sampler was subsequently verified on its exact Live revision;
+see the October 20 result below before using its output to choose a correction.
+
+## October 20 exact-Live workspace wait boundary
+
+PR #23 merged as `15cc249fd0bf9cfa194e4ba4c4175206a95091c9`.
+Render Deploys showed that exact commit **Live** after a 5m21s auto-deploy;
+the previous `f29bd85` deployment was no longer Live. The post-cutover
+six-flag connection gate returned all true. This verifies deployment and
+basic reachability, not warm-workload reliability.
+
+One bounded authenticated, read-only probe used the existing ignored hosted
+proof state for tenant `HOSTED-PROOF-5-20260902-144935`. No password, response
+body or cookie was printed or stored in this evidence. Client timestamps and
+durations came from PowerShell `Invoke-WebRequest`; server durations below
+come from Render application logs on instance `l46nm`, matched by response
+`X-Request-Id`. The login took 5,094.9 ms, so the following reads are
+post-login but **not** a clean low-latency baseline.
+
+| Stage | UTC client interval | Request ID | Client result |
+| --- | --- | --- | --- |
+| Readiness | 12:04:00.757-12:04:01.475 | `ade87e38-532a-4f89-a954-379ad1d5f3f3` | 200, 705.3 ms |
+| Login | 12:04:01.538-12:04:06.634 | `1144e676-1ddd-459f-9b18-8683d31438e9` | 200, 5,094.9 ms |
+| Workspace warm-up | 12:04:06.646-12:04:13.654 | `ce0d3c0c-82d5-40a9-8704-dff6715a40c5` | 200, 7,006.9 ms; 205,849 response bytes |
+| Workspace follow-up | 12:04:13.656-12:04:17.650 | `5233f2f3-6ced-442b-9a77-e2b9ff0cfb88` | 200, 3,993.9 ms; 205,849 response bytes |
+
+For the warm-up request, the same-request Render HTTP log recorded 6,512 ms
+handler/wall and 352 ms current-thread CPU; the workspace composition took
+4,686/250 ms wall/CPU. Sections were tenant 184, users 198, warehouses 102,
+connectors 1,099, incidents 2,201, supportAudit 101 and response 698 ms.
+Within incidents, Scenario notifications took 797 ms, replay 496, dispatch
+299 and audit 204 ms. Four one-second workspace-thread samples were all
+`JAVA_ACTIVE_OR_OTHER`; the representative application frame was
+`ConnectorTelemetryBatchReader#readInbound`. The sampled pool maximum was
+1/10 active, zero waiting and at least nine idle.
+
+For the follow-up, the matched HTTP log recorded 3,101 ms handler/wall and
+186 ms current-thread CPU; composition took 2,698/156 ms. Sections were
+tenant 294, users 109, warehouses 80, connectors 307, incidents 1,304,
+supportAudit 93 and response 496 ms. Scenario notifications took 536 ms
+within incidents. Both one-second thread samples were
+`JAVA_ACTIVE_OR_OTHER`, with representative application frame
+`AuthSessionService#resolveUser`; sampled pool maximum was 1/10 active,
+zero waiting and at least nine idle. The completion-time HTTP pool snapshot
+was 0/10 active, zero waiting. Nearby operational-dispatch scans processed
+zero items and reported no pool waiters.
+
+**Classification:** complete 200 responses and seconds-long client/server
+latency are proven on the new Live revision. The sampled request-thread and
+pool states do **not** show Hikari acquisition or 10/10 exhaustion in this
+window. `JAVA_ACTIVE_OR_OTHER` is a broad sampler category, not proof that
+CPU work dominated; low current-thread CPU also does not identify the
+off-thread, PostgreSQL or network wait. One-second snapshots may miss short
+JDBC waits, and no PostgreSQL PID, query plan or exact connection-hold time
+was captured. The client/server difference includes routing, transfer and
+other unmeasured time; it is not attributed to any one layer. The first and
+second reads had different section costs, so neither is a controlled
+before/after comparison. This is a healthy-pool slow-read boundary, not an
+explanation of historical Hikari 10/10 or workspace 204 responses.
+
+The next justified H1/H2/H7 discriminator is the actual PostgreSQL plan and
+duration for the `ConnectorTelemetryBatchReader` inbound/replay/import query
+family and Scenario notification reads at representative tenant volume,
+correlated with DB/host resource state. Do not infer a query defect from the
+representative Java frame alone or change pool size, timeout or capacity on
+this trace. M1 remains open.
