@@ -61,6 +61,24 @@ class OperationalDispatchProcessKillPostgresProof {
     }
 
     @Test
+    void publishAndBlockBeforeCompletion() {
+        String tenantCode = tenantCode();
+        repository.saveAndFlush(OperationalDispatchWorkItem.builder()
+            .tenantCode(tenantCode)
+            .updateType(OperationalUpdateType.INTEGRATION_STATE)
+            .source("postgres-post-publication-kill-proof")
+            .requestId(UUID.randomUUID().toString())
+            .status(OperationalDispatchStatus.PENDING)
+            .occurredAt(Instant.now())
+            .build());
+
+        DefaultListableBeanFactory realtimeBeans = new DefaultListableBeanFactory();
+        realtimeBeans.registerSingleton("realtime", new BlockingRealtimeService(tenantCode, markerPath(), true));
+        newQueueService(realtimeBeans).processPendingWork();
+        fail("Worker was not killed after its test-recorded publication");
+    }
+
+    @Test
     void reclaimAfterKill() throws IOException {
         long killedWorkerPid = Long.parseLong(Files.readString(markerPath()).trim());
         assertThat(ProcessHandle.current().pid()).isNotEqualTo(killedWorkerPid);
@@ -96,6 +114,42 @@ class OperationalDispatchProcessKillPostgresProof {
         }
     }
 
+    @Test
+    void reclaimAfterPublishedKill() throws IOException {
+        long killedWorkerPid = Long.parseLong(Files.readString(markerPath()).trim());
+        assertThat(ProcessHandle.current().pid()).isNotEqualTo(killedWorkerPid);
+        String tenantCode = tenantCode();
+        assertThat(Files.readString(publishedMarkerPath())).isEqualTo(tenantCode);
+        Long id = jdbc.queryForObject(
+            "select id from operational_dispatch_work_items where tenant_code = ?",
+            Long.class, tenantCode);
+        assertThat(id).isNotNull();
+        try {
+            OperationalDispatchWorkItem claimed = repository.findById(id).orElseThrow();
+            assertThat(claimed.getStatus()).isEqualTo(OperationalDispatchStatus.PROCESSING);
+            assertThat(claimed.getAttemptCount()).isEqualTo(1);
+            assertThat(claimed.getProcessedAt()).isNull();
+
+            RecordingRealtimeService realtime = new RecordingRealtimeService();
+            DefaultListableBeanFactory realtimeBeans = new DefaultListableBeanFactory();
+            realtimeBeans.registerSingleton("realtime", realtime);
+            OperationalDispatchQueueService freshWorker = newQueueService(realtimeBeans);
+            assertThat(freshWorker.processPendingWork()).isZero();
+            assertThat(realtime.integrationBroadcasts).isZero();
+
+            jdbc.update("update operational_dispatch_work_items set updated_at = ? where id = ?",
+                Timestamp.from(Instant.now().minusSeconds(600)), id);
+            assertThat(freshWorker.processPendingWork()).isEqualTo(1);
+            OperationalDispatchWorkItem completed = repository.findById(id).orElseThrow();
+            assertThat(completed.getStatus()).isEqualTo(OperationalDispatchStatus.COMPLETED);
+            assertThat(completed.getAttemptCount()).isEqualTo(2);
+            assertThat(completed.getProcessedAt()).isNotNull();
+            assertThat(realtime.integrationBroadcasts).isEqualTo(1);
+        } finally {
+            repository.deleteById(id);
+        }
+    }
+
     private OperationalDispatchQueueService newQueueService(DefaultListableBeanFactory realtimeBeans) {
         return new OperationalDispatchQueueService(
             repository,
@@ -120,20 +174,35 @@ class OperationalDispatchProcessKillPostgresProof {
         return Path.of(file);
     }
 
+    private Path publishedMarkerPath() {
+        return Path.of(markerPath() + ".published");
+    }
+
     private static final class BlockingRealtimeService extends RealtimeService {
         private final String expectedTenant;
         private final Path marker;
+        private final boolean publicationRecorded;
 
         private BlockingRealtimeService(String expectedTenant, Path marker) {
+            this(expectedTenant, marker, false);
+        }
+
+        private BlockingRealtimeService(String expectedTenant, Path marker, boolean publicationRecorded) {
             super(null, null, null, null, null);
             this.expectedTenant = expectedTenant;
             this.marker = marker;
+            this.publicationRecorded = publicationRecorded;
         }
 
         @Override
         public void broadcastIntegrationUpdates(String tenantCode) {
             assertThat(tenantCode).isEqualTo(expectedTenant);
             try {
+                if (publicationRecorded) {
+                    // The file is an observed test publication, not a WebSocket delivery receipt.
+                    Files.writeString(Path.of(marker + ".published"), tenantCode,
+                        StandardOpenOption.CREATE_NEW, StandardOpenOption.WRITE);
+                }
                 Files.writeString(marker, Long.toString(ProcessHandle.current().pid()),
                     StandardOpenOption.CREATE_NEW, StandardOpenOption.WRITE);
                 TimeUnit.MINUTES.sleep(3);
@@ -143,7 +212,9 @@ class OperationalDispatchProcessKillPostgresProof {
                 Thread.currentThread().interrupt();
                 throw new IllegalStateException("Worker was interrupted instead of killed", exception);
             }
-            fail("Worker was not killed while blocked before broadcast");
+            fail(publicationRecorded
+                ? "Worker was not killed after its test-recorded publication"
+                : "Worker was not killed while blocked before broadcast");
         }
     }
 

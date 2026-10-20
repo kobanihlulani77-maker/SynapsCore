@@ -273,3 +273,27 @@ PostgreSQL instance. It does not exercise real WebSocket delivery, a crash
 after the broadcast, multiple hosted service instances, a large mixed
 backlog, tenant fairness, or Hikari/resource headroom. A test-recorded marker
 is not an exactly-once external effect. H4/H11 and M1 remain OPEN.
+
+## OS kill after test-recorded publication, October 20
+
+[PR #31](https://github.com/kobanihlulani77-maker/SynapsCore/pull/31)
+extends the existing disposable-PostgreSQL process-kill harness. A worker
+commits a `PROCESSING` claim for one integration item, writes a tenant-scoped
+test publication marker, and blocks before the queue's terminal write. CI
+kills that JVM. A fresh JVM verifies attempt 1 is still `PROCESSING` and does
+not retry before lease expiry; after the test ages the lease, it records one
+more test publication and completes attempt 2. The proof cleans up its row.
+
+At code head `df680561d5900fbf148263e4bdedcd1c825a8ddf`,
+[CI run 39431034550](https://github.com/kobanihlulani77-maker/SynapsCore/actions/runs/39431034550)
+passed both jobs. The PostgreSQL job recorded OS-killing worker PID 3053
+after its marker, Maven exit 137, and a passing fresh-JVM reclaim test.
+Local test compilation and adjacent queue tests passed 7/7. This adds no
+production behavior change.
+
+The marker is a test-observed publication, not proof that an external client
+received a WebSocket message. The expected second marker demonstrates the
+at-least-once recovery boundary, not exactly-once external effects. This is
+one item and one disposable PostgreSQL instance, not a hosted multi-node,
+mixed-backlog, dependency-loss, or load/headroom proof. H4/H11 and M1 remain
+OPEN.
