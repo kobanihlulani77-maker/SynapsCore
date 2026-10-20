@@ -249,4 +249,7 @@ jobs:
             tail -n 60 "$prefix.one.log" "$prefix.two.log"
             exit 1
           fi
-          timeout 120s java -cp "$classpath" "$proof" verify "$key" "$RUNNER_TEMP"
+          if ! timeout 120s java -cp "$classpath" "$proof" verify "$key" "$RUNNER_TEMP"; then
+            tail -n 60 "$prefix.one.log" "$prefix.two.log"
+            exit 1
+          fi

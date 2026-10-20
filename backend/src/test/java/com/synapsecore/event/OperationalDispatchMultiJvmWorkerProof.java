@@ -103,12 +103,14 @@ public final class OperationalDispatchMultiJvmWorkerProof {
         int second = Integer.parseInt(Files.readString(file(directory, key, "two.result")).trim());
         int firstBroadcast = Files.exists(file(directory, key, "one.broadcast")) ? 1 : 0;
         int secondBroadcast = Files.exists(file(directory, key, "two.broadcast")) ? 1 : 0;
-        if (first + second != 1 || Math.min(first, second) != 0 || Math.max(first, second) != 1
-            || firstBroadcast != first || secondBroadcast != second) {
-            throw new IllegalStateException("Expected one worker completion and one test-recorded publication");
-        }
         Long id = Long.valueOf(Files.readString(file(directory, key, "id")).trim());
         OperationalDispatchWorkItem item = repository.findById(id).orElseThrow();
+        if (first + second != 1 || Math.min(first, second) != 0 || Math.max(first, second) != 1
+            || firstBroadcast != first || secondBroadcast != second) {
+            throw new IllegalStateException("Expected one worker completion and one test-recorded publication; "
+                + "results=" + first + "," + second + " markers=" + firstBroadcast + "," + secondBroadcast
+                + " durableStatus=" + item.getStatus() + " durableAttempt=" + item.getAttemptCount());
+        }
         if (item.getStatus() != OperationalDispatchStatus.COMPLETED || item.getAttemptCount() != 1
             || item.getProcessedAt() == null) {
             throw new IllegalStateException("Shared dispatch item did not complete exactly one attempt");
