@@ -34,7 +34,7 @@ public class RequestTraceFilter extends OncePerRequestFilter {
     private static final String ACTOR_MDC_KEY = "actor";
     private static final String TENANT_MDC_KEY = "tenant";
     private static final long SLOW_REQUEST_THRESHOLD_NANOS = 5_000_000_000L;
-    private static final long SLOW_SNAPSHOT_THRESHOLD_NANOS = 2_000_000_000L;
+    private static final long SLOW_FOCUSED_READ_THRESHOLD_NANOS = 2_000_000_000L;
 
     private final RequestTraceContext requestTraceContext;
     private final SynapseAccessProperties accessProperties;
@@ -118,8 +118,10 @@ public class RequestTraceFilter extends OncePerRequestFilter {
         if (!requestUri.startsWith("/api/")) {
             return;
         }
-        long threshold = "GET".equals(request.getMethod()) && "/api/dashboard/snapshot".equals(requestUri)
-            ? SLOW_SNAPSHOT_THRESHOLD_NANOS : SLOW_REQUEST_THRESHOLD_NANOS;
+        long threshold = "GET".equals(request.getMethod())
+            && ("/api/dashboard/snapshot".equals(requestUri)
+                || "/api/access/admin/workspace".equals(requestUri))
+            ? SLOW_FOCUSED_READ_THRESHOLD_NANOS : SLOW_REQUEST_THRESHOLD_NANOS;
         if (elapsedNanos < threshold) {
             return;
         }

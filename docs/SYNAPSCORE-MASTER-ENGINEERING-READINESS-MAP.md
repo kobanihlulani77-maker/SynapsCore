@@ -579,6 +579,40 @@ sections still dominate the matched read; SQL versus wait, Hikari ownership,
 the historical 204 browser outcome and M1 exit remain open. See the
 [workspace after-state](evidence/tenant-workspace-incident-composition-2026-10-15.md).
 
+**Next bounded H1/H2/H7 diagnostic:** Source confirms the workspace read
+has no outer transaction; connector and incident subcalls own separate
+transactional paths. The 3.10-second composition is not automatically one
+JDBC hold. A local candidate reuses the existing one-second snapshot
+wait/Hikari sampler for slow workspace composition without changing workload
+or capacity. The same candidate adds a workspace-GET-only two-second
+slow-HTTP warning so identity, handler and completion-time pool data can be
+compared with the section trace under one request ID. Its threshold regression
+failed before and passed after the change; other API routes retain five
+seconds. Focused workspace/Scenario/sampler tests passed 14/14 before the
+logging addition; the filter tests passed 15/15 and the complete backend
+rerun passed 413/413. The original candidate head `b8150eb` passed both
+exact-head CI jobs; the later evidence-only update must pass its own CI
+before merge, and an exact-Live request trace remains a separate gate.
+Even when Live, thread samples will classify broad waits but
+not exact SQL time,
+PostgreSQL PID or the ten historical Hikari owners. See the
+[workspace evidence](evidence/tenant-workspace-incident-composition-2026-10-15.md).
+
+**October 18 Live symptom check:** Render showed `f29bd85` Live; the
+six-flag gate passed and a last-24-hours application-log search found no
+`Connection is not available` entries. Recent E2E passes are owner-reported,
+not a quantified repeatability sample in this check. The same Live instance
+nevertheless logged concurrent, warm HTTP 200 reads lasting 7.16 seconds
+for Runtime, 7.81 seconds for Tenant Admin workspace and 8.60 seconds for
+dashboard snapshot. The snapshot's five in-flight pool samples reached at
+most 7/10 active with no waiters; completion-time pool snapshots also had
+headroom. This narrows that specific window away from a captured Hikari
+10/10 event, but leaves the shared non-CPU latency mechanism, historical
+starvation, 204 client outcome and timeout rate unresolved. Do not equate
+successful E2Es with H1/H2/H7 closure. Preserve the [same-request IDs and
+limits](evidence/tenant-workspace-incident-composition-2026-10-15.md#october-18-live-latency-and-timeout-check)
+for the next exact-Live diagnostic comparison.
+
 The [September 30 warm hosted trace](evidence/hosted-connector-telemetry-amplification-2026-09-30.md)
 provides the before-state: 58 connector summaries, nine telemetry queries per
 connector, and 8.5 seconds spent in the snapshot's connector section. The

@@ -135,6 +135,38 @@ class RequestTraceFilterTest {
     }
 
     @Test
+    void workspaceGetLogsAtTwoSecondsWithoutChangingWriteThreshold() {
+        request.setRequestURI("/api/access/admin/workspace");
+        request.setAttribute(HandlerMapping.BEST_MATCHING_PATTERN_ATTRIBUTE, "/api/access/admin/workspace");
+        request.setQueryString("token=must-not-enter-logs");
+        Logger logger = (Logger) LoggerFactory.getLogger(RequestTraceFilter.class);
+        ListAppender<ILoggingEvent> appender = new ListAppender<>();
+        appender.start();
+        logger.addAppender(appender);
+        try {
+            filter.logSlowRequest(request, 200, 1_999_000_000L, 1_000_000_000L, 800, 200);
+            assertThat(appender.list).isEmpty();
+
+            filter.logSlowRequest(request, 200, 2_000_000_000L, 1_000_000_000L, 800, 200);
+            assertThat(appender.list).hasSize(1);
+            String message = appender.list.get(0).getFormattedMessage();
+            assertThat(message).contains("route=/api/access/admin/workspace", "durationMs=2000",
+                "identityMs=1000", "handlerMs=1000", "cpuMs=800", "identityCpuMs=200",
+                "handlerCpuMs=600", "hikariTotal=-1");
+            assertThat(message).doesNotContain("must-not-enter-logs");
+
+            request.setMethod("POST");
+            filter.logSlowRequest(request, 200, 4_999_000_000L, 0, 100, 0);
+            assertThat(appender.list).hasSize(1);
+            filter.logSlowRequest(request, 200, 5_000_000_000L, 0, 100, 0);
+            assertThat(appender.list).hasSize(2);
+        } finally {
+            logger.detachAppender(appender);
+            appender.stop();
+        }
+    }
+
+    @Test
     void otherApiRoutesKeepFiveSecondSlowRequestThreshold() {
         request.setRequestURI("/api/orders");
         request.setAttribute(HandlerMapping.BEST_MATCHING_PATTERN_ATTRIBUTE, "/api/orders");
