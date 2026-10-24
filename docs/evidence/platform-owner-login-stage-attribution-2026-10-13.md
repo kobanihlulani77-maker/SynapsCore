@@ -61,11 +61,16 @@ the unchanged five-second threshold for unrelated routes and tenant login,
 stage arithmetic, and exclusion of a synthetic secret-bearing query string
 from the outer log. On October 24 the full local `mvnw test` run against the
 integrated branch completed with 416 tests across 73 Surefire reports, zero
-failures/errors/skips. The branch still requires fresh exact-head CI before
-merge and an exact-Live deployment before hosted attribution. None of these
-local results proves the cause of the earlier slow hosted logins.
+failures/errors/skips. The branch's exact-head CI passed both jobs before
+PR #13 merged as `54b162e`. Merged-main
+[CI 40085602023](https://github.com/kobanihlulani77-maker/SynapsCore/actions/runs/40085602023)
+also passed `verify` and `dispatch-postgres`. Render Deploys showed the exact
+merge SHA Live on October 24 after a 4m55s auto-deploy. At approximately
+10:28 UTC, `scripts/check-live-connections.ps1` returned all six flags true:
+frontend, backend, DB readiness, auth, WebSocket, and proof allowed. This
+proves rollout and basic connectivity, not the cause of earlier slow hosted
+logins or repeatable authenticated latency.
 
-After an approved merge, confirm the exact Render Live SHA and six-flag gate.
 Wait for a normal Platform Owner sign-in or one bounded, non-rate-limited
 probe; do not create repeated login traffic to force a warning. Match one
 slow client request ID to its outer HTTP and service-stage logs, then use
