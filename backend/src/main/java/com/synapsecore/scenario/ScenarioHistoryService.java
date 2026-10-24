@@ -16,6 +16,7 @@ import com.synapsecore.domain.repository.ScenarioRunRepository;
 import com.synapsecore.domain.entity.BusinessEventType;
 import com.synapsecore.domain.service.TenantOperationalPolicyService;
 import com.synapsecore.event.BusinessEventService;
+import com.synapsecore.observability.ThreadCpuTiming;
 import com.synapsecore.scenario.dto.ScenarioApprovalRequest;
 import com.synapsecore.scenario.dto.ScenarioApprovalResponse;
 import com.synapsecore.scenario.dto.ScenarioComparisonResponse;
@@ -38,8 +39,13 @@ import java.time.Instant;
 import java.util.Comparator;
 import java.util.Arrays;
 import java.util.List;
+import java.util.LinkedHashMap;
 import java.util.Locale;
+import java.util.Map;
+import java.util.function.Supplier;
 import lombok.RequiredArgsConstructor;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.hibernate.exception.ConstraintViolationException;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Sort;
@@ -54,7 +60,9 @@ import org.springframework.web.server.ResponseStatusException;
 @RequiredArgsConstructor
 public class ScenarioHistoryService {
 
+    private static final Logger log = LoggerFactory.getLogger(ScenarioHistoryService.class);
     private static final int DEFAULT_NOTIFICATION_LIMIT = 8;
+    private static final long SLOW_NOTIFICATION_NANOS = 300_000_000L;
 
     private final ScenarioRunRepository scenarioRunRepository;
     private final ObjectMapper objectMapper;
@@ -477,32 +485,62 @@ public class ScenarioHistoryService {
     }
 
     public List<ScenarioNotificationResponse> getScenarioNotifications(int limit, List<String> warehouseScopes) {
-        applyPendingSlaEscalations();
-        int effectiveLimit = limit <= 0 ? DEFAULT_NOTIFICATION_LIMIT : Math.min(limit, 12);
+        long startedAt = System.nanoTime();
+        long cpuStartedAt = ThreadCpuTiming.currentNanos();
+        Map<String, Long> sectionsMs = new LinkedHashMap<>();
+        Map<String, Long> sectionsCpuMs = new LinkedHashMap<>();
+        try {
+            timedNotificationSection(sectionsMs, sectionsCpuMs, "slaEscalation", () -> {
+                applyPendingSlaEscalations();
+                return null;
+            });
+            int effectiveLimit = limit <= 0 ? DEFAULT_NOTIFICATION_LIMIT : Math.min(limit, 12);
 
-        List<ScenarioNotificationResponse> activeEscalations = scenarioRunRepository
-            .findTop12ByTenant_CodeIgnoreCaseAndTypeAndApprovalStatusAndSlaEscalatedAtIsNotNullAndSlaAcknowledgedAtIsNullOrderBySlaEscalatedAtDescIdDesc(
-                tenantContextService.getCurrentTenantCodeOrDefault(),
-                ScenarioRunType.SAVED_PLAN,
-                ScenarioApprovalStatus.PENDING_APPROVAL)
-            .stream()
-            .map(this::toEscalationNotification)
-            .toList();
+            List<ScenarioNotificationResponse> activeEscalations = timedNotificationSection(
+                sectionsMs, sectionsCpuMs, "active", () -> scenarioRunRepository
+                    .findTop12ByTenant_CodeIgnoreCaseAndTypeAndApprovalStatusAndSlaEscalatedAtIsNotNullAndSlaAcknowledgedAtIsNullOrderBySlaEscalatedAtDescIdDesc(
+                        tenantContextService.getCurrentTenantCodeOrDefault(),
+                        ScenarioRunType.SAVED_PLAN,
+                        ScenarioApprovalStatus.PENDING_APPROVAL)
+                    .stream()
+                    .map(this::toEscalationNotification)
+                    .toList());
 
-        List<ScenarioNotificationResponse> acknowledgedEscalations = scenarioRunRepository
-            .findTop12ByTenant_CodeIgnoreCaseAndTypeAndSlaAcknowledgedAtIsNotNullOrderBySlaAcknowledgedAtDescIdDesc(
-                tenantContextService.getCurrentTenantCodeOrDefault(),
-                ScenarioRunType.SAVED_PLAN)
-            .stream()
-            .map(this::toAcknowledgementNotification)
-            .toList();
+            List<ScenarioNotificationResponse> acknowledgedEscalations = timedNotificationSection(
+                sectionsMs, sectionsCpuMs, "acknowledged", () -> scenarioRunRepository
+                    .findTop12ByTenant_CodeIgnoreCaseAndTypeAndSlaAcknowledgedAtIsNotNullOrderBySlaAcknowledgedAtDescIdDesc(
+                        tenantContextService.getCurrentTenantCodeOrDefault(),
+                        ScenarioRunType.SAVED_PLAN)
+                    .stream()
+                    .map(this::toAcknowledgementNotification)
+                    .toList());
 
-        return java.util.stream.Stream.concat(activeEscalations.stream(), acknowledgedEscalations.stream())
-            .sorted(Comparator.comparing(ScenarioNotificationResponse::createdAt).reversed()
-                .thenComparing(ScenarioNotificationResponse::scenarioRunId, Comparator.reverseOrder()))
-            .filter(notification -> isVisibleToWarehouseScopes(notification.warehouseCode(), warehouseScopes))
-            .limit(effectiveLimit)
-            .toList();
+            return timedNotificationSection(sectionsMs, sectionsCpuMs, "merge", () ->
+                java.util.stream.Stream.concat(activeEscalations.stream(), acknowledgedEscalations.stream())
+                    .sorted(Comparator.comparing(ScenarioNotificationResponse::createdAt).reversed()
+                        .thenComparing(ScenarioNotificationResponse::scenarioRunId, Comparator.reverseOrder()))
+                    .filter(notification -> isVisibleToWarehouseScopes(notification.warehouseCode(), warehouseScopes))
+                    .limit(effectiveLimit)
+                    .toList());
+        } finally {
+            long elapsed = System.nanoTime() - startedAt;
+            if (elapsed >= SLOW_NOTIFICATION_NANOS) {
+                log.warn("Slow scenario notification read totalMs={} cpuMs={} sectionsMs={} sectionsCpuMs={}",
+                    elapsed / 1_000_000, ThreadCpuTiming.elapsedMillis(cpuStartedAt), sectionsMs, sectionsCpuMs);
+            }
+        }
+    }
+
+    private <T> T timedNotificationSection(Map<String, Long> sectionsMs, Map<String, Long> sectionsCpuMs,
+                                           String section, Supplier<T> read) {
+        long startedAt = System.nanoTime();
+        long cpuStartedAt = ThreadCpuTiming.currentNanos();
+        try {
+            return read.get();
+        } finally {
+            sectionsMs.put(section, (System.nanoTime() - startedAt) / 1_000_000);
+            sectionsCpuMs.put(section, ThreadCpuTiming.elapsedMillis(cpuStartedAt));
+        }
     }
 
     private boolean isVisibleToWarehouseScopes(String warehouseCode, List<String> warehouseScopes) {

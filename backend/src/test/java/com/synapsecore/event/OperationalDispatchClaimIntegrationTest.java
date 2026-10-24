@@ -118,5 +118,6 @@ class OperationalDispatchClaimIntegrationTest {
         OperationalDispatchWorkItem claimed = repository.findById(item.getId()).orElseThrow();
         assertThat(claimed.getStatus()).isEqualTo(OperationalDispatchStatus.PROCESSING);
         assertThat(claimed.getAttemptCount()).isEqualTo(1);
+        repository.deleteById(item.getId());
     }
 }

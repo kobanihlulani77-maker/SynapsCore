@@ -41,16 +41,26 @@ import com.synapsecore.domain.repository.WarehouseRepository;
 import com.synapsecore.domain.service.SystemIncidentService;
 import com.synapsecore.integration.IntegrationConnectorService;
 import com.synapsecore.integration.dto.IntegrationConnectorResponse;
+import com.synapsecore.observability.SlowThreadWaitSampler;
+import com.synapsecore.observability.ThreadCpuTiming;
 import com.synapsecore.tenant.TenantContextService;
+import com.zaxxer.hikari.HikariDataSource;
+import com.zaxxer.hikari.HikariPoolMXBean;
 import java.net.URI;
 import java.net.URISyntaxException;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.Comparator;
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.Locale;
 import java.util.List;
+import java.util.Map;
+import java.util.function.Supplier;
+import javax.sql.DataSource;
 import lombok.RequiredArgsConstructor;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpStatus;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
@@ -60,6 +70,9 @@ import org.springframework.web.server.ResponseStatusException;
 @Service
 @RequiredArgsConstructor
 public class TenantWorkspaceAdministrationService {
+
+    private static final Logger log = LoggerFactory.getLogger(TenantWorkspaceAdministrationService.class);
+    private static final long SLOW_WORKSPACE_NANOS = 2_000_000_000L;
 
     private final TenantContextService tenantContextService;
     private final AccessDirectoryService accessDirectoryService;
@@ -76,27 +89,61 @@ public class TenantWorkspaceAdministrationService {
     private final SystemIncidentService systemIncidentService;
     private final AuditLogService auditLogService;
     private final IntegrationConnectorService integrationConnectorService;
+    private final DataSource dataSource;
 
     // Support incidents may perform SLA transitions; do not wrap composition in a read-only transaction.
     public TenantWorkspaceResponse getWorkspace() {
-        Tenant tenant = tenantContextService.getCurrentTenantOrDefault();
+        long startedAt = System.nanoTime();
+        long cpuStartedAt = ThreadCpuTiming.currentNanos();
+        SlowThreadWaitSampler waitSampler = SlowThreadWaitSampler.start(workspacePool());
+        Map<String, Long> sectionsMs = new LinkedHashMap<>();
+        Map<String, Long> sectionsCpuMs = new LinkedHashMap<>();
+        try {
+            return buildWorkspace(sectionsMs, sectionsCpuMs);
+        } finally {
+            waitSampler.close();
+            long elapsed = System.nanoTime() - startedAt;
+            if (elapsed >= SLOW_WORKSPACE_NANOS) {
+                log.warn("Slow tenant workspace composition totalMs={} cpuMs={} sectionsMs={} sectionsCpuMs={} waitSamples={}",
+                    elapsed / 1_000_000, ThreadCpuTiming.elapsedMillis(cpuStartedAt), sectionsMs, sectionsCpuMs,
+                    waitSampler.summary());
+            }
+        }
+    }
+
+    private HikariPoolMXBean workspacePool() {
+        try {
+            return dataSource instanceof HikariDataSource hikari && hikari.isRunning()
+                ? hikari.getHikariPoolMXBean() : null;
+        } catch (RuntimeException ignored) {
+            return null;
+        }
+    }
+
+    private TenantWorkspaceResponse buildWorkspace(Map<String, Long> sectionsMs, Map<String, Long> sectionsCpuMs) {
+        Tenant tenant = timedWorkspaceSection(sectionsMs, sectionsCpuMs, "tenant",
+            tenantContextService::getCurrentTenantOrDefault);
         String tenantCode = tenant.getCode();
-        List<AccessUser> users = accessUserRepository.findAllByTenant_CodeIgnoreCaseOrderByFullNameAscUsernameAsc(tenantCode);
-        List<WarehouseResponse> warehouses = warehouseRepository.findAllByTenant_CodeIgnoreCaseOrderByNameAsc(tenantCode).stream()
-            .map(this::toWarehouseResponse)
-            .toList();
-        List<IntegrationConnectorResponse> connectors = integrationConnectorRepository
-            .findAllByTenant_CodeIgnoreCaseOrderByTypeAscSourceSystemAsc(tenantCode).stream()
-            .map(integrationConnectorService::describeConnector)
-            .toList();
-        List<SystemIncidentResponse> supportIncidents = systemIncidentService.getActiveIncidents();
-        List<TenantWorkspaceSupportActivity> recentSupportActivity = auditLogRepository
-            .findTop20ByTenantCodeIgnoreCaseOrderByCreatedAtDesc(tenantCode).stream()
-            .filter(this::isSupportAudit)
-            .limit(8)
-            .map(this::toSupportActivity)
-            .toList();
+        List<AccessUser> users = timedWorkspaceSection(sectionsMs, sectionsCpuMs, "users",
+            () -> accessUserRepository.findAllByTenant_CodeIgnoreCaseOrderByFullNameAscUsernameAsc(tenantCode));
+        List<WarehouseResponse> warehouses = timedWorkspaceSection(sectionsMs, sectionsCpuMs, "warehouses",
+            () -> warehouseRepository.findAllByTenant_CodeIgnoreCaseOrderByNameAsc(tenantCode).stream()
+                .map(this::toWarehouseResponse)
+                .toList());
+        List<IntegrationConnectorResponse> connectors = timedWorkspaceSection(sectionsMs, sectionsCpuMs, "connectors",
+            integrationConnectorService::getTenantWorkspaceConnectors);
+        List<SystemIncidentResponse> supportIncidents = timedWorkspaceSection(sectionsMs, sectionsCpuMs, "incidents",
+            () -> systemIncidentService.getActiveIncidentsWithConnectors(connectors));
+        List<TenantWorkspaceSupportActivity> recentSupportActivity = timedWorkspaceSection(sectionsMs, sectionsCpuMs,
+            "supportAudit", () -> auditLogRepository.findTop20ByTenantCodeIgnoreCaseOrderByCreatedAtDesc(tenantCode)
+                .stream()
+                .filter(this::isSupportAudit)
+                .limit(8)
+                .map(this::toSupportActivity)
+                .toList());
         long disabledConnectorCount = connectors.stream().filter(connector -> !connector.enabled()).count();
+        long activeUserCount = users.stream().filter(AccessUser::isActive).count();
+        long inactiveUserCount = users.size() - activeUserCount;
         long activeUsersRequiringPasswordChange = users.stream()
             .filter(AccessUser::isActive)
             .filter(AccessUser::isPasswordChangeRequired)
@@ -118,7 +165,7 @@ public class TenantWorkspaceAdministrationService {
             .count();
         Instant latestSupportAuditAt = recentSupportActivity.isEmpty() ? null : recentSupportActivity.getFirst().createdAt();
 
-        return new TenantWorkspaceResponse(
+        return timedWorkspaceSection(sectionsMs, sectionsCpuMs, "response", () -> new TenantWorkspaceResponse(
             tenant.getId(),
             tenant.getCode(),
             tenant.getName(),
@@ -133,8 +180,8 @@ public class TenantWorkspaceAdministrationService {
                 warehouses.size(),
                 accessOperatorRepository.countByTenant_CodeIgnoreCaseAndActiveTrue(tenantCode),
                 accessOperatorRepository.countByTenant_CodeIgnoreCaseAndActiveFalse(tenantCode),
-                accessUserRepository.countByTenant_CodeIgnoreCaseAndActiveTrue(tenantCode),
-                accessUserRepository.countByTenant_CodeIgnoreCaseAndActiveFalse(tenantCode),
+                activeUserCount,
+                inactiveUserCount,
                 connectors.size() - disabledConnectorCount,
                 disabledConnectorCount,
                 integrationReplayRecordRepository.countByTenantCodeIgnoreCaseAndStatusIn(
@@ -164,7 +211,19 @@ public class TenantWorkspaceAdministrationService {
             tenant.getVersion(),
             tenant.getCreatedAt(),
             tenant.getUpdatedAt()
-        );
+        ));
+    }
+
+    private <T> T timedWorkspaceSection(Map<String, Long> sectionsMs, Map<String, Long> sectionsCpuMs,
+                                        String section, Supplier<T> read) {
+        long startedAt = System.nanoTime();
+        long cpuStartedAt = ThreadCpuTiming.currentNanos();
+        try {
+            return read.get();
+        } finally {
+            sectionsMs.put(section, (System.nanoTime() - startedAt) / 1_000_000);
+            sectionsCpuMs.put(section, ThreadCpuTiming.elapsedMillis(cpuStartedAt));
+        }
     }
 
     @Transactional

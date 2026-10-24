@@ -26,8 +26,10 @@ as the cause from the current evidence.
 
 ## Scoped candidate instrumentation
 
-This branch lowers the outer `RequestTraceFilter` warning threshold to two
-seconds for **Platform Owner login only**. The existing safe warning fields
+This branch adds Platform Owner login to the outer `RequestTraceFilter` routes
+with a two-second warning threshold. It preserves the later `main` threshold
+for dashboard snapshots and Tenant Admin workspace reads; unrelated routes
+retain five seconds. The existing safe warning fields
 include total HTTP wall/CPU, identity versus handler wall/CPU, final Hikari
 snapshot, status, and route. Other API routes retain their existing threshold.
 For a successful sign-in whose **service** time reaches two seconds,
@@ -49,14 +51,19 @@ then attribute the measured stage before proposing a product fix.
 
 ## Verification and next gate
 
-The focused local `RequestTraceFilterTest,PlatformOwnerSessionServiceTest` run
-passed 17 tests with zero failures/errors/skips. It covers the two-second
-threshold, unchanged five-second threshold for unrelated routes and tenant login, stage
-arithmetic and exclusion of a synthetic secret-bearing query string from the
-outer log. The full local backend `mvnw test` run completed with 414 tests
-across 73 Surefire reports, zero failures/errors/skips. Exact-head CI must
-still pass before merge. This is local proof of diagnostic control flow,
-**not** hosted attribution.
+The original branch's focused local run passed 17 tests and its full backend
+run passed 414 tests across 73 Surefire reports, with zero failures/errors/skips.
+After integrating October 24 `main`, the focused
+`RequestTraceFilterTest,PlatformOwnerSessionServiceTest` run passed 18/18 with
+zero failures/errors/skips. It covers the retained two-second workspace and
+snapshot thresholds, the new two-second Platform Owner login threshold,
+the unchanged five-second threshold for unrelated routes and tenant login,
+stage arithmetic, and exclusion of a synthetic secret-bearing query string
+from the outer log. On October 24 the full local `mvnw test` run against the
+integrated branch completed with 416 tests across 73 Surefire reports, zero
+failures/errors/skips. The branch still requires fresh exact-head CI before
+merge and an exact-Live deployment before hosted attribution. None of these
+local results proves the cause of the earlier slow hosted logins.
 
 After an approved merge, confirm the exact Render Live SHA and six-flag gate.
 Wait for a normal Platform Owner sign-in or one bounded, non-rate-limited

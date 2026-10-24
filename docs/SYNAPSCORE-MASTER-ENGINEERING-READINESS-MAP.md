@@ -6,6 +6,9 @@ This is the canonical engineering progression and pilot-readiness decision map.
 It governs the journey; linked evidence records establish what individual checks
 proved. The [hosted timeout recovery map](hosted-timeout-recovery-map.md) remains
 the detailed runtime investigation playbook within this program.
+The [engineering investigation and exit protocol](engineering-investigation-and-exit-protocol.md)
+governs how to select, bound, classify, and stop individual investigations
+without weakening this map's acceptance gates.
 The [Q4 2026 pilot acquisition blueprint](pilot-acquisition-blueprint-2026-q4.md)
 records the parallel commercial path beginning Monday October 5, 2026;
 research, discovery and conditional discussions do not bypass M1-M6 technical
@@ -18,14 +21,21 @@ acceptance or M7 customer-specific launch authorization.
 | Security plan update | 2026-10-04: M4 now has a full [SEC-01–SEC-25 security command plan](m4-security-command-plan.md) and explicit M5–M7 handoffs. Documentation only: M1 remains OPEN, M4 has not been executed, and no pilot authorization is implied. |
 | Repository verification | The September 27 local `main` and freshly fetched `origin/main` matched the original baseline then. Subsequent revisions are assessed only within their recorded scope; a documentation successor is not a newly verified application release. |
 | Current phase | M1: performance, concurrency, correctness, and runtime hardening - OPEN |
-| Current sub-workstream | H1/H2/H7: warm hosted latency, connection demand, and measured resource envelope; Replay convergence is a dependent H8 question |
-| Immediate objective | Live `8f5c7a9` now has five same-ID warm snapshot pairs: 2.67-3.67 seconds client, 2.20-3.22 seconds server, low HTTP-thread CPU. Two slow compositions had sparse in-flight pool samples with zero Hikari waiters and at most one active connection; this rules down saturation in those sampled windows, **not** historical 10/10 starvation, unsampled acquisition waits, JDBC PID/SQL or host-resource causes ([H2 after-sample](evidence/dashboard-snapshot-auth-query-bound-2026-10-08.md)). Bound the persistent serial snapshot wall time across section calls and PostgreSQL/Java wait before changing performance code. The revised October 13 Platform Owner probe obtained five authenticated Overview/Activity read pairs (486.7-1,741.7 / 509.0-1,520.2 ms client), but login took 2,342.6 ms, so its clean-warm baseline failed. These are diagnostic hosted HTTP samples, not a like-for-like pre/post index comparison or request-to-SQL/pool attribution. Preserve the separate slow-login question; do not force more sign-ins for a clean label ([activity boundary](evidence/platform-activity-read-boundary-2026-10-07.md)). |
-| Login attribution candidate | A bounded branch adds a two-second slow-HTTP warning only for Platform Owner login and safe stage timing for successful slow sign-ins. Focused local tests passed 17/17 and the full backend suite passed 414/414. This is **not** CI or hosted proof and changes no auth, transaction, pool or timeout behavior. The 2.3-3.7-second client login delays still have no proven server-stage or database owner; obtain exact-head CI and an approved Live deployment before any same-request attribution ([diagnostic boundary](evidence/platform-owner-login-stage-attribution-2026-10-13.md)). |
+| Operating decision (2026-10-15) | Prioritize operator/engine outcome over the count of successful slow-request warnings. Reuse existing evidence, name the workflow-specific acceptance budget (TBD until owner approval), and use one bounded causal discriminator. Correct 200 responses and sparse zero-waiter snapshots do not close historical Hikari starvation, recovery, or hosted repeatability. The workspace 204/18-19-second historical logs remain a client-outcome question, not a proven delivered DTO or proven browser timeout. See the [investigation protocol](engineering-investigation-and-exit-protocol.md). This is a work-selection decision, not M1 exit evidence. |
+| Current sub-workstream | H1/H2/H7/H12: warm hosted latency and wait/SQL/resource attribution; historical Hikari-holder and workspace-204 client outcomes remain separate open questions. Replay convergence is a dependent H8 question. |
+| Immediate objective | Attribute the residual warm workspace time without assuming Hikari exhaustion: the October 20 exact-Live same-request sample measured 7.01/3.99-second client reads with at most one sampled pooled connection and zero waiters. Inspect representative PostgreSQL query plans/durations and DB/host resource state for connector telemetry and Scenario notification reads before changing query shape or capacity ([workspace evidence](evidence/tenant-workspace-incident-composition-2026-10-15.md#october-20-exact-live-workspace-wait-boundary)). Separately resolve the client-visible outcome of historical 8-19-second workspace reads, especially two 204s; current 200 responses do not settle them. Earlier warm snapshot and October 13 Activity evidence do not identify historical 10/10 holders. H4 recovery and all broader M1 exit criteria remain open. |
+| Workspace connector read candidate | October 13 Render logs include 25-30-second workspace reads, in addition to the 8-19-second window. Source and a red H2 test proved the workspace still used individual connector telemetry despite the earlier general-list batch fix: 12 added connectors caused 110 additional prepared statements. A bounded correction now reuses batch telemetry without narrowing tenant-wide admin visibility; the local green bound and scoped/cross-tenant assertions passed. This is not a matched hosted latency or 204 client-outcome proof ([workspace evidence](evidence/tenant-workspace-connector-batching-2026-10-15.md)). |
+| Workspace 204 classification | October 20 source and existing test inspection show that workspace GET normally returns a DTO, while abort-like exceptions can be logged and metered as 204 by the request filter and error handlers. The historical server-side 204 warnings are therefore not proof of an intentionally empty successful workspace response. The specific abort path, origin, browser outcome, preceding 18-25-second wait, and relation to pool pressure remain unknown ([workspace evidence](evidence/tenant-workspace-connector-batching-2026-10-15.md#operator-outcome-and-historical-signal)). |
+| Login attribution candidate | PR #13 adds a two-second slow-HTTP warning for Platform Owner login and safe stage timing for successful slow sign-ins, while retaining the existing focused snapshot and workspace thresholds. The 2.3-3.7-second historical client login delays have no proven server-stage or database owner. Its prior local tests were against an older base; require current exact-head CI and an approved Live deployment before same-request attribution. This is a separate H1/H7 diagnostic and does not displace the immediate workspace objective ([diagnostic boundary](evidence/platform-owner-login-stage-attribution-2026-10-13.md)). |
 | Next gate | M2: repeatable hosted verification; entry BLOCKED until M1's in-scope hardening gates pass |
 | Pilot authorization | NOT GRANTED by this map; current candidate is not accepted for customer operations |
-| Last verified live backend | Render Deploys showed PR #8 merge `8f5c7a9e13ae7985353e39ed7d800bf7a52595c5` Live on October 13 as `dep-db5o3p15efls73ar7bd0` after 4m58s. The six-flag gate passed. Instance `ln7dc` produced five warm synthetic-tenant same-ID snapshot client/HTTP pairs, all 200, with bounded in-flight Hikari sampling on two slow compositions. Later `main` commits changed documents only. This is not a continuous per-request pool history, PostgreSQL PID/SQL attribution, load proof or M1 closure ([H2 after-sample](evidence/dashboard-snapshot-auth-query-bound-2026-10-08.md)). |
+| Last verified live backend | On October 20 Render Deploys showed PR #23 merge `15cc249fd0bf9cfa194e4ba4c4175206a95091c9` Live after a 5m21s auto-deploy; the post-cutover six-flag gate passed. One bounded same-request Tenant Admin probe returned complete 200 workspaces in 7.01 and 3.99 seconds client time, after a 5.09-second login. Matched composition took 4.69 and 2.70 seconds; sampled Hikari maximum was 1/10 active with zero waiters on both reads. This rules down captured pool starvation in that window but does not identify exact SQL/connection hold, prove a latency improvement, explain historical 204s or close M1 ([workspace evidence](evidence/tenant-workspace-incident-composition-2026-10-15.md#october-20-exact-live-workspace-wait-boundary)). |
 | Scoped recovery proof | [PR #2](https://github.com/kobanihlulani77-maker/SynapsCore/pull/2) merged as `16f44753f1cc90c21d3dbe6accc59a51d575c798`. The new disposable-PostgreSQL test rejects the terminal `COMPLETED` write after broadcast, verifies the claim remains recoverable, then reclaims/completes it after lease expiry with an explicit second broadcast. It changes only test/CI files; controlled process-stop, multi-instance and hosted recovery remain OPEN ([dispatch evidence](evidence/operational-dispatch-claim-recovery-2026-10-03.md)). |
-| Latest scoped CI evidence | PR #8 exact-head run `38139246676` and [merged-main run `38139660104`](https://github.com/kobanihlulani77-maker/SynapsCore/actions/runs/38139660104) passed `verify` and `dispatch-postgres` for the in-flight pool sampler. The sampler is now deployed and observed, not merely a local candidate. CI does not prove hosted latency repeatability, historical Hikari ownership or M1 closure ([H2 after-sample](evidence/dashboard-snapshot-auth-query-bound-2026-10-08.md)). |
+| H4 abort proof | [PR #15](https://github.com/kobanihlulani77-maker/SynapsCore/pull/15) merged as `a17fd61`. Its test simulates worker loss after a committed `PROCESSING` claim but before publication, then uses a fresh service object to prove lease-gated reclaim and one subsequent test broadcast. Local adjacent queue/claim tests passed 9/9; exact-head CI passed both jobs, including 5/5 selected disposable-PostgreSQL tests. This is not a killed process, independent JVM, multi-node, hosted, or backlog proof; H4/H11 and M1 remain OPEN ([dispatch evidence](evidence/operational-dispatch-claim-recovery-2026-10-03.md)). |
+| H4 independent claim boundary | [PR #28](https://github.com/kobanihlulani77-maker/SynapsCore/pull/28) exact-head [CI 39422819210](https://github.com/kobanihlulani77-maker/SynapsCore/actions/runs/39422819210) passed both jobs. In disposable PostgreSQL, two distinct JVMs raced for one committed dispatch row; one claimed attempt 1 and the other did not. This is claim-level CI proof, not two full workers, notification delivery, hosted multi-instance recovery, or load/headroom proof. H4/H11 and M1 remain OPEN ([dispatch evidence](evidence/operational-dispatch-claim-recovery-2026-10-03.md#independent-jvm-claim-race-october-20)). |
+| H4 independent worker boundary | [PR #30](https://github.com/kobanihlulani77-maker/SynapsCore/pull/30) merged as `476e7b8`; [merged-main CI 39430417923](https://github.com/kobanihlulani77-maker/SynapsCore/actions/runs/39430417923) passed both jobs. Its exact-head PostgreSQL proof ran three fresh two-JVM queue-drain rounds. The initial failing fixture exposed an older test-owned `PROCESSING` row contaminating global FIFO selection; its cleanup passed 9/9 adjacent local tests. The proof uses test-recorded publication, not real WebSocket delivery; hosted overlap, mixed backlog and headroom remain OPEN ([dispatch evidence](evidence/operational-dispatch-claim-recovery-2026-10-03.md#independent-jvm-queue-drain-october-20)). |
+| H4 post-publication kill boundary | [PR #31 candidate](https://github.com/kobanihlulani77-maker/SynapsCore/pull/31) exact-code-head [CI 39431034550](https://github.com/kobanihlulani77-maker/SynapsCore/actions/runs/39431034550) passed both jobs. In disposable PostgreSQL, CI killed one JVM after a tenant-scoped test publication marker but before the terminal write; a fresh JVM held the lease boundary, reclaimed attempt 2, and recorded a second test publication. This demonstrates at-least-once recovery, not actual WebSocket delivery or exactly-once external effects. Hosted multi-node, mixed backlog and headroom remain OPEN ([dispatch evidence](evidence/operational-dispatch-claim-recovery-2026-10-03.md#os-kill-after-test-recorded-publication-october-20)). |
+| Latest scoped H4 CI evidence | [PR #31 candidate run `39431034550`](https://github.com/kobanihlulani77-maker/SynapsCore/actions/runs/39431034550) passed post-publication OS-kill/fresh-JVM reclaim and general `verify` at `df68056`. [PR #30 merged-main run `39430417923`](https://github.com/kobanihlulani77-maker/SynapsCore/actions/runs/39430417923) passed both jobs for independent-JVM queue drain. [PR #28 exact-head run `39422819210`](https://github.com/kobanihlulani77-maker/SynapsCore/actions/runs/39422819210) passed two-JVM claim-only proof. None proves hosted multi-instance worker recovery, real WebSocket delivery, repeated hosted latency, historical Hikari ownership, or M1 closure ([dispatch evidence](evidence/operational-dispatch-claim-recovery-2026-10-03.md)). |
 | Local test artifacts | September 23 Surefire aggregate: 390 tests. The dispatch correction passed a 70-suite/403-test full backend run with zero failures/errors/skips and production packaging locally; its injected terminal-write failure was exercised in the H2 test profile, not PostgreSQL ([dispatch record](evidence/operational-dispatch-claim-recovery-2026-10-03.md)). On October 7, the activity-read diagnostic passed 36 focused tests and a full 70-suite/404-test H2-backed backend regression with zero failures/errors/skips ([activity boundary](evidence/platform-activity-read-boundary-2026-10-07.md)). |
 | Worktree boundary | Unrelated frontend Dockerfile edit, `.gitattributes`, two untracked Scenario evidence files, and raw CSV captures are not part of this assessment's committed implementation. |
 
@@ -354,7 +364,7 @@ it does not authorize changes to every downstream page.
 | H1 - Request/holder ownership | Historical starvation proven; a warm hosted 2026-09-27 sample captured `10/10` Hikari active with one waiter and slow requests, but not the ten holders ([evidence](evidence/warm-runtime-pool-pressure-2026-09-27.md)). On deployed `487b012`, one warm snapshot request took 18,799 ms wall and 559 ms current-thread CPU; composition took 14,803/415 ms, with Hikari 1 active/9 idle at completion ([evidence](evidence/snapshot-cpu-wall-observability-2026-09-30.md)). That rules down CPU execution on this HTTP thread, not DB/network/off-thread wait or historical Hikari ownership. The bounded slow-snapshot stack sampler passed exact-SHA CI and is Live on `50fca48`; its October 3 warm control returned a 4,007 ms snapshot, below the diagnostic trigger, so no sampled wait category was captured ([diagnostic and control](evidence/snapshot-wait-sampling-2026-09-30.md)). Two other October 3 hosted reads took 6.6 and 5.4 seconds with low CPU and no pool waiters at completion. The later deployed `9974937` read took 5,115 ms ([warm-read evidence](evidence/warm-read-coalescing-and-platform-overview-2026-10-03.md)). On October 7, Live `f7cd9b6` logged a 3,980 ms overview composition dominated by 3,399 ms in activity, but no browser duration, connection holder, PostgreSQL PID, or query wait was captured ([activity boundary](evidence/platform-activity-read-boundary-2026-10-07.md)). | For a representative slow request/job map UTC, request/thread, controller/service, transaction owner, acquisition wait, JDBC PID, SQL/lock state, non-SQL work, commit/rollback and response. Exit when the failing overlap has a defensible explanation or the missing instrumentation is precisely specified. Low thread CPU or sampled JDBC frames alone do not prove a PostgreSQL wait or CPU throttling. |
 | H2 - Query/composition efficiency | Batching and request-local reuse implemented; platform overview's per-tenant count fan-out was replaced by seven grouped counts ([evidence](evidence/platform-tenant-count-query-bounds-2026-09-30.md)). Connector telemetry batching passed 396/396 local backend tests and exact-SHA CI, then showed 58-connector direct-read client latency of 2,022 ms versus an earlier 9,233 ms sample and connector snapshot section time of 499 ms versus 8,532 ms ([evidence](evidence/connector-telemetry-batching-2026-09-30.md)). The same hosted snapshot still took 17,363 ms at the client across many sections. Live `74fa2d2` narrowed repeated 2.2-3.2 second platform activity reads to the audit stage; nearby PostgreSQL logs timed the ordered audit SQL at 2.0-2.9 seconds. V15's audit `created_at` index passed disposable-PostgreSQL CI, migrated safely and was verified Live on `5c321c1`. A separate hosted direct PostgreSQL probe confirmed the valid index, natural index scan and five warm SQL executions of 0.048-0.061 ms. Five later authenticated hosted Activity client reads took 509.0-1,520.2 ms, but a 2,342.6 ms login failed the clean-warm baseline; no same-request SQL trace was captured ([activity boundary](evidence/platform-activity-read-boundary-2026-10-07.md)). H2 is not closed. | Obtain a clean warm authenticated Activity/overview client and composition comparison without forcing sign-ins; keep direct SQL and HTTP measurements distinct. Include pool/headroom and repeatability. Correlate residual warm snapshot/login time with H1/H7 acquisition/hold and resource measurements. Also count queries/transactions and payload size for login, summary, snapshot, Runtime, Replay, catalog, platform overview and scoped reads at realistic sizes. Exit with measured budgets and no unexplained query amplification; preserve tenant/role/scope cache keys. |
 | H3 - Atomic writes and locks | Product/identity and Order/Replay double-borrow seams have focused proofs; the inventory first-row race test now synchronizes the actual missing-row boundary without changing production behavior ([evidence](evidence/inventory-first-row-race-proof-2026-09-27.md)) | Recheck top-level and ambient transaction callers; lock ordering, sequence repair under concurrent inserts, rollback on constraint failure, PostgreSQL aborted-transaction handling and inventory conservation. Exit with real PostgreSQL races producing documented success/conflict outcomes, exactly one durable result, released pool, and no partial side effects. |
-| H4 - Background overlap | One main scheduler, separate recommendation worker, guarded dispatch drain; local budget documented. A source-code gap left claimed `PROCESSING` dispatch items outside the `PENDING`-only drain after a process stop. Lease-based reclaim and attempt-guarded terminal updates passed local and disposable PostgreSQL 17 CI tests. A follow-up red/green test found that a successful broadcast followed by a failed completion write could falsely mark work `FAILED`; the correction preserves lease recovery and reports scheduler failure. The later PR #2 disposable-PostgreSQL test injected a terminal-write failure after broadcast, verified failure propagation and lease reclaim on attempt 2, and passed merged-main CI. Controlled crash/restart, independent instances, hosted delivery, duplicate consumer, backlog and headroom behavior remain unproven ([evidence](evidence/operational-dispatch-claim-recovery-2026-10-03.md)). | Map main scheduler jobs, recommendation pass, async drain, HTTP and deploy overlap. Prove dispatch PENDING/PROCESSING/FAILED recovery on PostgreSQL after a controlled crash, starvation/fairness across tenants, backlog age, failure accounting, lease overlap, thread-local cleanup. Exit with bounded headroom and recoverable queue state; at-least-once notification and process-local guards must not be described as exactly-once or multi-node coordination. |
+| H4 - Background overlap | One main scheduler, separate recommendation worker, guarded dispatch drain; local budget documented. A source-code gap left claimed `PROCESSING` dispatch items outside the `PENDING`-only drain after a process stop. Lease-based reclaim and attempt-guarded terminal updates passed local and disposable PostgreSQL 17 CI tests. A follow-up red/green test found that a successful broadcast followed by a failed completion write could falsely mark work `FAILED`; the correction preserves lease recovery and reports scheduler failure. The later PR #2 disposable-PostgreSQL test injected a terminal-write failure after broadcast, verified failure propagation and lease reclaim on attempt 2, and passed merged-main CI. PR #24 merged as `f29bd85`; its isolated PostgreSQL/JVM proof killed the worker after a committed claim and proved fresh-JVM lease recovery on attempt 2, with three passing CI executions. PR #28 exact-head CI then proved that two distinct JVMs racing for one committed row produce exactly one claim. These are isolated crash and claim-boundary proofs, not full hosted multi-instance worker recovery. Controlled hosted restart, duplicate-consumer side effects, backlog and headroom behavior remain unproven ([evidence](evidence/operational-dispatch-claim-recovery-2026-10-03.md)). | Map main scheduler jobs, recommendation pass, async drain, HTTP and deploy overlap. Prove dispatch PENDING/PROCESSING/FAILED recovery on PostgreSQL after a controlled crash, starvation/fairness across tenants, backlog age, failure accounting, lease overlap, thread-local cleanup. Exit with bounded headroom and recoverable queue state; at-least-once notification and process-local guards must not be described as exactly-once or multi-node coordination. |
 | H5 - Operational ledger and intelligence | Layer 2 plus lifecycle suites demonstrate key contracts locally | Overlap order intake, inventory corrections, partial dispatch, cancel/return and repeated request IDs. Verify available/reserved/on-hand arithmetic, no oversell or double release, terminal immutability, alert condition identity/resolution and recommendation currentness. Include transfer source/destination warehouse visibility and prediction with absent/sparse/stale demand. Exit with reconciled input/state/event/UI ledger. |
 | H6 - Ingestion and Replay | CSV/webhook/pull exist; per-attempt Replay transactions implemented | Check repeated external IDs and different bodies, cross-connector collisions, manual/auto replay race, token disable/rotation in flight, payload limits, malformed CSV/JSON, partial import outcomes, remote fetch timeout/body limit and SSRF/redirect paths. Exit with one order/reservation/task per accepted identity and preserved failure history; no manual row insertion to make proof pass. |
 | H7 - Capacity and resource behavior | Historical OOM and small-plan pressure reported; September 30 Render dashboard displayed a Free backend with a 0.15 CPU/512 MB metric limit and Basic-256mb PostgreSQL, but backend CPU/memory charts were unavailable. Treat the UI limit as an observed display, not a measured allocation or causal finding. Deployed slow-request CPU timing found 559 ms on-thread CPU across 18,799 ms wall in one warm request ([evidence](evidence/snapshot-cpu-wall-observability-2026-09-30.md)); host CPU, memory, GC and off-thread demand remain unknown. The verified connector batching corrected one genuine application inefficiency on Free. Available evidence does not justify an engineering plan upgrade now. An always-on backend is planned for pilot, but no plan change is authorized yet. | Record actual instance count, CPU/RAM/heap/GC/threads, DB CPU/memory/I/O, Redis, Hikari and browser request fan-out at a declared load/data envelope. Distinguish JVM build MAVEN_OPTS from runtime JVM flags. Inspect unbounded list/event/history/cache/session growth. Exit with a measured sustainable envelope, exhaustion behavior, recovery and cost. Apply the cross-phase infrastructure classification above; prove a Free-tier limit before proposing the smallest paid comparison, and obtain owner approval before changing plans. |
@@ -498,6 +508,115 @@ client reads later took 509.0-1,520.2 ms; a 2,342.6 ms login failed the
 probe's clean-warm gate. A like-for-like pre/post HTTP comparison and behavior
 under equivalent concurrent load remain unproven.
 H1/H7, broader H2 and M1 remain open.**
+
+**October 15 Tenant Admin workspace follow-through:** Connector batching
+landed on exact Render Live `8128fd1`, and five authenticated reads of an
+existing 131-connector proof tenant returned complete HTTP 200 workspaces in
+4,186.2-6,639.5 ms at the client. The paired last request took 6,102 ms on
+the server with 96 ms request-thread CPU and no Hikari waiter **at response
+completion**. A slow login and unlike historical workloads prevent a clean
+before/after latency claim. Workspace incident composition independently
+reads connector telemetry again; its actual cost remains unmeasured. The
+[workspace evidence](evidence/tenant-workspace-connector-batching-2026-10-15.md)
+records the UTC/request pair and the next bounded section-timing diagnostic.
+H1/H2/H7/H12 and M1 remain OPEN.
+
+**October 15 workspace incident boundary:** The section diagnostic was
+verified Live on `30b23a8`. Three complete 131-connector workspace reads
+took 3.3-5.6 seconds at the client; incident composition was their largest
+measured section at 1.1-2.1 seconds. The paired warm-up HTTP trace had low
+request CPU and no Hikari waiters **at completion**, not an in-flight wait
+proof. Workspace incident composition redundantly re-read connectors. A
+local red/green fixture measured 31 then 29 prepared statements after passing
+the existing connector snapshot, with scoped incident visibility preserved.
+The [same-request evidence](evidence/tenant-workspace-incident-composition-2026-10-15.md)
+also describes the slow-only nested incident trace candidate. Do not claim
+the duplicate read explains the full incident duration; capture its nested
+sections on the exact Live correction before choosing another intervention.
+M1 and M2-entry remain OPEN/BLOCKED respectively.
+
+**October 15 exact Live follow-up:** PR #19 was Live as `87a3e67`. The
+corrected workspace reused its connector snapshot; the nested incident log
+had no second connector-read section. Three complete 131-connector responses
+still took 6.93, 4.21, and 4.34 seconds at the client, with incident
+composition at 1.30-1.60 seconds and low request-thread CPU. This small
+before/after set does **not** establish a hosted speedup or regression.
+Scenario notification reads took 399-502 ms inside incidents; source shows
+an SLA escalation scan followed by two bounded notification queries. The
+[same-request evidence](evidence/tenant-workspace-incident-composition-2026-10-15.md)
+records exact UTC/request IDs, the one paired HTTP/pool snapshot, and
+limitations. Split that notification boundary before another correction;
+do not infer SQL time, a connection hold, or a Hikari fix from section wall
+time. H1/H2/H7/H12 and M1 remain OPEN, M2 entry BLOCKED.
+
+**October 18 exact Live diagnostic:** PR #20 was Live as `63e5614`.
+The [workspace after-state](evidence/tenant-workspace-incident-composition-2026-10-15.md)
+records two complete 133-connector HTTP 200 reads and the warm-up's matched
+section log. The new Scenario subsection logs are distributed across SLA
+scan, active read and acknowledged read rather than one consistently slow
+step. The warm-up's outer Scenario section was only 296 ms of 2,899 ms of
+workspace composition; connector, replay, incident and response/count work
+also contributed. The 33 visible slow-only Scenario logs are not a request
+rate or SQL/connection-hold proof. Treat the shared serial read/round-trip
+cost as the next H1/H2/H7 discriminator, not a justification for weakening
+Scenario governance, increasing capacity or closing M1. Historical 204
+outcomes and Hikari holder ownership remain unresolved.
+
+**October 18 bounded H2 candidate:** The workspace response/count section
+took 593 ms in the matched Live warm-up. Two active/inactive user count
+queries were redundant with its already-loaded tenant user list. A focused
+H2 test failed at 30 statements against a new bound, then passed after
+reusing the list with a bound of at most 28 and active/inactive semantic
+assertions. The full local backend run passed 412/412; this remains local
+query-demand evidence only. Exact-head CI, deployed latency, PostgreSQL
+and historical pool ownership are separate gates. See the
+[workspace evidence](evidence/tenant-workspace-incident-composition-2026-10-15.md).
+
+**October 18 exact-Live H2 follow-through:** PR #21 merged as `c46635f`
+after both exact-head CI jobs passed, and Render showed that merge Live. A
+post-deploy six-flag gate and three complete authenticated workspace reads
+passed on the same 133-connector tenant. The matched warm-up response/count
+section measured 394 ms versus 593 ms before, but total composition rose
+from 2,899 to 3,100 ms and the two warm follow-ups were 2.42/2.23 seconds
+versus one prior 1.98-second follow-up. This supports a local two-query
+reduction, **not** a demonstrated hosted latency fix. Incident and connector
+sections still dominate the matched read; SQL versus wait, Hikari ownership,
+the historical 204 browser outcome and M1 exit remain open. See the
+[workspace after-state](evidence/tenant-workspace-incident-composition-2026-10-15.md).
+
+**Next bounded H1/H2/H7 diagnostic:** Source confirms the workspace read
+has no outer transaction; connector and incident subcalls own separate
+transactional paths. The 3.10-second composition is not automatically one
+JDBC hold. A local candidate reuses the existing one-second snapshot
+wait/Hikari sampler for slow workspace composition without changing workload
+or capacity. The same candidate adds a workspace-GET-only two-second
+slow-HTTP warning so identity, handler and completion-time pool data can be
+compared with the section trace under one request ID. Its threshold regression
+failed before and passed after the change; other API routes retain five
+seconds. Focused workspace/Scenario/sampler tests passed 14/14 before the
+logging addition; the filter tests passed 15/15 and the complete backend
+rerun passed 413/413. The original candidate head `b8150eb` passed both
+exact-head CI jobs; the later evidence-only update must pass its own CI
+before merge, and an exact-Live request trace remains a separate gate.
+Even when Live, thread samples will classify broad waits but
+not exact SQL time,
+PostgreSQL PID or the ten historical Hikari owners. See the
+[workspace evidence](evidence/tenant-workspace-incident-composition-2026-10-15.md).
+
+**October 18 Live symptom check:** Render showed `f29bd85` Live; the
+six-flag gate passed and a last-24-hours application-log search found no
+`Connection is not available` entries. Recent E2E passes are owner-reported,
+not a quantified repeatability sample in this check. The same Live instance
+nevertheless logged concurrent, warm HTTP 200 reads lasting 7.16 seconds
+for Runtime, 7.81 seconds for Tenant Admin workspace and 8.60 seconds for
+dashboard snapshot. The snapshot's five in-flight pool samples reached at
+most 7/10 active with no waiters; completion-time pool snapshots also had
+headroom. This narrows that specific window away from a captured Hikari
+10/10 event, but leaves the shared non-CPU latency mechanism, historical
+starvation, 204 client outcome and timeout rate unresolved. Do not equate
+successful E2Es with H1/H2/H7 closure. Preserve the [same-request IDs and
+limits](evidence/tenant-workspace-incident-composition-2026-10-15.md#october-18-live-latency-and-timeout-check)
+for the next exact-Live diagnostic comparison.
 
 The [September 30 warm hosted trace](evidence/hosted-connector-telemetry-amplification-2026-09-30.md)
 provides the before-state: 58 connector summaries, nine telemetry queries per

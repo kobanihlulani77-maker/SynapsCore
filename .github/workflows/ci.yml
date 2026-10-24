@@ -90,6 +90,87 @@ jobs:
           java-version: "21"
           cache: maven
 
+      - name: Prove dispatch recovery after OS-killed worker
+        working-directory: backend
+        env:
+          SPRING_DATASOURCE_URL: jdbc:postgresql://localhost:5432/synapsecore_dispatch_test
+          SPRING_DATASOURCE_DRIVER_CLASS_NAME: org.postgresql.Driver
+          SPRING_DATASOURCE_USERNAME: synapsecore_test
+          SPRING_DATASOURCE_PASSWORD: synapsecore_test
+        run: |
+          set -euo pipefail
+          key="ci-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
+          marker="$RUNNER_TEMP/dispatch-worker-$key.pid"
+          log="$RUNNER_TEMP/dispatch-worker-$key.log"
+          timeout 240s ./mvnw -B \
+            -Dtest=OperationalDispatchProcessKillPostgresProof#claimAndBlock \
+            -Dsynapsecore.process-kill-proof=true \
+            -Dsynapsecore.process-kill-key="$key" \
+            -Dsynapsecore.process-kill-pid-file="$marker" test >"$log" 2>&1 &
+          maven_pid=$!
+          for attempt in $(seq 1 180); do
+            if [[ -s "$marker" ]]; then break; fi
+            if ! kill -0 "$maven_pid" 2>/dev/null; then tail -n 80 "$log"; exit 1; fi
+            sleep 1
+          done
+          if [[ ! -s "$marker" ]]; then tail -n 80 "$log"; exit 1; fi
+          worker_pid=$(cat "$marker")
+          if [[ ! "$worker_pid" =~ ^[0-9]+$ ]]; then tail -n 80 "$log"; exit 1; fi
+          kill -0 "$worker_pid"
+          kill -KILL "$worker_pid"
+          set +e
+          wait "$maven_pid"
+          maven_status=$?
+          set -e
+          if [[ "$maven_status" -eq 0 ]]; then tail -n 80 "$log"; exit 1; fi
+          echo "Killed test worker PID $worker_pid after its committed claim; Maven exited $maven_status."
+          tail -n 15 "$log"
+          ./mvnw -B \
+            -Dtest=OperationalDispatchProcessKillPostgresProof#reclaimAfterKill \
+            -Dsynapsecore.process-kill-proof=true \
+            -Dsynapsecore.process-kill-key="$key" \
+            -Dsynapsecore.process-kill-pid-file="$marker" test
+
+      - name: Prove reclaim after OS kill following test-recorded publication
+        working-directory: backend
+        env:
+          SPRING_DATASOURCE_URL: jdbc:postgresql://localhost:5432/synapsecore_dispatch_test
+          SPRING_DATASOURCE_DRIVER_CLASS_NAME: org.postgresql.Driver
+          SPRING_DATASOURCE_USERNAME: synapsecore_test
+          SPRING_DATASOURCE_PASSWORD: synapsecore_test
+        run: |
+          set -euo pipefail
+          key="post-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
+          marker="$RUNNER_TEMP/dispatch-post-publication-$key.pid"
+          log="$RUNNER_TEMP/dispatch-post-publication-$key.log"
+          timeout 240s ./mvnw -B \
+            -Dtest=OperationalDispatchProcessKillPostgresProof#publishAndBlockBeforeCompletion \
+            -Dsynapsecore.process-kill-proof=true \
+            -Dsynapsecore.process-kill-key="$key" \
+            -Dsynapsecore.process-kill-pid-file="$marker" test >"$log" 2>&1 &
+          maven_pid=$!
+          for attempt in $(seq 1 180); do
+            if [[ -s "$marker" && -s "$marker.published" ]]; then break; fi
+            if ! kill -0 "$maven_pid" 2>/dev/null; then tail -n 80 "$log"; exit 1; fi
+            sleep 1
+          done
+          if [[ ! -s "$marker" || ! -s "$marker.published" ]]; then tail -n 80 "$log"; exit 1; fi
+          worker_pid=$(cat "$marker")
+          if [[ ! "$worker_pid" =~ ^[0-9]+$ ]]; then tail -n 80 "$log"; exit 1; fi
+          kill -0 "$worker_pid"
+          kill -KILL "$worker_pid"
+          set +e
+          wait "$maven_pid"
+          maven_status=$?
+          set -e
+          if [[ "$maven_status" -eq 0 ]]; then tail -n 80 "$log"; exit 1; fi
+          echo "Killed worker PID $worker_pid after its test-recorded publication; Maven exited $maven_status."
+          ./mvnw -B \
+            -Dtest=OperationalDispatchProcessKillPostgresProof#reclaimAfterPublishedKill \
+            -Dsynapsecore.process-kill-proof=true \
+            -Dsynapsecore.process-kill-key="$key" \
+            -Dsynapsecore.process-kill-pid-file="$marker" test
+
       - name: Prove dispatch claim and reclaim on PostgreSQL
         working-directory: backend
         env:
@@ -98,3 +179,119 @@ jobs:
           SPRING_DATASOURCE_USERNAME: synapsecore_test
           SPRING_DATASOURCE_PASSWORD: synapsecore_test
         run: ./mvnw -B -Dtest=OperationalDispatchClaimIntegrationTest,OperationalDispatchTerminalWritePostgresProof,PlatformActivityReadIndexPostgresProof test
+
+      - name: Prove one shared dispatch claim across two JVMs
+        working-directory: backend
+        env:
+          SPRING_DATASOURCE_URL: jdbc:postgresql://localhost:5432/synapsecore_dispatch_test
+          SPRING_DATASOURCE_DRIVER_CLASS_NAME: org.postgresql.Driver
+          SPRING_DATASOURCE_USERNAME: synapsecore_test
+          SPRING_DATASOURCE_PASSWORD: synapsecore_test
+        run: |
+          set -euo pipefail
+          ./mvnw -B -DskipTests test-compile dependency:build-classpath -Dmdep.outputFile=target/test-classpath.txt
+          classpath="$(cat target/test-classpath.txt):target/classes:target/test-classes"
+          proof=com.synapsecore.event.OperationalDispatchMultiJvmClaimProof
+          key="ci-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
+          prefix="$RUNNER_TEMP/dispatch-two-jvm-$key"
+          timeout 120s java -cp "$classpath" "$proof" seed "$key" "$RUNNER_TEMP"
+          timeout 180s java -cp "$classpath" "$proof" claim "$key" "$RUNNER_TEMP" one >"$prefix.one.log" 2>&1 &
+          first_pid=$!
+          for attempt in $(seq 1 120); do
+            if [[ -s "$prefix.one.ready" ]]; then break; fi
+            if ! kill -0 "$first_pid" 2>/dev/null; then
+              tail -n 60 "$prefix.one.log"
+              exit 1
+            fi
+            sleep 1
+          done
+          if [[ ! -s "$prefix.one.ready" ]]; then
+            tail -n 60 "$prefix.one.log"
+            exit 1
+          fi
+          timeout 180s java -cp "$classpath" "$proof" claim "$key" "$RUNNER_TEMP" two >"$prefix.two.log" 2>&1 &
+          second_pid=$!
+          for attempt in $(seq 1 120); do
+            if [[ -s "$prefix.two.ready" ]]; then break; fi
+            if ! kill -0 "$first_pid" 2>/dev/null || ! kill -0 "$second_pid" 2>/dev/null; then
+              tail -n 60 "$prefix.one.log" "$prefix.two.log"
+              exit 1
+            fi
+            sleep 1
+          done
+          if [[ ! -s "$prefix.two.ready" ]]; then
+            tail -n 60 "$prefix.one.log" "$prefix.two.log"
+            exit 1
+          fi
+          touch "$prefix.release"
+          set +e
+          wait "$first_pid"
+          first_status=$?
+          wait "$second_pid"
+          second_status=$?
+          set -e
+          if [[ "$first_status" -ne 0 || "$second_status" -ne 0 ]]; then
+            tail -n 60 "$prefix.one.log" "$prefix.two.log"
+            exit 1
+          fi
+          timeout 120s java -cp "$classpath" "$proof" verify "$key" "$RUNNER_TEMP"
+
+      - name: Prove one queue drain and publication across two JVMs
+        working-directory: backend
+        env:
+          SPRING_DATASOURCE_URL: jdbc:postgresql://localhost:5432/synapsecore_dispatch_test
+          SPRING_DATASOURCE_DRIVER_CLASS_NAME: org.postgresql.Driver
+          SPRING_DATASOURCE_USERNAME: synapsecore_test
+          SPRING_DATASOURCE_PASSWORD: synapsecore_test
+        run: |
+          set -euo pipefail
+          classpath="$(cat target/test-classpath.txt):target/classes:target/test-classes"
+          proof=com.synapsecore.event.OperationalDispatchMultiJvmWorkerProof
+          for cycle in 1 2 3; do
+          key="wk-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}-${cycle}"
+          prefix="$RUNNER_TEMP/dispatch-two-worker-$key"
+          timeout 120s java -cp "$classpath" "$proof" seed "$key" "$RUNNER_TEMP"
+          timeout 180s java -cp "$classpath" "$proof" drain "$key" "$RUNNER_TEMP" one >"$prefix.one.log" 2>&1 &
+          first_pid=$!
+          for attempt in $(seq 1 120); do
+            if [[ -s "$prefix.one.ready" ]]; then break; fi
+            if ! kill -0 "$first_pid" 2>/dev/null; then
+              tail -n 60 "$prefix.one.log"
+              exit 1
+            fi
+            sleep 1
+          done
+          if [[ ! -s "$prefix.one.ready" ]]; then
+            tail -n 60 "$prefix.one.log"
+            exit 1
+          fi
+          timeout 180s java -cp "$classpath" "$proof" drain "$key" "$RUNNER_TEMP" two >"$prefix.two.log" 2>&1 &
+          second_pid=$!
+          for attempt in $(seq 1 120); do
+            if [[ -s "$prefix.two.ready" ]]; then break; fi
+            if ! kill -0 "$first_pid" 2>/dev/null || ! kill -0 "$second_pid" 2>/dev/null; then
+              tail -n 60 "$prefix.one.log" "$prefix.two.log"
+              exit 1
+            fi
+            sleep 1
+          done
+          if [[ ! -s "$prefix.two.ready" ]]; then
+            tail -n 60 "$prefix.one.log" "$prefix.two.log"
+            exit 1
+          fi
+          touch "$prefix.release"
+          set +e
+          wait "$first_pid"
+          first_status=$?
+          wait "$second_pid"
+          second_status=$?
+          set -e
+          if [[ "$first_status" -ne 0 || "$second_status" -ne 0 ]]; then
+            tail -n 60 "$prefix.one.log" "$prefix.two.log"
+            exit 1
+          fi
+          if ! timeout 120s java -cp "$classpath" "$proof" verify "$key" "$RUNNER_TEMP"; then
+            tail -n 60 "$prefix.one.log" "$prefix.two.log"
+            exit 1
+          fi
+          done

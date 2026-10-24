@@ -135,3 +135,165 @@ This is disposable-PostgreSQL transaction/reclaim proof under a test-owned
 trigger, not a process kill, independent JVM, hosted delivery, duplicate
 consumer, sustained backlog or resource-headroom proof. H4 and M1 remain
 **OPEN**.
+
+## Fresh-worker abort simulation candidate, October 13
+
+A test-only candidate extends the existing disposable-PostgreSQL proof class.
+It commits a `PROCESSING` claim, then throws a deliberate `Error` immediately
+before the integration notification is published. This bypasses the worker's
+ordinary `RuntimeException` failure handler, modeling loss of that worker
+between claim and publication. A newly constructed queue service sees the
+unexpired claim as ineligible. After the test ages the claim beyond the lease,
+that fresh service reclaims it, publishes once, and records `COMPLETED` on
+attempt 2. The assertions cover the durable status, attempt count, processed
+timestamp, and notification count on isolated test data.
+
+The changed test class compiled and the local focused queue/claim suite passed
+9/9. Docker Desktop's daemon was unavailable locally, so the new test did not
+run against local PostgreSQL. On candidate `98feffb`, the
+[dispatch-postgres CI job](https://github.com/kobanihlulani77-maker/SynapsCore/actions/runs/38711425142)
+used disposable PostgreSQL 17 and passed 5/5 selected tests, including both
+methods in `OperationalDispatchTerminalWritePostgresProof`. The general `verify`
+job was still running when this evidence was updated. The final-head
+[CI run `38711698411`](https://github.com/kobanihlulani77-maker/SynapsCore/actions/runs/38711698411)
+subsequently passed both `verify` and `dispatch-postgres` at `515c9b3`; the
+PostgreSQL job passed 5/5 selected tests. [PR #15](https://github.com/kobanihlulani77-maker/SynapsCore/pull/15)
+merged as `a17fd6141b0f71da385078f56dcbe0353ddf2414`. On October 15,
+Render Deploys showed that exact merge Live after 5m12s, and the post-deploy
+six-flag connection gate passed. This proves startup reachability, not hosted
+recovery. An exception in one JVM followed by a fresh service object is **not** an actual
+process kill, separate JVM, multi-instance race, hosted delivery, lease
+overlap, or backlog/headroom proof. H4/H11 and M1 remain OPEN regardless of
+this candidate's CI result.
+
+## Separate-JVM process-stop proof, October 18
+
+The next isolated test/CI candidate uses the existing disposable PostgreSQL
+job rather than production data. Its first guarded Maven test starts a worker,
+persists a `PROCESSING` claim, and writes that test JVM's PID only after the
+claim returns and publication is entered. The CI shell sends an OS `SIGKILL`
+to that PID, requires the first Maven invocation to fail, and starts a second
+Maven/JVM process against the same PostgreSQL database. The fresh worker must
+observe attempt 1 still `PROCESSING`, refuse to reclaim before lease expiry,
+then reclaim after the test ages only its own row and complete attempt 2 with
+one recorded broadcast. The test class is disabled unless the dedicated
+process-kill system property is set; it cannot terminate a normal local test
+run or hosted process. The adjacent local queue/claim suite passed 9/9. The
+complete local backend run exited zero with 414 reported tests across 73
+Surefire reports, zero failures/errors and two intentional guarded skips. A
+focused recompile after the PID-comparison edit again skipped both guarded
+methods. These local runs prove compilation and guard behavior, **not** the
+kill/reclaim path.
+
+At exact head `8a823e0f72de3d0c6f9385c00c23197049df5af1`, [CI run
+39120367583](https://github.com/kobanihlulani77-maker/SynapsCore/actions/runs/39120367583)
+passed both the disposable-PostgreSQL `dispatch-postgres` job and the general
+`verify` job. The CI shell sent `SIGKILL` to the marker PID after the committed
+claim; the first Maven invocation exited 137. A second Maven/JVM invocation
+read the same PostgreSQL row, confirmed attempt 1 was still `PROCESSING`,
+refused early reclaim, aged only that row's lease, then completed attempt 2
+with one test-recorded integration broadcast (`1/1` selected test passed).
+The adjacent PostgreSQL claim, terminal-write and Activity tests passed `5/5`.
+This is a real process boundary in an isolated CI service, not merely an
+in-process exception or fresh object. The test does not measure production
+WebSocket delivery or prove exactly-once publication.
+
+PR #24 merged as `f29bd85c7341c80feb016efb335989618eefa09a`.
+[Merged-main CI run 39121078371](https://github.com/kobanihlulani77-maker/SynapsCore/actions/runs/39121078371)
+passed both the disposable-PostgreSQL and general jobs, including a third
+isolated OS-kill/fresh-JVM recovery execution. The three passing executions
+are CI repeatability for this specific crash boundary, not a hosted service
+recovery measurement.
+
+This proof does not establish multi-node coordination, a live Render restart,
+backlog fairness, duplicate-signal effects after a post-broadcast crash,
+or pool headroom under dispatch load. H4/H11 and M1 remain OPEN.
+
+## Independent-JVM claim race, October 20
+
+[PR #28](https://github.com/kobanihlulani77-maker/SynapsCore/pull/28)
+adds an isolated disposable-PostgreSQL claim proof without changing production
+code. A seed JVM commits one `PENDING` dispatch row. Two distinct Java worker
+processes then start against the same PostgreSQL service, signal readiness,
+and are released together to call the production repository's
+`claimForDispatch` compare-and-set operation for the same row and attempt.
+A verifier checks that their process IDs differ, their claim counts are
+exactly `1` and `0`, and the durable row is `PROCESSING` at attempt 1 with no
+processed timestamp. It then completes that attempt once and removes the
+test-owned row.
+
+At exact PR head `44c986d29d098dbabd6013a0db73685132f5b713`,
+[CI run 39422819210](https://github.com/kobanihlulani77-maker/SynapsCore/actions/runs/39422819210)
+passed both `dispatch-postgres` and general `verify`. The PostgreSQL job log
+reported: `Two independent JVMs produced one committed PostgreSQL claim and
+one completion.` Local `test-compile` passed; the local Docker daemon was
+unavailable, so the PostgreSQL race was not run locally. This is one
+successful isolated CI execution at this head, not repeatable hosted proof.
+
+The proof covers the database claim boundary only. It does not run two full
+dispatch workers, publish a notification, test a post-publication crash,
+measure backlog age or pool headroom, or prove live multi-instance recovery.
+It does not establish exactly-once external effects. H4/H11 and M1 remain
+OPEN.
+
+## Independent-JVM queue drain, October 20
+
+[PR #30](https://github.com/kobanihlulani77-maker/SynapsCore/pull/30)
+extends the isolated PostgreSQL boundary from a direct repository claim to
+two independent JVMs calling the actual queue `processPendingWork()` method.
+Each JVM has a test-recording realtime service. A shared barrier releases
+both against one committed `PENDING` integration item; the verifier requires
+one worker result, a tenant-scoped publication marker from that same worker,
+and one durable `COMPLETED` attempt. No production dispatch code changes.
+
+The first candidate's PostgreSQL job failed its strict verifier. The next
+diagnostic run captured `results=0,0`, `markers=0,0`, and the proof item still
+`PENDING` at attempt 0. Its worker log showed selection of an older expired
+`DISPATCH-RACE-*` `ORDER_FLOW` item instead. The earlier
+`OperationalDispatchClaimIntegrationTest` had left that test-owned item
+`PROCESSING`; after the lease elapsed it became eligible and won the queue's
+global created-at ordering with the manual proof service's one-item batch.
+The worker then failed that unrelated operational item because the proof only
+provided an integration realtime stub, and never reached its own row. This
+was CI fixture contamination plus expected FIFO selection, not evidence of
+two publications or of a production dispatch correction. The smallest fix
+deletes the claimed row after the earlier test's assertions. The adjacent
+local queue/claim tests passed 9/9 with that cleanup.
+
+At exact candidate head `25fb755554228ec895e791efc476b15ebf086def`,
+[CI run 39428332103](https://github.com/kobanihlulani77-maker/SynapsCore/actions/runs/39428332103)
+passed both its disposable-PostgreSQL and general `verify` jobs. Three fresh queue-drain rounds each
+produced one completion and one matching test-recorded publication; the
+worker results/markers were `1,0`/`1,0`, `1,0`/`1,0`, and `0,1`/`0,1`.
+Local `test-compile` passed, but the separate-JVM PostgreSQL step ran in CI,
+not locally. A failed first candidate remains part of the red/green record.
+
+This proves a bounded one-row, no-crash worker overlap against one disposable
+PostgreSQL instance. It does not exercise real WebSocket delivery, a crash
+after the broadcast, multiple hosted service instances, a large mixed
+backlog, tenant fairness, or Hikari/resource headroom. A test-recorded marker
+is not an exactly-once external effect. H4/H11 and M1 remain OPEN.
+
+## OS kill after test-recorded publication, October 20
+
+[PR #31](https://github.com/kobanihlulani77-maker/SynapsCore/pull/31)
+extends the existing disposable-PostgreSQL process-kill harness. A worker
+commits a `PROCESSING` claim for one integration item, writes a tenant-scoped
+test publication marker, and blocks before the queue's terminal write. CI
+kills that JVM. A fresh JVM verifies attempt 1 is still `PROCESSING` and does
+not retry before lease expiry; after the test ages the lease, it records one
+more test publication and completes attempt 2. The proof cleans up its row.
+
+At code head `df680561d5900fbf148263e4bdedcd1c825a8ddf`,
+[CI run 39431034550](https://github.com/kobanihlulani77-maker/SynapsCore/actions/runs/39431034550)
+passed both jobs. The PostgreSQL job recorded OS-killing worker PID 3053
+after its marker, Maven exit 137, and a passing fresh-JVM reclaim test.
+Local test compilation and adjacent queue tests passed 7/7. This adds no
+production behavior change.
+
+The marker is a test-observed publication, not proof that an external client
+received a WebSocket message. The expected second marker demonstrates the
+at-least-once recovery boundary, not exactly-once external effects. This is
+one item and one disposable PostgreSQL instance, not a hosted multi-node,
+mixed-backlog, dependency-loss, or load/headroom proof. H4/H11 and M1 remain
+OPEN.

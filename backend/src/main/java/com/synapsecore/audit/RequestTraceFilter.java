@@ -119,7 +119,8 @@ public class RequestTraceFilter extends OncePerRequestFilter {
             return;
         }
         boolean focusedRoute = ("GET".equals(request.getMethod())
-            && "/api/dashboard/snapshot".equals(requestUri))
+            && ("/api/dashboard/snapshot".equals(requestUri)
+                || "/api/access/admin/workspace".equals(requestUri)))
             || ("POST".equals(request.getMethod())
                 && "/api/platform/session/login".equals(requestUri));
         long threshold = focusedRoute ? SLOW_FOCUSED_REQUEST_THRESHOLD_NANOS : SLOW_REQUEST_THRESHOLD_NANOS;
